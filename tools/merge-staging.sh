@@ -55,11 +55,13 @@ done
 # merged-/usr symlinks (bin -> usr/bin and friends), which builder/build-package.sh
 # creates identically in every tree and extension; anything else is a real collision.
 # e2fsprogs and util-linux both shipped /usr/bin/fsck until this existed in CI.
-dups=$(for t in $trees; do
-           as_owner find "$t" -mindepth 1 ! -type d -printf "%P $(basename "$t")\n"
-       done | sort | awk '{ n[$1]++; p[$1] = p[$1] " " $2 }
-                          END { for (f in n) if (n[f] > 1) print f ":" p[f] }' | sort)
-dups=$(grep -vE '^(rootfs|extensions/[^/]+)/(bin|lib|lib64|sbin|usr/sbin):' <<< "$dups" || true)
+shared_links='^(rootfs|extensions/[^/]+)/(bin|lib|lib64|sbin|usr/sbin)'
+listing=$(for t in $trees; do
+              as_owner find "$t" -mindepth 1 ! -type d -printf "%P\t$(basename "$t")\n"
+          done | LC_ALL=C sort)
+dups=$(awk -F'\t' '{ n[$1]++; p[$1] = p[$1] " " $2 }
+                   END { for (f in n) if (n[f] > 1) print f ":" p[f] }' <<< "$listing" | sort)
+dups=$(grep -vE "$shared_links:" <<< "$dups" || true)
 if [ -n "$dups" ]; then
     echo "error: more than one package installs these files:" >&2
     echo "$dups" | sed 's/^/    /' >&2
@@ -76,4 +78,12 @@ for t in $trees; do
     as_owner cp -a --reflink=auto "$t"/. ./
 done
 mkdir -p rootfs
+
+# Which package installed each path of rootfs/, for image/build-rootfs.sh: a package the
+# assembly removes whole (the container flavour has no kernel) leaves the SBOM with it,
+# rather than its CVEs being reported against an image that does not have it. Not
+# shipped; the assembly deletes it with the component records.
+mkdir -p rootfs/usr/share/flfs
+grep -vE "$shared_links"$'\t' <<< "$listing" | sed -n 's|^rootfs/||p' \
+    > rootfs/usr/share/flfs/owners
 touch "$STAMP"

@@ -639,6 +639,7 @@ du -sh "$IMAGE"
 # since the two flavours differ. Hand-written JSON; test/check-sbom.sh parses it.
 sbom="$IMAGE/usr/share/flfs/sbom.json"
 components="$IMAGE/usr/share/flfs/components"
+modules="$IMAGE/usr/share/flfs/modules"
 
 if [ ! -d "$components" ] || [ -z "$(ls -A "$components" 2>/dev/null)" ]; then
     echo "error: no component records in usr/share/flfs/components" >&2
@@ -646,6 +647,29 @@ if [ ! -d "$components" ] || [ -z "$(ls -A "$components" 2>/dev/null)" ]; then
     echo "       predates that and cannot be described. Delete rootfs/ and rebuild." >&2
     exit 1
 fi
+
+# A package the steps above removed whole leaves the SBOM too, or a scanner reports its
+# CVEs against an image without it: the container flavour has no kernel, kmod or PAM.
+# tools/merge-staging.sh lists who installed each path; a package stays while any of its
+# files is left other than its license texts (which nothing may remove) and its records.
+owners="$IMAGE/usr/share/flfs/owners"
+if [ ! -f "$owners" ]; then
+    echo "error: no usr/share/flfs/owners; rootfs/ predates it — run ./tools/merge-staging.sh" >&2
+    exit 1
+fi
+set +x
+present=$(while IFS=$'\t' read -r path pkg; do
+              case "$path" in usr/share/licenses/*|usr/share/flfs/*) continue ;; esac
+              if [ -e "$path" ] || [ -L "$path" ]; then echo "$pkg"; fi
+          done < "$owners" | LC_ALL=C sort -u)
+set -x
+for record in "$components"/*; do
+    pkg=$(basename "$record"); pkg=${pkg%-vendor}
+    grep -qxF "$pkg" <<< "$present" && continue
+    echo "sbom: nothing of $pkg is left in the $flavour image; not listed"
+    rm -f "$record" "$modules/$pkg"
+done
+rm -f "$owners"
 
 # Every component the SBOM will name ships its license text (a vendor record is its
 # package's: the vendored crates' texts are under the package's own directory).
@@ -667,7 +691,6 @@ created=$(date -u -d "@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y-%m-%dT%H:%M:%SZ)
 
 # jstr, spdxid and the package and relationship loops, shared with build-extension.sh.
 source /usr/local/bin/sbom.sh
-modules="$IMAGE/usr/share/flfs/modules"
 
 image_name="flfs-$flavour-$oci_arch"
 

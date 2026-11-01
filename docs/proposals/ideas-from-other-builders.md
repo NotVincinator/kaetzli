@@ -320,10 +320,11 @@ to start. With no `kernel.panic`, a panicked node hangs forever instead of reboo
 
 *Implemented, observing only:* `CPE=` in 50 packages' `env.sh`, Go modules and Rust
 crates in the SBOM (`builder/build-package.sh`, `image/sbom.sh`), an SBOM per extension,
-and a `cve-scan` job that nothing waits on: `test/cve-scan.sh` (grype, pinned) and
-`test/cve-history.sh`, which rescans the last builds' SBOMs with one database so that a
-step in the count is the image's doing, and sums the steps by whether the updater's
-commits made them. Step 4 (`check-sbom.sh` requiring the references) is not done.
+a package the assembly removes whole (the container image's kernel, kmod and PAM) left
+out of that flavour's SBOM, and a `cve-scan` job that nothing waits on: `test/cve-scan.sh`
+(grype, pinned) and `test/cve-history.sh`, which rescans the last builds' SBOMs with one
+database so that a step in the count is the image's doing, and sums the steps by whether
+the updater's commits made them. Step 4 (`check-sbom.sh` requiring the references) is not done.
 
 Known gaps:
 
@@ -331,8 +332,8 @@ Known gaps:
   passt and shadow: NVD had no product under the obvious vendor:product, and the right
   one has to be looked up by hand (NVD's keyword search). Until then their own advisories
   are not matched; the Go and Rust ones are covered through their modules and crates.
-- **linux-tools** has none on purpose: it is the kernel's source and would count the
-  kernel's CVEs twice.
+- **linux-tools** has none on purpose (its `env.sh` unsets the one it sources from the
+  kernel's): it is the kernel's source and would count the kernel's CVEs twice.
 - **No ignore list.** CPE matching reports disputed and distribution-specific advisories
   (glibc's CVE-2019-1010022–25, openssh's CVE-2007-2768), which inflate the count by a
   constant. Fine for a trend; an allowlist with a reason per entry, like

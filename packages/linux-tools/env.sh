@@ -12,6 +12,9 @@ source packages/kernel/env.sh
 FOLLOWS=kernel
 # The kernel is freestanding; these are ordinary programs against our glibc.
 unset NO_SYSROOT
+# NVD files every kernel CVE against linux_kernel, so the kernel's CPE here would count
+# each of them a second time against perf and bpftool (test/cve-scan.sh).
+unset CPE
 # libtraceevent is the second tarball, for the same reason libpcap is tcpdump's: an
 # extension's packages cannot compile against each other, and perf is its only
 # consumer. Without it perf builds, but `perf trace` does not and tracepoints print as
