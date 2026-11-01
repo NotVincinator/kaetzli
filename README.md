@@ -1,4 +1,4 @@
-# kaetzli
+# kaetzli 🐱
 
 The name is Swiss German for a little cat (Kätzli), with the -li ending a nod to other open source projects.
 
