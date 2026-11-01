@@ -1,0 +1,3 @@
+  FAIL: relationships naming unknown elements:
+SPDXRef-Package-netavark -CONTAINS-> SPDXRef-Module-netavark-libc-0.2.177
+SPDXRef-Image -CONTAINS-> SPDXRef-LocalExtra

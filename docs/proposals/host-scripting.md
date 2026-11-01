@@ -1,9 +1,9 @@
 # Host-side scripts: which language for which job
 
-**Status: proposal, partly implemented.** Implemented: item 1, the CVE reports
-(`python/`, see its README). CLAUDE.md (*Host-side code*) allows Python and Go for what
-runs on the host, in CI or in a builder container. This page reviews the scripts against
-that rule and orders the migration.
+**Status: proposal, partly implemented.** Implemented: items 1 and 2, the CVE reports
+and the SBOM (`python/`, see its README). CLAUDE.md (*Host-side code*) allows Python
+and Go for what runs on the host, in CI or in a builder container. This page reviews the
+scripts against that rule and orders the migration.
 
 Bash remains the only interpreter *in the image*. This is about the repository's tooling.
 
@@ -38,17 +38,21 @@ lookups and the summary format, so they move with it.
 
 Dependencies: `requests`, `python-debian`.
 
-### 2. SBOM: `image/sbom.sh`, `test/check-sbom.sh`
+### 2. SBOM: `image/sbom.py`, `test/check-sbom.py` (done)
 
-`sbom.sh` writes SPDX with `printf`, and `jstr` escapes strings with `sed`. It does not
-escape newlines or control characters other than tab and CR, and every field is a place
-to forget a comma. `check-sbom.sh` exists largely to catch that. Its comment says a JSON serialiser
-in `image/Containerfile` was the cost being avoided. Under the new rule that cost is
-python3 in a builder-side image, with stdlib `json` only, so the assembly needs no venv.
-The checker can then validate against the SPDX model with `spdx-tools`, not just
-re-derive a few invariants in jq.
+Ported with no dependency beyond the stdlib, in two places. The writer is
+`image/sbom.py`, run on python3 in the assembly image (builder-side, like perl in the
+builder), stdlib `json` only, so it stays outside the `kaetzli` package; the checker is
+`kaetzli.sbom_check`. The checks are the bash version's; validating against the SPDX
+model with `spdx-tools` would be stricter, so it is a change of its own. What the bash
+versions said:
 
-Dependencies: none in the assembly image; `spdx-tools` for the check.
+`sbom.sh` wrote SPDX with `printf`, and `jstr` escaped strings with `sed`. It did not
+escape control characters other than tab and CR, and every field was a place to forget a
+comma. `check-sbom.sh` existed largely to catch that, and its comment named a JSON
+serialiser in `image/Containerfile` as the cost being avoided.
+
+Dependencies: none in the assembly image; `spdx-tools` for a stricter check, later.
 
 ### 3. Size reports: `test/size-history.sh`, `rootfs-size.sh`, `vs-debian-slim.sh`, `oci-trim.sh`
 
@@ -119,14 +123,14 @@ Dependencies: `pexpect`, `pytest`.
   then it stays bash and tests both.
 - `test/check-doc-links.sh`, `check-image-files.sh`: small and fine, but they parse
   formats (markdown, glob manifests) that Python handles better. Move when touched.
-- `image/build-extension.sh`: mostly commands. Its SBOM part follows item 2.
+- `image/build-extension.sh`: mostly commands; its SBOM is `image/sbom.py` now.
 
 ## Stay bash
 
 | script | why |
 | --- | --- |
 | `build.sh`, `builder/build-package.sh`, `packages/*/build.sh`, `env.sh` | sourced by package builds; the vocabulary is shell functions, and `env.sh` is read by bash everywhere |
-| `image/build-rootfs.sh` | mostly cp, tar, setcap, mkfs.erofs and veritysetup in order. 987 lines is too long; split the reports and SBOM out (items 2, 3) and leave the commands |
+| `image/build-rootfs.sh` | mostly cp, tar, setcap, mkfs.erofs and veritysetup in order. 907 lines is too long; split the reports out (item 3, as the SBOM was) and leave the commands |
 | `tools/lib.sh` | the bash scripts that remain still need it; the Python module is its counterpart, not its replacement |
 | `tools/prep.sh`, `fetch-sources.sh`, `build-image.sh`, `build-extension.sh`, `publish-oci.sh`, `merge-staging.sh`, `clean.sh`, `image-tags.sh`, `build-node-e2e.sh` | podman, tar and file operations in sequence |
 | `tools/check-patches.sh`, `sync-patches.sh`, `patch-cves.sh` | patch and git invocations; `sync-patches.sh` is the largest and could move later |

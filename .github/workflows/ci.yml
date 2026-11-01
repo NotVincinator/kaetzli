@@ -403,9 +403,16 @@ jobs:
             output/rootfs-size-*.txt
             output/rootfs-files-*.txt
 
-      # The SBOM is hand-written JSON; this is where a parser exists.
+      # The SBOM check is Python, run by uv in python/'s venv (python/README.md).
+      - &setup-uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.1"
+          enable-cache: true
+          cache-dependency-glob: python/uv.lock
+
       - name: Check the SBOM
-        run: ./test/check-sbom.sh
+        run: ./test/check-sbom.py
 
       - name: Upload SBOMs
         if: always()
@@ -676,11 +683,7 @@ jobs:
           fetch-depth: 0 # cve-history.py labels each step by the commits between builds
 
       # The CVE reports are Python, run by uv in python/'s venv (python/README.md).
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          version: "0.13.1"
-          enable-cache: true
-          cache-dependency-glob: python/uv.lock
+      - *setup-uv
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:

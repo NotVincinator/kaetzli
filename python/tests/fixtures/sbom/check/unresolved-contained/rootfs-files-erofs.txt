@@ -1,0 +1,10 @@
+usr
+usr/share/licenses
+usr/share/licenses/gawk
+usr/share/licenses/gawk/COPYING
+usr/share/licenses/glibc/COPYING
+usr/share/licenses/kaetzlifetch/COPYING
+usr/share/licenses/netavark/COPYING
+usr/share/licenses/podman/COPYING
+usr/share/licenses/tzdata/COPYING
+usr/share/licenses/glibc/LICENSES/LGPL-2.1

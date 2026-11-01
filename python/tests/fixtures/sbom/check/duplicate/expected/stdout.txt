@@ -1,0 +1,2 @@
+python/tests/fixtures/sbom/check/duplicate/sbom-erofs.json
+  8 packages, 3 build tools, 2 unresolved libraries, 13 CONTAINS

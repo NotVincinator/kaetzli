@@ -31,10 +31,12 @@ jobs:
       - name: Lock is current
         run: uv lock --check
 
+      # ../image/*.py: what the assembly container runs on its own python3, stdlib only,
+      # outside the package but held to its rules (CLAUDE.md, Host-side code).
       - name: Lint
         run: |
-          uv run --locked ruff check .
-          uv run --locked ruff format --check .
+          uv run --locked ruff check . ../image/*.py
+          uv run --locked ruff format --check . ../image/*.py
 
       - name: Tests
         run: uv run --locked pytest

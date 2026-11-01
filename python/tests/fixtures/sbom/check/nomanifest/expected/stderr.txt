@@ -1,0 +1,1 @@
+  FAIL: no python/tests/fixtures/sbom/check/nomanifest/rootfs-files-erofs.txt to check the license texts against

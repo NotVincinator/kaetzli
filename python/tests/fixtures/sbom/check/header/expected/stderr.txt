@@ -1,0 +1,4 @@
+  FAIL: spdxVersion is not SPDX-2.3
+  FAIL: missing SPDXRef-DOCUMENT
+  FAIL: no documentNamespace
+  FAIL: no creationInfo.created

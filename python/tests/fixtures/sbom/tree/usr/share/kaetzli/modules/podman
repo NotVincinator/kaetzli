@@ -1,0 +1,4 @@
+pkg:golang/github.com/containers/common@v0.66.0
+pkg:golang/golang.org/x/sys@v0.38.0
+
+pkg:golang/stdlib@1.25.3

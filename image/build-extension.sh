@@ -40,49 +40,13 @@ mode="${1:?$usage}"
 name="${2:?$usage}"
 [[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { echo "error: '$name' is not a usable extension name" >&2; exit 2; }
 
-source /usr/local/bin/sbom.sh
-
 # An SPDX document for the extension staged in <tree>: its packages, the Go modules and
-# Rust crates they compiled in, and the builders.
+# Rust crates they compiled in, and the builders (image/sbom.py).
 write_sbom() { # tree out
-    local components="$1/usr/share/kaetzli/components" modules="$1/usr/share/kaetzli/modules" doc arch created
+    local arch
     case "$(uname -m)" in x86_64) arch=amd64 ;; aarch64) arch=arm64 ;; *) arch=$(uname -m) ;; esac
-    doc="kaetzli-ext-$name-$arch"
-    created=$(date -u -d "@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y-%m-%dT%H:%M:%SZ)
-    {
-        printf '{\n'
-        printf '  "spdxVersion": "SPDX-2.3",\n'
-        printf '  "dataLicense": "CC0-1.0",\n'
-        printf '  "SPDXID": "SPDXRef-DOCUMENT",\n'
-        printf '  "name": "%s",\n' "$(jstr "$doc")"
-        printf '  "documentNamespace": "https://github.com/fwilhe2/kaetzli/spdx/%s-%s",\n' \
-            "$(jstr "$doc")" "$(cat "$components"/* | sha256sum | cut -c1-16)"
-        printf '  "creationInfo": {\n'
-        printf '    "created": "%s",\n' "$created"
-        printf '    "creators": [ "Tool: kaetzli-build-extension", "Organization: github.com/fwilhe2/kaetzli" ]\n'
-        printf '  },\n'
-        printf '  "documentDescribes": [ "SPDXRef-Extension" ],\n'
-        printf '  "packages": [\n'
-        printf '    {\n'
-        printf '      "SPDXID": "SPDXRef-Extension",\n'
-        printf '      "name": "%s",\n' "$(jstr "$doc")"
-        printf '      "downloadLocation": "NOASSERTION",\n'
-        printf '      "filesAnalyzed": false,\n'
-        printf '      "licenseConcluded": "NOASSERTION",\n'
-        printf '      "licenseDeclared": "NOASSERTION",\n'
-        printf '      "copyrightText": "NOASSERTION",\n'
-        printf '      "primaryPackagePurpose": "OPERATING_SYSTEM"\n'
-        printf '    }'
-        sbom_component_packages "$components"
-        sbom_module_packages "$modules"
-        sbom_builder_packages "$components"
-        printf '\n  ],\n'
-        printf '  "relationships": [\n'
-        printf '    { "spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-Extension" }'
-        sbom_component_relationships SPDXRef-Extension "$components" "$modules"
-        printf '\n  ]\n'
-        printf '}\n'
-    } > "$2"
+    sbom.py extension "$1" --name "kaetzli-ext-$name-$arch" \
+        --created "$(date -u -d "@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y-%m-%dT%H:%M:%SZ)" > "$2"
     echo "sbom-ext-$name.json: $(grep -c '"SPDXID"' "$2") elements"
 }
 
@@ -204,7 +168,7 @@ case "$mode" in
         fi
 
         # The extension's SBOM, from its packages' component records the way
-        # build-rootfs.sh writes the image's (image/sbom.sh): at
+        # build-rootfs.sh writes the image's (image/sbom.py): at
         # usr/share/kaetzli/sbom-<name>.json, so a merged extension sits beside the image's
         # own, and as output/sbom-ext-<name>.json, which CI's sbom artifact carries.
         if [ -d usr/share/kaetzli/components ]; then

@@ -639,7 +639,7 @@ du -sh "$IMAGE"
 # ---------------------------------------------------------------------------------
 # The SBOM, SPDX 2.3, generated from the component records builder/build-package.sh
 # leaves rather than scanned (there is no package database). From the assembled tree,
-# since the two flavours differ. Hand-written JSON; test/check-sbom.sh parses it.
+# since the two flavours differ. test/check-sbom.py checks it.
 sbom="$IMAGE/usr/share/kaetzli/sbom.json"
 components="$IMAGE/usr/share/kaetzli/components"
 modules="$IMAGE/usr/share/kaetzli/modules"
@@ -692,111 +692,31 @@ fi
 
 created=$(date -u -d "@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y-%m-%dT%H:%M:%SZ)
 
-# jstr, spdxid and the package and relationship loops, shared with build-extension.sh.
-source /usr/local/bin/sbom.sh
-
 image_name="kaetzli-$flavour-$oci_arch"
 
-{
-    printf '{\n'
-    printf '  "spdxVersion": "SPDX-2.3",\n'
-    printf '  "dataLicense": "CC0-1.0",\n'
-    printf '  "SPDXID": "SPDXRef-DOCUMENT",\n'
-    printf '  "name": "%s",\n' "$(jstr "$image_name")"
-    # Unique per document, and derived rather than random so it is reproducible.
-    printf '  "documentNamespace": "https://github.com/fwilhe2/kaetzli/spdx/%s-%s",\n' \
-        "$(jstr "$image_name")" "$(cat "$components"/* $extra_manifest | sha256sum | cut -c1-16)"
-    printf '  "creationInfo": {\n'
-    printf '    "created": "%s",\n' "$created"
-    printf '    "creators": [ "Tool: kaetzli-build-rootfs", "Organization: github.com/fwilhe2/kaetzli" ]\n'
-    printf '  },\n'
-    printf '  "documentDescribes": [ "SPDXRef-Image" ],\n'
-    printf '  "packages": [\n'
+# Libraries a shipped binary needs and the image lacks: DEPENDS_ON without CONTAINS.
+# The same construction as test/check-rootfs-deps.sh, over the assembled tree. A
+# library is a file plus its SONAME symlink, so both count as provided.
+provided=$(
+    { find "$IMAGE" -name '*.so*' \( -type f -o -type l \) -print0 2>/dev/null |
+      xargs -0 -r -n40 sh -c '
+          for f in "$@"; do
+              basename "$f"
+              readelf -d "$f" 2>/dev/null | sed -n "s/.*SONAME.*\[\(.*\)\].*/\1/p"
+          done' _ || true; } | sort -u
+)
+# readelf fails on every non-ELF file; the braces let `|| true` cover only it.
+needed=$(
+    { find "$IMAGE" -type f -print0 2>/dev/null |
+      xargs -0 -r -n40 readelf -dW 2>/dev/null || true; } |
+    sed -n 's/.*NEEDED.*\[\(.*\)\].*/\1/p' | sort -u
+)
+comm -23 <(printf '%s\n' "$needed") <(printf '%s\n' "$provided") > /tmp/sbom-unresolved.txt
 
-    # The image itself, which everything else is CONTAINED_BY or a DEPENDS_ON of.
-    printf '    {\n'
-    printf '      "SPDXID": "SPDXRef-Image",\n'
-    printf '      "name": "%s",\n' "$(jstr "$image_name")"
-    printf '      "downloadLocation": "NOASSERTION",\n'
-    printf '      "filesAnalyzed": false,\n'
-    printf '      "licenseConcluded": "NOASSERTION",\n'
-    printf '      "licenseDeclared": "NOASSERTION",\n'
-    printf '      "copyrightText": "NOASSERTION",\n'
-    printf '      "primaryPackagePurpose": "OPERATING_SYSTEM"\n'
-    printf '    }'
-
-    sbom_component_packages "$components"
-    sbom_module_packages "$modules"
-
-    sbom_builder_packages "$components"
-
-    # Files a --extra overlay added: built elsewhere, so no provenance beyond their
-    # paths and hashes, which the comment carries. Absent from every normal build.
-    if [ -n "$extra_manifest" ]; then
-        printf ',\n    {\n'
-        printf '      "SPDXID": "SPDXRef-LocalExtra",\n'
-        printf '      "name": "local-extra",\n'
-        printf '      "versionInfo": "%s",\n' "$(sha256sum < "$extra_manifest" | cut -c1-16)"
-        printf '      "downloadLocation": "NOASSERTION",\n'
-        printf '      "filesAnalyzed": false,\n'
-        printf '      "licenseConcluded": "NOASSERTION",\n'
-        printf '      "licenseDeclared": "NOASSERTION",\n'
-        printf '      "copyrightText": "NOASSERTION",\n'
-        printf '      "comment": "%s"\n' "$(jstr "Overlaid from a local directory by tools/build-image.sh --extra, not built here: $(paste -sd ';' "$extra_manifest" | sed 's/;/; /g')")"
-        printf '    }'
-    fi
-
-    # Libraries a shipped binary needs and the image lacks: DEPENDS_ON without CONTAINS.
-    # The same construction as test/check-rootfs-deps.sh, over the assembled tree. A
-    # library is a file plus its SONAME symlink, so both count as provided.
-    provided=$(
-        { find "$IMAGE" -name '*.so*' \( -type f -o -type l \) -print0 2>/dev/null |
-          xargs -0 -r -n40 sh -c '
-              for f in "$@"; do
-                  basename "$f"
-                  readelf -d "$f" 2>/dev/null | sed -n "s/.*SONAME.*\[\(.*\)\].*/\1/p"
-              done' _ || true; } | sort -u
-    )
-    # readelf fails on every non-ELF file; the braces let `|| true` cover only it.
-    needed=$(
-        { find "$IMAGE" -type f -print0 2>/dev/null |
-          xargs -0 -r -n40 readelf -dW 2>/dev/null || true; } |
-        sed -n 's/.*NEEDED.*\[\(.*\)\].*/\1/p' | sort -u
-    )
-    missing=$(comm -23 <(printf '%s\n' "$needed") <(printf '%s\n' "$provided"))
-    for lib in $missing; do
-        [ -n "$lib" ] || continue
-        printf ',\n    {\n'
-        printf '      "SPDXID": "SPDXRef-Unresolved-%s",\n' "$(spdxid "$lib")"
-        printf '      "name": "%s",\n' "$(jstr "$lib")"
-        printf '      "versionInfo": "NOASSERTION",\n'
-        printf '      "downloadLocation": "NOASSERTION",\n'
-        printf '      "filesAnalyzed": false,\n'
-        printf '      "licenseConcluded": "NOASSERTION",\n'
-        printf '      "licenseDeclared": "NOASSERTION",\n'
-        printf '      "copyrightText": "NOASSERTION",\n'
-        printf '      "comment": "Referenced by a shipped binary through DT_NEEDED but not present in this image."\n'
-        printf '    }'
-    done
-
-    printf '\n  ],\n'
-    printf '  "relationships": [\n'
-    printf '    { "spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-Image" }'
-
-    sbom_component_relationships SPDXRef-Image "$components" "$modules"
-
-    if [ -n "$extra_manifest" ]; then
-        printf ',\n    { "spdxElementId": "SPDXRef-Image", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-LocalExtra" }'
-    fi
-
-    for lib in $missing; do
-        [ -n "$lib" ] || continue
-        printf ',\n    { "spdxElementId": "SPDXRef-Image", "relationshipType": "DEPENDS_ON", "relatedSpdxElement": "SPDXRef-Unresolved-%s" }' "$(spdxid "$lib")"
-    done
-
-    printf '\n  ]\n'
-    printf '}\n'
-} > "$sbom"
+# The document itself is image/sbom.py, shared with build-extension.sh: JSON is written
+# by a serialiser, never by printf.
+sbom.py image "$IMAGE" --name "$image_name" --created "$created" \
+    --unresolved /tmp/sbom-unresolved.txt ${extra_manifest:+--extra "$extra_manifest"} > "$sbom"
 
 rm -rf "$components" "$modules"
 

@@ -1,0 +1,7 @@
+name=netavark-vendor
+version=1.16.1
+license=Apache-2.0
+origin=tarball
+builder=ghcr.io/fwilhe2/kaetzli-builder:4f1c2a9b
+url=https://github.com/containers/netavark/releases/download/v1.16.1/netavark-v1.16.1-vendor.tar.gz
+sha256=aaaa000000000000000000000000000000000000000000000000000000000002

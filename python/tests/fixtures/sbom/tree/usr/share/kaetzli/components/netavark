@@ -1,0 +1,8 @@
+name=netavark
+version=1.16.1
+license=Apache-2.0
+origin=tarball
+builder=ghcr.io/fwilhe2/kaetzli-builder:4f1c2a9b
+url=https://github.com/containers/netavark/archive/v1.16.1/netavark-1.16.1.tar.gz
+sha256=aaaa000000000000000000000000000000000000000000000000000000000001
+cpe=cpe:2.3:a:containers:netavark:1.16.1:*:*:*:*:*:*:*

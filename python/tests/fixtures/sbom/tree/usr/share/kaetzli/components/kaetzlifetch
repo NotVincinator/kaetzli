@@ -1,0 +1,5 @@
+name=kaetzlifetch
+version=0
+license=MIT
+origin=local
+builder=ghcr.io/fwilhe2/kaetzli-builder:4f1c2a9b

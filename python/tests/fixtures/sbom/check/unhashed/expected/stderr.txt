@@ -1,0 +1,1 @@
+  FAIL: tarball packages with no SHA256: gawk netavark

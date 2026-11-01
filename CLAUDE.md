@@ -145,7 +145,7 @@ Constraint 5 is about the image. What runs on the host, in CI or in a builder co
 is not bound to bash, and bash is not the default: it is hard to read and review, and much
 of `test/` and `tools/` is JSON, HTTP, joins and report tables written in jq, awk and
 `declare -A`. Choose per job. `docs/proposals/host-scripting.md` reviews every script
-against this and orders the migration; the CVE reports are done.
+against this and orders the migration; the CVE reports and the SBOM are done.
 
 - **Bash** where the job *is* a sequence of commands and their exit codes: anything
   sourced by a package build (`builder/build-package.sh`, `packages/*/build.sh`, `env.sh`,
@@ -174,8 +174,11 @@ against this and orders the migration; the CVE reports are done.
   enough, and the `gh` CLI over a GitHub client library (it already holds the auth).
 - **Never in an image.** A Python helper used during assembly runs in the assembly
   container (python3 in `image/Containerfile` is builder-side), on files, and nothing it
-  imports is copied into the tree. `test/image-files/interpreters.txt` already fails a
-  `.py` in the tree; a python binary would need an `absent` line of its own.
+  imports is copied into the tree. It is stdlib only, since that container has no venv,
+  and so it lives beside its caller in `image/` (`image/sbom.py`), not in `kaetzli`;
+  `python/tests/` loads it by path and `python.yml` lints it with the rest.
+  `test/image-files/interpreters.txt` already fails a `.py` in the tree; a python binary
+  would need an `absent` line of its own.
 - **Tests, first.** Python gets pytest tests under `python/tests/`, written before the
   code and seen to fail (red, then green), and `.github/workflows/python.yml` runs them
   with `ruff check`, `ruff format --check` and `uv lock --check`. Collaborators are
@@ -229,7 +232,7 @@ against this and orders the migration; the CVE reports are done.
 ./test/rootfs-size.sh [erofs|oci]  # image size vs test/size-budget.txt, and where it went
 ./test/vs-debian-slim.sh          # the OCI image against debian-slim, with both breakdowns
 ./test/size-history.sh [amd64|arm64]  # both flavours against the last dozen builds on main
-./test/check-sbom.sh              # the SPDX documents parse and carry their provenance
+./test/check-sbom.py              # the SPDX documents are SPDX 2.3, carry their provenance and describe the image
 ./test/cve-scan.py [dir]          # known CVEs in the SBOMs, by grype (report only; the cve-scan job)
 ./test/cve-workbook.sh [dir]      # cve-scan.py's reports as <dir>/cve.ods, by grind ($GRIND or PATH; CI builds it from main)
 ./test/cve-history.py [amd64|arm64]  # the CVE count over the last builds on main, rescanned with one database, steps by update/other
@@ -429,13 +432,14 @@ each package's pins as `KAETZLI_*`, `build-package.sh` writes a record into the 
 after a successful install, and `build-rootfs.sh` turns the records in the *assembled* tree
 into SPDX, since the flavours differ: a package with no file left in a flavour is not in
 its SBOM, judged by `usr/share/kaetzli/owners`, which `merge-staging.sh` writes into `rootfs/`
-and the assembly deletes. `test/check-sbom.sh` parses it. A package's `CPE=` (NVD's
+and the assembly deletes. `image/sbom.py` writes it, stdlib Python on the assembly
+image's python3, never `printf`; `test/check-sbom.py` checks it. A package's `CPE=` (NVD's
 name for it, space-separated where NVD has two) becomes a `cpe23Type` reference each, and the Go modules and Rust crates a program
 compiled in (`go version -m`, `cargo tree -e normal`, recorded by `build-package.sh` in
 `usr/share/kaetzli/modules/`) become packages it `CONTAINS`: those two are what scanners match.
 A CVE a patch fixes (`tools/patch-cves.sh`) is a SPDX `fix` reference on its package, and
 `test/cve-scan.py` makes OpenVEX of those, so grype reports it patched rather than open.
-`image/sbom.sh` is shared with `build-extension.sh`, which writes `sbom-ext-<name>.json`.
+`image/sbom.py` is shared with `build-extension.sh`, which writes `sbom-ext-<name>.json`.
 Unresolved libraries
 are `DEPENDS_ON` without `CONTAINS`, computed like `check-rootfs-deps.sh` (a library is a
 file plus its SONAME symlink).
@@ -446,7 +450,7 @@ or `licenses/` directory, `debian/copyright`, and every `vendor/` dependency's) 
 `usr/share/licenses/<pkg>/`, hardlinking duplicates, and fails a package that has none;
 `packages/<pkg>/licenses/` stands in for a source with no text (`iana-etc`, `kaetzlifetch`).
 `build-rootfs.sh` hashes that tree before the first step and fails if any step changed it,
-and `check-sbom.sh` requires one for every package the SBOM names.
+and `check-sbom.py` requires one for every package the SBOM names.
 
 **The root is EROFS on dm-verity, attached read-only.** The hash tree is appended to the
 image, and `output/rootfs.cmdline` beside it — **half of the image**, the only place the

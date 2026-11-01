@@ -18,16 +18,18 @@ ARG SNAPSHOT
 # mkfs.erofs, which lays out the read-only root filesystem, and cryptsetup-bin is
 # veritysetup, which computes the dm-verity hash tree that seals it. libcap2-bin is
 # setcap, for the two file capabilities the image grants (newuidmap, newgidmap).
+# python3 runs image/sbom.py, which writes the SBOM with the standard library's json: a
+# builder-side interpreter, as perl is in the builder, and nothing of it reaches a tree.
 RUN rm -f /etc/apt/sources.list.d/debian.sources /etc/apt/sources.list \
     && printf 'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/%sT000000Z sid main\n' "$SNAPSHOT" \
        > /etc/apt/sources.list \
     && apt-get update \
-    && apt-get install -y --no-install-recommends erofs-utils cryptsetup-bin libcap2-bin binutils \
+    && apt-get install -y --no-install-recommends erofs-utils cryptsetup-bin libcap2-bin binutils python3 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY image/build-rootfs.sh image/build-extension.sh image/sbom.sh test/check-tree-hygiene.sh /usr/local/bin/
+COPY image/build-rootfs.sh image/build-extension.sh image/sbom.py test/check-tree-hygiene.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/build-rootfs.sh /usr/local/bin/build-extension.sh \
-             /usr/local/bin/check-tree-hygiene.sh
+             /usr/local/bin/sbom.py /usr/local/bin/check-tree-hygiene.sh
 
 COPY image/files /files
 

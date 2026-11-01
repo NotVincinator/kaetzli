@@ -1,0 +1,8 @@
+name=podman
+version=5.7.0
+license=Apache-2.0
+origin=tarball
+builder=ghcr.io/fwilhe2/kaetzli-builder:4f1c2a9b
+url=https://github.com/containers/podman/archive/v5.7.0/podman-5.7.0.tar.gz
+sha256=aaaa000000000000000000000000000000000000000000000000000000000004
+cpe=cpe:2.3:a:podman_project:podman:5.7.0:*:*:*:*:*:*:*

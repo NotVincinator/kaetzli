@@ -320,12 +320,12 @@ to start. With no `kernel.panic`, a panicked node hangs forever instead of reboo
 
 *Implemented, observing only:* `CPE=` in 53 packages' `env.sh` (two for gawk and shadow,
 which NVD files under two vendors each), Go modules and Rust crates in the SBOM
-(`builder/build-package.sh`, `image/sbom.sh`), an SBOM per extension,
+(`builder/build-package.sh`, `image/sbom.py`), an SBOM per extension,
 a package the assembly removes whole (the container image's kernel, kmod and PAM) left
 out of that flavour's SBOM, and a `cve-scan` job that nothing waits on: `test/cve-scan.py`
 (grype, pinned) and `test/cve-history.py`, which rescans the last builds' SBOMs with one
 database so that a step in the count is the image's doing, and sums the steps by whether
-the updater's commits made them. Step 4 (`check-sbom.sh` requiring the references) is not done.
+the updater's commits made them. Step 4 (`check-sbom.py` requiring the references) is not done.
 
 Known gaps:
 
@@ -377,14 +377,14 @@ come from.
    `Cargo.lock` and present in `./vendor` (`cargo_vendored`). Parse `Cargo.lock` (its
    `[[package]]` blocks are line-oriented: `name =`, `version =`) and emit
    `pkg:cargo/<name>@<version>` the same way.
-4. Extend `test/check-sbom.sh` to require a CPE or a non-generic purl for each package that
+4. Extend `test/check-sbom.py` to require a CPE or a non-generic purl for each package that
    declares one, and at least one `pkg:golang` entry for each Go program.
 5. Add a non-gating CI job beside `k8s` that runs osv-scanner (or grype) over
    `usr/share/kaetzli/sbom.json` from the rootfs artifact and writes the findings as a text
    job summary (the CI section of `CLAUDE.md` explains why it must be text). It reports
    only; do not make `result` depend on it.
 
-**Verification:** `test/check-sbom.sh` passes; the scan job lists findings for a known-old
+**Verification:** `test/check-sbom.py` passes; the scan job lists findings for a known-old
 module (temporarily pin one to check, then revert).
 
 ## 8. A report of what changed in the image

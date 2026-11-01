@@ -1,0 +1,2 @@
+python/tests/fixtures/sbom/check/dangling/sbom-erofs.json
+  7 packages, 2 build tools, 2 unresolved libraries, 13 CONTAINS

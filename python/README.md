@@ -8,9 +8,16 @@ launch.py            what each entry point calls: stdlib only, execs uv run --lo
 src/kaetzli/         shared: repo (env.sh through bash), report (stdout + job summary),
                      gh (CI runs and artifacts), http_cache
 src/kaetzli/cve/     the CVE reports: scan, context, history, and what they share
+src/kaetzli/sbom_check.py
+                     test/check-sbom.py: what the SBOM says
 tests/               pytest; fixtures/ holds real data cut down, and the bash versions'
                      output the Python had to reproduce
 ```
+
+One Python file is outside the package: `image/sbom.py`, which writes the SBOM in the
+assembly container. That has python3 and no venv, so it is stdlib only and imports
+nothing from `kaetzli`; `tests/test_sbom_write.py` runs it the way the container does,
+and the lint covers it as `../image/*.py`.
 
 ## Running
 
@@ -21,7 +28,7 @@ uv fetches the pinned Python and makes `python/.venv` from `uv.lock` on first us
 ./test/cve-scan.py output          # an entry point, from any directory
 cd python
 uv run pytest                      # the tests
-uv run ruff check . && uv run ruff format --check .
+uv run ruff check . ../image/*.py && uv run ruff format --check . ../image/*.py
 ```
 
 Never `pip install` anything, into the venv or elsewhere. A dependency is a line in

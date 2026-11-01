@@ -22,7 +22,7 @@ ENRICH is for SBOMs from before env.sh had CPE= (test/cve-history.py): each pack
 the CPE its env.sh has today, with the SBOM's version in it.
 
 Patched is not open. A package whose packages/<pkg>/patches fix a CVE says so in its SBOM
-entry, as an SPDX `fix` reference (tools/patch-cves.sh, image/sbom.sh); each SBOM's
+entry, as an SPDX `fix` reference (tools/patch-cves.sh, image/sbom.py); each SBOM's
 references become an OpenVEX document (<dir>/cve/<sbom>.vex.json) that grype applies, so
 those matches move from `matches` to `ignoredMatches` with a vex rule. Every count here is
 what is open; the patched ones are counted beside it and listed by name.

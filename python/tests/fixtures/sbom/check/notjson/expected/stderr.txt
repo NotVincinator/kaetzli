@@ -1,0 +1,2 @@
+  FAIL: not valid JSON
+        Invalid control character at: line 2 column 28 (char 55)

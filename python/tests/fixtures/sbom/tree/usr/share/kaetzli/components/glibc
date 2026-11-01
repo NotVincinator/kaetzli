@@ -1,0 +1,11 @@
+name=glibc
+version=2.42
+license=LGPL-2.1-or-later AND GPL-2.0-or-later WITH GCC-exception-2.0
+origin=tarball
+builder=ghcr.io/fwilhe2/kaetzli-builder:4f1c2a9b
+url=https://ftp.gnu.org/gnu/glibc/glibc-2.42.tar.xz
+sha256=d1775e32e4628e64ef930f435b67bb63af7599acb6be2b335b9f19f16509f17f
+cpe=cpe:2.3:a:gnu:glibc:2.42:*:*:*:*:*:*:*
+patches=upstream/0001-a.patch@1111aaaa,upstream/0002-b.patch@2222bbbb,0001-ours.patch@3333cccc
+fix=CVE-2026-0001 upstream/0001-a.patch git+https://sourceware.org/git/glibc.git@0b4e1c
+fix=CVE-2026-0002 0001-ours.patch    git+https://sourceware.org/git/glibc.git@9f8e7d  trailing  

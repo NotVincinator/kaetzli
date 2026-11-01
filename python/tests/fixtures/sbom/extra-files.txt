@@ -1,0 +1,3 @@
+usr/bin/my-tool	1234abcd
+usr/share/a;b	5678ef
+etc/motd	9abc

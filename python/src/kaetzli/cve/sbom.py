@@ -25,7 +25,7 @@ def _refs(pkg: dict, kind: str) -> list[dict]:
 
 def vex(doc: dict, timestamp: str) -> dict | None:
     """OpenVEX "fixed" for each CVE a package's patches fix (an SPDX `fix` reference,
-    image/sbom.sh), the product being the package's purl, which is what grype matches a
+    image/sbom.py), the product being the package's purl, which is what grype matches a
     statement against. None when no package has one."""
     statements = []
     for pkg in doc.get("packages") or []:
@@ -63,7 +63,7 @@ def enrich(doc: dict, cpes: dict[str, list[str]]) -> dict:
     """Today's CPEs, with the SBOM's version in them, for each package that has none.
 
     For SBOMs from before env.sh had CPE= (test/cve-history.py). By the record's own
-    name, as image/sbom.sh does: a <pkg>-vendor record is another upstream's code and
+    name, as image/sbom.py does: a <pkg>-vendor record is another upstream's code and
     gets none.
     """
     doc = copy.deepcopy(doc)
