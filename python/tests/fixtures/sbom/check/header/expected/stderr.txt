@@ -2,3 +2,4 @@
   FAIL: missing SPDXRef-DOCUMENT
   FAIL: no documentNamespace
   FAIL: no creationInfo.created
+  FAIL: SPDX: not readable as SPDX 2.3: Error while constructing CreationInfo: ['SetterError CreationInfo: Method spdx_tools.common.typing.dataclass_with_properties.make_setter.set_field() parameter document_namespace="None" violates type hint <class \'str\'>, as <class "builtins.NoneType"> "None" not instance of str.: None', 'SetterError CreationInfo: Method spdx_tools.common.typing.dataclass_with_properties.make_setter.set_field() parameter created="None" violates type hint <class \'datetime.datetime\'>, as <class "builtins.NoneType"> "None" not instance of <class "datetime.datetime">.: None']

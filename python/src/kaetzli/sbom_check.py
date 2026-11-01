@@ -14,6 +14,7 @@ be produced" mean something, and it checks three things:
   3. it describes *this* image: every package staged into the tree is in it, the
      relationship graph has no dangling references, and every package it names ships
      its license text (the manifest image/build-rootfs.sh writes beside it)
+  4. spdx-tools, the SPDX project's library, validates it against the SPDX 2.3 model
 """
 
 from __future__ import annotations
@@ -139,12 +140,33 @@ def check(doc: Path) -> tuple[list[str], str | None]:
     else:
         fails.append(f"no {manifest} to check the license texts against")
 
+    fails += spdx_model(doc)
+
     builders = _ids(packages, "SPDXRef-Builder-")
     summary = (
         f"  {len(components)} packages, {len(builders)} build tools, "
         f"{len(unresolved)} unresolved libraries, {len(contains)} CONTAINS"
     )
     return fails, summary
+
+
+def spdx_model(doc: Path) -> list[str]:
+    """What spdx-tools, the SPDX project's own library, finds wrong against the SPDX 2.3
+    model: the field formats, licence expressions and references the checks above do
+    not re-derive. Each names the element it is about."""
+    from spdx_tools.spdx.parser.error import SPDXParsingError
+    from spdx_tools.spdx.parser.parse_anything import parse_file
+    from spdx_tools.spdx.validation.document_validator import validate_full_spdx_document
+
+    try:
+        parsed = parse_file(str(doc))
+    except SPDXParsingError as e:
+        return ["SPDX: not readable as SPDX 2.3: " + "; ".join(e.get_messages())]
+    out = []
+    for m in validate_full_spdx_document(parsed, "SPDX-2.3"):
+        where = m.context.spdx_id or m.context.parent_id or "the document"
+        out.append(f"SPDX: {where}: {m.validation_message}")
+    return out
 
 
 def _names(names: list) -> str:

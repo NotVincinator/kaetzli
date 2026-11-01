@@ -3,7 +3,8 @@
 fixtures/sbom/expected/ is what the bash image/sbom.sh, with build-rootfs.sh's and
 build-extension.sh's document around it, wrote for fixtures/sbom/tree: the same elements
 with the same keys in the same order, which re-serialising it with sbom.py's own
-serialiser shows to the byte. Only the layout differs, and JSON escaping is now complete.
+serialiser shows to the byte. The layout differs, and JSON escaping is now complete.
+Since then, deliberately: a `fix` is the commit's URL, and a LicenseRef- has its text.
 """
 
 import ast
@@ -117,4 +118,84 @@ def test_a_value_may_contain_and_end_in_equals(tmp_path):
     tree = record(tmp_path, "a", "name=a\nurl=https://x/?a=b=\n")
     assert sbom.document("image", "n", CREATED, tree)["packages"][1]["downloadLocation"] == (
         "https://x/?a=b="
+    )
+
+
+@pytest.mark.parametrize(
+    ("locator", "url"),
+    [
+        (
+            "git+https://sourceware.org/git/glibc.git@d6ff274313d79feb864cc10eb775b91c817a67e9",
+            "https://sourceware.org/git/?p=glibc.git;a=commit;h=d6ff274313d79feb864cc10eb775b91c817a67e9",
+        ),
+        (
+            "git+https://gcc.gnu.org/git/gcc.git@2ab9ded76e8714b1654260ac68a815c20567cc09",
+            "https://gcc.gnu.org/git/?p=gcc.git;a=commit;h=2ab9ded76e8714b1654260ac68a815c20567cc09",
+        ),
+        ("git+https://github.com/o/r.git@abc1234", "https://github.com/o/r/commit/abc1234"),
+        ("git+https://github.com/o/r@abc1234", "https://github.com/o/r/commit/abc1234"),
+        # Already a URL (an upstream's patch index), or a form nothing maps: as it is, and
+        # test/check-sbom.py says so if it is not a URL.
+        ("https://ftp.gnu.org/gnu/bash/bash-5.3-patches/bash53-001", None),
+        ("git+https://github.com/fwilhe2/kaetzli#packages/x/patches/0001.patch", None),
+    ],
+)
+def test_a_fix_is_a_url_to_the_commit(locator, url):
+    """SPDX 2.3 wants a URL for a `fix`; git+<repo>@<sha> is its download-location
+    syntax, which validators refuse there."""
+    assert sbom.fix_url(locator) == (url or locator)
+
+
+def test_each_license_ref_has_its_text(tmp_path):
+    """A LicenseRef- is only meaningful with hasExtractedLicensingInfos: the texts the
+    packages declaring it ship."""
+    tree = record(tmp_path, "tzdata", "name=tzdata\nlicense=LicenseRef-PublicDomain\n")
+    record(tmp_path, "openssh", "name=openssh\nlicense=ISC AND LicenseRef-PublicDomain\n")
+    record(tmp_path, "openssh-vendor", "name=openssh-vendor\nlicense=LicenseRef-Other\n")
+    record(tmp_path, "gawk", "name=gawk\nlicense=GPL-3.0-or-later\n")
+    lic = tmp_path / "usr/share/licenses"
+    for path, text in {
+        "tzdata/LICENSE": "public domain\n",
+        "openssh/LICENCE": "isc and pd\n",
+        "openssh/sub/NOTE": "more\n",
+        "gawk/COPYING": "gpl\n",
+    }.items():
+        (lic / path).parent.mkdir(parents=True, exist_ok=True)
+        (lic / path).write_text(text)
+    doc = sbom.document("image", "n", CREATED, tree)
+    openssh = "=== openssh/LICENCE ===\nisc and pd\n\n=== openssh/sub/NOTE ===\nmore\n"
+    assert doc["hasExtractedLicensingInfos"] == [
+        {
+            "licenseId": "LicenseRef-Other",
+            "name": "Other",
+            "extractedText": openssh,
+            "comment": "The license texts of openssh-vendor, as usr/share/licenses/ ships them.",
+        },
+        {
+            "licenseId": "LicenseRef-PublicDomain",
+            "name": "PublicDomain",
+            "extractedText": openssh + "\n=== tzdata/LICENSE ===\npublic domain\n",
+            "comment": "The license texts of openssh, tzdata, as usr/share/licenses/ ships them.",
+        },
+    ]
+
+
+def test_no_license_ref_no_extracted_infos(tmp_path):
+    tree = record(tmp_path, "gawk", "name=gawk\nlicense=GPL-3.0-or-later\n")
+    assert "hasExtractedLicensingInfos" not in sbom.document("image", "n", CREATED, tree)
+
+
+def test_a_license_ref_without_a_text_fails(tmp_path):
+    tree = record(tmp_path, "x", "name=x\nlicense=LicenseRef-X\n")
+    with pytest.raises(SystemExit, match=r"LicenseRef-X.*usr/share/licenses/x"):
+        sbom.document("image", "n", CREATED, tree)
+
+
+def test_a_builder_is_named_up_to_the_first_colon_and_versioned_after_the_last():
+    # As bash's ${b%%:*} and ${b##*:} did, a registry port included.
+    p = sbom.builder_package("localhost:5000/kaetzli-builder:dev")
+    assert (p["SPDXID"], p["name"], p["versionInfo"]) == (
+        "SPDXRef-Builder-localhost-5000-kaetzli-builder-dev",
+        "localhost",
+        "dev",
     )

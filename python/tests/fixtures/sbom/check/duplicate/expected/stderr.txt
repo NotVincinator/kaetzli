@@ -1,1 +1,2 @@
-  FAIL: duplicate SPDXIDs: SPDXRef-Builder-localhost-5000-kaetzli-builder-dev SPDXRef-Package-gawk
+  FAIL: duplicate SPDXIDs: SPDXRef-Builder-ghcr.io-fwilhe2-kaetzli-builder-0faa30415d04fc02-amd64 SPDXRef-Package-gawk
+  FAIL: SPDX: SPDXRef-DOCUMENT: every spdx_id must be unique within the document, but found the following duplicates: ['SPDXRef-Builder-ghcr.io-fwilhe2-kaetzli-builder-0faa30415d04fc02-amd64', 'SPDXRef-Package-gawk']

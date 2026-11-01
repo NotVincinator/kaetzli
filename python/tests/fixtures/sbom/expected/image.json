@@ -3,12 +3,17 @@
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
   "name": "kaetzli-oci-amd64",
-  "documentNamespace": "https://github.com/fwilhe2/kaetzli/spdx/kaetzli-oci-amd64-26111c8600cc5de1",
+  "documentNamespace": "https://github.com/fwilhe2/kaetzli/spdx/kaetzli-oci-amd64-2a219b13bebc2937",
   "creationInfo": {
     "created": "2026-01-01T00:00:00Z",
-    "creators": [ "Tool: kaetzli-build-rootfs", "Organization: github.com/fwilhe2/kaetzli" ]
+    "creators": [
+      "Tool: kaetzli-build-rootfs",
+      "Organization: github.com/fwilhe2/kaetzli"
+    ]
   },
-  "documentDescribes": [ "SPDXRef-Image" ],
+  "documentDescribes": [
+    "SPDXRef-Image"
+  ],
   "packages": [
     {
       "SPDXID": "SPDXRef-Image",
@@ -26,10 +31,29 @@
       "versionInfo": "5.3.2",
       "downloadLocation": "https://ftp.gnu.org/gnu/gawk/gawk-5.3.2.tar.xz",
       "filesAnalyzed": false,
-      "checksums": [ { "algorithm": "SHA256", "checksumValue": "f8c3486509de705192138b00ef2c00bbbdd0e84c30d5c07d23fc73a9dc4cc9cc" } ],
-      "externalRefs": [ { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:generic/gawk@5.3.2" },
-                        { "referenceCategory": "SECURITY", "referenceType": "cpe23Type", "referenceLocator": "cpe:2.3:a:gnu:gawk:5.3.2:*:*:*:*:*:*:*" },
-                        { "referenceCategory": "SECURITY", "referenceType": "cpe23Type", "referenceLocator": "cpe:2.3:a:gawk_project:gawk:5.3.2:*:*:*:*:*:*:*" } ],
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "f8c3486509de705192138b00ef2c00bbbdd0e84c30d5c07d23fc73a9dc4cc9cc"
+        }
+      ],
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/gawk@5.3.2"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:gnu:gawk:5.3.2:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:gawk_project:gawk:5.3.2:*:*:*:*:*:*:*"
+        }
+      ],
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "GPL-3.0-or-later",
       "copyrightText": "NOASSERTION"
@@ -40,11 +64,36 @@
       "versionInfo": "2.42",
       "downloadLocation": "https://ftp.gnu.org/gnu/glibc/glibc-2.42.tar.xz",
       "filesAnalyzed": false,
-      "checksums": [ { "algorithm": "SHA256", "checksumValue": "d1775e32e4628e64ef930f435b67bb63af7599acb6be2b335b9f19f16509f17f" } ],
-      "externalRefs": [ { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:generic/glibc@2.42" },
-                        { "referenceCategory": "SECURITY", "referenceType": "cpe23Type", "referenceLocator": "cpe:2.3:a:gnu:glibc:2.42:*:*:*:*:*:*:*" },
-                        { "referenceCategory": "SECURITY", "referenceType": "fix", "referenceLocator": "git+https://sourceware.org/git/glibc.git@0b4e1c", "comment": "CVE-2026-0001 fixed by upstream/0001-a.patch" },
-                        { "referenceCategory": "SECURITY", "referenceType": "fix", "referenceLocator": "git+https://sourceware.org/git/glibc.git@9f8e7d  trailing", "comment": "CVE-2026-0002 fixed by 0001-ours.patch" } ],
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "d1775e32e4628e64ef930f435b67bb63af7599acb6be2b335b9f19f16509f17f"
+        }
+      ],
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/glibc@2.42"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:gnu:glibc:2.42:*:*:*:*:*:*:*"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "fix",
+          "referenceLocator": "https://sourceware.org/git/?p=glibc.git;a=commit;h=0b4e1c2d3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c",
+          "comment": "CVE-2026-0001 fixed by upstream/0001-a.patch"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "fix",
+          "referenceLocator": "https://sourceware.org/git/?p=glibc.git;a=commit;h=9f8e7d6c5b4a39281706f5e4d3c2b1a098765432",
+          "comment": "CVE-2026-0002 fixed by 0001-ours.patch"
+        }
+      ],
       "comment": "patched: upstream/0001-a.patch@1111aaaa, upstream/0002-b.patch@2222bbbb, 0001-ours.patch@3333cccc",
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "LGPL-2.1-or-later AND GPL-2.0-or-later WITH GCC-exception-2.0",
@@ -56,7 +105,13 @@
       "versionInfo": "0",
       "downloadLocation": "git+https://github.com/fwilhe2/kaetzli",
       "filesAnalyzed": false,
-      "externalRefs": [ { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:generic/kaetzlifetch@0" } ],
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/kaetzlifetch@0"
+        }
+      ],
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "MIT",
       "copyrightText": "NOASSERTION"
@@ -67,9 +122,24 @@
       "versionInfo": "1.16.1",
       "downloadLocation": "https://github.com/containers/netavark/archive/v1.16.1/netavark-1.16.1.tar.gz",
       "filesAnalyzed": false,
-      "checksums": [ { "algorithm": "SHA256", "checksumValue": "aaaa000000000000000000000000000000000000000000000000000000000001" } ],
-      "externalRefs": [ { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:generic/netavark@1.16.1" },
-                        { "referenceCategory": "SECURITY", "referenceType": "cpe23Type", "referenceLocator": "cpe:2.3:a:containers:netavark:1.16.1:*:*:*:*:*:*:*" } ],
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "aaaa000000000000000000000000000000000000000000000000000000000001"
+        }
+      ],
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/netavark@1.16.1"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:containers:netavark:1.16.1:*:*:*:*:*:*:*"
+        }
+      ],
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "Apache-2.0",
       "copyrightText": "NOASSERTION"
@@ -80,8 +150,19 @@
       "versionInfo": "1.16.1",
       "downloadLocation": "https://github.com/containers/netavark/releases/download/v1.16.1/netavark-v1.16.1-vendor.tar.gz",
       "filesAnalyzed": false,
-      "checksums": [ { "algorithm": "SHA256", "checksumValue": "aaaa000000000000000000000000000000000000000000000000000000000002" } ],
-      "externalRefs": [ { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:generic/netavark-vendor@1.16.1" } ],
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "aaaa000000000000000000000000000000000000000000000000000000000002"
+        }
+      ],
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/netavark-vendor@1.16.1"
+        }
+      ],
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "Apache-2.0",
       "copyrightText": "NOASSERTION"
@@ -92,9 +173,24 @@
       "versionInfo": "5.7.0",
       "downloadLocation": "https://github.com/containers/podman/archive/v5.7.0/podman-5.7.0.tar.gz",
       "filesAnalyzed": false,
-      "checksums": [ { "algorithm": "SHA256", "checksumValue": "aaaa000000000000000000000000000000000000000000000000000000000004" } ],
-      "externalRefs": [ { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:generic/podman@5.7.0" },
-                        { "referenceCategory": "SECURITY", "referenceType": "cpe23Type", "referenceLocator": "cpe:2.3:a:podman_project:podman:5.7.0:*:*:*:*:*:*:*" } ],
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "aaaa000000000000000000000000000000000000000000000000000000000004"
+        }
+      ],
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/podman@5.7.0"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceType": "cpe23Type",
+          "referenceLocator": "cpe:2.3:a:podman_project:podman:5.7.0:*:*:*:*:*:*:*"
+        }
+      ],
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "Apache-2.0",
       "copyrightText": "NOASSERTION"
@@ -105,11 +201,22 @@
       "versionInfo": "2026a",
       "downloadLocation": "https://data.iana.org/time-zones/releases/tzdata2026a.tar.gz?x=1&y=2",
       "filesAnalyzed": false,
-      "checksums": [ { "algorithm": "SHA256", "checksumValue": "aaaa000000000000000000000000000000000000000000000000000000000003" } ],
-      "externalRefs": [ { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:generic/tzdata@2026a" } ],
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "aaaa000000000000000000000000000000000000000000000000000000000003"
+        }
+      ],
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:generic/tzdata@2026a"
+        }
+      ],
       "comment": "patched: 0001-quote\".patch@4444dddd",
       "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
+      "licenseDeclared": "LicenseRef-PublicDomain",
       "copyrightText": "NOASSERTION"
     },
     {
@@ -118,7 +225,13 @@
       "versionInfo": "0.2.177",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": false,
-      "externalRefs": [ { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:cargo/libc@0.2.177" } ],
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:cargo/libc@0.2.177"
+        }
+      ],
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
       "copyrightText": "NOASSERTION"
@@ -129,7 +242,13 @@
       "versionInfo": "1.0.228",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": false,
-      "externalRefs": [ { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:cargo/serde@1.0.228" } ],
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:cargo/serde@1.0.228"
+        }
+      ],
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
       "copyrightText": "NOASSERTION"
@@ -140,7 +259,13 @@
       "versionInfo": "v0.66.0",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": false,
-      "externalRefs": [ { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/github.com/containers/common@v0.66.0" } ],
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:golang/github.com/containers/common@v0.66.0"
+        }
+      ],
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
       "copyrightText": "NOASSERTION"
@@ -151,7 +276,13 @@
       "versionInfo": "v0.38.0",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": false,
-      "externalRefs": [ { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/golang.org/x/sys@v0.38.0" } ],
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:golang/golang.org/x/sys@v0.38.0"
+        }
+      ],
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
       "copyrightText": "NOASSERTION"
@@ -162,7 +293,13 @@
       "versionInfo": "1.25.3",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": false,
-      "externalRefs": [ { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/stdlib@1.25.3" } ],
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceType": "purl",
+          "referenceLocator": "pkg:golang/stdlib@1.25.3"
+        }
+      ],
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
       "copyrightText": "NOASSERTION"
@@ -178,10 +315,10 @@
       "copyrightText": "NOASSERTION"
     },
     {
-      "SPDXID": "SPDXRef-Builder-localhost-5000-kaetzli-builder-dev",
-      "name": "localhost",
-      "versionInfo": "dev",
-      "downloadLocation": "localhost:5000/kaetzli-builder:dev",
+      "SPDXID": "SPDXRef-Builder-ghcr.io-fwilhe2-kaetzli-builder-0faa30415d04fc02-amd64",
+      "name": "ghcr.io/fwilhe2/kaetzli/builder",
+      "versionInfo": "0faa30415d04fc02-amd64",
+      "downloadLocation": "ghcr.io/fwilhe2/kaetzli/builder:0faa30415d04fc02-amd64",
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
@@ -189,25 +326,113 @@
     }
   ],
   "relationships": [
-    { "spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-Image" },
-    { "spdxElementId": "SPDXRef-Image", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-Package-gawk" },
-    { "spdxElementId": "SPDXRef-Builder-ghcr.io-fwilhe2-kaetzli-builder-4f1c2a9b", "relationshipType": "BUILD_TOOL_OF", "relatedSpdxElement": "SPDXRef-Package-gawk" },
-    { "spdxElementId": "SPDXRef-Image", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-Package-glibc" },
-    { "spdxElementId": "SPDXRef-Builder-ghcr.io-fwilhe2-kaetzli-builder-4f1c2a9b", "relationshipType": "BUILD_TOOL_OF", "relatedSpdxElement": "SPDXRef-Package-glibc" },
-    { "spdxElementId": "SPDXRef-Image", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-Package-kaetzlifetch" },
-    { "spdxElementId": "SPDXRef-Builder-ghcr.io-fwilhe2-kaetzli-builder-4f1c2a9b", "relationshipType": "BUILD_TOOL_OF", "relatedSpdxElement": "SPDXRef-Package-kaetzlifetch" },
-    { "spdxElementId": "SPDXRef-Image", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-Package-netavark" },
-    { "spdxElementId": "SPDXRef-Builder-ghcr.io-fwilhe2-kaetzli-builder-4f1c2a9b", "relationshipType": "BUILD_TOOL_OF", "relatedSpdxElement": "SPDXRef-Package-netavark" },
-    { "spdxElementId": "SPDXRef-Image", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-Package-netavark-vendor" },
-    { "spdxElementId": "SPDXRef-Builder-ghcr.io-fwilhe2-kaetzli-builder-4f1c2a9b", "relationshipType": "BUILD_TOOL_OF", "relatedSpdxElement": "SPDXRef-Package-netavark-vendor" },
-    { "spdxElementId": "SPDXRef-Image", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-Package-podman" },
-    { "spdxElementId": "SPDXRef-Builder-ghcr.io-fwilhe2-kaetzli-builder-4f1c2a9b", "relationshipType": "BUILD_TOOL_OF", "relatedSpdxElement": "SPDXRef-Package-podman" },
-    { "spdxElementId": "SPDXRef-Image", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-Package-tzdata" },
-    { "spdxElementId": "SPDXRef-Builder-localhost-5000-kaetzli-builder-dev", "relationshipType": "BUILD_TOOL_OF", "relatedSpdxElement": "SPDXRef-Package-tzdata" },
-    { "spdxElementId": "SPDXRef-Package-netavark", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-Module-netavark-libc-0.2.177" },
-    { "spdxElementId": "SPDXRef-Package-netavark", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-Module-netavark-serde-1.0.228" },
-    { "spdxElementId": "SPDXRef-Package-podman", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-Module-podman-github.com-containers-common-v0.66.0" },
-    { "spdxElementId": "SPDXRef-Package-podman", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-Module-podman-golang.org-x-sys-v0.38.0" },
-    { "spdxElementId": "SPDXRef-Package-podman", "relationshipType": "CONTAINS", "relatedSpdxElement": "SPDXRef-Module-podman-stdlib-1.25.3" }
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Image"
+    },
+    {
+      "spdxElementId": "SPDXRef-Image",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-Package-gawk"
+    },
+    {
+      "spdxElementId": "SPDXRef-Builder-ghcr.io-fwilhe2-kaetzli-builder-4f1c2a9b",
+      "relationshipType": "BUILD_TOOL_OF",
+      "relatedSpdxElement": "SPDXRef-Package-gawk"
+    },
+    {
+      "spdxElementId": "SPDXRef-Image",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-Package-glibc"
+    },
+    {
+      "spdxElementId": "SPDXRef-Builder-ghcr.io-fwilhe2-kaetzli-builder-4f1c2a9b",
+      "relationshipType": "BUILD_TOOL_OF",
+      "relatedSpdxElement": "SPDXRef-Package-glibc"
+    },
+    {
+      "spdxElementId": "SPDXRef-Image",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-Package-kaetzlifetch"
+    },
+    {
+      "spdxElementId": "SPDXRef-Builder-ghcr.io-fwilhe2-kaetzli-builder-4f1c2a9b",
+      "relationshipType": "BUILD_TOOL_OF",
+      "relatedSpdxElement": "SPDXRef-Package-kaetzlifetch"
+    },
+    {
+      "spdxElementId": "SPDXRef-Image",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-Package-netavark"
+    },
+    {
+      "spdxElementId": "SPDXRef-Builder-ghcr.io-fwilhe2-kaetzli-builder-4f1c2a9b",
+      "relationshipType": "BUILD_TOOL_OF",
+      "relatedSpdxElement": "SPDXRef-Package-netavark"
+    },
+    {
+      "spdxElementId": "SPDXRef-Image",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-Package-netavark-vendor"
+    },
+    {
+      "spdxElementId": "SPDXRef-Builder-ghcr.io-fwilhe2-kaetzli-builder-4f1c2a9b",
+      "relationshipType": "BUILD_TOOL_OF",
+      "relatedSpdxElement": "SPDXRef-Package-netavark-vendor"
+    },
+    {
+      "spdxElementId": "SPDXRef-Image",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-Package-podman"
+    },
+    {
+      "spdxElementId": "SPDXRef-Builder-ghcr.io-fwilhe2-kaetzli-builder-4f1c2a9b",
+      "relationshipType": "BUILD_TOOL_OF",
+      "relatedSpdxElement": "SPDXRef-Package-podman"
+    },
+    {
+      "spdxElementId": "SPDXRef-Image",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-Package-tzdata"
+    },
+    {
+      "spdxElementId": "SPDXRef-Builder-ghcr.io-fwilhe2-kaetzli-builder-0faa30415d04fc02-amd64",
+      "relationshipType": "BUILD_TOOL_OF",
+      "relatedSpdxElement": "SPDXRef-Package-tzdata"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-netavark",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-Module-netavark-libc-0.2.177"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-netavark",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-Module-netavark-serde-1.0.228"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-podman",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-Module-podman-github.com-containers-common-v0.66.0"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-podman",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-Module-podman-golang.org-x-sys-v0.38.0"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-podman",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-Module-podman-stdlib-1.25.3"
+    }
+  ],
+  "hasExtractedLicensingInfos": [
+    {
+      "licenseId": "LicenseRef-PublicDomain",
+      "name": "PublicDomain",
+      "extractedText": "=== tzdata/LICENSE ===\nUnless specified below, all files in the tz code and data are in the public domain.\n",
+      "comment": "The license texts of tzdata, as usr/share/licenses/ ships them."
+    }
   ]
 }

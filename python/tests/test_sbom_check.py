@@ -82,3 +82,30 @@ def test_the_entry_point(tmp_path):
     assert r.returncode == 1
     assert r.stdout.splitlines()[0] == good
     assert r.stderr == "  FAIL: tarball packages with no SHA256: gawk netavark\n"
+
+
+def test_the_spdx_model_is_checked(tmp_path):
+    """spdx-tools' validator, beyond what the checks above re-derive: here a `fix` that is
+    no URL and a LicenseRef- with no text, which the bash writer wrote."""
+    doc = json.loads((CHECK / "good" / "sbom-erofs.json").read_text())
+    glibc = next(p for p in doc["packages"] if p["name"] == "glibc")
+    glibc["externalRefs"][-1]["referenceLocator"] = "git+https://sourceware.org/git/glibc.git@0b4e"
+    # As iana-etc's: the validator knows LicenseRef-PublicDomain, but not this one.
+    next(p for p in doc["packages"] if p["name"] == "tzdata")["licenseDeclared"] = "LicenseRef-IANA"
+    (tmp_path / "sbom-erofs.json").write_text(json.dumps(doc))
+    (tmp_path / "rootfs-files-erofs.txt").write_bytes(
+        (CHECK / "good" / "rootfs-files-erofs.txt").read_bytes()
+    )
+    fails, _ = sbom_check.check(tmp_path / "sbom-erofs.json")
+    assert len(fails) == 2
+    assert fails[0].startswith("SPDX: SPDXRef-Package-glibc: externalPackageRef locator of type")
+    assert "git+https://sourceware.org/git/glibc.git@0b4e" in fails[0]
+    assert fails[1].startswith("SPDX: SPDXRef-Package-tzdata: Unrecognized license reference")
+
+
+def test_a_document_spdx_tools_cannot_read(tmp_path):
+    doc = json.loads((CHECK / "good" / "sbom-erofs.json").read_text())
+    doc["packages"][1]["checksums"] = [{"algorithm": "NOPE", "checksumValue": "x"}]
+    (tmp_path / "sbom-erofs.json").write_text(json.dumps(doc))
+    fails, _ = sbom_check.check(tmp_path / "sbom-erofs.json")
+    assert any(f.startswith("SPDX: not readable as SPDX 2.3:") for f in fails)

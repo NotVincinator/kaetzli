@@ -43,16 +43,18 @@ Dependencies: `requests`, `python-debian`.
 Ported with no dependency beyond the stdlib, in two places. The writer is
 `image/sbom.py`, run on python3 in the assembly image (builder-side, like perl in the
 builder), stdlib `json` only, so it stays outside the `kaetzli` package; the checker is
-`kaetzli.sbom_check`. The checks are the bash version's; validating against the SPDX
-model with `spdx-tools` would be stricter, so it is a change of its own. What the bash
-versions said:
+`kaetzli.sbom_check`. The checks were the bash version's; validation against the SPDX
+2.3 model with `spdx-tools` came after, as a change of its own, and found two things
+the bash writer got wrong: `fix` locators in download-location syntax rather than URLs,
+and a `LicenseRef-` with no text (`hasExtractedLicensingInfos`). What the bash versions
+said:
 
 `sbom.sh` wrote SPDX with `printf`, and `jstr` escaped strings with `sed`. It did not
 escape control characters other than tab and CR, and every field was a place to forget a
 comma. `check-sbom.sh` existed largely to catch that, and its comment named a JSON
 serialiser in `image/Containerfile` as the cost being avoided.
 
-Dependencies: none in the assembly image; `spdx-tools` for a stricter check, later.
+Dependencies: none in the assembly image; `spdx-tools` for the check.
 
 ### 3. Size reports: `test/size-history.sh`, `rootfs-size.sh`, `vs-debian-slim.sh`, `oci-trim.sh`
 

@@ -109,7 +109,9 @@ def component_package(r: dict) -> dict:
         if not f:
             continue
         cve, file, loc = [*f, "", ""][:3]
-        refs.append(_ref("SECURITY", "fix", loc.rstrip()) | {"comment": f"{cve} fixed by {file}"})
+        refs.append(
+            _ref("SECURITY", "fix", fix_url(loc.rstrip())) | {"comment": f"{cve} fixed by {file}"}
+        )
     # The tarball's checksum describes the source before packages/<pkg>/patches/; what
     # was applied on top is said here, each patch by name and SHA-256.
     patches = r.get("patches", "")
@@ -127,6 +129,22 @@ def component_package(r: dict) -> dict:
         ("licenseDeclared", r.get("license") or NOASSERTION),
         ("copyrightText", NOASSERTION),
     )
+
+
+# tools/patch-cves.sh names an upstream commit as git+<repo>@<sha>, SPDX's syntax for a
+# download location; a `fix` reference is a URL. The forms it writes, as the commit's page:
+_GITHUB = re.compile(r"git\+(https://github\.com/[^/@#]+/[^/@#]+?)(?:\.git)?@([0-9a-f]{7,40})")
+_GITWEB = re.compile(r"git\+https://([^/@#]+)/git/([^/@#]+\.git)@([0-9a-f]{7,40})")
+
+
+def fix_url(locator: str) -> str:
+    """The commit's web page for git+<repo>@<sha>; anything else as it is, so that
+    test/check-sbom.py names a form nothing maps yet."""
+    if m := _GITHUB.fullmatch(locator):
+        return f"{m[1]}/commit/{m[2]}"
+    if m := _GITWEB.fullmatch(locator):  # sourceware's and gcc's gitweb
+        return f"https://{m[1]}/git/?p={m[2]};a=commit;h={m[3]}"
+    return locator
 
 
 def _ref(category: str, kind: str, locator: str) -> dict:
@@ -225,6 +243,47 @@ def unresolved_package(lib: str) -> dict:
     )
 
 
+_LICENSE_REF = re.compile(r"(?<![A-Za-z0-9.:-])LicenseRef-[A-Za-z0-9.-]+")
+
+
+def extracted_licenses(records: list[dict], tree: Path) -> list[dict]:
+    """A LicenseRef- means nothing without its text (SPDX's hasExtractedLicensingInfos):
+    for each, the texts every package declaring it ships, in usr/share/licenses/<pkg>/.
+    A <pkg>-vendor record's are its package's, as build-rootfs.sh checks them."""
+    users: dict[str, list[str]] = {}
+    for r in records:
+        for ref in sorted(set(_LICENSE_REF.findall(r.get("license", "")))):
+            users.setdefault(ref, []).append(r["name"])
+    infos = []
+    for ref in sorted(users, key=str.encode):
+        names = sorted(users[ref], key=str.encode)
+        texts = []
+        for pkg in sorted({n.removesuffix("-vendor") for n in names}, key=str.encode):
+            d = tree / "usr/share/licenses" / pkg
+            files = sorted(
+                (f for f in d.rglob("*") if f.is_file()) if d.is_dir() else [],
+                key=lambda f: str(f.relative_to(d)).encode(),
+            )
+            if not files:
+                raise SystemExit(
+                    f"error: {ref} is declared by {pkg}, and usr/share/licenses/{pkg}/ has no text"
+                )
+            texts += (
+                f"=== {pkg}/{f.relative_to(d)} ===\n" + f.read_bytes().decode("utf-8", "replace")
+                for f in files
+            )
+        infos.append(
+            {
+                "licenseId": ref,
+                "name": ref.removeprefix("LicenseRef-"),
+                "extractedText": "\n".join(texts),
+                "comment": f"The license texts of {', '.join(names)}, "
+                "as usr/share/licenses/ ships them.",
+            }
+        )
+    return infos
+
+
 def rel(a: str, kind: str, b: str) -> dict:
     return {"spdxElementId": a, "relationshipType": kind, "relatedSpdxElement": b}
 
@@ -273,7 +332,7 @@ def document(
         rels.append(rel(root, "CONTAINS", "SPDXRef-LocalExtra"))
     rels += (rel(root, "DEPENDS_ON", f"SPDXRef-Unresolved-{spdxid(lib)}") for lib in unresolved)
 
-    return {
+    doc = {
         "spdxVersion": "SPDX-2.3",
         "dataLicense": "CC0-1.0",
         "SPDXID": "SPDXRef-DOCUMENT",
@@ -287,6 +346,9 @@ def document(
         "packages": packages,
         "relationships": rels,
     }
+    if infos := extracted_licenses(records, tree):
+        doc["hasExtractedLicensingInfos"] = infos
+    return doc
 
 
 def dumps(doc: dict) -> str:

@@ -1,8 +1,8 @@
 name=tzdata
 version=2026a
-license=
+license=LicenseRef-PublicDomain
 origin=tarball
-builder=localhost:5000/kaetzli-builder:dev
+builder=ghcr.io/fwilhe2/kaetzli/builder:0faa30415d04fc02-amd64
 url=https://data.iana.org/time-zones/releases/tzdata2026a.tar.gz?x=1&y=2
 sha256=aaaa000000000000000000000000000000000000000000000000000000000003
 patches=0001-quote".patch@4444dddd

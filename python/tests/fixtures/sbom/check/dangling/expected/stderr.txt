@@ -1,3 +1,5 @@
   FAIL: relationships naming unknown elements:
 SPDXRef-Package-netavark -CONTAINS-> SPDXRef-Module-netavark-libc-0.2.177
 SPDXRef-Image -CONTAINS-> SPDXRef-LocalExtra
+  FAIL: SPDX: the document: did not find the referenced spdx_id "SPDXRef-Module-netavark-libc-0.2.177" in the SPDX document
+  FAIL: SPDX: the document: did not find the referenced spdx_id "SPDXRef-LocalExtra" in the SPDX document

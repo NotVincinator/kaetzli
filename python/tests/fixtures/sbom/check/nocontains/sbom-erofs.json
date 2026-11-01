@@ -3,7 +3,7 @@
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
   "name": "kaetzli-erofs-amd64",
-  "documentNamespace": "https://github.com/fwilhe2/kaetzli/spdx/kaetzli-erofs-amd64-9c53c3af60e9cf46",
+  "documentNamespace": "https://github.com/fwilhe2/kaetzli/spdx/kaetzli-erofs-amd64-00970df395c8083c",
   "creationInfo": {
     "created": "2026-01-01T00:00:00Z",
     "creators": [
@@ -84,13 +84,13 @@
         {
           "referenceCategory": "SECURITY",
           "referenceType": "fix",
-          "referenceLocator": "git+https://sourceware.org/git/glibc.git@0b4e1c",
+          "referenceLocator": "https://sourceware.org/git/?p=glibc.git;a=commit;h=0b4e1c2d3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c",
           "comment": "CVE-2026-0001 fixed by upstream/0001-a.patch"
         },
         {
           "referenceCategory": "SECURITY",
           "referenceType": "fix",
-          "referenceLocator": "git+https://sourceware.org/git/glibc.git@9f8e7d  trailing",
+          "referenceLocator": "https://sourceware.org/git/?p=glibc.git;a=commit;h=9f8e7d6c5b4a39281706f5e4d3c2b1a098765432",
           "comment": "CVE-2026-0002 fixed by 0001-ours.patch"
         }
       ],
@@ -216,7 +216,7 @@
       ],
       "comment": "patched: 0001-quote\".patch@4444dddd",
       "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
+      "licenseDeclared": "LicenseRef-PublicDomain",
       "copyrightText": "NOASSERTION"
     },
     {
@@ -315,10 +315,10 @@
       "copyrightText": "NOASSERTION"
     },
     {
-      "SPDXID": "SPDXRef-Builder-localhost-5000-kaetzli-builder-dev",
-      "name": "localhost",
-      "versionInfo": "dev",
-      "downloadLocation": "localhost:5000/kaetzli-builder:dev",
+      "SPDXID": "SPDXRef-Builder-ghcr.io-fwilhe2-kaetzli-builder-0faa30415d04fc02-amd64",
+      "name": "ghcr.io/fwilhe2/kaetzli/builder",
+      "versionInfo": "0faa30415d04fc02-amd64",
+      "downloadLocation": "ghcr.io/fwilhe2/kaetzli/builder:0faa30415d04fc02-amd64",
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
@@ -395,7 +395,7 @@
       "relatedSpdxElement": "SPDXRef-Package-podman"
     },
     {
-      "spdxElementId": "SPDXRef-Builder-localhost-5000-kaetzli-builder-dev",
+      "spdxElementId": "SPDXRef-Builder-ghcr.io-fwilhe2-kaetzli-builder-0faa30415d04fc02-amd64",
       "relationshipType": "BUILD_TOOL_OF",
       "relatedSpdxElement": "SPDXRef-Package-tzdata"
     },
@@ -408,6 +408,14 @@
       "spdxElementId": "SPDXRef-Image",
       "relationshipType": "DEPENDS_ON",
       "relatedSpdxElement": "SPDXRef-Unresolved-lib-odd.so.2"
+    }
+  ],
+  "hasExtractedLicensingInfos": [
+    {
+      "licenseId": "LicenseRef-PublicDomain",
+      "name": "PublicDomain",
+      "extractedText": "=== tzdata/LICENSE ===\nUnless specified below, all files in the tz code and data are in the public domain.\n",
+      "comment": "The license texts of tzdata, as usr/share/licenses/ ships them."
     }
   ]
 }
