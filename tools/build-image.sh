@@ -34,7 +34,7 @@
 # and named in the SBOM (SPDXRef-LocalExtra). An overlay can only add: it is refused if it
 # would replace anything the build installed, write outside usr/, etc/ or opt/, touch
 # authentication, privilege, boot-time or provenance configuration (PAM, ssh, systemd,
-# tmpfiles, sysctl, accounts, the loader's, /etc/containers, usr/share/flfs and licenses;
+# tmpfiles, sysctl, accounts, the loader's, /etc/containers, usr/share/kaetzli and licenses;
 # the list is in image/build-rootfs.sh), or carry setuid, setgid or file capabilities.
 # Those changes belong in image/files or a package, where review sees them.
 #
@@ -123,12 +123,12 @@ mkdir -p output
 # Rebuilt every time: image/files is COPYed into it, so a stale image ships a stale /etc.
 podman build -q -t rootfs-builder -f image/Containerfile .
 
-build=${FLFS_BUILD:-$(git rev-parse HEAD 2>/dev/null || echo local)}
+build=${KAETZLI_BUILD:-$(git rev-parse HEAD 2>/dev/null || echo local)}
 for f in $flavours; do
     echo "==> image: $f"
     podman run --rm --security-opt label=disable \
-        -e FLFS_BUILD="$build" \
-        -e SOURCE_DATE_EPOCH="$FLFS_SOURCE_DATE_EPOCH" \
+        -e KAETZLI_BUILD="$build" \
+        -e SOURCE_DATE_EPOCH="$KAETZLI_SOURCE_DATE_EPOCH" \
         --volume "$PWD/rootfs":/usr/local/src:ro \
         "${extra_mount[@]}" \
         --volume "$PWD/output":/usr/local/output \
@@ -143,7 +143,7 @@ for ext in extensions/*/; do
     name=$(basename "$ext")
     echo "==> extension: $name"
     podman run --rm --security-opt label=disable \
-        -e SOURCE_DATE_EPOCH="$FLFS_SOURCE_DATE_EPOCH" \
+        -e SOURCE_DATE_EPOCH="$KAETZLI_SOURCE_DATE_EPOCH" \
         --volume "$PWD/$ext":/usr/local/src:ro \
         --volume "$PWD/output":/usr/local/output \
         rootfs-builder /usr/local/bin/build-extension.sh staged "$name"
@@ -151,5 +151,5 @@ done
 
 echo
 echo "done:"
-ls -lh output/rootfs.erofs output/flfs-oci.tar output/extensions/*.raw output/confexts/*.raw 2>/dev/null || true
+ls -lh output/rootfs.erofs output/kaetzli-oci.tar output/extensions/*.raw output/confexts/*.raw 2>/dev/null || true
 echo "boot it:  ./tools/boot-qemu.sh   (or ./test/systemd.sh output/rootfs.erofs rootfs/boot/bzImage)"

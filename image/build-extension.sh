@@ -21,7 +21,7 @@
 # The extension-release file is written here, not taken from the tree, because what it
 # says is a promise about this image and not about the extension:
 #
-#   ID=flfs                      only this OS merges it
+#   ID=kaetzli                      only this OS merges it
 #   SYSEXT_LEVEL= / CONFEXT_LEVEL=  the level image/files/etc/os-release declares, which
 #                                is the ABI an extension built today may rely on. LEVEL
 #                                overrides it, which only a test refusing a wrong one wants.
@@ -45,9 +45,9 @@ source /usr/local/bin/sbom.sh
 # An SPDX document for the extension staged in <tree>: its packages, the Go modules and
 # Rust crates they compiled in, and the builders.
 write_sbom() { # tree out
-    local components="$1/usr/share/flfs/components" modules="$1/usr/share/flfs/modules" doc arch created
+    local components="$1/usr/share/kaetzli/components" modules="$1/usr/share/kaetzli/modules" doc arch created
     case "$(uname -m)" in x86_64) arch=amd64 ;; aarch64) arch=arm64 ;; *) arch=$(uname -m) ;; esac
-    doc="flfs-ext-$name-$arch"
+    doc="kaetzli-ext-$name-$arch"
     created=$(date -u -d "@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y-%m-%dT%H:%M:%SZ)
     {
         printf '{\n'
@@ -55,11 +55,11 @@ write_sbom() { # tree out
         printf '  "dataLicense": "CC0-1.0",\n'
         printf '  "SPDXID": "SPDXRef-DOCUMENT",\n'
         printf '  "name": "%s",\n' "$(jstr "$doc")"
-        printf '  "documentNamespace": "https://github.com/fwilhe2/glowing-octo-robot/spdx/%s-%s",\n' \
+        printf '  "documentNamespace": "https://github.com/fwilhe2/kaetzli/spdx/%s-%s",\n' \
             "$(jstr "$doc")" "$(cat "$components"/* | sha256sum | cut -c1-16)"
         printf '  "creationInfo": {\n'
         printf '    "created": "%s",\n' "$created"
-        printf '    "creators": [ "Tool: flfs-build-extension", "Organization: github.com/fwilhe2/glowing-octo-robot" ]\n'
+        printf '    "creators": [ "Tool: kaetzli-build-extension", "Organization: github.com/fwilhe2/kaetzli" ]\n'
         printf '  },\n'
         printf '  "documentDescribes": [ "SPDXRef-Extension" ],\n'
         printf '  "packages": [\n'
@@ -110,7 +110,7 @@ assemble() { # class tree
     cp -a "$src" "$tree"
     mkdir -p "$tree/$release"
     {
-        echo "ID=flfs"
+        echo "ID=kaetzli"
         echo "$key=$level"
         if [ "$class" = sysext ]; then
             case "$(uname -m)" in
@@ -193,24 +193,24 @@ case "$mode" in
         # File capabilities the packages declare (build-rootfs.sh explains the records),
         # applied after the strip, which would drop them, and carried into the image by
         # the tar stream in assemble().
-        if [ -d usr/share/flfs/capabilities ]; then
+        if [ -d usr/share/kaetzli/capabilities ]; then
             while read -r path caps; do
                 [ -n "$path" ] || continue
                 [ -f "$path" ] || { echo "error: a capability record names $path, which is not a file" >&2; exit 1; }
                 setcap "$caps" "$path"
                 getcap "$path"
-            done < <(cat usr/share/flfs/capabilities/*)
-            rm -rf usr/share/flfs/capabilities
+            done < <(cat usr/share/kaetzli/capabilities/*)
+            rm -rf usr/share/kaetzli/capabilities
         fi
 
         # The extension's SBOM, from its packages' component records the way
         # build-rootfs.sh writes the image's (image/sbom.sh): at
-        # usr/share/flfs/sbom-<name>.json, so a merged extension sits beside the image's
+        # usr/share/kaetzli/sbom-<name>.json, so a merged extension sits beside the image's
         # own, and as output/sbom-ext-<name>.json, which CI's sbom artifact carries.
-        if [ -d usr/share/flfs/components ]; then
+        if [ -d usr/share/kaetzli/components ]; then
             write_sbom "$staged" "/usr/local/output/sbom-ext-$name.json"
-            cp "/usr/local/output/sbom-ext-$name.json" "usr/share/flfs/sbom-$name.json"
-            rm -rf usr/share/flfs/components usr/share/flfs/modules
+            cp "/usr/local/output/sbom-ext-$name.json" "usr/share/kaetzli/sbom-$name.json"
+            rm -rf usr/share/kaetzli/components usr/share/kaetzli/modules
         fi
 
         mkdir -p /tmp/staged-sysext /tmp/staged-confext

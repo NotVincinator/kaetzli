@@ -362,7 +362,7 @@ come from.
 
 1. **C packages: add CPEs.** Add an optional `CPE=` field to `packages/<pkg>/env.sh`, for
    example `CPE="cpe:2.3:a:openssl:openssl:$VERSION:*:*:*:*:*:*:*"`, carrying it like the
-   other pins: `build.sh` passes it as `FLFS_*`, `builder/build-package.sh` writes it into
+   other pins: `build.sh` passes it as `KAETZLI_*`, `builder/build-package.sh` writes it into
    the package's record, and `build-rootfs.sh` emits a second `externalRefs` entry with
    `"referenceCategory": "SECURITY", "referenceType": "cpe23Type"`. Take vendor/product
    pairs from the NVD CPE dictionary; leave the field out when NVD has none.
@@ -380,7 +380,7 @@ come from.
 4. Extend `test/check-sbom.sh` to require a CPE or a non-generic purl for each package that
    declares one, and at least one `pkg:golang` entry for each Go program.
 5. Add a non-gating CI job beside `k8s` that runs osv-scanner (or grype) over
-   `usr/share/flfs/sbom.json` from the rootfs artifact and writes the findings as a text
+   `usr/share/kaetzli/sbom.json` from the rootfs artifact and writes the findings as a text
    job summary (the CI section of `CLAUDE.md` explains why it must be text). It reports
    only; do not make `result` depend on it.
 
@@ -395,7 +395,7 @@ module (temporarily pin one to check, then revert).
 package list, kernel config and disk usage, and diffs them against the last release or
 nightly for review and release notes.
 
-**Gap:** flfs already has most of the inputs — `output/rootfs-files-<flavour>.txt`
+**Gap:** kaetzli already has most of the inputs — `output/rootfs-files-<flavour>.txt`
 manifests, `test/kernel-config-diff.sh`, `test/oci-trim.sh`, `test/rootfs-size.sh` and
 `test/size-history.sh` — but no single view of how a pull request changes the image
 compared with `main`.
@@ -403,7 +403,7 @@ compared with `main`.
 **Implementation:**
 
 1. Add `test/image-diff.sh <old-output> <new-output>` that reports, as text:
-   - package versions added, removed or changed (from the SBOMs, `usr/share/flfs/sbom.json`
+   - package versions added, removed or changed (from the SBOMs, `usr/share/kaetzli/sbom.json`
      in each tree, or the package records);
    - paths added and removed per flavour (`diff` of the two manifests, grouped by the
      package that owns each path, which the staging trees can tell);
@@ -482,7 +482,7 @@ done with it, not before.
   resort.
 - **Trailing-newline fix for `/etc/subuid`.** podman-machine-os,
   `podman-image/fixup-subuid-subgid.service`, works around entries appended without a
-  final newline. flfs ships both files read-only in `image/files/etc/`, so this matters
+  final newline. kaetzli ships both files read-only in `image/files/etc/`, so this matters
   only if users are ever added at runtime. Not needed today; listed so the issue is known.
 
 ## 11. Considered and not proposed

@@ -149,8 +149,8 @@ source /package-build.sh
 # binary ships its notice with it. packages/<pkg>/licenses/ is for a source that has no
 # text to copy. Identical files are hardlinked, so a hundred copies of Apache-2.0 cost
 # one. A package with no license text at all fails here rather than ship without one.
-if [ -n "${FLFS_PKG:-}" ]; then
-    licenses=$ROOTFS/usr/share/licenses/$FLFS_PKG
+if [ -n "${KAETZLI_PKG:-}" ]; then
+    licenses=$ROOTFS/usr/share/licenses/$KAETZLI_PKG
     name=( \( -iname 'copying*' -o -iname 'licen[cs]e*' -o -iname 'notice*' -o -iname 'copyright*'
               -o -iname 'unlicense*' \) )
     code=( \( -name '*.[ch]' -o -name '*.go' -o -name '*.rs' -o -name '*.py' -o -name '*.json'
@@ -174,8 +174,8 @@ if [ -n "${FLFS_PKG:-}" ]; then
         cp -L -r /usr/local/licenses/. "$licenses"/
     fi
     if [ ! -d "$licenses" ] || [ -z "$(find "$licenses" -type f)" ]; then
-        echo "error: $FLFS_PKG ships no license text: none in its source, and no" >&2
-        echo "       packages/$FLFS_PKG/licenses/ to stand in for one" >&2
+        echo "error: $KAETZLI_PKG ships no license text: none in its source, and no" >&2
+        echo "       packages/$KAETZLI_PKG/licenses/ to stand in for one" >&2
         exit 1
     fi
     chmod -R u=rwX,go=rX "$licenses"
@@ -185,36 +185,36 @@ if [ -n "${FLFS_PKG:-}" ]; then
 fi
 
 # The component record image/build-rootfs.sh turns into the SBOM: the pins ../build.sh
-# passes as FLFS_*. After the build, so only a package that installed gets one.
-if [ -n "${FLFS_PKG:-}" ]; then
-    components=$ROOTFS/usr/share/flfs/components
+# passes as KAETZLI_*. After the build, so only a package that installed gets one.
+if [ -n "${KAETZLI_PKG:-}" ]; then
+    components=$ROOTFS/usr/share/kaetzli/components
     install -d "$components"
     {
-        printf 'name=%s\n'    "$FLFS_PKG"
-        printf 'version=%s\n' "${FLFS_VERSION:-}"
-        printf 'license=%s\n' "${FLFS_LICENSE:-NOASSERTION}"
-        printf 'origin=%s\n'  "${FLFS_ORIGIN:-tarball}"
-        printf 'builder=%s\n' "${FLFS_BUILDER:-}"
+        printf 'name=%s\n'    "$KAETZLI_PKG"
+        printf 'version=%s\n' "${KAETZLI_VERSION:-}"
+        printf 'license=%s\n' "${KAETZLI_LICENSE:-NOASSERTION}"
+        printf 'origin=%s\n'  "${KAETZLI_ORIGIN:-tarball}"
+        printf 'builder=%s\n' "${KAETZLI_BUILDER:-}"
         # `if`, not `&&`: a false && list would fail the group under set -e.
-        if [ -n "${FLFS_URL:-}" ];    then printf 'url=%s\n'    "$FLFS_URL";    fi
-        if [ -n "${FLFS_SHA256:-}" ]; then printf 'sha256=%s\n' "$FLFS_SHA256"; fi
-        if [ -n "${FLFS_CPE:-}" ];    then printf 'cpe=%s\n'    "$FLFS_CPE";    fi
-    } > "$components/$FLFS_PKG"
+        if [ -n "${KAETZLI_URL:-}" ];    then printf 'url=%s\n'    "$KAETZLI_URL";    fi
+        if [ -n "${KAETZLI_SHA256:-}" ]; then printf 'sha256=%s\n' "$KAETZLI_SHA256"; fi
+        if [ -n "${KAETZLI_CPE:-}" ];    then printf 'cpe=%s\n'    "$KAETZLI_CPE";    fi
+    } > "$components/$KAETZLI_PKG"
     # Vendored dependencies are a component of their own, with their own checksum.
-    if [ -n "${FLFS_VENDOR_URL:-}" ]; then
+    if [ -n "${KAETZLI_VENDOR_URL:-}" ]; then
         {
-            printf 'name=%s\n'    "$FLFS_PKG-vendor"
-            printf 'version=%s\n' "${FLFS_VERSION:-}"
-            printf 'license=%s\n' "${FLFS_LICENSE:-NOASSERTION}"
+            printf 'name=%s\n'    "$KAETZLI_PKG-vendor"
+            printf 'version=%s\n' "${KAETZLI_VERSION:-}"
+            printf 'license=%s\n' "${KAETZLI_LICENSE:-NOASSERTION}"
             printf 'origin=tarball\n'
-            printf 'builder=%s\n' "${FLFS_BUILDER:-}"
-            printf 'url=%s\n'     "$FLFS_VENDOR_URL"
-            printf 'sha256=%s\n'  "${FLFS_VENDOR_SHA256:-}"
-        } > "$components/$FLFS_PKG-vendor"
+            printf 'builder=%s\n' "${KAETZLI_BUILDER:-}"
+            printf 'url=%s\n'     "$KAETZLI_VENDOR_URL"
+            printf 'sha256=%s\n'  "${KAETZLI_VENDOR_SHA256:-}"
+        } > "$components/$KAETZLI_PKG-vendor"
     fi
 
     # What a Go or Rust program compiled in, as purls, one per line in
-    # usr/share/flfs/modules/<pkg>: the SBOM lists each as a package its program
+    # usr/share/kaetzli/modules/<pkg>: the SBOM lists each as a package its program
     # CONTAINS, which is what a vulnerability scanner matches advisories against — most of
     # them, for this image, are about a module or crate rather than a program.
     #   Go: each binary's build info (`go version -m`, which reads it without running
@@ -236,7 +236,7 @@ if [ -n "${FLFS_PKG:-}" ]; then
         fi
     )
     if [ -n "$modules" ]; then
-        install -d "$ROOTFS/usr/share/flfs/modules"
-        LC_ALL=C sort -u <<< "$modules" > "$ROOTFS/usr/share/flfs/modules/$FLFS_PKG"
+        install -d "$ROOTFS/usr/share/kaetzli/modules"
+        LC_ALL=C sort -u <<< "$modules" > "$ROOTFS/usr/share/kaetzli/modules/$KAETZLI_PKG"
     fi
 fi

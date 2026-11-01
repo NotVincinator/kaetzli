@@ -12,7 +12,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source tools/lib.sh
 
-REGISTRY="${REGISTRY:-ghcr.io/fwilhe2/glowing-octo-robot}"
+REGISTRY="${REGISTRY:-ghcr.io/fwilhe2/kaetzli}"
 
 # The builder is compiled software and every build here is native, so there is one per
 # architecture and the tag has to say which — two runners pushing the same tag would

@@ -35,9 +35,9 @@
 #     sudo ip tuntap add dev tap0 mode tap user "$USER"
 #     sudo ip addr add 172.16.0.1/24 dev tap0 && sudo ip link set tap0 up
 #     sudo sysctl -w net.ipv4.ip_forward=1
-#     sudo nft add table ip flfs
-#     sudo nft add chain ip flfs post '{ type nat hook postrouting priority 100; }'
-#     sudo nft add rule ip flfs post ip saddr 172.16.0.0/24 masquerade
+#     sudo nft add table ip kaetzli
+#     sudo nft add chain ip kaetzli post '{ type nat hook postrouting priority 100; }'
+#     sudo nft add rule ip kaetzli post ip saddr 172.16.0.0/24 masquerade
 #
 # Leave the guest with `reboot` (reboot=k makes that end Firecracker), or kill it.
 set -euo pipefail

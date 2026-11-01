@@ -118,7 +118,7 @@ docs/             design notes; each says at the top whether it is implemented.
                   how-it-works.md is the mechanics and pitfalls of the system as it is,
                   debugging.md the debug extension, linking.md how a binary finds its
                   libraries
-examples/         images built FROM the published flfs image, each with its own README;
+examples/         images built FROM the published kaetzli image, each with its own README;
                   templates for users, not part of a build or of CI
 downloads/        source tarballs (gitignored)
 staging/          each package's own install tree, staging/<pkg>/{rootfs,extensions} (gitignored)
@@ -168,7 +168,7 @@ scratch directory for downloaded artifacts — it deliberately does not collide 
 ./test/k8s.sh output/rootfs.erofs rootfs/boot/bzImage      # 3-node kubeadm cluster via tools/k8s-demo.sh (KVM; skips without)
 ./test/node-conformance.sh output/rootfs.erofs rootfs/boot/bzImage  # upstream's [NodeConformance] node e2e specs on one node (KVM; FOCUS=, KEEP=1)
 ./test/reproducible.sh <pkg>...   # build twice from clean worktrees, compare to the byte (AGAINST_RUN=<id>: against CI's)
-./test/oci.sh output/flfs-oci.tar # load and run the container image (no qemu)
+./test/oci.sh output/kaetzli-oci.tar # load and run the container image (no qemu)
 ./test/prebuilt.sh [build|oci|ssh] # host-compiled C, C++, Rust and Go binaries, run in the image
 ./test/rootfs-size.sh [erofs|oci]  # image size vs test/size-budget.txt, and where it went
 ./test/vs-debian-slim.sh          # the OCI image against debian-slim, with both breakdowns
@@ -201,7 +201,7 @@ or a new case in one, gets a fixture that must produce a finding.
 
 Builds are slow (glibc, systemd and the kernel are tens of minutes); run them in the
 background. Image assembly is byte-reproducible, so a refactor of `image/build-rootfs.sh`
-can be checked by building before and after with the same `FLFS_BUILD=` and comparing
+can be checked by building before and after with the same `KAETZLI_BUILD=` and comparing
 `sha256sum` of everything in `output/`.
 
 **A removal gets an `absent` line in `test/image-files/<topic>.txt`** — a meson option
@@ -269,7 +269,7 @@ elsewhere. `SHA256` cannot be derived, so a bump is two lines: use
 `tools/bump-version.sh <pkg> <version>`, which writes both and verifies the tarball. A bump
 of `VERSION` alone fails the `sources` job as *CHECKSUM MISMATCH*.
 
-**`LOCAL_SOURCE=1`**: the source is `packages/<pkg>/src/` in git (`packages/flfsfetch`), with
+**`LOCAL_SOURCE=1`**: the source is `packages/<pkg>/src/` in git (`packages/kaetzlifetch`), with
 no `TARBALL`, `URL` or `SHA256`. `build.sh` mounts it **read-only**, so the build must
 compile straight to `DESTDIR` or under `/tmp`. The CI cache key hashes `src/` because the
 source can change with `env.sh` untouched. fetch, prep, image-tags and check-updates all
@@ -318,7 +318,7 @@ and status format). A package that sets `CFLAGS` wholesale drops both sysroot an
 ## Image assembly and boot
 
 `image/build-rootfs.sh` turns `rootfs/` into `output/rootfs.erofs` (or, with `oci`,
-`output/flfs-oci.tar`) on a copy in the container: skeleton, `image/files` as the shipped
+`output/kaetzli-oci.tar`) on a copy in the container: skeleton, `image/files` as the shipped
 `/etc`, the trim, first boot, `ldconfig`, `mkfs.erofs`, verity, the SBOM. **`image/files` is
 `COPY`ed into the assembly image**, so editing it means rebuilding that image
 (`tools/build-image.sh` does). Accounts are `root` and `user` (uid 1000) with **no
@@ -351,14 +351,14 @@ modules no config names. The rest of the trim is at build time: systemd's `-D…
 lines and the kernel's `vm.config`.
 
 **The SBOM is generated, not scanned** (there is no package database): `build.sh` passes
-each package's pins as `FLFS_*`, `build-package.sh` writes a record into the staging tree
+each package's pins as `KAETZLI_*`, `build-package.sh` writes a record into the staging tree
 after a successful install, and `build-rootfs.sh` turns the records in the *assembled* tree
 into SPDX, since the flavours differ: a package with no file left in a flavour is not in
-its SBOM, judged by `usr/share/flfs/owners`, which `merge-staging.sh` writes into `rootfs/`
+its SBOM, judged by `usr/share/kaetzli/owners`, which `merge-staging.sh` writes into `rootfs/`
 and the assembly deletes. `test/check-sbom.sh` parses it. A package's `CPE=` (NVD's
 name for it, space-separated where NVD has two) becomes a `cpe23Type` reference each, and the Go modules and Rust crates a program
 compiled in (`go version -m`, `cargo tree -e normal`, recorded by `build-package.sh` in
-`usr/share/flfs/modules/`) become packages it `CONTAINS`: those two are what scanners match.
+`usr/share/kaetzli/modules/`) become packages it `CONTAINS`: those two are what scanners match.
 `image/sbom.sh` is shared with `build-extension.sh`, which writes `sbom-ext-<name>.json`.
 Unresolved libraries
 are `DEPENDS_ON` without `CONTAINS`, computed like `check-rootfs-deps.sh` (a library is a
@@ -368,7 +368,7 @@ file plus its SONAME symlink).
 `build-package.sh` copies each package's upstream texts (top level, `doc/`, any `LICENSES/`
 or `licenses/` directory, `debian/copyright`, and every `vendor/` dependency's) into
 `usr/share/licenses/<pkg>/`, hardlinking duplicates, and fails a package that has none;
-`packages/<pkg>/licenses/` stands in for a source with no text (`iana-etc`, `flfsfetch`).
+`packages/<pkg>/licenses/` stands in for a source with no text (`iana-etc`, `kaetzlifetch`).
 `build-rootfs.sh` hashes that tree before the first step and fails if any step changed it,
 and `check-sbom.sh` requires one for every package the SBOM names.
 
@@ -388,7 +388,7 @@ those mount points empty, so anything needed there is made at boot (tmpfiles,
 image's (`VAR_DISK=` in `test/qemu-lib.sh`, which also passes a persistent machine ID).
 **`/home` and `/root` are symlinks to `var/home` and `var/roothome`**, as on ostree
 systems, so they are wherever `/var` is, with no mount of their own to order;
-`tmpfiles.d/flfs-home.conf` makes the targets. The OCI flavour keeps them as directories.
+`tmpfiles.d/kaetzli-home.conf` makes the targets. The OCI flavour keeps them as directories.
 
 **First boot happens in `build-rootfs.sh`, because `/etc` is read-only.** The units that
 write `/etc` are `ConditionNeedsUpdate=/etc` and skip, which is right only if the result is
@@ -480,7 +480,7 @@ reloads PID 1, so one that should start at boot needs `UpheldBy=` as well as `Wa
   (jansson). glib ships only `libglib-2.0`; `libffi-dev` is in `deps.txt` for its build only.
 - **Rootless** needs `newuidmap`/`newgidmap` (`packages/shadow`), `pasta`, `rootlessport`,
   and `/etc/subuid`/`subgid` for `user`. **The two helpers are file capabilities, never
-  setuid**: a package declares them in `usr/share/flfs/capabilities/<pkg>` (package tars
+  setuid**: a package declares them in `usr/share/kaetzli/capabilities/<pkg>` (package tars
   carry no xattrs) and the assembly applies them. Images are made from a tar stream with
   `--xattrs-include=security.capability`, so no host SELinux label gets in.
 - **glib is coupled to sid like OpenSSL, and unversioned**: keep `packages/glib` at or
@@ -543,7 +543,7 @@ which is why `vm.config` names so much arm64 board support.
 
 ## Reproducible builds
 
-**The same commit builds the same bytes, on any machine.** `FLFS_SOURCE_DATE_EPOCH` in
+**The same commit builds the same bytes, on any machine.** `KAETZLI_SOURCE_DATE_EPOCH` in
 `tools/lib.sh` is every "now" (`SOURCE_DATE_EPOCH` in each build). `test/reproducible.sh`
 builds a package twice and compares (`AGAINST_RUN=<id>`: against CI's), and CI's
 `reproducible` job assembles the images a second time and requires the same bytes. When
@@ -582,9 +582,9 @@ key, so even a comment there rebuilds every package.
 
 `publish-oci` is the only job that writes anything public, and only on `main`, so a pull
 request cannot exercise it — verify changes to it or `tools/publish-oci.sh` by hand
-(`REGISTRY=` points it at a local registry). It pushes `flfs:<commit>-<arch>`, then a
-manifest list at `flfs:<commit>` and `flfs:latest`, after `boot` (the OCI image is the same
-userspace as the disk). Both archives `podman load` as `localhost/flfs:latest`, so the
+(`REGISTRY=` points it at a local registry). It pushes `kaetzli:<commit>-<arch>`, then a
+manifest list at `kaetzli:<commit>` and `kaetzli:latest`, after `boot` (the OCI image is the same
+userspace as the disk). Both archives `podman load` as `localhost/kaetzli:latest`, so the
 script tags and pushes each before loading the next.
 
 `tools/fetch-image.sh` / `tools/boot-qemu.sh` are for poking at CI artifacts locally.

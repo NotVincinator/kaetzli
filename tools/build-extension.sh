@@ -23,7 +23,7 @@ mkdir -p output
 # extension's level is read from there.
 podman build -q -t rootfs-builder -f image/Containerfile . > /dev/null
 podman run --rm --security-opt label=disable \
-    -e SOURCE_DATE_EPOCH="$FLFS_SOURCE_DATE_EPOCH" ${LEVEL:+-e LEVEL="$LEVEL"} \
+    -e SOURCE_DATE_EPOCH="$KAETZLI_SOURCE_DATE_EPOCH" ${LEVEL:+-e LEVEL="$LEVEL"} \
     --volume "$(realpath "$dir")":/usr/local/src:ro \
     --volume "$PWD/output":/usr/local/output \
     rootfs-builder /usr/local/bin/build-extension.sh "$class" "$name"

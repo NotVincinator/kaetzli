@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Load the OCI image and run it:
 #
-#     ./test/oci.sh [output/flfs-oci.tar]
+#     ./test/oci.sh [output/kaetzli-oci.tar]
 #
 # `podman load` succeeding is already half the test — the archive image/build-rootfs.sh
 # writes is a hand-assembled OCI layout, so anything wrong with a media type, a digest or
@@ -16,7 +16,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-ARCHIVE="${1:-output/flfs-oci.tar}"
+ARCHIVE="${1:-output/kaetzli-oci.tar}"
 
 [ -f "$ARCHIVE" ] || {
     echo "error: no OCI archive at $ARCHIVE" >&2
@@ -26,7 +26,7 @@ ARCHIVE="${1:-output/flfs-oci.tar}"
     exit 1
 }
 
-# "Loaded image: localhost/flfs:latest" — the tag comes from the ref.name annotation the
+# "Loaded image: localhost/kaetzli:latest" — the tag comes from the ref.name annotation the
 # layout carries, so read it back rather than assuming it.
 loaded=$(podman load --quiet --input "$ARCHIVE" | tail -n1)
 ref=${loaded##*: }
@@ -37,7 +37,7 @@ echo "loaded $ref"
 # that is all a base image has, and asking for more is how a test starts depending on the
 # host. --network=none because none of it needs a network, and an image that quietly did
 # would be worth finding out about.
-podman run --rm --network=none -e EXPECT_BUILD="${FLFS_BUILD:-}" "$ref" -c '
+podman run --rm --network=none -e EXPECT_BUILD="${KAETZLI_BUILD:-}" "$ref" -c '
 set -u
 fail=0
 check() {  # check <description> <test...>
@@ -61,11 +61,11 @@ echo "the shell the entrypoint started:"
 check "bash is running as the entrypoint"    test -n "$BASH_VERSION"
 check "it started in the configured WORKDIR" test "$PWD" = /root
 check "PATH finds our binaries"              test "$(command -v ls)" = /usr/bin/ls
-check "os-release identifies the image"      test "$ID" = flfs
+check "os-release identifies the image"      test "$ID" = kaetzli
 
 # Whether the build stamped itself. This compares against what the caller passed rather
 # than asserting a value, so it says the right thing in both situations: CI exports
-# FLFS_BUILD and the two must agree, while a local run exports nothing and an image with
+# KAETZLI_BUILD and the two must agree, while a local run exports nothing and an image with
 # no BUILD_ID is correct. The case it catches is the one that would otherwise be silent —
 # CI supplying a commit that never reaches os-release, leaving a published image unable
 # to say which build it is.
@@ -111,7 +111,7 @@ check "and it runs, and it is bash"          test "$(sh -c "echo \$BASH_VERSION"
 # Not an assertion — it is the one binary of ours that exists to be looked at, and this
 # is the cheapest place in CI that runs a shipped binary at all.
 echo
-flfsfetch || echo "(flfsfetch is not in this image)"
+kaetzlifetch || echo "(kaetzlifetch is not in this image)"
 
 exit $fail
 '

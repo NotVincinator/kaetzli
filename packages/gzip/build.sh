@@ -36,8 +36,8 @@ ln -s gzip $ROOTFS/usr/bin/zcat
 # unpacks a layer with it. The builder container runs on our glibc — root build.sh binds
 # it over Debian's, because builds execute what they just compiled — so the installed
 # binary can simply be run under the installed name.
-printf 'flfs\n' | $ROOTFS/usr/bin/gzip -c > /tmp/gnu-standard-check.gz
-if [ "$($ROOTFS/usr/bin/zcat /tmp/gnu-standard-check.gz)" != flfs ]; then
+printf 'kaetzli\n' | $ROOTFS/usr/bin/gzip -c > /tmp/gnu-standard-check.gz
+if [ "$($ROOTFS/usr/bin/zcat /tmp/gnu-standard-check.gz)" != kaetzli ]; then
     echo "error: zcat did not decompress — -DGNU_STANDARD=0 did not reach the compile" >&2
     exit 1
 fi

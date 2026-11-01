@@ -76,7 +76,7 @@ cat /proc/sys/kernel/random/boot_id > /var/lib/persistent-var-test && \
 [[ \$(readlink /home):\$(readlink /root) == var/home:var/roothome ]] && \
 runuser -u user -- cp /var/lib/persistent-var-test /home/user/persistent-var-test && \
 cp /var/lib/persistent-var-test /root/persistent-var-test && \
-tar -C /usr/share/flfs -c sbom.json | podman import - localhost/persisted >/dev/null && \
+tar -C /usr/share/kaetzli -c sbom.json | podman import - localhost/persisted >/dev/null && \
 echo VAR'-FIRST-OK'"
 DIAGNOSE="findmnt /var; cat /etc/machine-id; systemctl --no-pager status var.mount systemd-makefs@*; journalctl --no-pager -b -u 'systemd-makefs*' -n 30"
 

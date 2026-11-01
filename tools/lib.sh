@@ -16,7 +16,7 @@
 # the commit's date on purpose: the date would make two builds of the same tree from
 # different commits differ in every timestamp, and nothing here means "when" by it. It
 # is not a version and does not need to move.
-FLFS_SOURCE_DATE_EPOCH=1767225600
+KAETZLI_SOURCE_DATE_EPOCH=1767225600
 
 # normalize_arch [arch] — amd64 or arm64, from either spelling; the host's when empty.
 normalize_arch() {

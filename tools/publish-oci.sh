@@ -6,7 +6,7 @@
 #     REGISTRY=localhost:5000 ./tools/publish-oci.sh
 #
 # It expects the two archives where CI's download-artifact leaves them,
-# artifacts/oci-image-<arch>/flfs-oci.tar, which is also where tools/fetch-image.sh
+# artifacts/oci-image-<arch>/kaetzli-oci.tar, which is also where tools/fetch-image.sh
 # puts a downloaded one. Both have to be present: the point of this script is the
 # manifest list, and a list with one entry is just an image with extra steps.
 #
@@ -21,8 +21,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-REGISTRY="${REGISTRY:-ghcr.io/fwilhe2/glowing-octo-robot}"
-REPO="$REGISTRY/flfs"
+REGISTRY="${REGISTRY:-ghcr.io/fwilhe2/kaetzli}"
+REPO="$REGISTRY/kaetzli"
 
 # GITHUB_SHA in Actions, the working tree's HEAD locally. Twelve characters because
 # that is long enough to be unambiguous and short enough to type.
@@ -30,12 +30,12 @@ sha="${GITHUB_SHA:-$(git rev-parse HEAD)}"
 TAG="${TAG:-${sha:0:12}}"
 
 # Also tag the list `latest`, unless something else was asked for: a moving name is
-# what makes `podman run ghcr.io/.../flfs` work without looking a commit up first.
+# what makes `podman run ghcr.io/.../kaetzli` work without looking a commit up first.
 LATEST="${LATEST:-latest}"
 
 per_arch=()
 for arch in amd64 arm64; do
-    archive="artifacts/oci-image-$arch/flfs-oci.tar"
+    archive="artifacts/oci-image-$arch/kaetzli-oci.tar"
     [ -f "$archive" ] || {
         echo "error: no OCI archive for $arch at $archive" >&2
         echo "       CI's rootfs job uploads one per architecture as oci-image-<arch>;" >&2
@@ -45,9 +45,9 @@ for arch in amd64 arm64; do
     }
 
     # Both archives carry the same ref.name annotation, so both load as
-    # localhost/flfs:latest and the second load moves that tag off the first image.
+    # localhost/kaetzli:latest and the second load moves that tag off the first image.
     # Hence tag and push inside the loop, before the next load: by the end of it
-    # localhost/flfs:latest means arm64 and nothing should be relying on it.
+    # localhost/kaetzli:latest means arm64 and nothing should be relying on it.
     loaded=$(podman load --quiet --input "$archive" | tail -n1)
     ref=${loaded##*: }
     [ -n "$ref" ] || { echo "error: could not tell what podman loaded: $loaded" >&2; exit 1; }

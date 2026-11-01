@@ -79,7 +79,7 @@ CONF
 # a pod out anyway. The other way round — kubelet asking CRI-O instead, the
 # PodAndContainerStatsFromCRI gate — is beta and off in 1.37, and fails the same test on
 # more fields (no PSI); worth trying again when it is on by default.
-cat > "$ROOTFS/etc/crio/crio.conf.d/10-flfs.conf" <<'CONF'
+cat > "$ROOTFS/etc/crio/crio.conf.d/10-kaetzli.conf" <<'CONF'
 [crio.runtime]
 default_runtime = "crun"
 drop_infra_ctr = false

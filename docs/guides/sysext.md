@@ -6,7 +6,7 @@ systemd merges their read-only filesystems over the base; removing an extension 
 the base view.
 
 The base declares `SYSEXT_LEVEL=1` and `CONFEXT_LEVEL=1` in `os-release`. Extension release
-metadata must match the corresponding level and `ID=flfs`. These levels represent the
+metadata must match the corresponding level and `ID=kaetzli`. These levels represent the
 interfaces extensions may rely on; bump them when an incompatible base change requires
 rebuilding extensions.
 

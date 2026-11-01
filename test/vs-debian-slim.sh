@@ -127,7 +127,7 @@ summary() {
 
 echo
 echo "container image size ($ARCH):"
-printf '  %10s MiB  flfs\n'  "$(mib "$ours_total")"
+printf '  %10s MiB  kaetzli\n'  "$(mib "$ours_total")"
 printf '  %10s MiB  %s\n'    "$(mib "$theirs_total")" "$BASELINE"
 if [ "$delta" -lt 0 ]; then
     echo "  → ${percent}% of debian-slim, $(mib $(( -delta ))) MiB smaller"
@@ -137,13 +137,13 @@ fi
 
 echo
 echo "  where the bytes are:"
-printf '    %8s  %8s  %s\n' "flfs" "debian" "directory"
+printf '    %8s  %8s  %s\n' "kaetzli" "debian" "directory"
 while read -r _ a b path; do
     printf '    %8s  %8s  %s\n' "$(mib "$a")" "$(mib "$b")" "$path"
 done <<< "$sorted"
 
 echo
-echo "  largest files, flfs:"
+echo "  largest files, kaetzli:"
 for entry in "${ours_files[@]:0:10}"; do
     printf '    %8s  %s\n' "$(mib "${entry%% *}")" "${entry#* }"
 done
@@ -157,7 +157,7 @@ summary "## Container image vs debian-slim — $ARCH"
 summary ""
 summary "**$(mib "$ours_total") MiB** against **$(mib "$theirs_total") MiB** for \`$BASELINE\` — ${percent}%, $(mib $(( delta < 0 ? -delta : delta ))) MiB $([ "$delta" -lt 0 ] && echo smaller || echo LARGER)."
 summary ""
-summary "| directory | flfs MiB | debian-slim MiB |"
+summary "| directory | kaetzli MiB | debian-slim MiB |"
 summary "| --- | ---: | ---: |"
 while read -r _ a b path; do
     summary "| \`$path\` | $(mib "$a") | $(mib "$b") |"
@@ -165,7 +165,7 @@ done <<< "$sorted"
 summary ""
 summary "<details><summary>Largest files</summary>"
 summary ""
-summary "| flfs | MiB |"
+summary "| kaetzli | MiB |"
 summary "| --- | ---: |"
 for entry in "${ours_files[@]:0:10}"; do
     summary "| \`${entry#* }\` | $(mib "${entry%% *}") |"

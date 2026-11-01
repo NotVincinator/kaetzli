@@ -377,14 +377,14 @@ jobs:
           exit $rc
 
       - name: Run the OCI image
-        run: FLFS_BUILD="$GITHUB_SHA" ./test/oci.sh output/flfs-oci.tar
+        run: KAETZLI_BUILD="$GITHUB_SHA" ./test/oci.sh output/kaetzli-oci.tar
 
       # Binaries built by the runner's gcc, g++, rustc and go: libgcc_s, libstdc++ and
       # zoneinfo, which nothing compiled here asks for.
       - name: Run binaries built elsewhere
         run: |
           ./test/prebuilt.sh build output/prebuilt
-          ./test/prebuilt.sh oci output/prebuilt output/flfs-oci.tar
+          ./test/prebuilt.sh oci output/prebuilt output/kaetzli-oci.tar
 
       # The same bytes, for the boot job to run in the guest.
       - name: Upload binaries built elsewhere
@@ -448,7 +448,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: oci-image-${{ matrix.arch }}
-          path: output/flfs-oci.tar
+          path: output/kaetzli-oci.tar
 
       - name: Upload system extensions
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -468,7 +468,7 @@ jobs:
         run: |
           entry() { echo "sha256 $(sha256sum "$1" | cut -d' ' -f1) $2"; }
           {
-            echo "# flfs boot bundle; tools/fetch-image.sh verifies downloads against it"
+            echo "# kaetzli boot bundle; tools/fetch-image.sh verifies downloads against it"
             echo "run $GITHUB_RUN_ID"
             echo "commit $GITHUB_SHA"
             echo "arch $ARCH"
@@ -530,7 +530,7 @@ jobs:
 
       - name: Check the images are reproducible
         run: |
-          outputs="output/rootfs.erofs output/rootfs.cmdline output/flfs-oci.tar output/sbom-erofs.json output/sbom-oci.json"
+          outputs="output/rootfs.erofs output/rootfs.cmdline output/kaetzli-oci.tar output/sbom-erofs.json output/sbom-oci.json"
           outputs+=" $(ls output/extensions/*.raw output/confexts/*.raw)"
           sha256sum $outputs > first.sha256
           ./tools/build-image.sh --image-only > second-build.log 2>&1 || { tail -50 second-build.log; exit 1; }
@@ -898,7 +898,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # tools/publish-oci.sh reads artifacts/oci-image-<arch>/flfs-oci.tar.
+      # tools/publish-oci.sh reads artifacts/oci-image-<arch>/kaetzli-oci.tar.
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: oci-image-*

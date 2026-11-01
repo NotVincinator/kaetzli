@@ -17,7 +17,7 @@
 # tools/prep.sh from the sources image or upstream. --images removes builder and sources
 # images whose tag no longer matches tools/image-tags.sh — every builder/deps.txt edit or
 # version bump leaves one behind, and a builder is gigabytes — plus the image-assembly
-# container and the `flfs` image test/oci.sh loads, which are rebuilt on every run. The
+# container and the `kaetzli` image test/oci.sh loads, which are rebuilt on every run. The
 # *current* builder and sources images stay unless --all says otherwise, since those are
 # what the next ./build.sh would pull.
 #
@@ -107,7 +107,7 @@ while read -r ref id size; do
             if [ "$current" = 0 ] && { [ "$ref" = "$builder" ] || [ "$ref" = "$sources" ]; }; then
                 continue
             fi ;;
-        localhost/rootfs-builder:*|localhost/flfs:*) ;;
+        localhost/rootfs-builder:*|localhost/kaetzli:*) ;;
         *) continue ;;
     esac
     if [ "$dry" = 1 ]; then

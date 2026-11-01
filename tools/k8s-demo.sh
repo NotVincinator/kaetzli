@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A multi-node Kubernetes cluster out of the flfs image, as a demo: boot NODES guests in
+# A multi-node Kubernetes cluster out of the kaetzli image, as a demo: boot NODES guests in
 # qemu, turn them into one kubeadm control plane and NODES-1 workers, and run something on
 # it that has to cross nodes to work.
 #
@@ -134,7 +134,7 @@ boot_router() {
 
     SSH_DIR="$STATE/ssh"
     qemu_ssh_setup
-    sed "s/^Host flfs$/Host $ROUTER/" "$SSH_DIR/config" > "$STATE/ssh_config"
+    sed "s/^Host kaetzli$/Host $ROUTER/" "$SSH_DIR/config" > "$STATE/ssh_config"
     # The authorized key, for the nodes, which get the same one.
     KEY_CREDENTIAL="$QEMU_APPEND_EXTRA"
     QEMU_NIC_EXTRA+=",hostfwd=tcp:127.0.0.1:$API_PORT-:6443"
@@ -200,7 +200,7 @@ boot_node() {
     local n="$1" name ip
     name=$(node_name "$n") ip=$(node_ip "$n")
 
-    sed -e "s/^Host flfs$/Host $name/" -e "s/^    HostName 127.0.0.1$/    HostName $ip\n    ProxyJump $ROUTER/" \
+    sed -e "s/^Host kaetzli$/Host $name/" -e "s/^    HostName 127.0.0.1$/    HostName $ip\n    ProxyJump $ROUTER/" \
         -e '/^    Port /d' "$STATE/ssh/config" >> "$STATE/ssh_config"
     QEMU_APPEND_EXTRA="$KEY_CREDENTIAL systemd.hostname=$name"
     QEMU_NIC_ARGS=(-netdev "stream,id=net0,server=off,addr.type=unix,addr.path=$STATE/$name.sock"
@@ -237,7 +237,7 @@ nodeRegistration:
 apiVersion: kubeadm.k8s.io/v1beta4
 kind: ClusterConfiguration
 kubernetesVersion: $K8S_VERSION
-clusterName: flfs
+clusterName: kaetzli
 networking:
   podSubnet: $POD_CIDR
   serviceSubnet: $SVC_CIDR

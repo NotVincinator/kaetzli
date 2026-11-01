@@ -7,7 +7,7 @@ set -x
 #
 #   erofs  a bootable, read-only disk for qemu — output/rootfs.erofs, the real output of
 #          this repo. Nothing on it can be changed; an update is a new image.
-#   oci    a container image — output/flfs-oci.tar, the same userspace with the parts
+#   oci    a container image — output/kaetzli-oci.tar, the same userspace with the parts
 #          that only mean something to a machine that boots taken back out
 #
 # One script, because the skeleton, the trim and ldconfig are the same for both; the
@@ -58,7 +58,7 @@ mkdir -p {mnt,opt,proc,srv,sys}
 mkdir -p var/{lib,lock,log,spool}
 install -d -m 0750 root
 # `user`'s home, for the container: nothing would create it on login. The disk image
-# replaces home and root with symlinks into /var (below), and tmpfiles.d/flfs-home.conf
+# replaces home and root with symlinks into /var (below), and tmpfiles.d/kaetzli-home.conf
 # makes the homes there. Numeric, since 1000 is a name only in the /etc being shipped.
 install -d -m 0700 home/user
 chown 1000:1000 home/user
@@ -84,16 +84,16 @@ cp -r /files/* .
 install -D -m 644 etc/os-release usr/lib/os-release
 ln -sfn ../usr/lib/os-release etc/os-release
 
-# The fields only a build knows. FLFS_VERSION is for a release (docs/proposals/release.md; nothing
-# sets it yet), FLFS_BUILD is the commit. Unset, the file is exactly as it is in git.
+# The fields only a build knows. KAETZLI_VERSION is for a release (docs/proposals/release.md; nothing
+# sets it yet), KAETZLI_BUILD is the commit. Unset, the file is exactly as it is in git.
 # PRETTY_NAME is rewritten in place: not every parser takes the last of two assignments.
-if [ -n "${FLFS_VERSION:-}" ]; then
-    sed -i "s/^PRETTY_NAME=\"\(.*\)\"\$/PRETTY_NAME=\"\1 $FLFS_VERSION\"/" usr/lib/os-release
-    printf 'VERSION="%s"\nVERSION_ID="%s"\n' "$FLFS_VERSION" "$FLFS_VERSION" >> usr/lib/os-release
+if [ -n "${KAETZLI_VERSION:-}" ]; then
+    sed -i "s/^PRETTY_NAME=\"\(.*\)\"\$/PRETTY_NAME=\"\1 $KAETZLI_VERSION\"/" usr/lib/os-release
+    printf 'VERSION="%s"\nVERSION_ID="%s"\n' "$KAETZLI_VERSION" "$KAETZLI_VERSION" >> usr/lib/os-release
 fi
 
-if [ -n "${FLFS_BUILD:-}" ]; then
-    printf 'BUILD_ID="%s"\n' "$FLFS_BUILD" >> usr/lib/os-release
+if [ -n "${KAETZLI_BUILD:-}" ]; then
+    printf 'BUILD_ID="%s"\n' "$KAETZLI_BUILD" >> usr/lib/os-release
 fi
 
 if [ "$flavour" = erofs ]; then
@@ -255,7 +255,7 @@ if [ -n "$setid" ]; then
 fi
 
 # The account files carry no comments, because buildah parses /etc/passwd itself and
-# stops at the first malformed line, so `USER user` in a Containerfile FROM flfs fails.
+# stops at the first malformed line, so `USER user` in a Containerfile FROM kaetzli fails.
 # Their reasons, here instead:
 #   passwd   `user` is uid 1000, above the 999 systemd-sysusers allocates up to.
 #   group    `user`'s group only; sysusers allocates the rest (wheel, systemd-journal).
@@ -446,7 +446,7 @@ extra_protected="etc/passwd etc/group etc/shadow etc/gshadow etc/subuid etc/subg
     etc/credstore etc/credstore.encrypted usr/lib/credstore etc/containers
     etc/ld.so.conf etc/ld.so.conf.d etc/ld.so.preload etc/ld.so.cache etc/nsswitch.conf
     etc/os-release usr/lib/os-release etc/machine-id etc/fstab
-    usr/share/flfs usr/share/licenses usr/lib/modules"
+    usr/share/kaetzli usr/share/licenses usr/lib/modules"
 if [ -d /extra ]; then
     set +x
     if [ -z "$(ls -A /extra)" ]; then
@@ -549,11 +549,11 @@ if [ "$flavour" = erofs ]; then
     # / at the 0555 tmpfiles.d/root.conf would otherwise fail to fchmod at every boot.
     chmod 555 "$IMAGE"
 
-    # File capabilities, declared by a package in usr/share/flfs/capabilities/<pkg> as
+    # File capabilities, declared by a package in usr/share/kaetzli/capabilities/<pkg> as
     # "<path> <caps>" lines, since package tars carry no xattrs. image/build-extension.sh
     # does the same for extensions.
     apply_capabilities() { # tree
-        local records="$1/usr/share/flfs/capabilities" path caps
+        local records="$1/usr/share/kaetzli/capabilities" path caps
         [ -d "$records" ] || return 0
         while read -r path caps; do
             [ -n "$path" ] || continue
@@ -594,7 +594,7 @@ UNIT
 
     # /home and /root live in /var, as on ostree systems: RAM with /var, and kept with it
     # when /var is a disk, with no mount of their own to order against /var's.
-    # tmpfiles.d/flfs-home.conf makes var/home and var/roothome at every boot. Relative,
+    # tmpfiles.d/kaetzli-home.conf makes var/home and var/roothome at every boot. Relative,
     # so the links resolve inside a mounted copy of the image too.
     rm -rf home root
     ln -s var/home home
@@ -613,7 +613,7 @@ UNIT
     done
 fi
 
-rm -rf usr/share/flfs/capabilities
+rm -rf usr/share/kaetzli/capabilities
 
 chown -R root:root etc
 
@@ -623,7 +623,7 @@ if [ "$flavour" = erofs ]; then
     chmod 755 etc/systemd/system etc/systemd/network etc/pam.d \
               etc/systemd/system/dbus.service.d etc/systemd/journald.conf.d \
               etc/systemd/resolved.conf.d etc/systemd/system-preset
-    chmod 644 etc/fstab etc/hostname etc/subuid etc/subgid etc/pam.d/* etc/tmpfiles.d/{flfs-home,home,provision}.conf \
+    chmod 644 etc/fstab etc/hostname etc/subuid etc/subgid etc/pam.d/* etc/tmpfiles.d/{kaetzli-home,home,provision}.conf \
               etc/systemd/network/*.network \
               etc/systemd/system/dbus.service.d/*.conf etc/systemd/journald.conf.d/*.conf \
               etc/systemd/resolved.conf.d/*.conf etc/systemd/system-preset/*.preset
@@ -640,12 +640,12 @@ du -sh "$IMAGE"
 # The SBOM, SPDX 2.3, generated from the component records builder/build-package.sh
 # leaves rather than scanned (there is no package database). From the assembled tree,
 # since the two flavours differ. Hand-written JSON; test/check-sbom.sh parses it.
-sbom="$IMAGE/usr/share/flfs/sbom.json"
-components="$IMAGE/usr/share/flfs/components"
-modules="$IMAGE/usr/share/flfs/modules"
+sbom="$IMAGE/usr/share/kaetzli/sbom.json"
+components="$IMAGE/usr/share/kaetzli/components"
+modules="$IMAGE/usr/share/kaetzli/modules"
 
 if [ ! -d "$components" ] || [ -z "$(ls -A "$components" 2>/dev/null)" ]; then
-    echo "error: no component records in usr/share/flfs/components" >&2
+    echo "error: no component records in usr/share/kaetzli/components" >&2
     echo "       builder/build-package.sh stages one per package; a tree without them" >&2
     echo "       predates that and cannot be described. Delete rootfs/ and rebuild." >&2
     exit 1
@@ -655,14 +655,14 @@ fi
 # CVEs against an image without it: the container flavour has no kernel, kmod or PAM.
 # tools/merge-staging.sh lists who installed each path; a package stays while any of its
 # files is left other than its license texts (which nothing may remove) and its records.
-owners="$IMAGE/usr/share/flfs/owners"
+owners="$IMAGE/usr/share/kaetzli/owners"
 if [ ! -f "$owners" ]; then
-    echo "error: no usr/share/flfs/owners; rootfs/ predates it — run ./tools/merge-staging.sh" >&2
+    echo "error: no usr/share/kaetzli/owners; rootfs/ predates it — run ./tools/merge-staging.sh" >&2
     exit 1
 fi
 set +x
 present=$(while IFS=$'\t' read -r path pkg; do
-              case "$path" in usr/share/licenses/*|usr/share/flfs/*) continue ;; esac
+              case "$path" in usr/share/licenses/*|usr/share/kaetzli/*) continue ;; esac
               if [ -e "$path" ] || [ -L "$path" ]; then echo "$pkg"; fi
           done < "$owners" | LC_ALL=C sort -u)
 set -x
@@ -695,7 +695,7 @@ created=$(date -u -d "@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y-%m-%dT%H:%M:%SZ)
 # jstr, spdxid and the package and relationship loops, shared with build-extension.sh.
 source /usr/local/bin/sbom.sh
 
-image_name="flfs-$flavour-$oci_arch"
+image_name="kaetzli-$flavour-$oci_arch"
 
 {
     printf '{\n'
@@ -704,11 +704,11 @@ image_name="flfs-$flavour-$oci_arch"
     printf '  "SPDXID": "SPDXRef-DOCUMENT",\n'
     printf '  "name": "%s",\n' "$(jstr "$image_name")"
     # Unique per document, and derived rather than random so it is reproducible.
-    printf '  "documentNamespace": "https://github.com/fwilhe2/glowing-octo-robot/spdx/%s-%s",\n' \
+    printf '  "documentNamespace": "https://github.com/fwilhe2/kaetzli/spdx/%s-%s",\n' \
         "$(jstr "$image_name")" "$(cat "$components"/* $extra_manifest | sha256sum | cut -c1-16)"
     printf '  "creationInfo": {\n'
     printf '    "created": "%s",\n' "$created"
-    printf '    "creators": [ "Tool: flfs-build-rootfs", "Organization: github.com/fwilhe2/glowing-octo-robot" ]\n'
+    printf '    "creators": [ "Tool: kaetzli-build-rootfs", "Organization: github.com/fwilhe2/kaetzli" ]\n'
     printf '  },\n'
     printf '  "documentDescribes": [ "SPDXRef-Image" ],\n'
     printf '  "packages": [\n'
@@ -910,7 +910,7 @@ gzip -9n < /tmp/layer.tar > /tmp/layer.tar.gz
 rm -f /tmp/layer.tar
 read -r layer_digest layer_size < <(blob /tmp/layer.tar.gz)
 
-# Entrypoint bash, no Cmd: `podman run flfs -c uptime` works. PATH is explicit because
+# Entrypoint bash, no Cmd: `podman run kaetzli -c uptime` works. PATH is explicit because
 # the runtime's default names directories a merged-/usr image does not have.
 cat > /tmp/config.json <<EOF
 {
@@ -922,8 +922,8 @@ cat > /tmp/config.json <<EOF
     "Entrypoint": ["/bin/bash"],
     "WorkingDir": "/root",
     "Labels": {
-      "org.opencontainers.image.title": "flfs",
-      "org.opencontainers.image.description": "Florian's Linux From Scratch, without the kernel and systemd"
+      "org.opencontainers.image.title": "kaetzli",
+      "org.opencontainers.image.description": "Kaetzli, without the kernel and systemd"
     }
   },
   "rootfs": {
@@ -960,7 +960,7 @@ cat > /tmp/manifest.json <<EOF
 EOF
 read -r manifest_digest manifest_size < <(blob /tmp/manifest.json)
 
-# ref.name is the tag `podman load` gives what it reads: localhost/flfs:latest.
+# ref.name is the tag `podman load` gives what it reads: localhost/kaetzli:latest.
 cat > "$layout/index.json" <<EOF
 {
   "schemaVersion": 2,
@@ -971,7 +971,7 @@ cat > "$layout/index.json" <<EOF
       "digest": "sha256:$manifest_digest",
       "size": $manifest_size,
       "platform": { "architecture": "$oci_arch", "os": "linux" },
-      "annotations": { "org.opencontainers.image.ref.name": "flfs:latest" }
+      "annotations": { "org.opencontainers.image.ref.name": "kaetzli:latest" }
     }
   ]
 }
@@ -979,9 +979,9 @@ EOF
 echo '{"imageLayoutVersion": "1.0.0"}' > "$layout/oci-layout"
 
 repro_tar --owner=0 --group=0 --directory "$layout" oci-layout index.json blobs \
-    > /usr/local/output/flfs-oci.tar
-ls -l /usr/local/output/flfs-oci.tar
+    > /usr/local/output/kaetzli-oci.tar
+ls -l /usr/local/output/kaetzli-oci.tar
 
-echo "archive $(stat -c %s /usr/local/output/flfs-oci.tar)" >> "$report"
+echo "archive $(stat -c %s /usr/local/output/kaetzli-oci.tar)" >> "$report"
 
 cat "$report"

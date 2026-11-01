@@ -38,7 +38,7 @@
 #     ./tools/ssh.sh                  # a shell as `user`
 #     ./tools/ssh.sh systemctl status # or a command
 #     ./tools/ssh.sh --root           # a root shell
-#     scp -F output/ssh/config file flfs:/tmp/
+#     scp -F output/ssh/config file kaetzli:/tmp/
 #
 # Every boot gets a fresh key pair, handed to the guest as a credential and deleted when
 # qemu exits (qemu_ssh_setup in test/qemu-lib.sh). At the console, a username is enough.

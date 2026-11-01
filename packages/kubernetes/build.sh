@@ -13,11 +13,11 @@
 # would have computed, stamped the way hack/lib/version.sh does it, into both packages
 # that report it — kubeadm refuses to work with a kubelet that cannot say what it is.
 # gitCommit is left empty, as for podman: a release tarball has no .git.
-major="${FLFS_VERSION%%.*}" minor="${FLFS_VERSION#*.}"; minor="${minor%%.*}"
+major="${KAETZLI_VERSION%%.*}" minor="${KAETZLI_VERSION#*.}"; minor="${minor%%.*}"
 build_date=$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)
 ldflags="-s -w"
 for pkg in k8s.io/client-go/pkg/version k8s.io/component-base/version; do
-    ldflags+=" -X $pkg.gitVersion=v$FLFS_VERSION -X $pkg.gitMajor=$major -X $pkg.gitMinor=$minor"
+    ldflags+=" -X $pkg.gitVersion=v$KAETZLI_VERSION -X $pkg.gitMajor=$major -X $pkg.gitMinor=$minor"
     ldflags+=" -X $pkg.gitTreeState=clean -X $pkg.buildDate=$build_date"
 done
 
@@ -28,8 +28,8 @@ for cmd in kubeadm kubectl; do
 done
 
 # What kubeadm compares against the cluster it joins.
-"$ROOTFS/usr/bin/kubelet" --version | grep -qx "Kubernetes v$FLFS_VERSION" || {
-    echo "kubernetes: kubelet does not report v$FLFS_VERSION" >&2; exit 1; }
+"$ROOTFS/usr/bin/kubelet" --version | grep -qx "Kubernetes v$KAETZLI_VERSION" || {
+    echo "kubernetes: kubelet does not report v$KAETZLI_VERSION" >&2; exit 1; }
 for cmd in kubeadm kubectl; do
     if readelf -d "$ROOTFS/usr/bin/$cmd" 2>/dev/null | grep -q NEEDED; then
         echo "kubernetes: $cmd is dynamically linked" >&2; exit 1

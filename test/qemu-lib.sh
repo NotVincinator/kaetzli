@@ -147,7 +147,7 @@ qemu_ssh_setup() {
     else
         rm -rf "$SSH_DIR"
         mkdir -p -m 700 "$SSH_DIR"
-        ssh-keygen -q -t ed25519 -N '' -C "flfs-ephemeral@$(hostname)" -f "$SSH_DIR/id_ed25519"
+        ssh-keygen -q -t ed25519 -N '' -C "kaetzli-ephemeral@$(hostname)" -f "$SSH_DIR/id_ed25519"
     fi
 
     # No host key checking: the guest makes new host keys every boot, and this is a
@@ -157,7 +157,7 @@ qemu_ssh_setup() {
     [ -n "${SSH_PROXY:-}" ] || reach="    HostName 127.0.0.1
     Port $SSH_PORT"
     cat > "$SSH_DIR/config" <<EOF
-Host flfs
+Host kaetzli
 $reach
     User root
     IdentityFile $(realpath "$SSH_DIR/id_ed25519")

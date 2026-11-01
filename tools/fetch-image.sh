@@ -11,7 +11,7 @@
 # runs in progress, docs-only runs and [skip ci] commits), for the host's own architecture.
 # Override any of:
 #   ARCH         amd64 or arm64 (default the host's own architecture)
-#   ROOTFS_RUN   pin a specific glowing-octo-robot run id
+#   ROOTFS_RUN   pin a specific kaetzli run id
 #   OUT          output directory (default output/boot-image, or output/boot-image-$ARCH
 #                when ARCH is overridden away from the host's own)
 #
@@ -43,7 +43,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source tools/lib.sh
 
-REPO="fwilhe2/glowing-octo-robot"
+REPO="fwilhe2/kaetzli"
 
 # Defaults to the host's own architecture. ci.yml builds and boot-tests both amd64 and
 # arm64 in every run, tagging each artifact with the arch that produced it, so this has

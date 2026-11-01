@@ -9,7 +9,7 @@
 #     ./tools/ssh.sh -L 8080:localhost:80 # any ssh option, as long as it comes before a command
 #
 # The key, the port and every option are in the ssh_config qemu_ssh_setup (test/qemu-lib.sh)
-# wrote for this boot, so this is `ssh -F $SSH_DIR/config flfs` and nothing more — scp,
+# wrote for this boot, so this is `ssh -F $SSH_DIR/config kaetzli` and nothing more — scp,
 # sftp and rsync -e take the same -F. The key exists only while that guest runs; there is
 # nothing to set up and nothing left behind.
 #
@@ -17,7 +17,7 @@
 # a login of its own — a logind session, /run/user/1000 and a user manager — is what
 # rootless podman needs and what `su user` from a root session never gives it: su keeps
 # root's $XDG_RUNTIME_DIR, and pam_systemd will not open a session inside one. The key is
-# the same one either way; image/files/etc/tmpfiles.d/flfs-home.conf copies it into
+# the same one either way; image/files/etc/tmpfiles.d/kaetzli-home.conf copies it into
 # user's authorized_keys. --root, which has to come first, logs in as root instead.
 #
 # Overrides:
@@ -39,4 +39,4 @@ if [ "${1:-}" = --root ]; then
     shift
 fi
 
-exec ssh -F "$SSH_DIR/config" -l "$login" flfs "$@"
+exec ssh -F "$SSH_DIR/config" -l "$login" kaetzli "$@"

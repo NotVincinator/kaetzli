@@ -21,7 +21,7 @@
 # out of it.
 stage=$(mktemp -d)
 make CC=gcc CFLAGS="-O2 $CFLAGS" LDFLAGS="$LDFLAGS" \
-    VERSION="$FLFS_VERSION" TOPDIR=/usr TZDIR=/usr/share/zoneinfo \
+    VERSION="$KAETZLI_VERSION" TOPDIR=/usr TZDIR=/usr/share/zoneinfo \
     ZFLAGS='-b slim' REDO=posix_only DESTDIR="$stage" \
     install
 

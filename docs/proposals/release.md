@@ -29,7 +29,7 @@ as a bootable disk.
 
 ## OCI tags
 
-If versioned OCI releases are added, keep `flfs:latest` for the latest stable release and
+If versioned OCI releases are added, keep `kaetzli:latest` for the latest stable release and
 move the current `main` build behavior to an `edge` tag. Preserve per-commit tags. This
 would change the current meaning of `latest`, so document the transition before making it.
 
@@ -55,5 +55,5 @@ source commit and provenance references.
 
 The release workflow should be a thin caller of scripts that can be run locally or against
 a test registry. Keep release-version generation in one step so tags, image metadata,
-asset names, and notes use the same value. `FLFS_VERSION` is supported by image assembly,
+asset names, and notes use the same value. `KAETZLI_VERSION` is supported by image assembly,
 but the current CI does not set it for a release.

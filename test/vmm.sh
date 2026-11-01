@@ -152,7 +152,7 @@ round_vz() {
         expect_driver "$drivers" vmw_vsock_virtio_transport
         local id
         id=$(timeout 60 ssh -F "$SSH_DIR/config" \
-                 -o ProxyCommand="socat - VSOCK-CONNECT:$VSOCK_CID:22" flfs \
+                 -o ProxyCommand="socat - VSOCK-CONNECT:$VSOCK_CID:22" kaetzli \
                  cat /proc/sys/kernel/random/boot_id) || fail "ssh over vsock (cid $VSOCK_CID) failed"
         [ "$id" = "$(ask BOOTID 'cat /proc/sys/kernel/random/boot_id')" ] ||
             fail "ssh over vsock reached a different machine ($id)"

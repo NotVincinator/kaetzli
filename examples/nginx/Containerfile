@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1.7
 #
-# nginx on flfs: compile in Debian, ship on flfs, prove it runs before the image exists.
+# nginx on kaetzli: compile in Debian, ship on kaetzli, prove it runs before the image exists.
 #
 # The builder is Debian *stable* on purpose, not sid. A binary only runs on a glibc at
 # least as new as the one it was compiled against, and trixie is frozen at 2.41 for its
-# whole life while flfs only moves forward (2.44 today) — so the builder can never
-# overtake the runtime. The same holds for openssl and zlib, which flfs ships: trixie's
-# 3.5 / 1.3.1 against flfs's 3.5.9 / 1.3.2. Compile against the older headers, run
+# whole life while kaetzli only moves forward (2.44 today) — so the builder can never
+# overtake the runtime. The same holds for openssl and zlib, which kaetzli ships: trixie's
+# 3.5 / 1.3.1 against kaetzli's 3.5.9 / 1.3.2. Compile against the older headers, run
 # against the newer library by SONAME — the arrangement the repo itself uses for curl
 # and libssl.
 #
@@ -14,11 +14,11 @@
 # along with podman and glib, so Debian's libpcre2-8.so.0 is bundled — it was compiled
 # against trixie's glibc too, so the same argument covers it.
 
-ARG FLFS=ghcr.io/fwilhe2/glowing-octo-robot/flfs:latest
+ARG KAETZLI=ghcr.io/fwilhe2/kaetzli/kaetzli:latest
 ARG DEBIAN=debian:trixie-slim
-# Pin both by digest in real use: FLFS=…/flfs:<commit>@sha256:…, DEBIAN=…@sha256:…
+# Pin both by digest in real use: KAETZLI=…/kaetzli:<commit>@sha256:…, DEBIAN=…@sha256:…
 
-FROM ${FLFS} AS runtime
+FROM ${KAETZLI} AS runtime
 
 # ---------------------------------------------------------------------------------------
 FROM ${DEBIAN} AS build
@@ -74,22 +74,22 @@ RUN install -d /out/usr/lib \
     && cp -L "/usr/lib/$(gcc -print-multiarch)/libpcre2-8.so.0" /out/usr/lib/
 
 # Fail here, with a readable message, rather than at `docker run`: every library the
-# binary and the bundled libraries name must exist in flfs or in the bundle, and every
+# binary and the bundled libraries name must exist in kaetzli or in the bundle, and every
 # symbol version asked for must be one that copy defines. This is
 # test/check-rootfs-deps.sh and check-symbol-versions.sh in miniature, run against the
 # real runtime image's /usr/lib.
-COPY --from=runtime /usr/lib /flfs/usr/lib
+COPY --from=runtime /usr/lib /kaetzli/usr/lib
 RUN set -e; status=0; \
     for elf in /out/usr/bin/nginx /out/usr/lib/*.so*; do \
         for lib in $(readelf -d "$elf" | sed -n 's/.*NEEDED.*\[\(.*\)\]/\1/p'); do \
-            have=; for dir in /flfs/usr/lib /out/usr/lib; do \
+            have=; for dir in /kaetzli/usr/lib /out/usr/lib; do \
                 [ -e "$dir/$lib" ] && { have=$dir/$lib; break; }; \
             done; \
-            [ -n "$have" ] || { echo "${elf#/out}: no $lib in flfs or the bundle" >&2; status=1; continue; }; \
+            [ -n "$have" ] || { echo "${elf#/out}: no $lib in kaetzli or the bundle" >&2; status=1; continue; }; \
             for ver in $(readelf -V "$elf" | awk -v l="$lib" \
                            '/File:/ {f=($4==l)} f && /Name:/ {print $3}'); do \
                 readelf -V "$have" | grep -q "Name: $ver\$" \
-                    || { echo "${elf#/out}: ${have#/flfs} does not define $ver" >&2; status=1; }; \
+                    || { echo "${elf#/out}: ${have#/kaetzli} does not define $ver" >&2; status=1; }; \
             done; \
         done; \
     done; \
@@ -123,15 +123,15 @@ EOF
 # because an unprivileged process cannot bind below 1024.
 RUN install -d -o user -g user /var/cache/nginx /run/nginx && ldconfig
 
-# Numeric, so it works with any flfs image: earlier ones had comment lines in
+# Numeric, so it works with any kaetzli image: earlier ones had comment lines in
 # /etc/passwd, which buildah's own passwd parser (podman build) rejects as "unknown user".
 USER 1000:1000
 
-# The check that cannot lie: run the binary on flfs's own loader and libraries.
+# The check that cannot lie: run the binary on kaetzli's own loader and libraries.
 # LD_BIND_NOW resolves every symbol at load, so an *unversioned* one missing from a
 # library (pcre2's are versioned, but not everything's is) fails here too instead of
 # on the first request that happens to call it. It runs as `user` because that is how
-# the container runs — as root, nginx would switch to `nobody`, which flfs has no
+# the container runs — as root, nginx would switch to `nobody`, which kaetzli has no
 # account for.
 RUN LD_BIND_NOW=1 nginx -V && nginx -t
 EXPOSE 8080

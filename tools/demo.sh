@@ -9,7 +9,7 @@
 #   1. the immutable root: EROFS on dm-verity, read-only, the root hash on the kernel
 #      command line; the only writable state is /var
 #   2. its identity: os-release with the commit it was built from, the machine ID and
-#      hostname a VM gives it, and flfsfetch
+#      hostname a VM gives it, and kaetzlifetch
 #   3. a system extension attached to the running machine: the base has no podman, so
 #      podman.raw is copied to /var/lib/extensions and merged with systemd-sysext
 #   4. a container: a one-layer image made from the guest's own bash, run by podman and
@@ -64,7 +64,7 @@ ssh_cfg="$STATE/$NAME/ssh/config"
 # guest <command>: show it, then run it as root in the guest.
 guest() {
     printf '\n\033[1m# %s\033[0m\n' "$1"
-    ssh -F "$ssh_cfg" -l root flfs "$1" || true
+    ssh -F "$ssh_cfg" -l root kaetzli "$1" || true
 }
 stop() { printf '\n\033[1;34m== %s\033[0m\n' "$1"; }
 
@@ -77,13 +77,13 @@ guest 'findmnt -no SOURCE,FSTYPE /var   # state lives here: a disk of its own, o
 stop "2. What it is, and which machine"
 guest '. /etc/os-release; echo "$PRETTY_NAME, built from ${BUILD_ID:-an unrecorded commit}"'
 guest 'echo "hostname $(</proc/sys/kernel/hostname), machine ID $(</etc/machine-id)"'
-guest 'flfsfetch'
+guest 'kaetzlifetch'
 
 stop "3. An extension, attached while it runs"
 guest 'command -v podman || echo "no podman in the base image"'
-printf '\n\033[1m# (host) scp %s flfs:/var/lib/extensions/\033[0m\n' "$ext"
-ssh -F "$ssh_cfg" -l root flfs 'mkdir -p /var/lib/extensions'
-scp -q -F "$ssh_cfg" "$ext" root@flfs:/var/lib/extensions/podman.raw
+printf '\n\033[1m# (host) scp %s kaetzli:/var/lib/extensions/\033[0m\n' "$ext"
+ssh -F "$ssh_cfg" -l root kaetzli 'mkdir -p /var/lib/extensions'
+scp -q -F "$ssh_cfg" "$ext" root@kaetzli:/var/lib/extensions/podman.raw
 guest 'systemd-sysext refresh && systemd-sysext status'
 guest 'podman --version'
 

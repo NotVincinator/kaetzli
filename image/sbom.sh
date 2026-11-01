@@ -3,9 +3,9 @@
 # each extension. Each function prints JSON fragments that continue an open array, every
 # element starting with ",\n", so the caller writes the document around them.
 #
-#   usr/share/flfs/components/<pkg>   key=value pins: name, version, license, origin,
+#   usr/share/kaetzli/components/<pkg>   key=value pins: name, version, license, origin,
 #                                     builder, url, sha256, cpe
-#   usr/share/flfs/modules/<pkg>      purls, one per line: the Go modules and Rust crates
+#   usr/share/kaetzli/modules/<pkg>      purls, one per line: the Go modules and Rust crates
 #                                     a package's programs compiled in
 
 # JSON string escaping, applied to every value.
@@ -37,7 +37,7 @@ sbom_component_packages() { # components-dir
         printf '      "name": "%s",\n' "$(jstr "$name")"
         printf '      "versionInfo": "%s",\n' "$(jstr "$version")"
         if [ "$origin" = local ]; then
-            printf '      "downloadLocation": "git+https://github.com/fwilhe2/glowing-octo-robot",\n'
+            printf '      "downloadLocation": "git+https://github.com/fwilhe2/kaetzli",\n'
         else
             printf '      "downloadLocation": "%s",\n' "$(jstr "$url")"
         fi

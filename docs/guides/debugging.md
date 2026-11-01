@@ -116,7 +116,7 @@ and source. Forward the guest port over SSH; gdbserver has no authentication.
 gdbserver 127.0.0.1:2345 --attach "$(pidof <program>)"
 
 # Host
-ssh -F output/ssh/config -N -L 2345:127.0.0.1:2345 flfs
+ssh -F output/ssh/config -N -L 2345:127.0.0.1:2345 kaetzli
 gdb -ex 'set sysroot rootfs' -ex 'target remote :2345' rootfs/usr/bin/<program>
 ```
 

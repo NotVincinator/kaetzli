@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run binaries this repository did not build:
 #
-#     ./test/prebuilt.sh                        # compile, then run in output/flfs-oci.tar
+#     ./test/prebuilt.sh                        # compile, then run in output/kaetzli-oci.tar
 #     ./test/prebuilt.sh build [dir]            # compile only, into dir (output/prebuilt)
 #     ./test/prebuilt.sh oci [dir] [archive]    # run what dir holds in the OCI image
 #     ./test/prebuilt.sh ssh [dir]              # ...or in the guest $SSH_DIR's config reaches
@@ -207,30 +207,30 @@ run_ssh() {
     local dir="$1" config="${SSH_DIR:-output/ssh}/config" bin name out rc fail=0
     [ -f "$config" ] || { echo "error: no $config — is a guest running?" >&2; return 1; }
     binaries "$dir"
-    ssh -n -F "$config" flfs 'rm -rf /tmp/prebuilt'
-    scp -q -p -r -F "$config" "$dir" flfs:/tmp/prebuilt
+    ssh -n -F "$config" kaetzli 'rm -rf /tmp/prebuilt'
+    scp -q -p -r -F "$config" "$dir" kaetzli:/tmp/prebuilt
     echo "running in the guest, over ssh:"
     for bin in "$dir"/*; do
         name=$(basename "$bin")
         rc=0
-        out=$(ssh -n -F "$config" flfs "/tmp/prebuilt/$name" 2>&1) || rc=$?
+        out=$(ssh -n -F "$config" kaetzli "/tmp/prebuilt/$name" 2>&1) || rc=$?
         report "$name" "$rc" "$out"
         [ "$rc" -eq 0 ] || fail=1
     done
-    ssh -n -F "$config" flfs 'rm -rf /tmp/prebuilt' || true
+    ssh -n -F "$config" kaetzli 'rm -rf /tmp/prebuilt' || true
     return $fail
 }
 
 case "${1:-}" in
     build) build "${2:-output/prebuilt}" ;;
-    oci)   run_oci "${2:-output/prebuilt}" "${3:-output/flfs-oci.tar}" ;;
+    oci)   run_oci "${2:-output/prebuilt}" "${3:-output/kaetzli-oci.tar}" ;;
     ssh)   run_ssh "${2:-output/prebuilt}" ;;
     "")    dir=$(mktemp -d)
            trap 'rm -rf "$dir"' EXIT
            # Two statements, not `build && run_oci`: on the left of && set -e is off for
            # the whole of build(), and a compiler failure would go unnoticed.
            build "$dir"
-           run_oci "$dir" output/flfs-oci.tar ;;
+           run_oci "$dir" output/kaetzli-oci.tar ;;
     *)     echo "usage: $0 [build [dir] | oci [dir] [archive] | ssh [dir]]" >&2
            exit 1 ;;
 esac

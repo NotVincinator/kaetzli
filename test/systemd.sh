@@ -18,7 +18,7 @@
 # racing a unit that is merely slow; the deadline below is what catches one that hangs.
 # Two more ride along on the same shell, because a login over a serial console is the
 # expensive part and running one more command on it is free: systemd's Tainted property,
-# and flfsfetch, which is the only binary in usr/bin that anything in test/ ever runs
+# and kaetzlifetch, which is the only binary in usr/bin that anything in test/ ever runs
 # for its own sake.
 #
 # This is deliberately separate from test/boot.sh and test/network.sh rather than folded
@@ -47,10 +47,10 @@ TEST_NAME=systemd
 # handshake free of other packages means a failure here means what it says.
 STATE="SYSTEMD-STATE:"
 TAINT="SYSTEMD-TAINT:"
-FETCH="FLFSFETCH-DONE"
+FETCH="KAETZLIFETCH-DONE"
 CHECK="echo SYSTEMD'-STATE':\$(systemctl is-system-running --wait)"
 # --no-color because this transcript is read as text, in a CI log or output/*.log.
-FETCH_RUN="flfsfetch --no-color; echo FLFSFETCH'-DONE'"
+FETCH_RUN="kaetzlifetch --no-color; echo KAETZLIFETCH'-DONE'"
 # The taint string is systemd's own summary of things it found wrong with the system that
 # no unit will ever fail over — an unmerged /usr/sbin, a /var/run that is a directory. It
 # is a colon-separated word list, empty on a healthy system, so it costs one more command
@@ -97,10 +97,10 @@ DIAGNOSE="systemctl --failed --no-pager --plain; journalctl -p err -b --no-pager
 # not there, so nothing else would notice it go. $(< file) is a builtin; the value is not
 # in the command typed, so the echo cannot match.
 FWCFG="SYSTEMD-FWCFG:"
-FWCFG_CHECK="echo SYSTEMD'-FWCFG':[\$(< /run/credentials/@system/flfs.fwcfg-probe)]"
+FWCFG_CHECK="echo SYSTEMD'-FWCFG':[\$(< /run/credentials/@system/kaetzli.fwcfg-probe)]"
 
 qemu_setup
-[ "$PROFILE" != pc ] || QEMU_FWCFG_CREDENTIALS="flfs.fwcfg-probe=delivered"
+[ "$PROFILE" != pc ] || QEMU_FWCFG_CREDENTIALS="kaetzli.fwcfg-probe=delivered"
 qemu_preflight
 qemu_boot
 console_login
@@ -199,7 +199,7 @@ fi
 # Partly for the pleasure of seeing it in a CI log, and partly because this is the only
 # place anything in test/ runs a binary out of usr/bin that is not already on systemd's
 # or login's critical path. It rides along on the shell this test already has rather
-# than costing a fifth qemu boot, and flfsfetch is a fair canary: it links nothing but
+# than costing a fifth qemu boot, and kaetzlifetch is a fair canary: it links nothing but
 # glibc and reads /etc/os-release, /proc and /sys, so "it printed its own OS name" means
 # the loader, the libc and the shipped /etc all did their jobs.
 #
@@ -207,24 +207,24 @@ fi
 # is exactly the class of bug the rest of this directory exists to catch.
 mark=$(console_mark)
 console_send "$FETCH_RUN"
-await "$FETCH" 30 "$mark" || fail "flfsfetch did not run (is /usr/bin/flfsfetch in the image?)"
+await "$FETCH" 30 "$mark" || fail "kaetzlifetch did not run (is /usr/bin/kaetzlifetch in the image?)"
 
 # Everything the guest emitted after the command was typed, minus the end marker itself.
-echo ">> flfsfetch says:"
+echo ">> kaetzlifetch says:"
 tail -c "+$((mark + 1))" "$LOG" | tr -d '\r' | sed -e "/$FETCH/,\$d" -e 's/^/   /'
 
-# The OS field exists only if /etc/os-release was found and parsed — flfsfetch omits a
+# The OS field exists only if /etc/os-release was found and parsed — kaetzlifetch omits a
 # field it cannot fill rather than printing it empty. Matching the field name rather than
 # its value keeps this from breaking the day the name in image/files/etc/os-release
 # changes.
 if ! tail -c "+$((mark + 1))" "$LOG" | grep -qa 'OS: '; then
-    fail "flfsfetch ran but printed no OS field — /etc/os-release unreadable?"
+    fail "kaetzlifetch ran but printed no OS field — /etc/os-release unreadable?"
 fi
 # This boot has no /var disk and a verity root, so the setup fields have one right
 # answer each. They are read from the mount table and the command line, and are the
 # summary a user goes by when deciding whether what they install will survive a reboot.
 for want in 'Root: erofs, read-only, dm-verity' 'State: in memory' 'Image: '; do
     tail -c "+$((mark + 1))" "$LOG" | grep -qaF "$want" ||
-        fail "flfsfetch did not print '$want'"
+        fail "kaetzlifetch did not print '$want'"
 done
-echo ">> flfsfetch OK"
+echo ">> kaetzlifetch OK"

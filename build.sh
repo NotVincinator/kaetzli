@@ -111,21 +111,21 @@ else
 fi
 
 # The pins, for the component record builder/build-package.sh writes and the SBOM is
-# made from. FLFS_BUILDER is the one build input env.sh does not describe.
+# made from. KAETZLI_BUILDER is the one build input env.sh does not describe.
 component_env=(
-    --env "FLFS_PKG=$PKG"
-    --env "FLFS_VERSION=$VERSION"
-    --env "FLFS_LICENSE=${LICENSE:-NOASSERTION}"
-    --env "FLFS_CPE=${CPE:-}"
-    --env "FLFS_BUILDER=$BUILDER"
-    --env "SOURCE_DATE_EPOCH=$FLFS_SOURCE_DATE_EPOCH"
+    --env "KAETZLI_PKG=$PKG"
+    --env "KAETZLI_VERSION=$VERSION"
+    --env "KAETZLI_LICENSE=${LICENSE:-NOASSERTION}"
+    --env "KAETZLI_CPE=${CPE:-}"
+    --env "KAETZLI_BUILDER=$BUILDER"
+    --env "SOURCE_DATE_EPOCH=$KAETZLI_SOURCE_DATE_EPOCH"
 )
 if [ -n "${LOCAL_SOURCE:-}" ]; then
-    component_env+=(--env "FLFS_ORIGIN=local")
+    component_env+=(--env "KAETZLI_ORIGIN=local")
 else
-    component_env+=(--env "FLFS_ORIGIN=tarball" --env "FLFS_URL=$URL" --env "FLFS_SHA256=$SHA256")
+    component_env+=(--env "KAETZLI_ORIGIN=tarball" --env "KAETZLI_URL=$URL" --env "KAETZLI_SHA256=$SHA256")
     if [ -n "${VENDOR_TARBALL:-}" ]; then
-        component_env+=(--env "FLFS_VENDOR_URL=$VENDOR_URL" --env "FLFS_VENDOR_SHA256=$VENDOR_SHA256")
+        component_env+=(--env "KAETZLI_VENDOR_URL=$VENDOR_URL" --env "KAETZLI_VENDOR_SHA256=$VENDOR_SHA256")
     fi
 fi
 

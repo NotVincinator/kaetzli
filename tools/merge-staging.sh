@@ -83,7 +83,7 @@ mkdir -p rootfs
 # assembly removes whole (the container flavour has no kernel) leaves the SBOM with it,
 # rather than its CVEs being reported against an image that does not have it. Not
 # shipped; the assembly deletes it with the component records.
-mkdir -p rootfs/usr/share/flfs
+mkdir -p rootfs/usr/share/kaetzli
 grep -vE "$shared_links"$'\t' <<< "$listing" | sed -n 's|^rootfs/||p' \
-    > rootfs/usr/share/flfs/owners
+    > rootfs/usr/share/kaetzli/owners
 touch "$STAMP"

@@ -3,7 +3,7 @@
 # what is installed, pulled or configured there survives a reboot, a restart and an
 # image update, while the root stays the read-only image it booted.
 #
-#     ./tools/vm.sh start                      # boot `flfs` in the background, wait for ssh
+#     ./tools/vm.sh start                      # boot `kaetzli` in the background, wait for ssh
 #     ./tools/vm.sh ssh [--root] [cmd...]      # log in (as `user` unless --root); scp: see below
 #     ./tools/vm.sh console                    # its serial console (Ctrl-] leaves)
 #     ./tools/vm.sh stop                       # power it off
@@ -22,7 +22,7 @@
 #     ./tools/vm.sh rm dev before-k8s          # delete a snapshot; `rm dev` deletes the machine
 #     ./tools/vm.sh resize dev 40G             # grow /var; the guest grows its filesystem at boot
 #
-# Every command takes the machine's name first and defaults to `flfs`; it is also the
+# Every command takes the machine's name first and defaults to `kaetzli`; it is also the
 # guest's hostname. Options to start and run are remembered, so a plain `start` boots the
 # machine the way it was last booted:
 #
@@ -44,7 +44,7 @@
 #                          in test/qemu-lib.sh): formatted by the guest on its first boot
 #   ssh/                   its key pair, made once and handed to every boot as the
 #                          ssh.authorized_keys.root credential, and an ssh_config with
-#                          this boot's port; `ssh -F output/vms/<name>/ssh/config flfs`
+#                          this boot's port; `ssh -F output/vms/<name>/ssh/config kaetzli`
 #                          is what `vm.sh ssh` runs, and scp, sftp and rsync -e take it too
 #   image/                 the image it boots, copied from its source at every start that
 #                          finds the source changed. A copy, because qemu reads the root
@@ -75,7 +75,7 @@ source test/qemu-lib.sh
 STATE="${VM_STATE:-output/vms}"
 mkdir -p "$STATE"
 STATE=$(cd "$STATE" && pwd)   # absolute: it ends up in qemu's command line, which `running` reads
-DEFAULT_VM=flfs
+DEFAULT_VM=kaetzli
 
 # " NAME" for a command line shown to the user, nothing for the default machine.
 arg() { [ "$NAME" = "$DEFAULT_VM" ] || printf ' %s' "$NAME"; }
@@ -98,7 +98,7 @@ select_vm() { # name [may-be-new]
     DIR="$STATE/$NAME"
     # The console and QMP sockets, somewhere short: a socket's path has to fit in 108
     # bytes, and a checkout can be deeper than that leaves room for.
-    RUN="${XDG_RUNTIME_DIR:-/tmp/flfs-$(id -u)}/flfs-vm-$(printf %s "$DIR" | cksum | cut -d' ' -f1)"
+    RUN="${XDG_RUNTIME_DIR:-/tmp/kaetzli-$(id -u)}/kaetzli-vm-$(printf %s "$DIR" | cksum | cut -d' ' -f1)"
     [ "${2:-}" = new ] || exists "$NAME" || die "no machine '$NAME' (./tools/vm.sh list; ./tools/vm.sh start $NAME makes it)"
 }
 
@@ -169,7 +169,7 @@ create_vm() { # size
     truncate -s "$bytes" "$DIR/var.img"
     od -An -tx1 -N16 /dev/urandom | tr -d ' \n' > "$DIR/var.img.machine-id"
     mkdir -p -m 700 "$DIR/ssh"
-    ssh-keygen -q -t ed25519 -N '' -C "flfs-vm-$NAME@$(hostname)" -f "$DIR/ssh/id_ed25519"
+    ssh-keygen -q -t ed25519 -N '' -C "kaetzli-vm-$NAME@$(hostname)" -f "$DIR/ssh/id_ed25519"
     config_defaults
     VM_ARCH=$(normalize_arch "${ARCH:-}")
     if [ "$VM_ARCH" = "$(normalize_arch)" ] && local_build_complete; then VM_IMAGE=local; else VM_IMAGE=ci; fi
@@ -361,7 +361,7 @@ prepare() {
 }
 
 # A command as root on the machine, for this script's own use.
-ssh_vm() { ssh -F "$DIR/ssh/config" -o ConnectTimeout=5 -l root flfs "$@"; }
+ssh_vm() { ssh -F "$DIR/ssh/config" -o ConnectTimeout=5 -l root kaetzli "$@"; }
 
 cmd_start() {
     # Starting what runs already is not an error, as long as nothing was asked to change.
@@ -401,7 +401,7 @@ cmd_start() {
     local hint
     hint=$(arg)
     cat <<EOF
-   ./tools/vm.sh ssh$hint [--root]   a shell (or: ssh -F $DIR/ssh/config flfs)
+   ./tools/vm.sh ssh$hint [--root]   a shell (or: ssh -F $DIR/ssh/config kaetzli)
    ./tools/vm.sh console$hint        the serial console (Ctrl-] to leave)
    ./tools/vm.sh stop$hint
 EOF
@@ -459,7 +459,7 @@ cmd_ssh() {
     [ "${1:-}" != --root ] || { login=root; shift; }
     select_vm "$name"
     running >/dev/null || die "'$NAME' is not running (./tools/vm.sh start$(arg))"
-    exec ssh -F "$DIR/ssh/config" -l "$login" flfs "$@"
+    exec ssh -F "$DIR/ssh/config" -l "$login" kaetzli "$@"
 }
 
 cmd_console() {

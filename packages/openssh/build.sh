@@ -61,7 +61,7 @@ drop_installed usr/libexec/ssh-keysign usr/libexec/ssh-pkcs11-helper \
 # from a copy in a home: tmpfiles writes those only if missing, and /home and /root are on
 # the /var disk when there is one, so a copy would keep the first boot's key forever. sshd
 # reads the file as the target user, so root's is the credential where PID 1 put it, and
-# every other user's a copy in /run (image/files/etc/tmpfiles.d/flfs-home.conf).
+# every other user's a copy in /run (image/files/etc/tmpfiles.d/kaetzli-home.conf).
 cat > $ROOTFS/etc/ssh/sshd_config <<'EOF'
 # Drop-ins first: in sshd_config the first setting of an option wins.
 Include /etc/ssh/sshd_config.d/*.conf

@@ -79,7 +79,7 @@ qemu_pid=$!
 cleanup() {
     if [ "${KEEP:-0}" = 1 ] && kill -0 "$qemu_pid" 2>/dev/null; then
         echo ">> KEEP=1: the guest is still running (pid $qemu_pid)."
-        echo "   ssh -F $STATE/ssh/config flfs      # root; the suite is in /var/lib/node-e2e"
+        echo "   ssh -F $STATE/ssh/config kaetzli      # root; the suite is in /var/lib/node-e2e"
         echo "   kill $qemu_pid; rm -rf $STATE      # when done"
         return
     fi
@@ -89,7 +89,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-g() { ssh -F "$STATE/ssh/config" -o ServerAliveInterval=30 flfs "$@"; }
+g() { ssh -F "$STATE/ssh/config" -o ServerAliveInterval=30 kaetzli "$@"; }
 
 echo ">> booting $ROOTFS with $KERNEL and the kubernetes extension, ${MEM} MB, $CPUS vCPUs"
 deadline=$((SECONDS + TIMEOUT))
@@ -138,7 +138,7 @@ mkdir -p /var/lib/node-e2e
 ln -sfn /usr/bin/kubelet /var/lib/node-e2e/kubelet
 GUEST
 
-scp -q -F "$STATE/ssh/config" "$suite/e2e_node.test" "$suite/ginkgo" flfs:/var/lib/node-e2e/
+scp -q -F "$STATE/ssh/config" "$suite/e2e_node.test" "$suite/ginkgo" kaetzli:/var/lib/node-e2e/
 
 echo ">> running the suite: focus $FOCUS, skip $SKIP, $PROCS processes (full output in $STATE/run.log)"
 set +e

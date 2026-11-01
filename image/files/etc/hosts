@@ -6,7 +6,7 @@
 # 127.0.1.1, not 127.0.0.1: the hostname in /etc/hostname belongs to a machine whose
 # real address comes from DHCP and changes, so it gets its own loopback address rather
 # than sharing localhost's. Keep this in step with /etc/hostname.
-127.0.1.1       flfs
+127.0.1.1       kaetzli
 
 # The IPv6 multicast entries every distribution ships. Nothing in the image sends to
 # them, but they are what makes `getent hosts ip6-allnodes` answer the same here as

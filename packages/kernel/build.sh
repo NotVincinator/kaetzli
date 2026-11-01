@@ -8,7 +8,7 @@
 # Reproducible: without these kbuild stamps date, user, host and a per-tree build counter
 # into `uname -v`. SOURCE_DATE_EPOCH comes from build.sh.
 export KBUILD_BUILD_TIMESTAMP="$(date -u -d "@$SOURCE_DATE_EPOCH")"
-export KBUILD_BUILD_USER=flfs KBUILD_BUILD_HOST=flfs KBUILD_BUILD_VERSION=1
+export KBUILD_BUILD_USER=kaetzli KBUILD_BUILD_HOST=kaetzli KBUILD_BUILD_VERSION=1
 
 make defconfig
 make kvm_guest.config

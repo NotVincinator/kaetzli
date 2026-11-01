@@ -47,7 +47,7 @@ from the uploaded artifacts; tests then run for each supported variant and archi
 Each variant adds image artifacts, size budgets, and boot coverage, so add one only when it
 has a real user.
 
-Keep the existing `flfs:latest` and commit tags assigned to the current full image if
+Keep the existing `kaetzli:latest` and commit tags assigned to the current full image if
 variants are introduced. Decide how to name and publish other variants before publishing
 them.
 

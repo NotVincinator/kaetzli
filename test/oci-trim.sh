@@ -14,7 +14,7 @@
 #   added     paths only the container has (its /home/user, the /var the disk image
 #             empties for its tmpfs)
 #   links     test/check-rootfs-deps.sh run on the container's own layer, unpacked from
-#             flfs-oci.tar: the evidence that no binary left behind needs a library the
+#             kaetzli-oci.tar: the evidence that no binary left behind needs a library the
 #             subtractions deleted. build-rootfs.sh's own consumer guards (glib and pcre2,
 #             libudev) fail the assembly before this; this covers everything else.
 #
@@ -26,7 +26,7 @@ cd "$(dirname "$0")/.."
 export LC_ALL=C
 
 out=${1:-output}
-erofs=$out/rootfs-files-erofs.txt oci=$out/rootfs-files-oci.txt archive=$out/flfs-oci.tar
+erofs=$out/rootfs-files-erofs.txt oci=$out/rootfs-files-oci.txt archive=$out/kaetzli-oci.tar
 for f in "$erofs" "$oci" "$archive"; do
     [ -f "$f" ] || { echo "error: no $f (./tools/build-image.sh writes it)" >&2; exit 1; }
 done

@@ -1,6 +1,8 @@
-# glowing-octo-robot
+# kaetzli
 
-glowing-octo-robot builds a small Linux system for virtual machines and containers. Packages
+The name is Swiss German for a little cat (Kätzli), with the -li ending a nod to other open source projects.
+
+kaetzli builds a small Linux system for virtual machines and containers. Packages
 are built from pinned source archives, assembled into a read-only EROFS disk image, and
 published as an OCI image. Optional systemd extensions add Podman, Kubernetes, and debugging
 tools without changing the base image.
@@ -16,7 +18,7 @@ physical hardware.
 | Artifact | Contents |
 | --- | --- |
 | `output/rootfs.erofs` and `output/rootfs.cmdline` | Read-only EROFS root with a dm-verity hash tree; keep the files together. |
-| `output/flfs-oci.tar` | OCI image of the userspace, without a kernel or systemd. |
+| `output/kaetzli-oci.tar` | OCI image of the userspace, without a kernel or systemd. |
 | `output/extensions/*.raw` | Optional system extensions, including Podman, Kubernetes, and debugging tools. |
 | `output/confexts/*.raw` | Configuration extensions used with the corresponding system extension. |
 
@@ -43,7 +45,7 @@ Connect as the unprivileged `user` account, then run a rootless container:
 
 ```sh
 ./tools/vm.sh ssh
-podman run --rm docker.io/library/alpine:latest echo hello from flfs
+podman run --rm docker.io/library/alpine:latest echo hello from kaetzli
 ```
 
 The VM keeps its `/var` data when stopped. Exit the shell and stop it with
@@ -51,7 +53,7 @@ The VM keeps its `/var` data when stopped. Exit the shell and stop it with
 downloaded images before installing them. See [Machines](#machines) to manage more VMs.
 
 The published OCI image can also run under Podman or Docker. It has no package manager;
-see [`examples/nginx`](examples/nginx/README.md) for an image built on top of flfs.
+see [`examples/nginx`](examples/nginx/README.md) for an image built on top of kaetzli.
 
 ## Host requirements
 
@@ -117,7 +119,7 @@ See [Debugging](docs/guides/debugging.md) for console and log details.
 ## Machines
 
 `tools/vm.sh` manages QEMU machines under `output/vms/`. Each has its own `/var` disk,
-machine ID, SSH key, and image. The default machine is `flfs`; add a name when you want
+machine ID, SSH key, and image. The default machine is `kaetzli`; add a name when you want
 more than one. Image updates are picked up on the next start.
 
 ```sh

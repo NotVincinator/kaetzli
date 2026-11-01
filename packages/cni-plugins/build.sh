@@ -3,7 +3,7 @@
 # left to whatever a cluster's CNI DaemonSet copies in. Static Go, as upstream builds them.
 for plugin in main/bridge main/loopback ipam/host-local meta/portmap; do
     CGO_ENABLED=0 go build \
-        -ldflags "-s -w -X github.com/containernetworking/plugins/pkg/utils/buildversion.BuildVersion=v$FLFS_VERSION" \
+        -ldflags "-s -w -X github.com/containernetworking/plugins/pkg/utils/buildversion.BuildVersion=v$KAETZLI_VERSION" \
         -o "$ROOTFS/usr/libexec/cni/${plugin#*/}" "./plugins/$plugin"
 done
 
