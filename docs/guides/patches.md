@@ -116,6 +116,22 @@ UPSTREAM_PATCH_SKIP="ncurses-6\.6-20251230\.patch\.gz"    # in the tarball alrea
 A name ending in `.gz` is verified compressed, as it was signed, and committed
 decompressed.
 
+## CVEs fixed by patches
+
+A scanner matches versions: glibc 2.44 is glibc 2.44 to it, however many fixes are on
+top. So the build says what its patches fix, and the scan believes it:
+
+- `tools/patch-cves.sh <pkg>` lists the CVEs a package's patches fix. It reads each
+  patch's message (never the diff) and `patches/upstream.cves`, which `sync-patches.sh`
+  writes from glibc's advisories. For one of our own patches, name the CVE in its message,
+  for example with a `CVE: CVE-2026-12345` line.
+- `build.sh` records them, and the SBOM carries each as an SPDX `fix` reference on its
+  package.
+- `test/cve-scan.sh` turns those into OpenVEX (`output/cve/<sbom>.vex.json`) and passes it
+  to grype. A patched CVE is then not counted as open. The job summary lists patched CVEs
+  separately, and the CVE workbook marks them `patched` in a Status column; its severity
+  counts are open findings only.
+
 ## Test that patches apply
 
 ```sh
