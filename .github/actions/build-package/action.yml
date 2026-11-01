@@ -37,9 +37,9 @@ runs:
         if [ -n "${NO_SYSROOT:-}" ]; then sysroot=false; else sysroot=true; fi
         echo "sysroot=$sysroot" >> $GITHUB_OUTPUT
         PKG="packages/${{ inputs.package }}"
-        # glibc's env.sh and build.sh are in here for every package: they are compiled
-        # against that glibc, so changing its version or how it is configured has to
-        # rebuild all of them, not only glibc.
+        # glibc's env.sh, build.sh and patches are in here for every package: they are
+        # compiled against that glibc, so changing its version, how it is configured or
+        # which release-branch commits it carries has to rebuild all of them, not only glibc.
         # The builder image reference is in here rather than the files behind it: it is
         # already a content hash of builder/, so a changed dependency list rebuilds every
         # package, which is what we want and what listing the files by hand used to do.
@@ -57,7 +57,7 @@ runs:
         # sourced: $PACKAGE in the key catches a version bump, that file the rest.
         follows=
         [ -z "${FOLLOWS:-}" ] || follows="packages/$FOLLOWS/env.sh"
-        sum=$(cat build.sh tools/lib.sh builder/build-package.sh packages/glibc/env.sh packages/glibc/build.sh $PKG/build.sh $PKG/env.sh $follows <(./tools/image-tags.sh builder) <(find $PKG/src $PKG/licenses $PKG/patches -type f -print0 2>/dev/null | sort -z | xargs -0r cat) | md5sum | cut -d ' ' -f 1)
+        sum=$(cat build.sh tools/lib.sh builder/build-package.sh packages/glibc/env.sh packages/glibc/build.sh $PKG/build.sh $PKG/env.sh $follows <(./tools/image-tags.sh builder) <(find packages/glibc/patches $PKG/src $PKG/licenses $PKG/patches -type f -print0 2>/dev/null | sort -z | xargs -0r cat) | md5sum | cut -d ' ' -f 1)
         # And the half-month, so nothing is served from the cache for longer than about
         # two weeks. Every input above is pinned, but the claim that a pinned input still
         # builds is only tested by building it — a binary cached for a year says nothing

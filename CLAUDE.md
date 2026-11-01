@@ -153,7 +153,7 @@ scratch directory for downloaded artifacts — it deliberately does not collide 
 ./test/selftest.sh                      # the static checks above fail on broken fixture trees, and pass on a good one
 ./tools/check-updates.sh [pkg...] # what upstream has released since the pinned VERSION, VENDOR_VERSION and patch series
 ./tools/check-patches.sh [--version V] [pkg...]  # packages/<pkg>/patches apply to the tarball (seconds; no build)
-./tools/sync-patches.sh [--list] <pkg>  # patches/upstream/ = upstream's patch series (bash53-NNN)
+./tools/sync-patches.sh [--list] <pkg>  # patches/upstream/ = upstream's patch series (bash53-NNN) or release branch (glibc)
 ./test/boot.sh output/rootfs.erofs rootfs/boot/bzImage   # headless boot smoke test (reads rootfs.cmdline beside the image)
 ./test/systemd.sh output/rootfs.erofs rootfs/boot/bzImage  # no failed units
 ./test/network.sh output/rootfs.erofs rootfs/boot/bzImage  # DHCP + DNS + outbound TCP
@@ -272,11 +272,16 @@ elsewhere. `SHA256` cannot be derived, so a bump is two lines: use
 of `VERSION` alone fails the `sources` job as *CHECKSUM MISMATCH*.
 
 **Patches** (`docs/guides/patches.md`): `packages/<pkg>/patches/upstream/*` (a series
-upstream publishes, owned by `tools/sync-patches.sh`, `-p$UPSTREAM_PATCH_STRIP`) then
+upstream publishes, or a release branch as `git format-patch` — glibc follows
+`release/<v>/master` — owned by `tools/sync-patches.sh`, `-p$UPSTREAM_PATCH_STRIP`) then
 `patches/*.patch` (ours, `-p1`), applied by `build.sh` at extraction in the builder with
 `--fuzz=0`. They are in the extraction stamp, the cache key, the sources image and its tag,
 and the SBOM. Ours is upstream's commit verbatim, for a fix not yet released; a bump to the
-release that has it fails until the patch is deleted, which is the point.
+release that has it fails until the patch is deleted, which is the point. A sync only
+appends (a changed or vanished committed patch is exit 3) and, with
+`packages/<pkg>/upstream-key.asc`, verifies every new file with `gpgv` against that pinned
+key; bash, ncurses, glibc and gcc follow series this way, nightly, through the update
+workflow and auto-merge.
 
 **`VENDOR_VERSION`**: a second tarball with a version of its own (tcpdump's libpcap,
 linux-tools' libtraceevent) is checked by `check-updates.sh` as `<pkg>/<VENDOR_NAME>`, from

@@ -159,6 +159,23 @@ apply_patches() {
                 while read -r p; do
                     case $p in /patches/upstream/*) level=$STRIP ;; *) level=1 ;; esac
                     echo "  patching: ${p#/patches/} (-p$level)"
+                    # A preamble meant to be fed to sh (ncurses: "remove these files, then
+                    # patch") ends in `exit`. Its `rm -f <path>` lines are done here, and
+                    # nothing else in it is run: the patch is data, never a script.
+                    pre=$(awk "/^(Index: |--- |\*\*\* |diff )/ { exit } { print }" "$p")
+                    if printf "%s\n" "$pre" | grep -qx exit; then
+                        printf "%s\n" "$pre" | sed -n "/^[^#[:space:]]/p" | while read -r cmd; do
+                            case $cmd in
+                                exit) ;;
+                                "rm -f "*)
+                                    f=${cmd#rm -f }
+                                    case $f in /*|*..*|*[!A-Za-z0-9._/+-]*)
+                                        echo "error: ${p#/patches/}: refusing to remove $f" >&2; exit 1 ;; esac
+                                    rm -f -- "$f" ;;
+                                *) echo "error: ${p#/patches/}: preamble command not understood: $cmd" >&2; exit 1 ;;
+                            esac
+                        done
+                    fi
                     if ! patch --batch --forward --fuzz=0 --no-backup-if-mismatch -p"$level" -i "$p" >/tmp/out 2>&1; then
                         cat /tmp/out >&2
                         echo "error: ${p#/patches/} does not apply" >&2

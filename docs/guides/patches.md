@@ -6,7 +6,7 @@ at build time.
 
 ```
 packages/<pkg>/patches/
-    upstream/          a patch series upstream publishes (bash53-001, …), applied first
+    upstream/          upstream's patch series (bash53-001, …) or release branch, applied first
     0001-<topic>.patch our own, applied after, in file-name order
 ```
 
@@ -59,6 +59,62 @@ release. A version bump syncs too, because a new release starts a new series.
 ./tools/sync-patches.sh --list bash   # what upstream has
 ./tools/sync-patches.sh bash          # make patches/upstream/ match it
 ```
+
+### From a release branch
+
+glibc backports fixes, security fixes above all, to `release/2.44/master` and rarely tags
+a point release for them. The branch is followed as a series too:
+
+```sh
+UPSTREAM_PATCH_GIT="https://sourceware.org/git/glibc.git"
+UPSTREAM_PATCH_BRANCH="release/${VERSION}/master"
+UPSTREAM_PATCH_BASE="glibc-${VERSION}"   # the tag the tarball was cut from
+```
+
+`sync-patches.sh` writes `git format-patch <base>..<branch>`, so the tarball plus the
+series is the branch's tree at its head. That head is the `From <sha>` line of the last
+patch. Only the commits since the tag are fetched (about 40 seconds, 50 MB), not the
+repository. `--list` first compares the branch head with that line, so a check with
+nothing new costs one `git ls-remote`.
+
+A glibc sync rebuilds every package, because each one is compiled against glibc.
+
+### How a series is kept current, and why that is safe
+
+Nobody imports patches by hand. Every night `update-packages.yml` runs
+`check-updates.sh`, which reports a longer series as `2.44-p66 -> 2.44-p67`. The workflow
+then runs `sync-patches.sh` and opens a pull request that lists the new patches and the
+CVEs they fix. CI builds and boots it, and `auto-merge.yml` merges it after 24 hours if
+it is green and nobody labelled it `hold`. A version bump starts a new series
+(`bump-version.sh` calls `sync-patches.sh --new-series`).
+
+What stops a bad patch from getting that far:
+
+- **Append-only.** Every committed patch must come back byte for byte, and new ones must
+  sort after them. A rewritten branch, a replaced file or a changed server fails the
+  sync (exit 3), so the workflow opens nothing and the run is red.
+- **Signatures, where upstream signs.** `packages/<pkg>/upstream-key.asc` pins the key.
+  Every newly fetched patch must verify against it with `gpgv`, not against a key the
+  server offers. bash (Chet Ramey) and ncurses (Thomas E. Dickey) sign theirs; both keys
+  were checked against two independent sources when pinned.
+- **Git history, where upstream does not sign.** glibc and gcc branch commits are
+  unsigned. Each patch carries its commit id, and append-only means the branch can only
+  have moved forward.
+- **Patches are data.** Patches apply with `--fuzz=0`. A preamble meant to be fed to `sh`
+  (ncurses: "remove these files first") is honoured only for `rm -f` of paths inside the
+  tree; anything else in it fails the build.
+- **Every patch is in git** and in the pull request diff, the cache key and the sources
+  image, so what was built is always what was reviewed.
+
+More options for series on a server:
+
+```sh
+UPSTREAM_PATCH_SIG=".asc"                                  # signature suffix, default .sig
+UPSTREAM_PATCH_SKIP="ncurses-6\.6-20251230\.patch\.gz"    # in the tarball already
+```
+
+A name ending in `.gz` is verified compressed, as it was signed, and committed
+decompressed.
 
 ## Test that patches apply
 

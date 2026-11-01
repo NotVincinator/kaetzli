@@ -16,7 +16,8 @@
 #   version   the release itself (VERSION)                 tools/bump-version.sh
 #   vendor    a second tarball with a VENDOR_VERSION of     tools/bump-version.sh --vendor
 #             its own, shown as <pkg>/<VENDOR_NAME>
-#   patches   an upstream patch series (UPSTREAM_PATCHES),  tools/sync-patches.sh
+#   patches   an upstream patch series (UPSTREAM_PATCHES,   tools/sync-patches.sh
+#             or a release branch, UPSTREAM_PATCH_GIT),
 #             shown as <VERSION>-p<n>, n patches
 set -euo pipefail
 
@@ -91,10 +92,11 @@ check_vendor() {
 
 # check_patches <version> — the upstream patch series against patches/upstream/.
 check_patches() {
-    local index ours theirs
-    index=$(env_get "$PKG" UPSTREAM_PATCHES)
-    [ -n "$index" ] || return 0
-    ours=$(find "packages/$PKG/patches/upstream" -type f 2>/dev/null | wc -l)
+    local index repo ours theirs
+    { read -r index; read -r repo; } < <(env_get "$PKG" UPSTREAM_PATCHES UPSTREAM_PATCH_GIT)
+    [ -n "$index$repo" ] || return 0
+    [ -n "$index" ] || index="$repo $(env_get "$PKG" UPSTREAM_PATCH_BRANCH)"
+    ours=$( { find "packages/$PKG/patches/upstream" -type f 2>/dev/null || true; } | wc -l)
     if ! theirs=$(./tools/sync-patches.sh --list "$PKG" | wc -l); then
         $JSON || printf '%-12s %-10s %s\n' "$PKG" "$1-p$ours" "ERROR: patch listing failed"
         failed=true; return 0

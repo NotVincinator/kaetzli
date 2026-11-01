@@ -152,8 +152,9 @@ if ! ./tools/fetch-sources.sh "$PKG" >/dev/null; then
     exit 1
 fi
 
-# A package whose fixes come as an upstream patch series (bash) starts a new one with
-# every release: the old version's patches go, the new one's — often none yet — come.
-if [ -n "$(env_get "$PKG" UPSTREAM_PATCHES)" ]; then
-    ./tools/sync-patches.sh "$PKG"
+# A package whose fixes come as an upstream patch series (bash) or release branch (glibc)
+# starts a new one with every release: the old version's patches go, the new one's —
+# often none yet — come.
+if [ -n "$(env_get "$PKG" UPSTREAM_PATCHES UPSTREAM_PATCH_GIT | tr -d '\n')" ]; then
+    ./tools/sync-patches.sh --new-series "$PKG"
 fi
