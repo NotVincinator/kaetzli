@@ -5,7 +5,8 @@
 #     CVE-2026-8674	upstream/0019-resolv-Fix-assertion-failure-on-search-list-trunc.patch	git+https://sourceware.org/git/glibc.git@1f502624…
 #
 # Tab-separated: the CVE, the patch under packages/<pkg>/patches/, and where the fix comes
-# from (the upstream commit, the upstream patch file, or the patch in this repository).
+# from (the upstream commit — for our own patches too, which are upstream's commits verbatim —
+# or the upstream patch file).
 # build.sh records these in the package's component record, image/sbom.py turns them into
 # SPDX `fix` references, and test/cve-scan.py into an OpenVEX document grype applies, so
 # a CVE a patch closes is reported as patched rather than open (docs/guides/patches.md).
@@ -32,21 +33,32 @@ source tools/lib.sh
 [ -n "${1:-}" ] || { echo "usage: ${0##*/} <package>" >&2; exit 2; }
 PKG=$(package_name "$1")
 dir="packages/$PKG/patches"
-mapfile -t v < <(env_get "$PKG" UPSTREAM_PATCH_GIT UPSTREAM_PATCHES)
-repo=${v[0]:-} index=${v[1]:-}
+mapfile -t v < <(env_get "$PKG" UPSTREAM_PATCH_GIT UPSTREAM_PATCHES UPSTREAM_GITHUB)
+repo=${v[0]:-} index=${v[1]:-} github=${v[2]:-}
+# Our own patches are upstream's commits verbatim (docs/guides/patches.md), so their
+# fix is that commit too, in the repository the release branch comes from or else the
+# GitHub project releases are taken from.
+own_repo=$repo
+[ -n "$own_repo" ] || [ -z "$github" ] || own_repo="https://github.com/$github"
 
-# locator <patch> — where the fix in that patch comes from.
+# locator <patch> — where the fix in that patch comes from. image/sbom.py makes a URL of
+# git+<repo>@<sha>; anything it cannot map, test/check-sbom.py fails, naming the form.
 locator() {
     local f=$1 sha
+    sha=$(sed -n '1s/^From \([0-9a-f]\{40\}\) .*/\1/p' "$f")
     case $f in
         "$dir"/upstream/*)
             if [ -n "$repo" ]; then
-                sha=$(sed -n '1s/^From \([0-9a-f]\{40\}\) .*/\1/p' "$f")
                 echo "git+$repo@$sha"
             else
                 echo "${index%/}/${f##*/}"
             fi ;;
-        *) echo "git+https://github.com/fwilhe2/kaetzli#$f" ;;
+        *)
+            if [ -n "$own_repo" ] && [ -n "$sha" ]; then
+                echo "git+$own_repo@$sha"
+            else
+                echo "git+https://github.com/fwilhe2/kaetzli#$f"
+            fi ;;
     esac
 }
 

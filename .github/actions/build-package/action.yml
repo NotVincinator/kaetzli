@@ -53,11 +53,16 @@ runs:
         # carries none (builder/build-package.sh). And $PKG/patches: applied to the source
         # at extraction (docs/guides/patches.md), and changed without a VERSION bump.
         #
+        # The CVEs its patches fix (tools/patch-cves.sh) are written into the package's
+        # component record, and so into the artifact: its output is in here, rather than
+        # the script, so a change to how a fix is named rebuilds only the packages whose
+        # record it changes.
+        #
         # A FOLLOWS package's VERSION, TARBALL and SHA256 are another package's env.sh,
         # sourced: $PACKAGE in the key catches a version bump, that file the rest.
         follows=
         [ -z "${FOLLOWS:-}" ] || follows="packages/$FOLLOWS/env.sh"
-        sum=$(cat build.sh tools/lib.sh builder/build-package.sh packages/glibc/env.sh packages/glibc/build.sh $PKG/build.sh $PKG/env.sh $follows <(./tools/image-tags.sh builder) <(find packages/glibc/patches $PKG/src $PKG/licenses $PKG/patches -type f -print0 2>/dev/null | sort -z | xargs -0r cat) | md5sum | cut -d ' ' -f 1)
+        sum=$(cat build.sh tools/lib.sh builder/build-package.sh packages/glibc/env.sh packages/glibc/build.sh $PKG/build.sh $PKG/env.sh $follows <(./tools/image-tags.sh builder) <(./tools/patch-cves.sh "${{ inputs.package }}") <(find packages/glibc/patches $PKG/src $PKG/licenses $PKG/patches -type f -print0 2>/dev/null | sort -z | xargs -0r cat) | md5sum | cut -d ' ' -f 1)
         # And the half-month, so nothing is served from the cache for longer than about
         # two weeks. Every input above is pinned, but the claim that a pinned input still
         # builds is only tested by building it — a binary cached for a year says nothing
