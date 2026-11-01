@@ -175,9 +175,17 @@ jobs:
           EOF
             )
           elif [ "$KIND" = patches ]; then
-            # The new patches are committed: a build never fetches them.
+            # The new patches are committed: a build never fetches them. sync-patches.sh
+            # only appends, and verifies each new file against a pinned key where the
+            # package has one (bash); a series that was rewritten or does not verify
+            # exits 3 and fails this job, so nothing is opened and the run is red.
+            cves_before=$(./tools/patch-cves.sh "$PKG" | cut -f1)
             ./tools/sync-patches.sh "$PKG"
-            git add "packages/$PKG/patches"
+            git add -A "packages/$PKG/patches"
+            ADDED=$(git diff --cached --name-only --diff-filter=A -- "packages/$PKG/patches/upstream" \
+                    | sed 's|.*/|- `|; s|$|`|')
+            FIXED=$(comm -13 <(echo "$cves_before" | sort) <(./tools/patch-cves.sh "$PKG" | cut -f1 | sort) \
+                    | sed 's|.*|- [&](https://nvd.nist.gov/vuln/detail/&)|')
             TITLE="Update $PKG to $LATEST"
             COMMIT_BODY=$(cat <<EOF
           \`$PKG\` $CURRENT -> $LATEST: upstream's patch series, in
@@ -237,6 +245,26 @@ jobs:
           Opened automatically by \`.github/workflows/update-packages.yml\`. Closing this
           pull request stops $LATEST from being proposed again; the next dated image still
           gets its own.
+          EOF
+          )
+          elif [ "$KIND" = patches ]; then
+            BODY=$(cat <<EOF
+          \`$PKG\` $CURRENT -> $LATEST: new patches from upstream, appended to
+          \`packages/$PKG/patches/upstream/\` by \`tools/sync-patches.sh\`. None of the
+          patches already committed changed; that is checked, and a sync that would change one
+          fails instead of opening this.
+
+          Source: $URL
+
+          New patches:
+          $ADDED
+
+          CVEs they fix (\`tools/patch-cves.sh\`, reported as patched by the CVE scan):
+          ${FIXED:-none named}
+
+          Opened automatically by \`.github/workflows/update-packages.yml\`. CI builds
+          with the patches applied and boots the image; auto-merge takes it after a day if
+          that is green, unless it is labelled \`hold\`.
           EOF
           )
           else
