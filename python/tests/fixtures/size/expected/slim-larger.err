@@ -1,0 +1,6 @@
+error: the container image is 27.2 MiB bigger than debian:trixie-slim on amd64.
+       The breakdown above says which directory; take it back out. There is no
+       number to raise here on purpose — the point of building this from source
+       is that the result is smaller than the base image it replaces, and past
+       that line the honest answer is to use debian-slim, which also ships a
+       package manager and security updates.

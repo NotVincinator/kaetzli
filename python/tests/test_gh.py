@@ -44,6 +44,7 @@ def test_successful_runs_newest_first():
     assert [r.id for r in runs] == ["30", "20", "10"]
     assert runs[0].sha == "c" * 40
     assert runs[0].date == "2026-10-30"
+    assert runs[0].created == "2026-10-30T10:00:00Z"
     argv = fake.calls[0]
     assert argv[argv.index("--workflow") + 1] == "ci.yml"
     assert argv[argv.index("--branch") + 1] == "main"

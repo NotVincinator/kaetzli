@@ -724,7 +724,7 @@ cp "$sbom" "/usr/local/output/sbom-$flavour.json"
 echo "sbom: $(wc -c < "$sbom") bytes, $(grep -c '"SPDXID"' "$sbom") elements"
 
 # ---------------------------------------------------------------------------------
-# The size report test/rootfs-size.sh reads, taken here because this is the only place
+# The size report test/rootfs-size.py reads, taken here because this is the only place
 # the assembled tree exists. Apparent bytes, so it compares across arches and formats.
 report=/usr/local/output/rootfs-size-$flavour.txt
 {

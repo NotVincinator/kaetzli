@@ -1,0 +1,10 @@
+## Image size over time — amd64
+
+This build:
+
+| flavour | size |
+| --- | ---: |
+| `erofs` | 74.0 MiB |
+| `oci` | 48.0 MiB |
+
+_no `gh` on PATH, so there is no history to compare against._

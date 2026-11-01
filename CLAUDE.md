@@ -145,7 +145,8 @@ Constraint 5 is about the image. What runs on the host, in CI or in a builder co
 is not bound to bash, and bash is not the default: it is hard to read and review, and much
 of `test/` and `tools/` is JSON, HTTP, joins and report tables written in jq, awk and
 `declare -A`. Choose per job. `docs/proposals/host-scripting.md` reviews every script
-against this and orders the migration; the CVE reports and the SBOM are done.
+against this and orders the migration; the CVE reports, the SBOM and the size reports
+are done.
 
 - **Bash** where the job *is* a sequence of commands and their exit codes: anything
   sourced by a package build (`builder/build-package.sh`, `packages/*/build.sh`, `env.sh`,
@@ -229,9 +230,9 @@ against this and orders the migration; the CVE reports and the SBOM are done.
 ./test/reproducible.sh <pkg>...   # build twice from clean worktrees, compare to the byte (AGAINST_RUN=<id>: against CI's)
 ./test/oci.sh output/kaetzli-oci.tar # load and run the container image (no qemu)
 ./test/prebuilt.sh [build|oci|ssh] # host-compiled C, C++, Rust and Go binaries, run in the image
-./test/rootfs-size.sh [erofs|oci]  # image size vs test/size-budget.txt, and where it went
-./test/vs-debian-slim.sh          # the OCI image against debian-slim, with both breakdowns
-./test/size-history.sh [amd64|arm64]  # both flavours against the last dozen builds on main
+./test/rootfs-size.py [erofs|oci]  # image size vs test/size-budget.txt, and where it went
+./test/vs-debian-slim.py          # the OCI image against debian-slim, with both breakdowns
+./test/size-history.py [amd64|arm64]  # both flavours against the last dozen builds on main
 ./test/check-sbom.py              # the SBOMs validate as SPDX 2.3 (spdx-tools), carry their provenance and describe the image
 ./test/cve-scan.py [dir]          # known CVEs in the SBOMs, by grype (report only; the cve-scan job)
 ./test/cve-workbook.sh [dir]      # cve-scan.py's reports as <dir>/cve.ods, by grind ($GRIND or PATH; CI builds it from main)
@@ -240,7 +241,7 @@ against this and orders the migration; the CVE reports and the SBOM are done.
 ./test/check-doc-links.sh         # relative links in the tracked markdown resolve
 ./test/check-image-files.sh       # each assembled image against test/image-files/: what must and must not ship
 ./test/check-tree-hygiene.sh <tree>  # nothing world-writable, no dangling symlink (build-rootfs.sh runs it on each flavour)
-./test/oci-trim.sh [output]       # what the OCI image leaves out of the disk image, and a deps check on its layer
+./test/oci-trim.py [output]       # what the OCI image leaves out of the disk image, and a deps check on its layer
 ./tools/vm.sh start|ssh|stop|list|run|console|update|snapshot [name] ...  # named machines that keep /var
 ./tools/demo.sh [reset]           # a fresh `demo` vm.sh machine: verity root, identity, sysext attach, a container
 ./tools/boot-qemu.sh              # interactive boot (Ctrl-a x to exit)
@@ -270,8 +271,8 @@ or a new default. `check-image-files.sh` holds the manifest `build-rootfs.sh` wr
 each assembled tree (`output/rootfs-files-<flavour>.txt`; rootfs/ still has everything
 the trim removes) to those lines, and `present` lines guard what must never be trimmed.
 
-`rootfs-size.sh` checks against a budget we chose; `vs-debian-slim.sh` against the image
-somebody would otherwise use, and has no number to raise. `size-history.sh` only reports.
+`rootfs-size.py` checks against a budget we chose; `vs-debian-slim.py` against the image
+somebody would otherwise use, and has no number to raise. `size-history.py` only reports.
 **Any job summary has to be text — sparklines in a markdown table, no mermaid**: the run
 page concatenates every job's summary and renders each mermaid block in its own iframe.
 
@@ -415,7 +416,7 @@ kmod (no modules), sshd, libudev, conmon with glib and pcre2. `libsystemd.so.0` 
 (crun, libmount). Libraries deleted this way are guarded: a new consumer fails the build.
 **Grepping binaries for a library name needs `grep -a`** — GNU grep otherwise discards a
 match inside an ELF `.dynstr`. Anything added *below* the subtractions block runs on a tree
-without systemd, so it has to say which flavour it is for. `test/oci-trim.sh` shows the
+without systemd, so it has to say which flavour it is for. `test/oci-trim.py` shows the
 whole difference from the two manifests, side effects included, and runs the deps check
 on the OCI layer; CI puts it in the rootfs job's summary, so a change to the block is
 reviewed by its result. The OCI archive is written by

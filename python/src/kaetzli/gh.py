@@ -27,6 +27,7 @@ class Run:
     id: str
     sha: str
     date: str  # YYYY-MM-DD
+    created: str = ""  # createdAt as gh gives it, 2026-11-01T10:30:53Z
 
 
 class Gh:
@@ -68,7 +69,10 @@ class Gh:
             runs = json.loads(p.stdout or "[]")
         except json.JSONDecodeError:
             return []
-        return [Run(str(r["databaseId"]), r["headSha"], r["createdAt"][:10]) for r in runs]
+        return [
+            Run(str(r["databaseId"]), r["headSha"], r["createdAt"][:10], r["createdAt"])
+            for r in runs
+        ]
 
     def live_artifacts(self, run_id: str, name: str) -> int:
         """How many unexpired artifacts called name the run has. Asked per run: the

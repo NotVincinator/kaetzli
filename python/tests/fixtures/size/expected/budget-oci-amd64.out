@@ -1,0 +1,40 @@
+image size (oci, amd64): 48.0 MiB of a 51 MiB budget (94%)
+  archive: 19.2 MiB of gzipped layer, config and manifest
+
+  where it is:
+         MiB  directory
+        47.3  usr
+        25.0  usr/lib
+        19.1  usr/bin
+         2.4  usr/share
+         0.7  etc
+         0.7  usr/lib64
+         0.2  etc/ssl
+         0.1  usr/libexec
+
+  largest files:
+         5.9  usr/lib/libcrypto.so.3
+         2.7  usr/lib/libstdc++.so.6.0.36
+         1.9  usr/lib/libc.so.6
+         1.5  usr/lib/libsystemd.so.0.45.0
+         1.5  usr/bin/coreutils
+         1.4  usr/bin/bash
+         1.2  usr/bin/gawk-5.4.1
+         1.2  usr/bin/gawk
+         1.1  usr/lib/libm.so.6
+         1.1  usr/bin/ldconfig
+         1.0  usr/bin/openssl
+         1.0  usr/lib/libnftables.so.1.1.0
+         1.0  usr/lib/libssl.so.3
+         1.0  usr/lib/libmvec.so.1
+         0.9  usr/bin/ssh
+         0.8  usr/lib/libzstd.so.1.5.7
+         0.7  usr/bin/ip
+         0.7  usr/bin/crun
+         0.7  usr/lib/libcurl.so.4.8.0
+         0.6  usr/bin/tc
+         0.5  etc/services
+         0.5  usr/bin/ssh-keyscan
+         0.5  usr/bin/ssh-keygen
+         0.5  usr/lib/libmount.so.1.1.0
+         0.5  usr/lib/libbpf.so.1.8.0

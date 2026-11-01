@@ -1,0 +1,37 @@
+# assembled erofs image tree, sizes in bytes. Written by image/build-rootfs.sh.
+total 77486370
+dir 76577990 usr
+dir 46055069 usr/lib
+dir 24899568 usr/bin
+dir 2430176 usr/libexec
+dir 2418998 usr/share
+dir 816531 etc
+dir 770162 usr/lib64
+dir 194451 etc/ssl
+dir 91800 boot
+file 6198832 usr/lib/libcrypto.so.3
+file 5755640 usr/lib/systemd/libsystemd-shared-262.so
+file 2836608 usr/lib/systemd/libsystemd-core-262.so
+file 2796536 usr/lib/libstdc++.so.6.0.36
+file 2292232 usr/lib/systemd/systemd-networkd
+file 1999672 usr/lib/libc.so.6
+file 1611144 usr/lib/libsystemd.so.0.45.0
+file 1576832 usr/bin/coreutils
+file 1524928 usr/lib/libglib-2.0.so.0.9000.1
+file 1427584 usr/bin/bash
+file 1220928 usr/bin/gawk-5.4.1
+file 1220928 usr/bin/gawk
+file 1145392 usr/lib/libm.so.6
+file 1123512 usr/bin/ldconfig
+file 1113536 usr/libexec/sshd-session
+file 1092120 usr/bin/openssl
+file 1083824 usr/lib/libnftables.so.1.1.0
+file 1081616 usr/lib/libssl.so.3
+file 1076192 usr/libexec/sshd-auth
+file 1015224 usr/lib/libmvec.so.1
+file 1004728 usr/lib/security/pam_systemd.so
+file 989888 usr/bin/ssh
+file 834336 usr/lib/libzstd.so.1.5.7
+file 820656 usr/bin/udevadm
+file 743712 usr/bin/ip
+disk 29200384

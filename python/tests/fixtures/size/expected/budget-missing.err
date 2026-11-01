@@ -1,0 +1,2 @@
+error: no size report at python/tests/fixtures/size/budget/nonexistent.txt
+       image/build-rootfs.sh writes one per flavour into output/; build the image first

@@ -1,0 +1,29 @@
+## Image size over time — amd64
+
+| flavour | last 3 builds on `main` → now | main | this build | Δ |
+| --- | --- | ---: | ---: | ---: |
+| `erofs` | `▁▁█▁` | 75.9 | **74.0** | −1.9 |
+| `oci` | `▁▂▇█` | 48.0 | **48.0** | +0.0 |
+
+MiB, apparent size of the assembled tree — the same number `test/rootfs-size.py` holds to `test/size-budget.txt`.
+
+<details><summary>Where <code>erofs</code> changed against `main`</summary>
+
+| directory | now | Δ |
+| --- | ---: | ---: |
+| `usr/sbin` | 0.0 | −3.0 |
+| `usr/share` | 2.4 | −1.0 |
+| `usr/libexec` | 2.3 | +0.3 |
+
+</details>
+
+<details><summary>Run by run</summary>
+
+| date | commit | erofs | oci |
+| --- | --- | ---: | ---: |
+| 2026-11-01 09:16 | `5ece577` | 73.9 | 47.9 |
+| 2026-11-01 10:06 | `3e761bd` | 73.9 | 47.9 |
+| 2026-11-01 10:27 | `af96e9a` | 75.9 | 48.0 |
+| **this build** | `225ca10` | **74.0** | **48.0** |
+
+</details>

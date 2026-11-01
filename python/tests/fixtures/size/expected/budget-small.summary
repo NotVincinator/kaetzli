@@ -1,0 +1,47 @@
+## Image size — erofs, amd64
+
+**30.0 MiB** of a **90 MiB** budget (33%). 
+
+| directory | MiB |
+| --- | ---: |
+| `usr` | 73.1 |
+| `usr/lib` | 43.9 |
+| `usr/bin` | 23.8 |
+| `usr/share` | 2.4 |
+| `usr/libexec` | 2.3 |
+| `etc` | 0.8 |
+| `usr/lib64` | 0.7 |
+| `etc/ssl` | 0.2 |
+| `boot` | 0.1 |
+
+<details><summary>Largest files</summary>
+
+| file | MiB |
+| --- | ---: |
+| `usr/lib/libcrypto.so.3` | 5.9 |
+| `usr/lib/systemd/libsystemd-shared-262.so` | 5.5 |
+| `usr/lib/systemd/libsystemd-core-262.so` | 2.7 |
+| `usr/lib/libstdc++.so.6.0.36` | 2.7 |
+| `usr/lib/systemd/systemd-networkd` | 2.2 |
+| `usr/lib/libc.so.6` | 1.9 |
+| `usr/lib/libsystemd.so.0.45.0` | 1.5 |
+| `usr/bin/coreutils` | 1.5 |
+| `usr/lib/libglib-2.0.so.0.9000.1` | 1.5 |
+| `usr/bin/bash` | 1.4 |
+| `usr/bin/gawk-5.4.1` | 1.2 |
+| `usr/bin/gawk` | 1.2 |
+| `usr/lib/libm.so.6` | 1.1 |
+| `usr/bin/ldconfig` | 1.1 |
+| `usr/libexec/sshd-session` | 1.1 |
+| `usr/bin/openssl` | 1.0 |
+| `usr/lib/libnftables.so.1.1.0` | 1.0 |
+| `usr/lib/libssl.so.3` | 1.0 |
+| `usr/libexec/sshd-auth` | 1.0 |
+| `usr/lib/libmvec.so.1` | 1.0 |
+| `usr/lib/security/pam_systemd.so` | 1.0 |
+| `usr/bin/ssh` | 0.9 |
+| `usr/lib/libzstd.so.1.5.7` | 0.8 |
+| `usr/bin/udevadm` | 0.8 |
+| `usr/bin/ip` | 0.7 |
+
+</details>

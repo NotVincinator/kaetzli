@@ -41,6 +41,12 @@ class Report:
         return cls(stdout=None, summary_path=Path(path) if path else None)
 
     @classmethod
+    def summary_only(cls) -> Report:
+        """The job summary alone, for a report whose stdout is shaped differently."""
+        path = os.environ.get("GITHUB_STEP_SUMMARY") or None
+        return cls(stdout=_Discard(), summary_path=Path(path) if path else None)
+
+    @classmethod
     def quiet(cls) -> Report:
         """Writes nowhere: a report run for its files alone."""
         return cls(stdout=_Discard(), summary_path=None)

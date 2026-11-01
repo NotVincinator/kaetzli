@@ -22,7 +22,7 @@ answer to "how much do the updates help".
 
 Builds from before the extensions had SBOMs are the disk image alone; the series says so
 when it changes shape. History reaches as far back as artifact retention. Like
-test/size-history.sh this reports and never fails.
+test/size-history.py this reports and never fails.
 """
 
 from __future__ import annotations

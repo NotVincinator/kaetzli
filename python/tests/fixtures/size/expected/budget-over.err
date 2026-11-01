@@ -1,0 +1,6 @@
+error: the erofs image is 200.0 MiB, over its 90 MiB budget on amd64
+       by 110.0 MiB.
+       Either find what grew in the breakdown above and take it back out, or —
+       if this is growth you wanted — raise the 'erofs amd64' line in test/size-budget.txt in
+       the same commit that caused it. Raising it silently later is the thing this
+       check exists to prevent.

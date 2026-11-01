@@ -1,0 +1,36 @@
+# assembled oci image tree, sizes in bytes. Written by image/build-rootfs.sh.
+total 50258279
+dir 49475725 usr
+dir 26165865 usr/lib
+dir 20058464 usr/bin
+dir 2406937 usr/share
+dir 777228 etc
+dir 770162 usr/lib64
+dir 194451 etc/ssl
+dir 70280 usr/libexec
+file 6198832 usr/lib/libcrypto.so.3
+file 2796536 usr/lib/libstdc++.so.6.0.36
+file 1999672 usr/lib/libc.so.6
+file 1611144 usr/lib/libsystemd.so.0.45.0
+file 1576832 usr/bin/coreutils
+file 1427584 usr/bin/bash
+file 1220928 usr/bin/gawk-5.4.1
+file 1220928 usr/bin/gawk
+file 1145392 usr/lib/libm.so.6
+file 1123512 usr/bin/ldconfig
+file 1092120 usr/bin/openssl
+file 1083824 usr/lib/libnftables.so.1.1.0
+file 1081616 usr/lib/libssl.so.3
+file 1015224 usr/lib/libmvec.so.1
+file 989888 usr/bin/ssh
+file 834336 usr/lib/libzstd.so.1.5.7
+file 743712 usr/bin/ip
+file 711264 usr/bin/crun
+file 699576 usr/lib/libcurl.so.4.8.0
+file 602640 usr/bin/tc
+file 563158 etc/services
+file 559312 usr/bin/ssh-keyscan
+file 542920 usr/bin/ssh-keygen
+file 514216 usr/lib/libmount.so.1.1.0
+file 487736 usr/lib/libbpf.so.1.8.0
+archive 20070400

@@ -1,6 +1,6 @@
 # How big each assembled image is allowed to be, per flavour and architecture, in MiB.
 #
-# `test/rootfs-size.sh` fails a build that goes over. This is not a measurement and not a
+# `test/rootfs-size.py` fails a build that goes over. This is not a measurement and not a
 # target — it is a ceiling somebody chose, and the only reason it is in git is so that
 # crossing it takes a commit. Nothing else in CI notices an image getting bigger: every
 # check here asks whether the image *works*, and a fatter one works fine right up until

@@ -8,6 +8,8 @@ launch.py            what each entry point calls: stdlib only, execs uv run --lo
 src/kaetzli/         shared: repo (env.sh through bash), report (stdout + job summary),
                      gh (CI runs and artifacts), http_cache
 src/kaetzli/cve/     the CVE reports: scan, context, history, and what they share
+src/kaetzli/size/    the size reports: budget (rootfs-size), slim (vs-debian-slim),
+                     history (size-history), trim (oci-trim), and sizes, their parser
 src/kaetzli/sbom_check.py
                      test/check-sbom.py: what the SBOM says
 tests/               pytest; fixtures/ holds real data cut down, and the bash versions'

@@ -1,0 +1,29 @@
+OCI image against the disk image (27 and 13 paths)
+  tree size: 74.0 MiB disk, 48.0 MiB container
+  removed:   18 paths, in 8 subtrees or files
+  added:     4 paths
+
+removed, by area (paths):
+     4  usr/lib/systemd
+     3  etc/systemd/system
+     3  usr/lib/udev
+     2  usr/lib/systemd-boot
+     1  boot
+     1  boot/bzImage
+     1  etc/systemd
+     1  usr/bin/sshd
+     1  usr/lib/libpam.so.0
+     1  usr/lib/libpam.so.0.85.1
+
+shared libraries removed:
+  usr/lib/libpam.so.0
+  usr/lib/libpam.so.0.85.1
+  usr/lib/systemd/libsystemd-shared-262.so
+
+added (only in the container):
+  home
+  var/log
+  var/tmp
+
+links: test/check-rootfs-deps.sh on the container's layer
+  All shared library dependencies in <tree>/ are satisfied.

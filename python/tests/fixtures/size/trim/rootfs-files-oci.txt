@@ -1,0 +1,14 @@
+# flavour: oci
+etc
+etc/hostname
+home
+home/user
+usr
+usr/bin
+usr/bin/bash
+usr/lib
+usr/lib/libc.so.6
+usr/lib/libsystemd.so.0
+var
+var/log
+var/tmp

@@ -396,8 +396,8 @@ package list, kernel config and disk usage, and diffs them against the last rele
 nightly for review and release notes.
 
 **Gap:** kaetzli already has most of the inputs — `output/rootfs-files-<flavour>.txt`
-manifests, `test/kernel-config-diff.sh`, `test/oci-trim.sh`, `test/rootfs-size.sh` and
-`test/size-history.sh` — but no single view of how a pull request changes the image
+manifests, `test/kernel-config-diff.sh`, `test/oci-trim.py`, `test/rootfs-size.py` and
+`test/size-history.py` — but no single view of how a pull request changes the image
 compared with `main`.
 
 **Implementation:**
@@ -407,7 +407,7 @@ compared with `main`.
      in each tree, or the package records);
    - paths added and removed per flavour (`diff` of the two manifests, grouped by the
      package that owns each path, which the staging trees can tell);
-   - size changes per package above a threshold (reuse `rootfs-size.sh`'s breakdown);
+   - size changes per package above a threshold (reuse `rootfs-size.py`'s breakdown);
    - the extension contents the same way.
 2. In CI, have the rootfs job fetch the previous `main` run's bundle (as
    `tools/fetch-image.sh` already does) and post the output as the job summary and, on
@@ -454,7 +454,7 @@ hardening options come and go with upstream defaults unnoticed.
    new `deps.txt` entry is a decision of its own.
 
 **Verification:** both architectures build; the boot, container, debug and k8s tests pass.
-Watch `test/rootfs-size.sh` (randomization and init-on-alloc cost little space but some
+Watch `test/rootfs-size.py` (randomization and init-on-alloc cost little space but some
 boot time) and `test/debug.sh` (`PROC_KCORE` off affects `perf` only for kernel symbol
 reads through `/proc/kcore`; BTF and kallsyms remain).
 

@@ -1,9 +1,9 @@
 # Host-side scripts: which language for which job
 
-**Status: proposal, partly implemented.** Implemented: items 1 and 2, the CVE reports
-and the SBOM (`python/`, see its README). CLAUDE.md (*Host-side code*) allows Python
-and Go for what runs on the host, in CI or in a builder container. This page reviews the
-scripts against that rule and orders the migration.
+**Status: proposal, partly implemented.** Implemented: items 1 to 3, the CVE reports,
+the SBOM and the size reports (`python/`, see its README). CLAUDE.md (*Host-side code*)
+allows Python and Go for what runs on the host, in CI or in a builder container. This
+page reviews the scripts against that rule and orders the migration.
 
 Bash remains the only interpreter *in the image*. This is about the repository's tooling.
 
@@ -57,13 +57,20 @@ serialiser in `image/Containerfile` as the cost being avoided.
 
 Dependencies: none in the assembly image; `spdx-tools` for the check.
 
-### 3. Size reports: `test/size-history.sh`, `rootfs-size.sh`, `vs-debian-slim.sh`, `oci-trim.sh`
+### 3. Size reports: `test/rootfs-size.py`, `vs-debian-slim.py`, `size-history.py`, `oci-trim.py` (done)
 
-These are awk sparklines, associative arrays of directory sizes and markdown tables, and
-`size-history.sh` repeats the "last N green runs on main that still have artifact X" loop.
-That loop also appears in `cve-context.sh`, `cve-history.sh`, `fetch-image.sh`,
-`reproducible.sh` and `dispatch-ci.sh`. The shared module now has it, from item 1:
-`kaetzli.gh.Gh` (`successful_runs`, `newest_run_with`, `download`).
+Ported with no dependency beyond the stdlib, as `kaetzli.size`: one parser for the size
+report `image/build-rootfs.sh` writes, shared by all four, and the run lookup from item 1
+(`kaetzli.gh.Gh`) for the history. The measurements stay commands: debian-slim is still
+`podman export`, `du` and `find`, the layer is unpacked by GNU tar, and the links check is
+still `test/check-rootfs-deps.sh`. One deliberate difference: `oci-trim`'s count of
+removed subtrees. In byte order `systemd-boot` sorts between `systemd` and `systemd/…`,
+and the awk that found the topmost path of each subtree then counted `systemd`'s
+contents as subtrees of their own. What the bash versions said:
+
+These were awk sparklines, associative arrays of directory sizes and markdown tables, and
+`size-history.sh` repeated the "last N green runs on main that still have artifact X"
+loop that `cve-history.sh` had too.
 
 Dependencies: none (stdlib and the `gh` CLI).
 

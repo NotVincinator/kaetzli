@@ -1,0 +1,37 @@
+# debian:trixie-slim (amd64) filesystem, sizes in bytes. Written by test/vs-debian-slim.sh.
+total 78864241
+dir 74306757 usr
+dir 44624358 usr/lib
+dir 22219380 usr/bin
+dir 4745690 usr/sbin
+dir 4396920 var
+dir 2820658 var/lib
+dir 2698834 usr/share
+dir 1572222 var/cache
+dir 159794 etc
+dir 80152 etc/apt
+file 6521408 usr/lib/x86_64-linux-gnu/libcrypto.so.3
+file 3935376 usr/bin/perl5.40.1
+file 3935376 usr/bin/perl
+file 2580592 usr/lib/x86_64-linux-gnu/libapt-pkg.so.7.0.0
+file 2497768 usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.33
+file 1995216 usr/lib/x86_64-linux-gnu/libc.so.6
+file 1870376 usr/bin/sqv
+file 1864304 usr/lib/x86_64-linux-gnu/libdb-5.3.so
+file 1571096 usr/lib/x86_64-linux-gnu/libsqlite3.so.0.8.6
+file 1298416 usr/bin/bash
+file 1131784 usr/lib/x86_64-linux-gnu/libsystemd.so.0.40.0
+file 1109952 usr/lib/x86_64-linux-gnu/libssl.so.3
+file 1018072 usr/lib/x86_64-linux-gnu/libmvec.so.1
+file 988168 usr/sbin/ldconfig
+file 977112 usr/lib/x86_64-linux-gnu/libm.so.6
+file 825456 usr/lib/x86_64-linux-gnu/libsepol.so.2
+file 825336 usr/lib/x86_64-linux-gnu/libzstd.so.1.5.7
+file 781774 var/cache/debconf/templates.dat-old
+file 781774 var/cache/debconf/templates.dat
+file 781480 usr/lib/x86_64-linux-gnu/libapt-private.so.0.0.0
+file 711216 usr/lib/x86_64-linux-gnu/libpcre2-8.so.0.14.0
+file 671528 usr/lib/x86_64-linux-gnu/perl-base/auto/re/re.so
+file 566080 usr/lib/x86_64-linux-gnu/libgmp.so.10.5.0
+file 502512 usr/lib/x86_64-linux-gnu/libmount.so.1.1.0
+file 473080 usr/lib/x86_64-linux-gnu/gconv/libCNS.so

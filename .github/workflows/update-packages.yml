@@ -248,7 +248,7 @@ jobs:
           both builder images are rebuilt from the snapshot archive, and every package is
           recompiled because that reference is in their cache keys. A green run here means
           the whole image still builds and boots against the new Debian. Expect it to be
-          slow, and expect \`test/rootfs-size.sh\` to be the interesting check — a different
+          slow, and expect \`test/rootfs-size.py\` to be the interesting check — a different
           \`strip\` or \`mkfs.erofs\` is exactly what moves those numbers.
 
           Opened automatically by \`.github/workflows/update-packages.yml\`. Closing this

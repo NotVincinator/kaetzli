@@ -1,0 +1,46 @@
+## Image size — oci, amd64
+
+**48.0 MiB** of a **51 MiB** budget (94%). 19.2 MiB as a gzipped OCI archive.
+
+| directory | MiB |
+| --- | ---: |
+| `usr` | 47.3 |
+| `usr/lib` | 25.0 |
+| `usr/bin` | 19.1 |
+| `usr/share` | 2.4 |
+| `etc` | 0.7 |
+| `usr/lib64` | 0.7 |
+| `etc/ssl` | 0.2 |
+| `usr/libexec` | 0.1 |
+
+<details><summary>Largest files</summary>
+
+| file | MiB |
+| --- | ---: |
+| `usr/lib/libcrypto.so.3` | 5.9 |
+| `usr/lib/libstdc++.so.6.0.36` | 2.7 |
+| `usr/lib/libc.so.6` | 1.9 |
+| `usr/lib/libsystemd.so.0.45.0` | 1.5 |
+| `usr/bin/coreutils` | 1.5 |
+| `usr/bin/bash` | 1.4 |
+| `usr/bin/gawk-5.4.1` | 1.2 |
+| `usr/bin/gawk` | 1.2 |
+| `usr/lib/libm.so.6` | 1.1 |
+| `usr/bin/ldconfig` | 1.1 |
+| `usr/bin/openssl` | 1.0 |
+| `usr/lib/libnftables.so.1.1.0` | 1.0 |
+| `usr/lib/libssl.so.3` | 1.0 |
+| `usr/lib/libmvec.so.1` | 1.0 |
+| `usr/bin/ssh` | 0.9 |
+| `usr/lib/libzstd.so.1.5.7` | 0.8 |
+| `usr/bin/ip` | 0.7 |
+| `usr/bin/crun` | 0.7 |
+| `usr/lib/libcurl.so.4.8.0` | 0.7 |
+| `usr/bin/tc` | 0.6 |
+| `etc/services` | 0.5 |
+| `usr/bin/ssh-keyscan` | 0.5 |
+| `usr/bin/ssh-keygen` | 0.5 |
+| `usr/lib/libmount.so.1.1.0` | 0.5 |
+| `usr/lib/libbpf.so.1.8.0` | 0.5 |
+
+</details>
