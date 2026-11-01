@@ -355,7 +355,7 @@ after a successful install, and `build-rootfs.sh` turns the records in the *asse
 into SPDX, since the flavours differ: a package with no file left in a flavour is not in
 its SBOM, judged by `usr/share/flfs/owners`, which `merge-staging.sh` writes into `rootfs/`
 and the assembly deletes. `test/check-sbom.sh` parses it. A package's `CPE=` (NVD's
-name for it) becomes a `cpe23Type` reference, and the Go modules and Rust crates a program
+name for it, space-separated where NVD has two) becomes a `cpe23Type` reference each, and the Go modules and Rust crates a program
 compiled in (`go version -m`, `cargo tree -e normal`, recorded by `build-package.sh` in
 `usr/share/flfs/modules/`) become packages it `CONTAINS`: those two are what scanners match.
 `image/sbom.sh` is shared with `build-extension.sh`, which writes `sbom-ext-<name>.json`.

@@ -318,8 +318,9 @@ to start. With no `kernel.panic`, a panicked node hangs forever instead of reboo
 
 ## 7. An SBOM that vulnerability scanners can match
 
-*Implemented, observing only:* `CPE=` in 50 packages' `env.sh`, Go modules and Rust
-crates in the SBOM (`builder/build-package.sh`, `image/sbom.sh`), an SBOM per extension,
+*Implemented, observing only:* `CPE=` in 53 packages' `env.sh` (two for gawk and shadow,
+which NVD files under two vendors each), Go modules and Rust crates in the SBOM
+(`builder/build-package.sh`, `image/sbom.sh`), an SBOM per extension,
 a package the assembly removes whole (the container image's kernel, kmod and PAM) left
 out of that flavour's SBOM, and a `cve-scan` job that nothing waits on: `test/cve-scan.sh`
 (grype, pinned) and `test/cve-history.sh`, which rescans the last builds' SBOMs with one
@@ -328,10 +329,10 @@ the updater's commits made them. Step 4 (`check-sbom.sh` requiring the reference
 
 Known gaps:
 
-- **No CPE yet** for cni-plugins, conmon, cri-tools, gawk, libxcrypt, netavark, nftables,
-  passt and shadow: NVD had no product under the obvious vendor:product, and the right
-  one has to be looked up by hand (NVD's keyword search). Until then their own advisories
-  are not matched; the Go and Rust ones are covered through their modules and crates.
+- **No CPE** for conmon, cri-tools, libxcrypt, netavark, nftables and passt: as of
+  2026-11-01 NVD's dictionary has no product for them and no CVE names one (netavark's
+  one advisory is filed against Red Hat's products only). A first advisory will create
+  one; the Go and Rust code in them is matched through its modules and crates meanwhile.
 - **linux-tools** has none on purpose (its `env.sh` unsets the one it sources from the
   kernel's): it is the kernel's source and would count the kernel's CVEs twice.
 - **No ignore list.** CPE matching reports disputed and distribution-specific advisories

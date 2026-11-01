@@ -9,6 +9,7 @@ TARBALL="$PACKAGE.tar.gz"
 URL="https://github.com/containernetworking/plugins/archive/refs/tags/v${VERSION}.tar.gz"
 SHA256="34bd82d47e981940751619c9cc44c095bb90bfcaf8d71865cbb822c37690a764"
 LICENSE="Apache-2.0"
+CPE="cpe:2.3:a:linuxfoundation:cni_network_plugins:${VERSION}:*:*:*:*:*:*:*"
 EXTENSION=kubernetes
 UPSTREAM_GITHUB="containernetworking/plugins"
 UPSTREAM_SED='s/^v//'

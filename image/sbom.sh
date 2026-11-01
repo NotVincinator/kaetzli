@@ -20,7 +20,7 @@ spdxid() { printf '%s' "$1" | tr -c 'A-Za-z0-9.-' '-'; }
 # indexes; a record with a cpe= gets it as a SECURITY reference, which is what scanners
 # match C packages by (NVD's CPE dictionary, env.sh's CPE=).
 sbom_component_packages() { # components-dir
-    local record name version license origin url sha256 cpe key value
+    local record name version license origin url sha256 cpe c key value cpes
     for record in "$1"/*; do
         name= version= license= origin= url= sha256= cpe=
         while IFS='=' read -r key value; do
@@ -45,15 +45,16 @@ sbom_component_packages() { # components-dir
         if [ -n "$sha256" ]; then
             printf '      "checksums": [ { "algorithm": "SHA256", "checksumValue": "%s" } ],\n' "$(jstr "$sha256")"
         fi
-        if [ -n "$cpe" ]; then
-            printf '      "externalRefs": [ { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:generic/%s@%s" },\n' \
-                "$(jstr "$name")" "$(jstr "$version")"
-            printf '                        { "referenceCategory": "SECURITY", "referenceType": "cpe23Type", "referenceLocator": "%s" } ],\n' \
-                "$(jstr "$cpe")"
-        else
-            printf '      "externalRefs": [ { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:generic/%s@%s" } ],\n' \
-                "$(jstr "$name")" "$(jstr "$version")"
-        fi
+        # cpe= may name several, space-separated, where NVD files one upstream's advisories
+        # under more than one vendor (gawk, shadow); a CPE has no spaces of its own.
+        printf '      "externalRefs": [ { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:generic/%s@%s" }' \
+            "$(jstr "$name")" "$(jstr "$version")"
+        read -ra cpes <<< "$cpe"   # split, but no pathname expansion of the CPE's `*`s
+        for c in "${cpes[@]}"; do
+            printf ',\n                        { "referenceCategory": "SECURITY", "referenceType": "cpe23Type", "referenceLocator": "%s" }' \
+                "$(jstr "$c")"
+        done
+        printf ' ],\n'
         printf '      "licenseConcluded": "NOASSERTION",\n'
         printf '      "licenseDeclared": "%s",\n' "$(jstr "${license:-NOASSERTION}")"
         printf '      "copyrightText": "NOASSERTION"\n'
