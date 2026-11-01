@@ -1,0 +1,31 @@
+From 492151d7e3617161d09ff6053391b5f35a623b86 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Wed, 23 Sep 2026 15:46:30 +0200
+Subject: [PATCH 203/385] tree-optimization/127571 - fix association of offset
+ computation
+
+The expression was flagged by UBSAN, the following should match
+up the computations with the preceeding condition.
+
+	PR tree-optimization/127571
+	* tree-ssa-sccvn.cc (vn_walk_cb_data::push_partial_def):
+	Re-associate offset computation to avoid overflow.
+
+(cherry picked from commit d6ca7e8e1cf62734f0257cdc668da907cf3e0297)
+---
+ gcc/tree-ssa-sccvn.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/tree-ssa-sccvn.cc b/gcc/tree-ssa-sccvn.cc
+index c2e861067979..362e764936f0 100644
+--- a/gcc/tree-ssa-sccvn.cc
++++ b/gcc/tree-ssa-sccvn.cc
+@@ -2079,7 +2079,7 @@ vn_walk_cb_data::push_partial_def (pd_data pd,
+ 	  pd.offset += o;
+ 	}
+       if (pd.size + pd.offset > offseti + maxsizei)
+-	pd.size = maxsizei + ((pd.size + pd.offset - offseti - maxsizei)
++	pd.size = maxsizei + ((pd.size + pd.offset - (offseti + maxsizei))
+ 			      % BITS_PER_UNIT);
+     }
+ 

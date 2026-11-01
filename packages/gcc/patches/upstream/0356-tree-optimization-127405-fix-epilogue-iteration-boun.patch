@@ -1,0 +1,140 @@
+From 9f3b7c6f11ed479e5c34a20b1a212c3dcdaa4a18 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Thu, 17 Sep 2026 13:14:04 +0200
+Subject: [PATCH 356/385] tree-optimization/127405 fix epilogue iteration bound
+ when the control IV wraps
+
+tree_transform_and_unroll_loop records an upper bound of FACTOR - 1
+latch iterations on the epilogue loop it creates.  That is justified by
+the main unrolled loop consuming all but less than FACTOR iterations,
+i.e. by ENTER_MAIN_COND being false implying that less than FACTOR
+iterations are left.
+
+determine_exit_conditions however builds ENTER_MAIN_COND by rewriting a
+NE_EXPR exit test into a LT_EXPR/GT_EXPR comparison of the control IV,
+which is only valid when that IV does not wrap.  For
+
+  void test (unsigned long n, int *a, int *b)
+  {
+    for (unsigned long i = n - 2; i + 2 != 0; --i)
+      a[i+2] = b[i+2] - a[i+3] - a[i+5] + (int)(i + 2);
+  }
+
+the control IV runs from n - 3 downwards to (unsigned long) -2, so with
+FACTOR 3 the guard that BOUND - DELTA does not overflow is constant
+false and ENTER_MAIN_COND folds to false.  Predictive commoning then
+unrolls, the main loop is removed as unreachable and the epilogue - which
+performs all n iterations - is left claiming an upper bound of 2.  Loop
+peeling subsequently peeled three iterations and dropped the loop, so at
+-O3 the testcase was miscompiled.
+
+Only set the epilogue bound (and scale its profile accordingly) when the
+exit test is not a NE_EXPR one or the control IV is known not to wrap.
+In the remaining case the epilogue keeps the bound inherited from the
+original loop, which is correct whether or not the main loop is entered.
+
+	PR tree-optimization/127405
+	* tree-ssa-loop-manip.cc (tree_transform_and_unroll_loop): Only
+	set nb_iterations_upper_bound of the epilogue loop and scale its
+	profile when the control IV is known not to wrap.
+
+	* gcc.dg/tree-ssa/predcom-10.c: New test.
+
+(cherry picked from commit 9f6eb7d2993046e5720275f590098db0ac0188d4)
+---
+ gcc/testsuite/gcc.dg/tree-ssa/predcom-10.c | 42 ++++++++++++++++++++++
+ gcc/tree-ssa-loop-manip.cc                 | 31 +++++++++++-----
+ 2 files changed, 64 insertions(+), 9 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/tree-ssa/predcom-10.c
+
+diff --git a/gcc/testsuite/gcc.dg/tree-ssa/predcom-10.c b/gcc/testsuite/gcc.dg/tree-ssa/predcom-10.c
+new file mode 100644
+index 000000000000..b6d87a62c34f
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/tree-ssa/predcom-10.c
+@@ -0,0 +1,42 @@
++/* PR/127405 */
++/* Predictive commoning used to unroll the loop below and wrongly record an
++   upper bound of UNROLL_FACTOR - 1 iterations on the epilogue loop, even
++   though the main unrolled loop is never entered because the control IV
++   wraps.  Later loop peeling then dropped all but the first three
++   iterations.  */
++
++/* { dg-do run } */
++/* { dg-options "-O2 -fpredictive-commoning -fpeel-loops" } */
++
++extern void abort (void);
++
++int a[12], b[12];
++
++void __attribute__((noipa))
++test (unsigned long n, int *a, int *b)
++{
++  /* I wraps around zero, the exit test is I + 2 != 0.  */
++  for (unsigned long i = n - 2; i + 2 != 0; --i)
++    a[i + 2] = b[i + 2] - a[i + 3] - a[i + 5] + (int) (i + 2);
++}
++
++int
++main (int argc, char **argv)
++{
++  /* N is 6, but not known to the compiler.  */
++  unsigned long n = argc + 5;
++
++  for (int i = 0; i < 12; i++)
++    {
++      a[i] = 0;
++      b[i] = i + 1;
++    }
++
++  test (n, a, b);
++
++  if (a[6] != 13 || a[5] != -2 || a[4] != 11
++      || a[3] != -17 || a[2] != 24 || a[1] != -32)
++    abort ();
++
++  return 0;
++}
+diff --git a/gcc/tree-ssa-loop-manip.cc b/gcc/tree-ssa-loop-manip.cc
+index 03e255281b75..4207e49c932c 100644
+--- a/gcc/tree-ssa-loop-manip.cc
++++ b/gcc/tree-ssa-loop-manip.cc
+@@ -1238,16 +1238,29 @@ tree_transform_and_unroll_loop (class loop *loop, unsigned factor,
+ 
+       /* The epilog loop latch executes at most factor - 1 times.
+ 	 Since the epilog is entered unconditionally it will need to handle
+-	 up to factor executions of its body.  */
+-      new_loop->any_upper_bound = true;
+-      new_loop->nb_iterations_upper_bound = factor - 1;
+-      /* We do not really know estimate on number of iterations, since we do not
+-	 track any estimates modulo unroll factor.
+-	 Drop estimate from loop_info and scale loop profile.
+-	 It may be more realistic to scale loop profile to factor / 2 - 1,
+-	 but vectorizer also uses factor - 1.  */
++	 up to factor executions of its body.
++
++	 That however relies on ENTER_MAIN_COND being false implying that
++	 less than factor iterations are left.  determine_exit_conditions
++	 derives ENTER_MAIN_COND from a LT_EXPR/GT_EXPR comparison of the
++	 control IV, which for a NE_EXPR exit test is only valid if that IV
++	 does not wrap.  When it may wrap the main loop can be skipped (the
++	 condition may even be constant false) while the epilog still runs
++	 all iterations of the original loop, so keep the bound we inherited
++	 from it.  */
++      if (desc->cmp != NE_EXPR || desc->control.no_overflow)
++	{
++	  new_loop->any_upper_bound = true;
++	  new_loop->nb_iterations_upper_bound = factor - 1;
++	  /* We do not really know estimate on number of iterations, since we
++	     do not track any estimates modulo unroll factor.
++	     Scale loop profile.  It may be more realistic to scale loop
++	     profile to factor / 2 - 1, but vectorizer also uses factor - 1.  */
++	  scale_loop_profile (new_loop, profile_probability::always (),
++			      factor - 1);
++	}
++      /* Drop estimate from loop_info, see above.  */
+       new_loop->any_estimate = false;
+-      scale_loop_profile (new_loop, profile_probability::always (), factor - 1);
+     }
+   else
+     new_exit = single_dom_exit (loop);

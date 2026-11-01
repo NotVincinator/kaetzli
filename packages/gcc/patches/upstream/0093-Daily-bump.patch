@@ -1,0 +1,259 @@
+From 0ee4d1380d0707f99c1f7beb16a8b5f3c9d41954 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 25 Aug 2026 00:20:56 +0000
+Subject: [PATCH 093/385] Daily bump.
+
+---
+ gcc/ChangeLog                     | 77 +++++++++++++++++++++++++++++++
+ gcc/DATESTAMP                     |  2 +-
+ gcc/ada/ChangeLog                 | 10 ++++
+ gcc/cp/ChangeLog                  | 14 ++++++
+ gcc/fortran/ChangeLog             | 22 +++++++++
+ gcc/testsuite/ChangeLog           | 57 +++++++++++++++++++++++
+ libgcc/config/avr/libf7/ChangeLog |  9 ++++
+ 7 files changed, 190 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 1fafa1fa34b7..a6e3a9200c76 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,80 @@
++2026-08-24  Peter Bergner  <bergner@tenstorrent.com>
++
++	Backported from master:
++	2026-08-13  Peter Bergner  <bergner@tenstorrent.com>
++
++	* config/riscv/riscv-cores.def (RISCV_TUNE): Add tt-ascalon-xg.
++	(RISCV_CORE): Likewise.
++	* config/riscv/riscv-opts.h (enum riscv_microarchitecture_type):
++	Add tt_ascalon_xg.
++	* config/riscv/riscv.md (tune): Likewise.
++	* config/riscv/tt-ascalon-d8.md (asc-xg-fp64-vec0, asc-xg-fp64-vec1):
++	New define_cpu_unit.
++	(tt_ascalon_xg_fp64_vec): New define_reservation.
++	(tt_ascalon_d8_int_load, tt_ascalon_d8_alu, tt_ascalon_d8_sfb,
++	tt_ascalon_d8_branch, tt_ascalon_d8_float_move, tt_ascalon_d8_fcvt,
++	tt_ascalon_d8_fcmp, tt_ascalon_d8_imul, tt_ascalon_d8_idiv,
++	tt_ascalon_d8_fadd, tt_ascalon_d8_mul, tt_ascalon_d8_float_fma,
++	tt_ascalon_d8_float_div_half, tt_ascalon_d8_float_div_single,
++	tt_ascalon_d8_float_div_double, tt_ascalon_d8_popcount,
++	tt_ascalon_d8_vec_load, tt_ascalon_d8_vec_store,
++	tt_ascalon_d8_vec_load_strided, tt_ascalon_d8_vec_store_strided,
++	tt_ascalon_d8_vec_load_indexed, tt_ascalon_d8_vec_store_indexed,
++	tt_ascalon_d8_vec_loadstore_seg, tt_ascalon_d8_vec_alu_1,
++	tt_ascalon_d8_vec_alu_2, tt_ascalon_d8_vec_alu_3,
++	tt_ascalon_d8_vec_alu_4, tt_ascalon_d8_vec_imul, tt_ascalon_d8_vec_pop,
++	tt_ascalon_d8_vec_crypto_aes, tt_ascalon_d8_vec_crypto_sha,
++	tt_ascalon_d8_vec_perm_1, tt_ascalon_d8_vec_perm_3,
++	tt_ascalon_d8_vec_perm_4, tt_ascalon_d8_vec_reduction,
++	tt_ascalon_d8_vec_ordered_reduction, tt_ascalon_d8_vec_idiv_byte,
++	tt_ascalon_d8_vec_idiv_half, tt_ascalon_d8_vec_idiv_single,
++	tt_ascalon_d8_vec_idiv_double, tt_ascalon_d8_vec_float_divsqrt_half,
++	tt_ascalon_d8_vec_float_divsqrt_single,
++	tt_ascalon_d8_vec_float_divsqrt_double, tt_ascalon_d8_vec_mask,
++	tt_ascalon_d8_vec_vesetvl, tt_ascalon_d8_vec_setrm,
++	tt_ascalon_d8_vec_readlen, tt_ascalon_d8_vec_unknown):
++	Use tt_ascalon_xg.
++	(tt_ascalon_d8_vec_fcmp, tt_ascalon_d8_vec_fadd,
++	tt_ascalon_d8_vec_fmul): Disable vector instructions that produce FP64
++	output values when tuning for tt_ascalon_xg.
++	(tt_ascalon_xg_fp64_vec_insns): New define_insn_reservation.
++	* doc/riscv-mcpu.texi: Regenerate.
++	* doc/riscv-mtune.texi: Likewise.
++
++2026-08-24  Jin Ma  <jinma@linux.alibaba.com>
++
++	Backported from master:
++	2026-08-21  Jin Ma  <jinma@linux.alibaba.com>
++
++	PR target/126873
++	* config/riscv/autovec.md (vec_set<mode>): Zero-extend a
++	sub-Pmode index to Pmode.
++	(vec_extract<mode><vel>): Likewise.
++
++2026-08-24  Jeff Law  <jeffrey.law@oss.qualcomm.com>
++
++	Backported from master:
++	2026-08-14  Jeff Law  <jeffrey.law@oss.qualcomm.com>
++
++	PR rtl-optimization/126426
++	* ext-dce.cc (carry_backpropagate): Return a conservatively
++	correct mask when presented with vector modes.
++	(ext_dce_process_uses): Don't use GET_MODE_INNER, we need to
++	know the full extent of the bits for vector and complex modes.
++
++2026-08-24  Georg-Johann Lay  <avr@gjlay.de>
++
++	Backported from master:
++	2026-08-23  Georg-Johann Lay  <avr@gjlay.de>
++
++	PR target/127004
++	* config/avr/avr-passes.cc (rtl-iter.h): Include.
++	(insninfo_t::scratch_mask): New method.
++	(optimize_data_t::try_split_ldi): Use it for ignore_mask.
++	(optimize_data_t::try_split_any): Same.
++	(optimize_data_t::emit_sequence): Dump ignore_mask prior to
++	calling fatal_insn.
++
+ 2026-08-20  Pietro Monteiro  <pietro@sociotechnical.xyz>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 8bf4b61a4440..cd565db6db3a 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260824
++20260825
+diff --git a/gcc/ada/ChangeLog b/gcc/ada/ChangeLog
+index 0ac652b93da1..4d8b35433edd 100644
+--- a/gcc/ada/ChangeLog
++++ b/gcc/ada/ChangeLog
+@@ -1,3 +1,13 @@
++2026-08-24  Eric Botcazou  <ebotcazou@adacore.com>
++
++	PR ada/127026
++	* exp_aggr.adb (Must_Slide): Reorder parameters, rename Obj_Type to
++	Ob_Typ and add Assign boolean parameter.  Return Assign's value in
++	the case where Obj_Typ is unconstrained.
++	(Build_Array_Aggr_Code): Adjust call to Must_Slide.
++	(In_Place_Assign_OK): Likewise.
++	(Expand_Array_Aggregate): Likewise.
++
+ 2026-08-19  Eric Botcazou  <ebotcazou@adacore.com>
+ 
+ 	PR ada/126928
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index cc6315022a93..e43b6c278c58 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,17 @@
++2026-08-24  Jason Merrill  <jason@redhat.com>
++
++	Backported from master:
++	2026-08-22  Jason Merrill  <jason@redhat.com>
++
++	PR c++/124888
++	* pt.cc (tsubst_expr): Pass type to {get,build}_typeid.
++	* rtti.cc (build_typeid, get_typeid): Take it.
++	(type_info_ptr_type): Remove.
++	(get_tinfo_ptr): Take tinfo_ptr_type instead of voidp.
++	(get_tinfo_ptr_dynamic): Likewise.
++	(get_void_tinfo_ptr): Pass const_ptr_type_node.
++	* cp-tree.h (build_typeid, get_typeid): Adjust.
++
+ 2026-08-20  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index 1ea954dd6ae8..dcb4ce4b863d 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,25 @@
++2026-08-24  Paul Thomas  <pault@gcc.gnu.org>
++
++	Backported from master:
++	2026-06-03  Steven G. Kargl  <kargl@gcc.gnu.org>
++
++	PR fortran/105594
++	* module.cc (gfc_use_module): Suppress bogus warning for a missing
++	ONLY clause on a submodule.
++
++2026-08-24  Paul Thomas  <pault@gcc.gnu.org>
++
++	Backported from master:
++	2026-06-02  Paul Thomas  <pault@gcc.gnu.org>
++
++	PR fortran/88632
++	PR fortran/104630
++	* module.cc (write_symtree): Do not filter out private symbols
++	when writing a submodule interface file (.smod).  Submodules are
++	descendants of their ancestor module and access private symbols
++	in the module's contains section via host association per
++	Fortran 2018 section 14.2.2.
++
+ 2026-08-18  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index f8d4b8a6d45c..cb9c3adb291a 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,60 @@
++2026-08-24  Jason Merrill  <jason@redhat.com>
++
++	Backported from master:
++	2026-08-22  Jason Merrill  <jason@redhat.com>
++
++	PR c++/124888
++	* g++.dg/modules/typeid-2_a.C: New test.
++	* g++.dg/modules/typeid-2_b.C: New test.
++
++2026-08-24  Jin Ma  <jinma@linux.alibaba.com>
++
++	Backported from master:
++	2026-08-21  Jin Ma  <jinma@linux.alibaba.com>
++
++	PR target/126873
++	* gcc.target/riscv/pr126873.c: New test.
++
++2026-08-24  Jeff Law  <jeffrey.law@oss.qualcomm.com>
++
++	Backported from master:
++	2026-08-14  Jeff Law  <jeffrey.law@oss.qualcomm.com>
++
++	PR rtl-optimization/126426
++	* gcc.target/riscv/pr126426.c: New test.
++
++2026-08-24  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* gnat.dg/array43.adb: New test.
++
++2026-08-24  Paul Thomas  <pault@gcc.gnu.org>
++
++	Backported from master:
++	2026-06-03  Steven G. Kargl  <kargl@gcc.gnu.org>
++
++	PR fortran/105594
++	* gfortran.dg/pr105594.f90: New test.
++
++2026-08-24  Paul Thomas  <pault@gcc.gnu.org>
++
++	Backported from master:
++	2026-06-02  Paul Thomas  <pault@gcc.gnu.org>
++
++	PR fortran/88632
++	PR fortran/104630
++	* gfortran.dg/submodule_35.f90: New test.
++	* gfortran.dg/submodule_35_aux.f90: Submodule and program for
++	for the new test.
++	Assisted by: Claude Sonnet 4.6
++
++2026-08-24  Georg-Johann Lay  <avr@gjlay.de>
++
++	Backported from master:
++	2026-08-23  Georg-Johann Lay  <avr@gjlay.de>
++
++	PR target/127004
++	* gcc.target/avr/torture/pr127004.c: New test.
++
+ 2026-08-21  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+ 
+ 	Backported from master:
+diff --git a/libgcc/config/avr/libf7/ChangeLog b/libgcc/config/avr/libf7/ChangeLog
+index 38c4ff604371..982c602bfb4e 100644
+--- a/libgcc/config/avr/libf7/ChangeLog
++++ b/libgcc/config/avr/libf7/ChangeLog
+@@ -1,3 +1,12 @@
++2026-08-24  Georg-Johann Lay  <avr@gjlay.de>
++
++	Backported from master:
++	2026-08-24  Georg-Johann Lay  <avr@gjlay.de>
++
++	PR target/127024
++	* libf7-asm.sx (to_integer): Don't skip XJMP
++	if __AVR_ERRATA_SKIP_JMP_CALL__.
++
+ 2026-08-07  Release Manager
+ 
+ 	* GCC 16.2.0 released.

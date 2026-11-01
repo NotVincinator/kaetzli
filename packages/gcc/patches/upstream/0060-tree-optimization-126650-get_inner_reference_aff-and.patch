@@ -1,0 +1,83 @@
+From 4e9903e714e49f4cb51ff2b687d73beb296e6f55 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Wed, 5 Aug 2026 10:31:47 +0200
+Subject: [PATCH 060/385] tree-optimization/126650 - get_inner_reference_aff
+ and bitfields
+
+get_inner_reference_aff tries to compensate for bit precision
+offsets and sizes by rounding down and up, but fails to do this
+correctly.  The following makes it more obviously correct by
+rounding positions and computing the rounded size based on those.
+
+	PR tree-optimization/126650
+	* tree-affine.cc (get_inner_reference_aff): Fixup rounding
+	of size.
+
+	* gcc.dg/torture/pr126650.c: New testcase.
+
+(cherry picked from commit 9baaca2adeca178edf8c0816ef328dba1cf270bc)
+---
+ gcc/testsuite/gcc.dg/torture/pr126650.c | 35 +++++++++++++++++++++++++
+ gcc/tree-affine.cc                      |  5 ++--
+ 2 files changed, 38 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/pr126650.c
+
+diff --git a/gcc/testsuite/gcc.dg/torture/pr126650.c b/gcc/testsuite/gcc.dg/torture/pr126650.c
+new file mode 100644
+index 000000000000..166705d9cfe6
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/pr126650.c
+@@ -0,0 +1,35 @@
++/* { dg-do run } */
++
++#include <stdarg.h>
++#include <stdlib.h>
++
++long a;
++
++void __attribute__((noipa)) foo (int n, ...)
++{
++  va_list list;
++  va_start (list, n);
++  int val = va_arg (list, int);
++  if (val != -64)
++    abort ();
++  va_end (list);
++}
++
++int main()
++{
++  struct b {
++    int : 7;
++    int : 2;
++    int : 6;
++    int : 3;
++    int c : 7;
++  };
++  union {
++    int d;
++    struct b bf;
++    char e[4];
++  } f;
++  f.d = a;
++  f.e[3] = 7;
++  foo (1, f.bf.c);
++}
+diff --git a/gcc/tree-affine.cc b/gcc/tree-affine.cc
+index b5b7249c6750..181fd6fb33ce 100644
+--- a/gcc/tree-affine.cc
++++ b/gcc/tree-affine.cc
+@@ -1030,10 +1030,11 @@ get_inner_reference_aff (tree ref, aff_tree *addr, poly_widest_int *size)
+       aff_combination_add (addr, &tmp);
+     }
+ 
+-  aff_combination_const (&tmp, sizetype, bits_to_bytes_round_down (bitpos));
++  poly_int64 bytepos = bits_to_bytes_round_down (bitpos);
++  aff_combination_const (&tmp, sizetype, bytepos);
+   aff_combination_add (addr, &tmp);
+ 
+-  *size = bits_to_bytes_round_up (bitsize);
++  *size = bits_to_bytes_round_up (bitpos + bitsize) - bytepos;
+ 
+   return base;
+ }

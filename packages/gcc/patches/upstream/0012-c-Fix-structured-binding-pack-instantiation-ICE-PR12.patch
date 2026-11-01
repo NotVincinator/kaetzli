@@ -1,0 +1,157 @@
+From c40ebe81cd414dd691a065fb4273d0e3111b5225 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Thu, 6 Aug 2026 11:13:53 +0200
+Subject: [PATCH 012/385] c++: Fix structured binding pack instantiation ICE
+ [PR125591]
+
+The following testcase ICEs in tsubst_pack_expansion, we trigger the
+gcc_assert (DECL_DECOMPOSITION_P (orig_arg));
+assertion.  But in this case, retrieve_local_specialization doesn't
+return the expected DECL_DECOMPOSITION_P, but ARGUMENT_PACK_SELECT instead.
+That is because it has been registered earlier in
+gen_elem_of_pack_expansion_instantiation
+in
+              aps = make_argument_pack_select (arg_pack, index);
+              if (!mark_used (parm, complain) && !(complain & tf_error))
+                return error_mark_node;
+              register_local_specialization (aps, parm);
+The following patch just stops assuming retrieve_local_specialization
+has to return DECL_DECOMPOSITION_P, but allows also ARGUMENT_PACK_SELECT.
+The patch is large due to reindentation, with diff -upb it is just
+
+@@ -14309,8 +14309,9 @@ tsubst_pack_expansion (tree t, tree args
+       else if (DECL_DECOMPOSITION_P (parm_pack))
+        {
+          orig_arg = retrieve_local_specialization (parm_pack);
++         if (DECL_DECOMPOSITION_P (orig_arg))
++           {
+        expand_sb_pack:
+-         gcc_assert (DECL_DECOMPOSITION_P (orig_arg));
+          if (TREE_TYPE (orig_arg) == error_mark_node)
+            return error_mark_node;
+          gcc_assert (DECL_HAS_VALUE_EXPR_P (orig_arg));
+@@ -14339,6 +14340,12 @@ tsubst_pack_expansion (tree t, tree args
+            }
+        }
+       else
++           {
++             gcc_assert (TREE_CODE (orig_arg) == ARGUMENT_PACK_SELECT);
++             arg_pack = orig_arg;
++           }
++       }
++      else
+         {
+          int idx;
+           template_parm_level_and_index (parm_pack, &level, &idx);
+
+2026-08-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/125591
+	* pt.cc (tsubst_pack_expansion): Don't require
+	retrieve_local_specialization on structured binding to
+	always return structured binding, instead handle if it returns
+	ARGUMENT_PACK_SELECT.
+
+	* g++.dg/cpp26/decomp31.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 091a150a8a51bc953906d3da2a1a09d83fc36633)
+---
+ gcc/cp/pt.cc                          | 53 +++++++++++++++------------
+ gcc/testsuite/g++.dg/cpp26/decomp31.C | 19 ++++++++++
+ 2 files changed, 49 insertions(+), 23 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp26/decomp31.C
+
+diff --git a/gcc/cp/pt.cc b/gcc/cp/pt.cc
+index 4359ae8e5569..729c7b191654 100644
+--- a/gcc/cp/pt.cc
++++ b/gcc/cp/pt.cc
+@@ -14254,33 +14254,40 @@ tsubst_pack_expansion (tree t, tree args, tsubst_flags_t complain,
+       else if (DECL_DECOMPOSITION_P (parm_pack))
+ 	{
+ 	  orig_arg = retrieve_local_specialization (parm_pack);
+-	expand_sb_pack:
+-	  gcc_assert (DECL_DECOMPOSITION_P (orig_arg));
+-	  if (TREE_TYPE (orig_arg) == error_mark_node)
+-	    return error_mark_node;
+-	  gcc_assert (DECL_HAS_VALUE_EXPR_P (orig_arg));
+-	  arg_pack = DECL_VALUE_EXPR (orig_arg);
+-	  if (TREE_CODE (arg_pack) != ARRAY_REF)
++	  if (DECL_DECOMPOSITION_P (orig_arg))
+ 	    {
+-	      /* Structured binding packs when initializer is non-dependent
+-		 should have their DECL_VALUE_EXPR set to a TREE_VEC.  See
+-		 cp_finish_decomp comment above the packv variable for
+-		 details.  */
+-	      tree vec = make_tree_vec (TREE_VEC_LENGTH (arg_pack) - 2);
+-	      if (TREE_VEC_LENGTH (vec))
+-		memcpy (TREE_VEC_BEGIN (vec), &TREE_VEC_ELT (arg_pack, 2),
+-			TREE_VEC_LENGTH (vec) * sizeof (tree));
+-	      arg_pack = make_node (NONTYPE_ARGUMENT_PACK);
+-	      ARGUMENT_PACK_ARGS (arg_pack) = vec;
++	    expand_sb_pack:
++	      if (TREE_TYPE (orig_arg) == error_mark_node)
++		return error_mark_node;
++	      gcc_assert (DECL_HAS_VALUE_EXPR_P (orig_arg));
++	      arg_pack = DECL_VALUE_EXPR (orig_arg);
++	      if (TREE_CODE (arg_pack) != ARRAY_REF)
++		{
++		  /* Structured binding packs when initializer is non-dependent
++		     should have their DECL_VALUE_EXPR set to a TREE_VEC.  See
++		     cp_finish_decomp comment above the packv variable for
++		     details.  */
++		  tree vec = make_tree_vec (TREE_VEC_LENGTH (arg_pack) - 2);
++		  if (TREE_VEC_LENGTH (vec))
++		    memcpy (TREE_VEC_BEGIN (vec), &TREE_VEC_ELT (arg_pack, 2),
++			    TREE_VEC_LENGTH (vec) * sizeof (tree));
++		  arg_pack = make_node (NONTYPE_ARGUMENT_PACK);
++		  ARGUMENT_PACK_ARGS (arg_pack) = vec;
++		}
++	      else
++		{
++		  /* If the structured binding pack has type dependent
++		     base, we can't expand it yet.  */
++		  tree base = TREE_OPERAND (arg_pack, 0);
++		  gcc_assert (VAR_P (base)
++			      && type_dependent_expression_p (base));
++		  arg_pack = NULL_TREE;
++		}
+ 	    }
+ 	  else
+ 	    {
+-	      /* If the structured binding pack has type dependent
+-		 base, we can't expand it yet.  */
+-	      tree base = TREE_OPERAND (arg_pack, 0);
+-	      gcc_assert (VAR_P (base)
+-			  && type_dependent_expression_p (base));
+-	      arg_pack = NULL_TREE;
++	      gcc_assert (TREE_CODE (orig_arg) == ARGUMENT_PACK_SELECT);
++	      arg_pack = orig_arg;
+ 	    }
+ 	}
+       else
+diff --git a/gcc/testsuite/g++.dg/cpp26/decomp31.C b/gcc/testsuite/g++.dg/cpp26/decomp31.C
+new file mode 100644
+index 000000000000..f9657a9ca6cb
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp26/decomp31.C
+@@ -0,0 +1,19 @@
++// PR c++/125591
++// { dg-do compile { target c++20 } }
++// { dg-options "" }
++
++template <typename T, typename U>
++concept is_same_v = __is_same (T, U);
++
++struct A { int x, y, z; };
++struct B { int x; long y; };
++
++template <class V>
++consteval bool
++foo ()
++{
++  constexpr auto [...Ms] = V {};		// { dg-warning "structured binding packs only available with" "" { target c++23_down } }
++						// { dg-warning "structured binding declaration can be 'constexpr' only with" "" { target c++23_down } .-1 }
++  using T = decltype (Ms...[0]);		// { dg-warning "pack indexing only available with" "" { target c++23_down } }
++  return (is_same_v<decltype(Ms), T> && ...);
++}

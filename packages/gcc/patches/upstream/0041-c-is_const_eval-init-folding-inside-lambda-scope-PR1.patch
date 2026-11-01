@@ -1,0 +1,100 @@
+From 62b3305d69025d25a5b8cbc531b14a6adb3d1cbc Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Fri, 14 Aug 2026 15:53:12 -0400
+Subject: [PATCH 041/385] c++: is_const_eval init folding inside lambda scope
+ [PR126483]
+
+Here when processing a's copy-initialization we overeagerly fold its
+initializer as if the lambda scope is not constexpr, and thus assume
+is_constant_evaluated is false.  Subsequent constant evaluation of the
+lambda gives the wrong answer due to this premature folding.
+
+The culprit cp_fully_fold_init call is guarded by DECL_DECLARED_CONSTEXPR_P
+but that can't be relied on for maybe-constexpr lambdas until the lambda is
+fully parsed and its body is checked as a whole for constexpr suitability.
+This patch makes us check maybe_constexpr_fn instead, which considers such
+lambdas.
+
+This however means we no longer fold a's copy-init even for the runtime
+version of the lambda body, hence the is_constant_evaluated3b.C xfail.
+Making maybe_constexpr_fn distinguish between fully parsed constexpr and
+non-constexpr lambdas doesn't help because we don't hit this code path
+again.  And cp_fold_function doesn't fold the copy-init because it's
+represented as an INIT_EXPR of an AGGR_INIT_EXPR which it doesn't yet
+handle.  The subsequent patch will enable folding of INIT_EXPR
+initializers to address this xfail.
+
+	PR c++/126483
+
+gcc/cp/ChangeLog:
+
+	* typeck2.cc (store_init_value): Check maybe_constexpr_fn
+	instead of DECL_DECLARED_CONSTEXPR_P of the function scope.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/opt/is_constant_evaluated3b.C: xfail a1 initializer
+	folding.
+	* g++.dg/cpp2a/is-constant-evaluated16.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit b3bca9f73eb6b29bddf5fec92e929f32675b8d20)
+---
+ gcc/cp/typeck2.cc                             |  2 +-
+ .../g++.dg/cpp2a/is-constant-evaluated16.C    | 20 +++++++++++++++++++
+ .../g++.dg/opt/is_constant_evaluated3b.C      |  2 +-
+ 3 files changed, 22 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp2a/is-constant-evaluated16.C
+
+diff --git a/gcc/cp/typeck2.cc b/gcc/cp/typeck2.cc
+index 664dd0990bf8..d29dbfcb65df 100644
+--- a/gcc/cp/typeck2.cc
++++ b/gcc/cp/typeck2.cc
+@@ -1019,7 +1019,7 @@ store_init_value (tree decl, tree init, vec<tree, va_gc>** cleanups, int flags)
+      that might fold away something that needs to be diagnosed at constexpr
+      evaluation time.  */
+   if (!current_function_decl
+-      || !DECL_DECLARED_CONSTEXPR_P (current_function_decl)
++      || !maybe_constexpr_fn (current_function_decl)
+       || TREE_STATIC (decl))
+     value = cp_fully_fold_init (value);
+ 
+diff --git a/gcc/testsuite/g++.dg/cpp2a/is-constant-evaluated16.C b/gcc/testsuite/g++.dg/cpp2a/is-constant-evaluated16.C
+new file mode 100644
+index 000000000000..c727967673e3
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp2a/is-constant-evaluated16.C
+@@ -0,0 +1,20 @@
++// PR c++/126483
++// { dg-do compile { target c++17 } }
++
++struct A {
++  int m;
++  constexpr A(int n) : m(__builtin_is_constant_evaluated() ? 42 : n) { }
++};
++
++constexpr auto v = [] {
++  A a = 0;
++  return a.m;
++};
++static_assert(v() == 42);
++
++template<class>
++constexpr auto vt = [] {
++  A a = 0;
++  return a.m;
++};
++static_assert(vt<void>() == 42);
+diff --git a/gcc/testsuite/g++.dg/opt/is_constant_evaluated3b.C b/gcc/testsuite/g++.dg/opt/is_constant_evaluated3b.C
+index ff708e23832b..ac6d21d632e1 100644
+--- a/gcc/testsuite/g++.dg/opt/is_constant_evaluated3b.C
++++ b/gcc/testsuite/g++.dg/opt/is_constant_evaluated3b.C
+@@ -17,7 +17,7 @@ auto f = [] {
+   A a5{};
+ };
+ 
+-// { dg-final { scan-tree-dump "a1 = {\\.n=42, \\.m=0}" "original" } }
++// { dg-final { scan-tree-dump "a1 = {\\.n=42, \\.m=0}" "original" { xfail *-*-* } } }
+ // { dg-final { scan-tree-dump "a2 = {\\.n=42, \\.m=0}" "original" } }
+ // { dg-final { scan-tree-dump "a3 = {\\.n=42, \\.m=0}" "original" } }
+ // { dg-final { scan-tree-dump "a4 = {\\.n=42, \\.m=0}" "original" } }

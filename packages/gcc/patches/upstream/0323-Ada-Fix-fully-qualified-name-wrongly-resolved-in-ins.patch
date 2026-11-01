@@ -1,0 +1,188 @@
+From a697c8115b8b5d7c7bf3bc066a38765ee18e76c9 Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Thu, 22 Oct 2026 19:12:57 +0200
+Subject: [PATCH 323/385] Ada: Fix fully qualified name wrongly resolved in
+ instance of generic child
+
+This is a regression present on the mainline and 16 branch, introduced by
+the recent removal of an old kludge from Sem_Ch8.Premature_Usage that was
+salvaging the incorrect resolution of a fully qualified name in the instance
+of a generic child unit that is a homonym of one of its parents.  It turns
+out that the incorrect resolution comes from another old kludge present in
+Save_Global_References that short-circuits the normal resolution implemented
+in Find_Expanded_Name.
+
+gcc/ada/
+	PR ada/128044
+	* sem_ch12.adb (Save_Global_References.Reset_Entity): Remove old
+	kludge short-circuiting the resolution of expanded names.
+
+gcc/testsuite/
+	* gnat.dg/specs/generic_inst11.ads: New test.
+	* gnat.dg/specs/generic_inst11_pkg.ads: New helper package.
+	* gnat.dg/specs/generic_inst11_pkg-g1.ads: Likewise.
+	* gnat.dg/specs/generic_inst11_pkg-g1-parser.ads: Likewise.
+	* gnat.dg/specs/generic_inst11_pkg-g1-parser-g2.ads: Likewise.
+	* gnat.dg/specs/generic_inst11_pkg-g1-parser-g2-parser.ads: Likewise
+---
+ gcc/ada/sem_ch12.adb                          | 55 +------------------
+ .../gnat.dg/specs/generic_inst11.ads          | 13 +++++
+ ...generic_inst11_pkg-g1-parser-g2-parser.ads |  7 +++
+ .../specs/generic_inst11_pkg-g1-parser-g2.ads |  3 +
+ .../specs/generic_inst11_pkg-g1-parser.ads    |  5 ++
+ .../gnat.dg/specs/generic_inst11_pkg-g1.ads   |  3 +
+ .../gnat.dg/specs/generic_inst11_pkg.ads      |  2 +
+ 7 files changed, 36 insertions(+), 52 deletions(-)
+ create mode 100644 gcc/testsuite/gnat.dg/specs/generic_inst11.ads
+ create mode 100644 gcc/testsuite/gnat.dg/specs/generic_inst11_pkg-g1-parser-g2-parser.ads
+ create mode 100644 gcc/testsuite/gnat.dg/specs/generic_inst11_pkg-g1-parser-g2.ads
+ create mode 100644 gcc/testsuite/gnat.dg/specs/generic_inst11_pkg-g1-parser.ads
+ create mode 100644 gcc/testsuite/gnat.dg/specs/generic_inst11_pkg-g1.ads
+ create mode 100644 gcc/testsuite/gnat.dg/specs/generic_inst11_pkg.ads
+
+diff --git a/gcc/ada/sem_ch12.adb b/gcc/ada/sem_ch12.adb
+index 763d5837b1d7..2ed907981531 100644
+--- a/gcc/ada/sem_ch12.adb
++++ b/gcc/ada/sem_ch12.adb
+@@ -17682,30 +17682,6 @@ package body Sem_Ch12 is
+       ------------------
+ 
+       procedure Reset_Entity (N : Node_Id) is
+-         function Top_Ancestor (E : Entity_Id) return Entity_Id;
+-         --  Find the ultimate ancestor of the current unit. If it is not a
+-         --  generic unit, then the name of the current unit in the prefix of
+-         --  an expanded name must be replaced with its generic homonym to
+-         --  ensure that it will be properly resolved in an instance.
+-
+-         ------------------
+-         -- Top_Ancestor --
+-         ------------------
+-
+-         function Top_Ancestor (E : Entity_Id) return Entity_Id is
+-            Par : Entity_Id;
+-
+-         begin
+-            Par := E;
+-            while Is_Child_Unit (Par) loop
+-               Par := Scope (Par);
+-            end loop;
+-
+-            return Par;
+-         end Top_Ancestor;
+-
+-      --  Start of processing for Reset_Entity
+-
+       begin
+          N2 := Get_Associated_Node (N);
+          E  := Entity (N2);
+@@ -17780,38 +17756,13 @@ package body Sem_Ch12 is
+          elsif Nkind (Parent (N)) = N_Selected_Component
+            and then Nkind (Parent (N2)) = N_Expanded_Name
+          then
+-            --  In case of previous errors, the tree might be malformed
+-
+-            if No (Entity (Parent (N2))) then
+-               null;
+-
+-            elsif Is_Global (Entity (Parent (N2))) then
++            if Present (Entity (Parent (N2)))
++              and then Is_Global (Entity (Parent (N2)))
++            then
+                Change_Selected_Component_To_Expanded_Name (Parent (N));
+                Set_Associated_Node (Parent (N), Parent (N2));
+                Set_Global_Type     (Parent (N), Parent (N2));
+                Save_Entity_Descendants (N);
+-
+-            --  If this is a reference to the current generic entity, replace
+-            --  by the name of the generic homonym of the current package. This
+-            --  is because in an instantiation Par.P.Q will not resolve to the
+-            --  name of the instance, whose enclosing scope is not necessarily
+-            --  Par. We use the generic homonym rather that the name of the
+-            --  generic itself because it may be hidden by a local declaration.
+-
+-            elsif In_Open_Scopes (Entity (Parent (N2)))
+-              and then not
+-                Is_Generic_Unit (Top_Ancestor (Entity (Prefix (Parent (N2)))))
+-            then
+-               if Ekind (Entity (Parent (N2))) = E_Generic_Package then
+-                  Rewrite (Parent (N),
+-                    Make_Identifier (Sloc (N),
+-                      Chars =>
+-                        Chars (Generic_Homonym (Entity (Parent (N2))))));
+-               else
+-                  Rewrite (Parent (N),
+-                    Make_Identifier (Sloc (N),
+-                      Chars => Chars (Selector_Name (Parent (N2)))));
+-               end if;
+             end if;
+ 
+             if Nkind (Parent (Parent (N))) in N_Generic_Instantiation
+diff --git a/gcc/testsuite/gnat.dg/specs/generic_inst11.ads b/gcc/testsuite/gnat.dg/specs/generic_inst11.ads
+new file mode 100644
+index 000000000000..35d44408e19d
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/specs/generic_inst11.ads
+@@ -0,0 +1,13 @@
++-- { dg-do compile }
++
++with Generic_Inst11_Pkg.G1;
++with Generic_Inst11_Pkg.G1.Parser;
++with Generic_Inst11_Pkg.G1.Parser.G2;
++with Generic_Inst11_Pkg.G1.Parser.G2.Parser;
++
++package Generic_Inst11 is
++  package My_G1        is new Generic_Inst11_Pkg.G1;
++  package My_Parser    is new My_G1.Parser;
++  package My_G2        is new My_Parser.G2;
++  package My_G2_Parser is new My_G2.Parser;
++end Generic_Inst11;
+diff --git a/gcc/testsuite/gnat.dg/specs/generic_inst11_pkg-g1-parser-g2-parser.ads b/gcc/testsuite/gnat.dg/specs/generic_inst11_pkg-g1-parser-g2-parser.ads
+new file mode 100644
+index 000000000000..6ad08ccdb786
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/specs/generic_inst11_pkg-g1-parser-g2-parser.ads
+@@ -0,0 +1,7 @@
++generic
++package Generic_Inst11_Pkg.G1.Parser.G2.Parser is
++   type Instance is new Generic_Inst11_Pkg.G1.Parser.Instance
++     with null record;
++   overriding
++   procedure Parse (Parser : in out Instance) is null;
++end Generic_Inst11_Pkg.G1.Parser.G2.Parser;
+diff --git a/gcc/testsuite/gnat.dg/specs/generic_inst11_pkg-g1-parser-g2.ads b/gcc/testsuite/gnat.dg/specs/generic_inst11_pkg-g1-parser-g2.ads
+new file mode 100644
+index 000000000000..4ae9669abd85
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/specs/generic_inst11_pkg-g1-parser-g2.ads
+@@ -0,0 +1,3 @@
++generic
++package Generic_Inst11_Pkg.G1.Parser.G2 is
++end Generic_Inst11_Pkg.G1.Parser.G2;
+diff --git a/gcc/testsuite/gnat.dg/specs/generic_inst11_pkg-g1-parser.ads b/gcc/testsuite/gnat.dg/specs/generic_inst11_pkg-g1-parser.ads
+new file mode 100644
+index 000000000000..3908c5916ed3
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/specs/generic_inst11_pkg-g1-parser.ads
+@@ -0,0 +1,5 @@
++generic
++package Generic_Inst11_Pkg.G1.Parser is
++   type Instance is abstract tagged null record;
++   procedure Parse (Parser : in out Instance) is abstract;
++end Generic_Inst11_Pkg.G1.Parser;
+diff --git a/gcc/testsuite/gnat.dg/specs/generic_inst11_pkg-g1.ads b/gcc/testsuite/gnat.dg/specs/generic_inst11_pkg-g1.ads
+new file mode 100644
+index 000000000000..e2fef0a8119f
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/specs/generic_inst11_pkg-g1.ads
+@@ -0,0 +1,3 @@
++generic
++package Generic_Inst11_Pkg.G1 is
++end Generic_Inst11_Pkg.G1;
+diff --git a/gcc/testsuite/gnat.dg/specs/generic_inst11_pkg.ads b/gcc/testsuite/gnat.dg/specs/generic_inst11_pkg.ads
+new file mode 100644
+index 000000000000..ab8157d7ff19
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/specs/generic_inst11_pkg.ads
+@@ -0,0 +1,2 @@
++package Generic_Inst11_Pkg is
++end Generic_Inst11_Pkg;

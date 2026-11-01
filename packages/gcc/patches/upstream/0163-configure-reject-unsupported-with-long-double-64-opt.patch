@@ -1,0 +1,104 @@
+From 81eff4e45599838612422bd429845ba0117bd7f3 Mon Sep 17 00:00:00 2001
+From: Kishan Parmar <kishan@linux.ibm.com>
+Date: Wed, 2 Sep 2026 12:10:30 +0530
+Subject: [PATCH 163/385] configure: reject unsupported --with-long-double-64
+ option [PR122535]
+
+Configure script previously accepted  unsupported  --with-long-double-64
+option  without  any  warning, leading  to  confusion.  This  option was
+mistakenly  documented in install.texi  but never  handled by  configure
+script, resulting in it being silently ignored.
+
+Patch updates configure script to error out  when  --with-long-double-64
+or --without-long-double-64  is  used, and instructs to use  the correct
+--without-long-double-128 or --with-long-double-128 option instead.
+
+Additionally, the mistaken  documentation  reference in install.texi has
+been corrected to reflect the actual supported option.
+
+2026-09-02  Peter Bergner  <bergner@gcc.gnu.org>
+
+ChangeLog:
+	PR target/122535
+	* configure.ac: Error out on --with-long-double-64.
+	* configure: Regenerate.
+
+gcc/ChangeLog:
+	* doc/install.texi: Remove incorrect mention of --with-long-double-64.
+	Co-authored-by: Kishan Parmar <kishan@linux.ibm.com>
+
+(cherry picked from commit 0367500f385f57f93e01e09b27b0a3b3c7695dd6)
+---
+ configure            | 15 +++++++++++++++
+ configure.ac         | 11 +++++++++++
+ gcc/doc/install.texi |  2 +-
+ 3 files changed, 27 insertions(+), 1 deletion(-)
+
+diff --git a/configure b/configure
+index 083e8823d2b6..a43c1779b43d 100755
+--- a/configure
++++ b/configure
+@@ -818,6 +818,7 @@ ospace_frag'
+ ac_user_opts='
+ enable_option_checking
+ with_build_libsubdir
++with_long_double_64
+ with_system_zlib
+ with_zstd
+ enable_as_accelerator_for
+@@ -3026,6 +3027,20 @@ if test x$with_gnu_as = xno ; then
+   noconfigdirs="$noconfigdirs gas"
+ fi
+ 
++# Catch an invalid use of --with-long-double-64 early.
++
++# Check whether --with-long-double-64 was given.
++if test "${with_long_double_64+set}" = set; then :
++  withval=$with_long_double_64;
++if test x$with_long_double_64 = xyes ; then
++  as_fn_error $? "found --with-long-double-64 but use --without-long-double-128 instead" "$LINENO" 5
++else
++  as_fn_error $? "found --without-long-double-64 but use --with-long-double-128 instead" "$LINENO" 5
++fi
++
++fi
++
++
+ use_included_zlib=
+ 
+ # Check whether --with-system-zlib was given.
+diff --git a/configure.ac b/configure.ac
+index c5de225b0ac3..5f4dd0377229 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -244,6 +244,17 @@ if test x$with_gnu_as = xno ; then
+   noconfigdirs="$noconfigdirs gas"
+ fi
+ 
++# Catch an invalid use of --with-long-double-64 early.
++AC_ARG_WITH(long-double-64,
++[],
++[
++if test x$with_long_double_64 = xyes ; then
++  AC_MSG_ERROR([found --with-long-double-64 but use --without-long-double-128 instead])
++else
++  AC_MSG_ERROR([found --without-long-double-64 but use --with-long-double-128 instead])
++fi
++])
++
+ use_included_zlib=
+ AC_ARG_WITH(system-zlib,
+ [AS_HELP_STRING([--with-system-zlib], [use installed libz])])
+diff --git a/gcc/doc/install.texi b/gcc/doc/install.texi
+index 001d16fe67a0..41424773b0a8 100644
+--- a/gcc/doc/install.texi
++++ b/gcc/doc/install.texi
+@@ -2492,7 +2492,7 @@ Linux systems and on big endian 64-bit systems where the default cpu
+ is at least power7 (i.e.@: @option{--with-cpu=power7},
+ @option{--with-cpu=power8}, or @option{--with-cpu=power9} is used).
+ 
+-If you use the @option{--with-long-double-64} configuration option,
++If you use the @option{--without-long-double-128} configuration option,
+ the @option{--with-long-double-format=ibm} and
+ @option{--with-long-double-format=ieee} options are ignored.
+ 

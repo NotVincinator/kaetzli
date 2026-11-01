@@ -1,0 +1,176 @@
+From c36b1ae7c9fc98ea76b9ce51336bfb9c0b514a7d Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Fri, 9 Oct 2026 12:35:52 +0200
+Subject: [PATCH 355/385] Do not strip conversions on bit test masks in
+ ifcombine
+
+In recognize_bits_test, get_name_for_bit_test was unconditionally called
+on gimple_assign_rhs1 of the BIT_AND_EXPR.  Because bitwise AND is
+commutative, rhs1 is not necessarily the name being tested; when testing
+a variable against a non-constant mask, rhs1 may be the mask rather than
+the tested value.
+
+When rhs1 was a mask defined by a single-use narrowing conversion (such as
+m = (int) mm), get_name_for_bit_test stripped the conversion and returned
+the wider variable (e.g. mm).  If the subsequent matching in
+ifcombine_ifandif then matched the other operand with the other
+condition's tested variable via a commutativity swap, the stripped operand
+was swapped into the mask position.  Because the mask had a wider type
+than the tested variable, ifcombine widened the tested variable (e.g.
+(unsigned long) y) and bitwise-ORed the masks together.  This resurrected
+upper bits from the wider variable that had been explicitly truncated in
+the original program, leading to wrong code when the tested variable
+sign-extended into those bit positions.
+
+Fix this by having recognize_bits_test return the raw operands of the
+BIT_AND_EXPR.  In ifcombine_ifandif, first attempt to match the operands
+directly under commutativity.  Only if that fails, look through
+conversions on the two names, so that a stripped operand never becomes
+part of the combined mask.  Looking through conversions of the names is
+valid for arbitrary masks since the name is truncated and the masks are
+zero-extended to the common type.
+
+	PR tree-optimization/126563
+	* tree-ssa-ifcombine.cc (recognize_bits_test): Do not call
+	get_name_for_bit_test on rhs1.
+	(ifcombine_ifandif): Check all operands for abnormal PHIs.
+	Look through conversions via get_name_for_bit_test on the names
+	only when direct matching fails.
+
+	* gcc.dg/tree-ssa/ssa-ifcombine-14.c: New test.
+	* gcc.dg/tree-ssa/ssa-ifcombine-15.c: New test.
+
+(cherry picked from commit 7a3878019f77ec4a41ca31ee8a09f7da6ab92470)
+---
+ .../gcc.dg/tree-ssa/ssa-ifcombine-14.c        | 41 +++++++++++++++++++
+ .../gcc.dg/tree-ssa/ssa-ifcombine-15.c        | 25 +++++++++++
+ gcc/tree-ssa-ifcombine.cc                     | 22 ++++++++--
+ 3 files changed, 85 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/tree-ssa/ssa-ifcombine-14.c
+ create mode 100644 gcc/testsuite/gcc.dg/tree-ssa/ssa-ifcombine-15.c
+
+diff --git a/gcc/testsuite/gcc.dg/tree-ssa/ssa-ifcombine-14.c b/gcc/testsuite/gcc.dg/tree-ssa/ssa-ifcombine-14.c
+new file mode 100644
+index 000000000000..75d660503a0a
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/tree-ssa/ssa-ifcombine-14.c
+@@ -0,0 +1,41 @@
++/* { dg-do run } */
++/* { dg-options "-O1" } */
++
++__attribute__((noipa)) int
++f (long long mm, int a, int b)
++{
++  int m = (int) mm;
++  int y = a + b;
++  if ((m & y) == 0 && (y & 4) == 0)
++    return 1;
++  return 0;
++}
++
++__attribute__((noipa)) int
++ref (long long mm, int a, int b)
++{
++  volatile int m = (int) mm;
++  volatile int y = a + b;
++  volatile int t1 = (m & y) == 0;
++  if (!t1) return 0;
++  volatile int t2 = (y & 4) == 0;
++  if (!t2) return 0;
++  return 1;
++}
++
++int
++main (void)
++{
++  long long mm = 0x100000000LL;
++  int bad = 0;
++  for (int a = -16; a <= 16; a++)
++    for (int b = -16; b <= 16; b++)
++      {
++        int got = f (mm, a, b), want = ref (mm, a, b);
++        if (got != want)
++          bad++;
++      }
++  if (bad)
++    __builtin_abort ();
++  return 0;
++}
+diff --git a/gcc/testsuite/gcc.dg/tree-ssa/ssa-ifcombine-15.c b/gcc/testsuite/gcc.dg/tree-ssa/ssa-ifcombine-15.c
+new file mode 100644
+index 000000000000..57c5edb10927
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/tree-ssa/ssa-ifcombine-15.c
+@@ -0,0 +1,25 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -fdump-tree-ifcombine-details" } */
++
++/* Looking through the narrowing conversion of the tested name is valid
++   even with non-constant masks.  */
++
++int
++f1 (long x, int m)
++{
++  int t = (int) x;
++  if ((t & m) == 0 && (x & 4) == 0)
++    return 1;
++  return 0;
++}
++
++int
++f2 (long x, int m, long m2)
++{
++  int t = (int) x;
++  if ((t & m) == 0 && (x & m2) == 0)
++    return 1;
++  return 0;
++}
++
++/* { dg-final { scan-tree-dump-times "optimizing bits or bits test" 2 "ifcombine" } } */
+diff --git a/gcc/tree-ssa-ifcombine.cc b/gcc/tree-ssa-ifcombine.cc
+index a60e6914e68c..21800698660d 100644
+--- a/gcc/tree-ssa-ifcombine.cc
++++ b/gcc/tree-ssa-ifcombine.cc
+@@ -375,7 +375,7 @@ recognize_bits_test (gcond *cond, tree *name, tree *bits, bool inv)
+       || gimple_assign_rhs_code (stmt) != BIT_AND_EXPR)
+     return false;
+ 
+-  *name = get_name_for_bit_test (gimple_assign_rhs1 (stmt));
++  *name = gimple_assign_rhs1 (stmt);
+   *bits = gimple_assign_rhs2 (stmt);
+ 
+   return true;
+@@ -895,7 +895,11 @@ ifcombine_ifandif (basic_block inner_cond_bb, bool inner_inv,
+       if ((TREE_CODE (name1) == SSA_NAME
+ 	   && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (name1))
+ 	  || (TREE_CODE (name2) == SSA_NAME
+-	      && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (name2)))
++	      && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (name2))
++	  || (TREE_CODE (bits1) == SSA_NAME
++	      && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (bits1))
++	  || (TREE_CODE (bits2) == SSA_NAME
++	      && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (bits2)))
+ 	return false;
+ 
+       /* Find the common name which is bit-tested.  */
+@@ -911,7 +915,19 @@ ifcombine_ifandif (basic_block inner_cond_bb, bool inner_inv,
+       else if (bits1 == name2)
+ 	std::swap (name1, bits1);
+       else
+-	goto bits_test_failed;
++	{
++	  /* Look through non-widening conversions, but only on the names
++	     so that a stripped operand never becomes part of the mask.  */
++	  tree t1 = get_name_for_bit_test (name1);
++	  tree t2 = get_name_for_bit_test (name2);
++	  if (t1 != t2)
++	    goto bits_test_failed;
++	  name1 = name2 = t1;
++	}
++
++      if (TREE_CODE (name1) == SSA_NAME
++	  && SSA_NAME_OCCURS_IN_ABNORMAL_PHI (name1))
++	return false;
+ 
+       /* As we strip non-widening conversions in finding a common
+          name that is tested make sure to end up with an integral

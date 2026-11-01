@@ -1,0 +1,43 @@
+From 57bbde5cba606956c7b6c513ed2bf5e895fdb06d Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Mon, 24 Aug 2026 23:48:55 +0200
+Subject: [PATCH 105/385] testsuite: Fix two pastos
+
+As mentioned in
+https://sourceware.org/pipermail/libc-alpha/2026-August/179946.html
+there are two spots which use unnecessarily larger _BitInt types
+on the rhs of comparisons.
+
+This patch fixes it.
+
+2026-08-24  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.dg/builtin-stdc-bit-1.c (main): Fix two pastos.
+
+(cherry picked from commit 85a3d553207ae1dddc51cdcbdc036c9e6726f8ba)
+---
+ gcc/testsuite/gcc.dg/builtin-stdc-bit-1.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/testsuite/gcc.dg/builtin-stdc-bit-1.c b/gcc/testsuite/gcc.dg/builtin-stdc-bit-1.c
+index 6ba95ad3a47a..b45c1991ae7c 100644
+--- a/gcc/testsuite/gcc.dg/builtin-stdc-bit-1.c
++++ b/gcc/testsuite/gcc.dg/builtin-stdc-bit-1.c
+@@ -891,7 +891,7 @@ main ()
+       || __builtin_stdc_bit_floor (~(unsigned _BitInt(373)) 0) != ((unsigned _BitInt(373)) 1) << (373 - 1))
+     __builtin_abort ();
+   if (__builtin_stdc_bit_floor (((unsigned _BitInt(512)) 511) << 405) != (((unsigned _BitInt(512)) 256) << 405)
+-      || __builtin_stdc_bit_floor (((unsigned _BitInt(373)) 512) << 242) != (((unsigned _BitInt(512)) 512) << 242))
++      || __builtin_stdc_bit_floor (((unsigned _BitInt(373)) 512) << 242) != (((unsigned _BitInt(373)) 512) << 242))
+     __builtin_abort ();
+   if (__builtin_stdc_bit_ceil ((unsigned _BitInt(512)) 0) != 1
+       || !expr_has_type (__builtin_stdc_bit_ceil ((unsigned _BitInt(512)) 0), unsigned _BitInt(512))
+@@ -905,7 +905,7 @@ main ()
+       || __builtin_stdc_bit_ceil ((~(unsigned _BitInt(373)) 0) >> 1) != ((unsigned _BitInt(373)) 1) << (373 - 1))
+     __builtin_abort ();
+   if (__builtin_stdc_bit_ceil (((unsigned _BitInt(512)) 512) << 405) != (((unsigned _BitInt(512)) 512) << 405)
+-      || __builtin_stdc_bit_ceil (((unsigned _BitInt(373)) 513) << 242) != (((unsigned _BitInt(512)) 1024) << 242))
++      || __builtin_stdc_bit_ceil (((unsigned _BitInt(373)) 513) << 242) != (((unsigned _BitInt(373)) 1024) << 242))
+     __builtin_abort ();
+   if (__builtin_stdc_bit_floor ((unsigned _BitInt(__BITINT_MAXWIDTH__)) 0) != 0)
+     __builtin_abort ();

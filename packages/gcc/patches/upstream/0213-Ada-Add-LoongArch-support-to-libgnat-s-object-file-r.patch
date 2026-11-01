@@ -1,0 +1,65 @@
+From 0ec1e5ba4855254ce28fc3a0abf2759cc07f09f1 Mon Sep 17 00:00:00 2001
+From: Yang Yujie <yangyujie@loongson.cn>
+Date: Tue, 29 Sep 2026 10:52:33 +0200
+Subject: [PATCH 213/385] Ada: Add LoongArch support to libgnat's object file
+ reader
+
+gcc/ada/
+	* libgnat/s-objrea.ads (Object_Arch): Add LOONGARCH.
+	* libgnat/s-objrea.adb (EM_LOONGARCH): New named number.
+	(ELF_Ops.Initialize): Deal with EM_LOONGARCH.
+	(Read_Address): Deal with LOONGARCH.
+---
+ gcc/ada/libgnat/s-objrea.adb | 6 +++++-
+ gcc/ada/libgnat/s-objrea.ads | 5 ++++-
+ 2 files changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/ada/libgnat/s-objrea.adb b/gcc/ada/libgnat/s-objrea.adb
+index 255ddde4a98a..2223697c016d 100644
+--- a/gcc/ada/libgnat/s-objrea.adb
++++ b/gcc/ada/libgnat/s-objrea.adb
+@@ -82,6 +82,7 @@ package body System.Object_Reader is
+       EM_X86_64      : constant := 62; --  AMD x86-64 architecture
+       EM_AARCH64     : constant := 183; --  Aarch64
+       EM_RISCV       : constant := 243; --  RISC-V
++      EM_LOONGARCH   : constant := 258; --  LoongArch
+ 
+       EN_NIDENT  : constant := 16;
+ 
+@@ -657,6 +658,9 @@ package body System.Object_Reader is
+             when EM_RISCV =>
+                Res.Arch := RISCV;
+ 
++            when EM_LOONGARCH =>
++               Res.Arch := LOONGARCH;
++
+             when others =>
+                raise Format_Error with "unrecognized architecture";
+          end case;
+@@ -2081,7 +2085,7 @@ package body System.Object_Reader is
+             Address_64 := Read (S);
+             return Address_64;
+ 
+-         when RISCV | S390 =>
++         when RISCV | S390 | LOONGARCH =>
+             case Obj.Format is
+                when ELF32 =>
+                   Address_32 := Read (S);
+diff --git a/gcc/ada/libgnat/s-objrea.ads b/gcc/ada/libgnat/s-objrea.ads
+index 88bf21629c31..b044946fabb6 100644
+--- a/gcc/ada/libgnat/s-objrea.ads
++++ b/gcc/ada/libgnat/s-objrea.ads
+@@ -129,9 +129,12 @@ package System.Object_Reader is
+       AARCH64,
+       --  64-bit ARM
+ 
+-      RISCV);
++      RISCV,
+       --  RISC-V
+ 
++      LOONGARCH);
++      --  LoongArch
++
+    ------------------
+    -- Target types --
+    ------------------

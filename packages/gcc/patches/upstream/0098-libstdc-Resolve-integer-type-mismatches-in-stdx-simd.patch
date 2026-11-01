@@ -1,0 +1,100 @@
+From 7ebe0af619c317969346b7c612198776c2f89cc8 Mon Sep 17 00:00:00 2001
+From: Matthias Kretz <m.kretz@gsi.de>
+Date: Mon, 17 Aug 2026 15:44:35 +0200
+Subject: [PATCH 098/385] libstdc++: Resolve integer type mismatches in
+ stdx::simd [PR122981]
+
+Conversions from generic vector to ARM vector are rejected when the
+value type is not equal. Since arm-none-eabi defines int32_t as long
+rather than int, a generic int vector passed as int32x2_t argument is
+ill-formed.
+
+With this patch, use the intN_t aliases in general: for the central
+__int_for_sizeof meta function and when bitcasting vectors in the NEON
+popcount implementation.
+
+This solution avoids unnecessary reinterpretation of generic vectors as
+ARM vectors, keeping it a tiny bit more type safe.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/122981
+	* include/experimental/bits/simd.h (__int_for_sizeof): Return
+	int32_t, int8_t, int16_t, and int64_t, rather than int, signed
+	char, short, long, and long long.
+	* include/experimental/bits/simd_neon.h (_S_popcount): Cast
+	elements to int8_t, int16_t, int32_t, or int64_t, rather than
+	signed char, short, int, or long.
+
+Signed-off-by: Matthias Kretz <m.kretz@gsi.de>
+(cherry picked from commit 4e08734e5fcfba5fb657a163a20c001236655f01)
+---
+ libstdc++-v3/include/experimental/bits/simd.h  | 18 ++++++++----------
+ .../include/experimental/bits/simd_neon.h      |  8 ++++----
+ 2 files changed, 12 insertions(+), 14 deletions(-)
+
+diff --git a/libstdc++-v3/include/experimental/bits/simd.h b/libstdc++-v3/include/experimental/bits/simd.h
+index b96818af6e6f..d1f5ca3ad319 100644
+--- a/libstdc++-v3/include/experimental/bits/simd.h
++++ b/libstdc++-v3/include/experimental/bits/simd.h
+@@ -604,16 +604,14 @@ template <size_t _Bytes>
+   __int_for_sizeof()
+   {
+     static_assert(_Bytes > 0);
+-    if constexpr (_Bytes == sizeof(int))
+-      return int();
+-    else if constexpr (_Bytes == sizeof(_SChar))
+-      return _SChar();
+-    else if constexpr (_Bytes == sizeof(short))
+-      return short();
+-    else if constexpr (_Bytes == sizeof(long))
+-      return long();
+-    else if constexpr (_Bytes == sizeof(_LLong))
+-      return _LLong();
++    if constexpr (_Bytes == sizeof(int32_t))
++      return int32_t();
++    else if constexpr (_Bytes == sizeof(int8_t))
++      return int8_t();
++    else if constexpr (_Bytes == sizeof(int16_t))
++      return int16_t();
++    else if constexpr (_Bytes == sizeof(int64_t))
++      return int64_t();
+   #ifdef __SIZEOF_INT128__
+     else if constexpr (_Bytes == sizeof(__int128))
+       return __int128();
+diff --git a/libstdc++-v3/include/experimental/bits/simd_neon.h b/libstdc++-v3/include/experimental/bits/simd_neon.h
+index 8fabee7f3283..e032a1ea535d 100644
+--- a/libstdc++-v3/include/experimental/bits/simd_neon.h
++++ b/libstdc++-v3/include/experimental/bits/simd_neon.h
+@@ -480,27 +480,27 @@ template <typename _Abi, typename>
+       {
+ 	if constexpr (sizeof(_Tp) == 1)
+ 	  {
+-	    const auto __s8 = __vector_bitcast<_SChar>(__k._M_data);
++	    const auto __s8 = __vector_bitcast<int8_t>(__k._M_data);
+ 	    int8x8_t __tmp = __lo64(__s8) + __hi64z(__s8);
+ 	    return -vpadd_s8(vpadd_s8(vpadd_s8(__tmp, int8x8_t()), int8x8_t()),
+ 			     int8x8_t())[0];
+ 	  }
+ 	else if constexpr (sizeof(_Tp) == 2)
+ 	  {
+-	    const auto __s16 = __vector_bitcast<short>(__k._M_data);
++	    const auto __s16 = __vector_bitcast<int16_t>(__k._M_data);
+ 	    int16x4_t __tmp = __lo64(__s16) + __hi64z(__s16);
+ 	    return -vpadd_s16(vpadd_s16(__tmp, int16x4_t()), int16x4_t())[0];
+ 	  }
+ 	else if constexpr (sizeof(_Tp) == 4)
+ 	  {
+-	    const auto __s32 = __vector_bitcast<int>(__k._M_data);
++	    const auto __s32 = __vector_bitcast<int32_t>(__k._M_data);
+ 	    int32x2_t __tmp = __lo64(__s32) + __hi64z(__s32);
+ 	    return -vpadd_s32(__tmp, int32x2_t())[0];
+ 	  }
+ 	else if constexpr (sizeof(_Tp) == 8)
+ 	  {
+ 	    static_assert(sizeof(__k) == 16);
+-	    const auto __s64 = __vector_bitcast<long>(__k._M_data);
++	    const auto __s64 = __vector_bitcast<int64_t>(__k._M_data);
+ 	    return -(__s64[0] + __s64[1]);
+ 	  }
+       }

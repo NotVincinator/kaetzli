@@ -1,0 +1,30 @@
+From 3f1d2ed150174dea197f8510321d21e3d6d644fa Mon Sep 17 00:00:00 2001
+From: Viljar Indus <indus@adacore.com>
+Date: Tue, 22 Sep 2026 10:55:07 +0200
+Subject: [PATCH 195/385] Ada: Fix crash in can_equal_min_or_max_val_p
+
+This changes can_equal_min_or_max_val_p to update the value only when we
+are dealing with a known integral type, instead of with a pointer type for
+which min/max values are not defined.
+
+gcc/ada/
+	* gcc-interface/trans.cc (can_equal_min_Or_max_val_p): Add guard
+	for integral types.
+---
+ gcc/ada/gcc-interface/trans.cc | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ada/gcc-interface/trans.cc b/gcc/ada/gcc-interface/trans.cc
+index 6db0aa0a6bec..2665cc93fafb 100644
+--- a/gcc/ada/gcc-interface/trans.cc
++++ b/gcc/ada/gcc-interface/trans.cc
+@@ -2886,7 +2886,8 @@ can_equal_min_or_max_val_p (tree val, tree type, bool max)
+   if (TREE_CODE (min_or_max_val) != INTEGER_CST)
+     return true;
+ 
+-  if (TREE_CODE (val) == NOP_EXPR)
++  if (TREE_CODE (val) == NOP_EXPR
++      && INTEGRAL_TYPE_P (TREE_TYPE (TREE_OPERAND (val, 0))))
+     val = (max
+ 	   ? TYPE_MAX_VALUE (TREE_TYPE (TREE_OPERAND (val, 0)))
+ 	   : TYPE_MIN_VALUE (TREE_TYPE (TREE_OPERAND (val, 0))));

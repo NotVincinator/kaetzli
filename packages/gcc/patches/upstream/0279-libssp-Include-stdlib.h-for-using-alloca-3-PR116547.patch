@@ -1,0 +1,43 @@
+From bb769ffa8aeaa82ad59d224843b4ac5396496eea Mon Sep 17 00:00:00 2001
+From: WHR <whr@rivoreo.one>
+Date: Sat, 31 Aug 2024 06:26:02 +0000
+Subject: [PATCH 279/385] libssp: Include 'stdlib.h' for using alloca(3)
+ [PR116547]
+
+As GCC now treating implicit declaration of function as an error instead of
+warning, compilation of libssp has been broken on some operating systems.
+The following error is from an x86_64-unknown-freebsd11 system:
+
+    [...]/libssp/ssp.c: In function 'fail':
+    [...]/libssp/ssp.c:134:17: error: implicit declaration of function 'alloca' [-Wimplicit-function-declaration]
+      134 |       p = buf = alloca (len);
+          |                 ^~~~~~
+
+Similarly: amd64-unknown-openbsd7.9.
+
+Most operating systems specifies that 'stdlib.h' should be included to get
+the declaration of alloca(3).
+
+	PR other/116547
+	* ssp.c: Include stdlib.h for alloca(3).
+
+Co-authored-by: Thomas Schwinge <tschwinge@baylibre.com>
+(cherry picked from commit 7c3add671b5deddb69b2fca3c489e2a06ddd4f90)
+---
+ libssp/ssp.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/libssp/ssp.c b/libssp/ssp.c
+index 3f497dcc1370..7785f03db2b5 100644
+--- a/libssp/ssp.c
++++ b/libssp/ssp.c
+@@ -39,6 +39,9 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ #ifdef HAVE_MALLOC_H
+ # include <malloc.h>
+ #endif
++#ifdef HAVE_STDLIB_H
++# include <stdlib.h>
++#endif
+ #ifdef HAVE_STRING_H
+ # include <string.h>
+ #endif

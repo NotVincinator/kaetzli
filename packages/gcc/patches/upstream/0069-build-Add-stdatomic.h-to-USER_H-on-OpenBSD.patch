@@ -1,0 +1,36 @@
+From 980bfacc116703fb994f780a6a6fb7a164fd6fc0 Mon Sep 17 00:00:00 2001
+From: Pietro Monteiro <pietro@sociotechnical.xyz>
+Date: Thu, 20 Aug 2026 11:54:57 -0400
+Subject: [PATCH 069/385] build: Add stdatomic.h to USER_H on OpenBSD
+
+Otherwise libatomic build fails with:
+../../../gcc/libatomic/fence.c:27:10: fatal error: stdatomic.h: No such file or directory
+   27 | #include <stdatomic.h>
+      |          ^~~~~~~~~~~~~
+compilation terminated.
+../../../gcc/libatomic/flag.c:27:10: fatal error: stdatomic.h: No such file or directory
+   27 | #include <stdatomic.h>
+
+gcc/ChangeLog:
+
+	* config/t-openbsd (USER_H): Add $(srcdir)/ginclude/stdatomic.h.
+
+Signed-off-by: Pietro Monteiro <pietro@sociotechnical.xyz>
+(cherry picked from commit d32c1f0238f33b0f6a3ef1b5b228678a92585094)
+---
+ gcc/config/t-openbsd | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/config/t-openbsd b/gcc/config/t-openbsd
+index 3b625d62b30d..eba06fdd5c4c 100644
+--- a/gcc/config/t-openbsd
++++ b/gcc/config/t-openbsd
+@@ -1,5 +1,6 @@
+-# We don't need GCC's own include files.
+-USER_H = $(EXTRA_HEADERS)
++# We need stdatomic.h from GCC's include files.
++USER_H = $(srcdir)/ginclude/stdatomic.h \
++	$(EXTRA_HEADERS)
+ 
+ # OpenBSD-specific D support.
+ openbsd-d.o: $(srcdir)/config/openbsd-d.cc

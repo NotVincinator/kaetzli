@@ -1,0 +1,81 @@
+From 7c4d19cf7df66dbd5d15b89fdc5c1a61f04d247b Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Wed, 30 Sep 2026 16:46:47 +0200
+Subject: [PATCH 222/385] Ada: Fix propagation of GNATMAKE_FOR_BUILD Makefile
+ variable
+
+The variable needs to be passed directly to sub-makes instead of being
+exported for sub-configures.
+
+/
+	PR ada/120106
+	* Makefile.def (GNATMAKE_FOR_BUILD): New flag to pass.
+	* Makefile.tpl (HOST_EXPORTS): Remove GNATMAKE_FOR_BUILD.
+	(BASE_TARGET_EXPORTS): Likewise.
+	* Makefile.in: Regenerate.
+---
+ Makefile.def | 1 +
+ Makefile.in  | 3 +--
+ Makefile.tpl | 2 --
+ 3 files changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/Makefile.def b/Makefile.def
+index cde69c9c9f76..d64499611894 100644
+--- a/Makefile.def
++++ b/Makefile.def
+@@ -282,6 +282,7 @@ flags_to_pass = { flag= CFLAGS_FOR_BUILD ; };
+ flags_to_pass = { flag= CXX_FOR_BUILD ; };
+ flags_to_pass = { flag= EXPECT ; };
+ flags_to_pass = { flag= FLEX ; };
++flags_to_pass = { flag= GNATMAKE_FOR_BUILD ; };
+ flags_to_pass = { flag= INSTALL ; };
+ flags_to_pass = { flag= INSTALL_DATA ; };
+ flags_to_pass = { flag= INSTALL_PROGRAM ; };
+diff --git a/Makefile.in b/Makefile.in
+index 110fa63c10cc..e78f226feb18 100644
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -209,7 +209,6 @@ HOST_EXPORTS = \
+ 	GOC="$(GOC)"; export GOC; \
+ 	GDC="$(GDC)"; export GDC; \
+ 	GM2="$(GM2)"; export GM2; \
+-	GNATMAKE_FOR_BUILD="$(GNATMAKE_FOR_BUILD)"; export GNATMAKE_FOR_BUILD; \
+ 	AR="$(AR)"; export AR; \
+ 	AS="$(AS)"; export AS; \
+ 	CC_FOR_BUILD="$(CC_FOR_BUILD)"; export CC_FOR_BUILD; \
+@@ -322,7 +321,6 @@ BASE_TARGET_EXPORTS = \
+ 	GOC="$(GOC_FOR_TARGET) $(XGCC_FLAGS_FOR_TARGET) $$TFLAGS"; export GOC; \
+ 	GDC="$(GDC_FOR_TARGET) $(XGCC_FLAGS_FOR_TARGET) $$TFLAGS"; export GDC; \
+ 	GM2="$(GM2_FOR_TARGET) $(XGCC_FLAGS_FOR_TARGET) $$TFLAGS"; export GM2; \
+-	GNATMAKE_FOR_BUILD="$(GNATMAKE_FOR_BUILD)"; export GNATMAKE_FOR_BUILD; \
+ 	DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	DSYMUTIL="$(DSYMUTIL_FOR_TARGET)"; export DSYMUTIL; \
+ 	LD="$(COMPILER_LD_FOR_TARGET)"; export LD; \
+@@ -907,6 +905,7 @@ BASE_FLAGS_TO_PASS = \
+ 	"CXX_FOR_BUILD=$(CXX_FOR_BUILD)" \
+ 	"EXPECT=$(EXPECT)" \
+ 	"FLEX=$(FLEX)" \
++	"GNATMAKE_FOR_BUILD=$(GNATMAKE_FOR_BUILD)" \
+ 	"INSTALL=$(INSTALL)" \
+ 	"INSTALL_DATA=$(INSTALL_DATA)" \
+ 	"INSTALL_PROGRAM=$(INSTALL_PROGRAM)" \
+diff --git a/Makefile.tpl b/Makefile.tpl
+index a5ff44e3dbca..be31a8cc038b 100644
+--- a/Makefile.tpl
++++ b/Makefile.tpl
+@@ -212,7 +212,6 @@ HOST_EXPORTS = \
+ 	GOC="$(GOC)"; export GOC; \
+ 	GDC="$(GDC)"; export GDC; \
+ 	GM2="$(GM2)"; export GM2; \
+-	GNATMAKE_FOR_BUILD="$(GNATMAKE_FOR_BUILD)"; export GNATMAKE_FOR_BUILD; \
+ 	AR="$(AR)"; export AR; \
+ 	AS="$(AS)"; export AS; \
+ 	CC_FOR_BUILD="$(CC_FOR_BUILD)"; export CC_FOR_BUILD; \
+@@ -325,7 +324,6 @@ BASE_TARGET_EXPORTS = \
+ 	GOC="$(GOC_FOR_TARGET) $(XGCC_FLAGS_FOR_TARGET) $$TFLAGS"; export GOC; \
+ 	GDC="$(GDC_FOR_TARGET) $(XGCC_FLAGS_FOR_TARGET) $$TFLAGS"; export GDC; \
+ 	GM2="$(GM2_FOR_TARGET) $(XGCC_FLAGS_FOR_TARGET) $$TFLAGS"; export GM2; \
+-	GNATMAKE_FOR_BUILD="$(GNATMAKE_FOR_BUILD)"; export GNATMAKE_FOR_BUILD; \
+ 	DLLTOOL="$(DLLTOOL_FOR_TARGET)"; export DLLTOOL; \
+ 	DSYMUTIL="$(DSYMUTIL_FOR_TARGET)"; export DSYMUTIL; \
+ 	LD="$(COMPILER_LD_FOR_TARGET)"; export LD; \

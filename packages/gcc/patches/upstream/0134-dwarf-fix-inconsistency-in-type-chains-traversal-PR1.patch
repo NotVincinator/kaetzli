@@ -1,0 +1,151 @@
+From 49711a94ef6e7ec95be3c45df02b51c9ddd443ed Mon Sep 17 00:00:00 2001
+From: Vineet Gupta <vineet.gupta@linux.dev>
+Date: Wed, 24 Jun 2026 09:19:46 -0700
+Subject: [PATCH 134/385] dwarf: fix inconsistency in type chains traversal
+ [PR125421]
+
+typedef chain traversal could sometimes skip an intermediate type.
+This could happen when two DIEs have a common underlying type but diverge
+due to presence of additional attribute in one case and a qualifier in
+other.
+In the example from testcase, variable "perm" typechain misses interim u16.
+
+             typedef unsigned short __u16;
+                      typedef __u16 u16;
+  __attribute__((btf_type_tag(""))) u16 a;
+                              const u16 perm;
+
+generates
+
+  .uleb128 0x1	# (DIE (0x66) DW_TAG_variable)
+  .long	.LASF3	# DW_AT_name: "perm"
+  		# DW_AT_decl_file (1, pr125421.c)
+  .byte	0xa	# DW_AT_decl_line
+  .byte	0xb	# DW_AT_decl_column
+  .long	0x2f	# DW_AT_type
+
+  .uleb128 0x4	# (DIE (0x2f) DW_TAG_const_type)
+  .long	0x23	# DW_AT_type                        <-- BUG
+
+  .uleb128 0x3	# (DIE (0x23) DW_TAG_typedef)
+  .long	.LASF5	# DW_AT_name: "__u16"
+  .byte	0x1	# DW_AT_decl_file (pr125421.c)
+  .byte	0x7	# DW_AT_decl_line
+  .byte	0xf	# DW_AT_decl_column
+  .long	0x34	# DW_AT_type
+
+  .uleb128 0x5	# (DIE (0x34) DW_TAG_base_type)
+  .byte	0x2	# DW_AT_byte_size
+  .byte	0x5	# DW_AT_encoding
+  .long	.LASF6	# DW_AT_name: "short int"
+
+What makes this issue worse is depending on the order in which the types
+are specified in source, and processed, the problem may or maynot show up.
+So in the test code above if lines 3 and 4 are swppaed, "perm" gets the
+missing type u16 as expected.
+
+The issue is in modified_type_die (), get_qualified_type (type) returned
+pointer may not be identical to dtype: TREE_TYPE (TYPE_NAME (qualified_type))
+while having the same underlying base type. And due to the failed
+pointer identity test, subsequent usage of DECL_ORIGINAL_TYPE () for recursive
+chain processing can peel away the needed type.
+
+The implications are for a multi CU build, structurally similar but
+non identical variants of types (due to an embedded member getting a
+different chained typdef) can be generated and accumulate at link time
+in the final .debug_info.
+
+This would be OK / unnoticed for usual dwarf debugging purposes.
+However in BFP workflow: kernel binary linking invokes pahole to process
+the dwarf and dedup it for btf generation (gcc can emit btf directly but
+thats not been done currently for other reasons). The slightly different
+variations of same structure due to thi issue cause combinatiorial explosion
+in pahole dedup processing trying to match and failing repeatedly in what
+seems like infinite recursion. The problem showed up and was excerbated
+when trying to enable attr btf_type_tag in kernel with gcc for the first
+time as that is the key ingredient to trigger the latent issue.
+
+Fix is to handle qualified_type != dtype as if they were identical when
+they are different variant nodes of the same underlying typedef.
+
+Bootstrapped and regtested on x86 and aarch64.
+
+	PR debug/125421
+
+gcc/ChangeLog:
+
+	* dwarf2out.cc (modified_type_die): Handle qualified_type being
+	a variant of dtype as if they were identical to avoid peeling a
+	typdef.
+	For named types, use dentry unconditionally as that is valid for
+	both cases of qualified_type == and  != dentry.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.dg/debug/dwarf2/pr125421.c: New Test.
+
+Signed-off-by: Vineet Gupta <vineet.gupta@linux.dev>
+(cherry picked from commit 3e2885588fe0e5273a50c471d41c61ee9aefc269)
+---
+ gcc/dwarf2out.cc                             | 15 ++++++++++++---
+ gcc/testsuite/gcc.dg/debug/dwarf2/pr125421.c | 18 ++++++++++++++++++
+ 2 files changed, 30 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/debug/dwarf2/pr125421.c
+
+diff --git a/gcc/dwarf2out.cc b/gcc/dwarf2out.cc
+index bf342e468bf9..9d6ca06067f7 100644
+--- a/gcc/dwarf2out.cc
++++ b/gcc/dwarf2out.cc
+@@ -13997,7 +13997,16 @@ modified_type_die (tree type, int cv_quals, tree type_attrs, bool reverse,
+       tree dtype = TREE_TYPE (name);
+ 
+       /* Skip the typedef for base types with DW_AT_endianity, no big deal.  */
+-      if (qualified_type == dtype && !reverse_type)
++      if (!reverse_type
++	  && (qualified_type == dtype
++	      /* Pointer identity check above might fail when qualified_type
++		 is a different variant node of the same typedef yet requires
++		 the same handling as if they matched (see PR/125421).
++		 Skip this when btf_type_tag attributes are present, as those
++		 need to be handled in the else branch below.  */
++	      || (TYPE_NAME (qualified_type) == name
++		  && TYPE_QUALS (qualified_type) == TYPE_QUALS (dtype)
++		  && !lookup_attribute ("btf_type_tag", type_attrs))))
+ 	{
+ 	  tree origin = decl_ultimate_origin (name);
+ 
+@@ -14009,8 +14018,8 @@ modified_type_die (tree type, int cv_quals, tree type_attrs, bool reverse,
+ 				      reverse, context_die);
+ 
+ 	  /* For a named type, use the typedef.  */
+-	  gen_type_die (qualified_type, context_die);
+-	  return lookup_type_die (qualified_type);
++	  gen_type_die (dtype, context_die);
++	  return lookup_type_die (dtype);
+ 	}
+       else
+ 	{
+diff --git a/gcc/testsuite/gcc.dg/debug/dwarf2/pr125421.c b/gcc/testsuite/gcc.dg/debug/dwarf2/pr125421.c
+new file mode 100644
+index 000000000000..810afeae7394
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/debug/dwarf2/pr125421.c
+@@ -0,0 +1,18 @@
++/* Verify the typedef chains are preserved.
++   DW_TAG_const_type for "const u16" chains to u16 typedef and doesnot
++   skip to underlying __u16 typedef */
++
++/* { dg-do compile } */
++/* { dg-options "-gdwarf -dA" } */
++
++typedef short __u16;
++typedef __u16 u16;
++__attribute__((btf_type_tag(""))) u16 __softirq_pending;
++const u16 perm;
++
++/* The exact failing pattern is hard to encode with TCL regex machinery,
++   so resort to an indirect way: in the buggy output, const_type points
++   directly to __u16, and only one u16 typedef DIE is emitted (for the
++   btf_type_tag use). In the fixed output, const_type points to a u16
++   typedef, creating a second u16 typedef DIE.
++/* { dg-final { scan-assembler-times "(DW_AT_name: \"u16\"|\"u16..\"\[^\\r\\n\]*DW_AT_name)" 2 } } */

@@ -1,0 +1,134 @@
+From 59c09a39d0e89c0a19606d0c8dfd8c023cf5d75f Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 15 Sep 2026 00:20:13 +0000
+Subject: [PATCH 161/385] Daily bump.
+
+---
+ gcc/ChangeLog           | 20 +++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 17 +++++++++++++
+ libstdc++-v3/ChangeLog  | 54 +++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 92 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index e6b6cd691ff7..dd489a5aa4b6 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,23 @@
++2026-09-14  Jeff Law  <jeffreyalaw@gmail.com>
++
++	Backported from master:
++	2026-09-13  Jeff Law  <jeffreyalaw@gmail.com>
++		    Sun Yuechi  <sunyuechi@iscas.ac.cn
++
++	* config/riscv/riscv-bclr-lowest-set-bit.cc
++	(pass_bclr_lowest_set_bit::execute): Do not handle addiw forms.
++
++2026-09-14  Jeff Law  <jeffrey.law@oss.qualcomm.com>
++
++	Backported from master:
++	2026-09-11  Jeff Law  <jeffrey.law@oss.qualcomm.com>
++
++	PR target/127306
++	* config/riscv/riscv-bclr-lowest-set-bit.cc (find_later_ctz): Fix
++	off-by-one error for scan to verify ctz input isn't modified.
++	(pass_bclr_lowest_bit_set::execute): Remove original AND in case
++	where the CTZ is found after the AND.
++
+ 2026-09-13  Jeff Law  <jeffrey.law@oss.qualcomm.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 1c5002a42eae..1ded3e06871f 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260914
++20260915
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 346eefb4abe5..01e4b18fb806 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,20 @@
++2026-09-14  Jeff Law  <jeffreyalaw@gmail.com>
++
++	Backported from master:
++	2026-09-13  Jeff Law  <jeffreyalaw@gmail.com>
++		    Sun Yuechi  <sunyuechi@iscas.ac.cn
++
++	* gcc.target/riscv/bclr-lowest-set-bit-1.c: Update expected output.
++	* gcc.target/riscv/bclr-lowest-set-bit-2.c: New test.
++
++2026-09-14  Jeff Law  <jeffrey.law@oss.qualcomm.com>
++
++	Backported from master:
++	2026-09-11  Jeff Law  <jeffrey.law@oss.qualcomm.com>
++
++	PR target/127306
++	* gcc.target/riscv/pr127306.c: New test.
++
+ 2026-09-13  Zhou Qiankang  <wszqkzqk@qq.com>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index 7dcd6ded9dbf..05d25baa455a 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,57 @@
++2026-09-14  Tomasz Kamiński  <tkaminsk@redhat.com>
++
++	PR libstdc++/124121
++	* include/std/inplace_vector (inplace_vector::_M_init): Remove
++	unnecessary start_lifetime_as call. Emit error using
++	__builtin_constexpr_diag.
++
++2026-09-14  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-09-10  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/127220
++	* include/std/format (__format::_Arg_t): Move definition
++	earlier.
++	(basic_format_parse_context::check_dynamic_spec): Construct
++	array of _Arg_t from template parameter list.
++	(basic_format_parse_context::check_dynamic_spec_integral):
++	Construct array of _Arg_t based on supported types.
++	(basic_format_parse_context::check_dynamic_spec_string):
++	Likewise.
++	(basic_format_parse_context::__check_dynamic_spec): Replace
++	template parameter list with span<const _Arg_t> function
++	parameter and simplify accordingly. Define in class body.
++	(basic_format_parse_context::_Scan_parse_context): New struct
++	the replaces _Scanner::_Parse_context.
++	(__format::_Scanner::_M_pc): Change type to _Scan_parse_context.
++
++2026-09-14  Steven Sudit  <stevensudit@gmail.com>
++
++	Backported from master:
++	2026-09-09  Steven Sudit  <stevensudit@gmail.com>
++
++	PR libstdc++/127219
++	* include/std/format
++	(basic_format_parse_context::__valid_types_for_check_dynamic_spec):
++	Make static, so that the static_assert in check_dynamic_spec does
++	not use this.
++
++2026-09-14  Tomasz Kamiński  <tkaminsk@redhat.com>
++
++	Backported from master:
++	2026-09-10  Tomasz Kamiński  <tkaminsk@redhat.com>
++		    Marco Falke  <falke.marco@gmail.com>
++
++	PR libstdc++/126949
++	* include/bits/hashtable_policy.h (_Hash_code_base::_M_hash)
++	(_Hashtable_base::_M_equal, _Hashtable_alloc::_M_alloc):
++	Value initialized members in NSDMI.
++	* testsuite/23_containers/unordered_map/cons/default.cc: Check
++	default construction with an hash, equality and allocator with
++	explicit constructor.
++	* testsuite/23_containers/unordered_set/cons/default.cc: Likewise.
++
+ 2026-09-11  Avi Kivity  <avi@scylladb.com>
+ 
+ 	Backported from master:

@@ -1,0 +1,106 @@
+From 046f8f3134c29cb6c760e69cb2eeb3db8a644a62 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Mon, 3 Aug 2026 11:26:11 +0200
+Subject: [PATCH 002/385] mips: Fix up creation of MD builtins with 0 arguments
+ [PR126484]
+
+For MIPS_SI_FTYPE_VOID and MIPS_USI_FTYPE_VOID which are meant
+for functions which return (SImode) int or unsigned int and have
+(void) arguments the MIPS backend creates those using
+case MIPS_SI_FTYPE_VOID: types[(int) type] = build_function_type_list (intSI_type_node, void_type_node, NULL_TREE); break;
+case MIPS_USI_FTYPE_VOID: types[(int) type] = build_function_type_list (unsigned_intSI_type_node, void_type_node, NULL_TREE); break;
+That is wrong, because functions which don't take any arguments
+(i.e. (void) or C23/C++ ()) should be using void_list_node as
+TYPE_ARG_TYPES, not a TREE_LIST with void_type_node TREE_VALUE
+and TREE_CHAIN being that void_list_node.  Although void_list_node
+also has TREE_VALUE of void_type_node, various places in the C++
+FE as well as in the middle-end rely on void_list_node to be unique,
+compare it using pointer comparison.
+The following testcase strangely happens to compile fine when compiled
+in C, but fails in C++ (which reports wrong number of arguments due
+to this bug).
+
+The following simple patch just arranges those 0 argument functions
+to have the MIPS_*_FTYPE_VOID enumerators be named as before, but
+in the build_function_type_list call omit that ", void_type_node" part,
+so it creates correct 0 arguments FUNCTION_TYPE.
+
+2026-08-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/126484
+	* config/mips/mips-ftypes.def (MIPS_SI_FTYPE_VOID,
+	MIPS_USI_FTYPE_VOID): Use DEF_MIPS_FTYPE with 0 as
+	first argument rather than 1 and leave out ", VOID" from
+	second argument.
+	* config/mips/mips.cc (MIPS_FTYPE_NAME0): Define.
+	(MIPS_FTYPE_ATYPES0): Define.
+
+	* g++.target/mips/pr126484.C: New test.
+
+Reviewed-by: Richard Biener <rguenth@suse.de>
+(cherry picked from commit e152b584c3df7ce0ef738f3d7c2d852490d59e3d)
+---
+ gcc/config/mips/mips-ftypes.def          | 4 ++--
+ gcc/config/mips/mips.cc                  | 4 ++++
+ gcc/testsuite/g++.target/mips/pr126484.C | 8 ++++++++
+ 3 files changed, 14 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/g++.target/mips/pr126484.C
+
+diff --git a/gcc/config/mips/mips-ftypes.def b/gcc/config/mips/mips-ftypes.def
+index fb72661c6822..94f5c5ddf0eb 100644
+--- a/gcc/config/mips/mips-ftypes.def
++++ b/gcc/config/mips/mips-ftypes.def
+@@ -75,7 +75,7 @@ DEF_MIPS_FTYPE (1, (SI, V4QI))
+ DEF_MIPS_FTYPE (2, (SI, V4QI, V4QI))
+ DEF_MIPS_FTYPE (2, (SI, V4SI, UQI))
+ DEF_MIPS_FTYPE (2, (SI, V8HI, UQI))
+-DEF_MIPS_FTYPE (1, (SI, VOID))
++DEF_MIPS_FTYPE (0, (SI))
+ 
+ DEF_MIPS_FTYPE (2, (UDI, UDI, UDI))
+ DEF_MIPS_FTYPE (2, (UDI, UV2SI, UV2SI))
+@@ -84,7 +84,7 @@ DEF_MIPS_FTYPE (2, (UDI, V2DI, UQI))
+ DEF_MIPS_FTYPE (2, (USI, V16QI, UQI))
+ DEF_MIPS_FTYPE (2, (USI, V4SI, UQI))
+ DEF_MIPS_FTYPE (2, (USI, V8HI, UQI))
+-DEF_MIPS_FTYPE (1, (USI, VOID))
++DEF_MIPS_FTYPE (0, (USI))
+ 
+ DEF_MIPS_FTYPE (2, (UV16QI, UV16QI, UQI))
+ DEF_MIPS_FTYPE (2, (UV16QI, UV16QI, UV16QI))
+diff --git a/gcc/config/mips/mips.cc b/gcc/config/mips/mips.cc
+index cc45a195b891..76543a232483 100644
+--- a/gcc/config/mips/mips.cc
++++ b/gcc/config/mips/mips.cc
+@@ -211,6 +211,7 @@ enum mips_ucbranch_type
+ };
+ 
+ /* Macros to create an enumeration identifier for a function prototype.  */
++#define MIPS_FTYPE_NAME0(A) MIPS_##A##_FTYPE_VOID
+ #define MIPS_FTYPE_NAME1(A, B) MIPS_##A##_FTYPE_##B
+ #define MIPS_FTYPE_NAME2(A, B, C) MIPS_##A##_FTYPE_##B##_##C
+ #define MIPS_FTYPE_NAME3(A, B, C, D) MIPS_##A##_FTYPE_##B##_##C##_##D
+@@ -17137,6 +17138,9 @@ mips_build_cvpointer_type (void)
+ 
+ /* MIPS_FTYPE_ATYPESN takes N MIPS_FTYPES-like type codes and lists
+    their associated MIPS_ATYPEs.  */
++#define MIPS_FTYPE_ATYPES0(A) \
++  MIPS_ATYPE_##A
++
+ #define MIPS_FTYPE_ATYPES1(A, B) \
+   MIPS_ATYPE_##A, MIPS_ATYPE_##B
+ 
+diff --git a/gcc/testsuite/g++.target/mips/pr126484.C b/gcc/testsuite/g++.target/mips/pr126484.C
+new file mode 100644
+index 000000000000..2d55cb939c0d
+--- /dev/null
++++ b/gcc/testsuite/g++.target/mips/pr126484.C
+@@ -0,0 +1,8 @@
++// PR target/126484
++// { dg-do compile }
++
++int
++foo ()
++{
++  return __builtin_mips_get_fcsr ();
++}

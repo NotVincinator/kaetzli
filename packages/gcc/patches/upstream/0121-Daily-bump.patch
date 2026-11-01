@@ -1,0 +1,50 @@
+From ac1d802cad423e7b2e7c2449ec16a1e51460de62 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Mon, 31 Aug 2026 00:21:14 +0000
+Subject: [PATCH 121/385] Daily bump.
+
+---
+ gcc/DATESTAMP           | 2 +-
+ gcc/cp/ChangeLog        | 8 ++++++++
+ gcc/testsuite/ChangeLog | 8 ++++++++
+ 3 files changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index cb2d581fd4b4..08239b647341 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260830
++20260831
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index e43b6c278c58..c621b7021f0e 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,11 @@
++2026-08-30  Vincenzo Calabretta  <vincenzo.cal.main@gmail.com>
++
++	Backported from master:
++	2026-08-29  Vincenzo Calabretta  <vincenzo.cal.main@gmail.com>
++
++	PR c++/127046
++	* constexpr.cc (unshare_constructor): Copy RANGE_EXPR indexes.
++
+ 2026-08-24  Jason Merrill  <jason@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index ec1944773204..258efb2c6a55 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2026-08-30  Vincenzo Calabretta  <vincenzo.cal.main@gmail.com>
++
++	Backported from master:
++	2026-08-29  Vincenzo Calabretta  <vincenzo.cal.main@gmail.com>
++
++	PR c++/127046
++	* g++.dg/cpp2a/constexpr-dtor20.C: New test.
++
+ 2026-08-29  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:

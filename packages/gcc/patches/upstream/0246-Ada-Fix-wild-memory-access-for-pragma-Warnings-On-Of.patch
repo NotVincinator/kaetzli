@@ -1,0 +1,29 @@
+From 6a970972c580723a065a83ff2adb3da7ff382b41 Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Wed, 7 Oct 2026 21:22:28 +0200
+Subject: [PATCH 246/385] Ada: Fix wild memory access for pragma Warnings
+ (On|Off, "*")
+
+This occurs when the pragma is in a configuration file.  The problem is that
+Find_Direct_Name manually walks the scope stack while it is still empty.
+
+gcc/ada/
+	PR ada/126125
+	* sem_ch8.adb (Find_Direct_Name): Add missing guard to the manual
+	walk of the scope stack used to cope with the Rtsfind mechanism.
+---
+ gcc/ada/sem_ch8.adb | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/gcc/ada/sem_ch8.adb b/gcc/ada/sem_ch8.adb
+index 68537725e9bc..e1e20f50ca93 100644
+--- a/gcc/ada/sem_ch8.adb
++++ b/gcc/ada/sem_ch8.adb
+@@ -6525,6 +6525,7 @@ package body Sem_Ch8 is
+ 
+          Level := Scope_Stack.Last;
+          loop
++            exit when Level < 0;
+             Scop := Scope_Stack.Table (Level).Entity;
+             exit when Scop = Scope (E);
+             Level := Level - 1;

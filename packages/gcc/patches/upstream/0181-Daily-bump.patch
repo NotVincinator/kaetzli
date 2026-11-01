@@ -1,0 +1,325 @@
+From 8b54c1af78c4af76995d0ff686e4019c7bb2433f Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 17 Sep 2026 00:20:52 +0000
+Subject: [PATCH 181/385] Daily bump.
+
+---
+ ChangeLog               |   9 +++
+ gcc/ChangeLog           | 130 ++++++++++++++++++++++++++++++++++++++++
+ gcc/DATESTAMP           |   2 +-
+ gcc/testsuite/ChangeLog |  92 ++++++++++++++++++++++++++++
+ libstdc++-v3/ChangeLog  |  42 +++++++++++++
+ 5 files changed, 274 insertions(+), 1 deletion(-)
+
+diff --git a/ChangeLog b/ChangeLog
+index 7a4696334dcc..3ad4adbedf58 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,12 @@
++2026-09-16  Kishan Parmar  <kishan@linux.ibm.com>
++
++	Backported from master:
++	2026-09-02  Peter Bergner  <bergner@gcc.gnu.org>
++
++	PR target/122535
++	* configure.ac: Error out on --with-long-double-64.
++	* configure: Regenerate.
++
+ 2026-08-27  Michael Meissner  <meissner@linux.ibm.com>
+ 
+ 	* MAINTAINERS: Update Michael Meissner's information.
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index dd489a5aa4b6..c1ce493ae5e5 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,133 @@
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-15  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127390
++	* tree-vect-stmts.cc (vectorizable_comparison_1): Reject
++	bit-precision integer comparisons.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-14  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127377
++	* tree-ssa-sccvn.cc (vn_walk_cb_data::push_partial_def):
++	Properly consider the padding before the object when
++	pruning the size.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-09  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127262
++	* gimple-predicate-analysis.cc (predicate::init_from_control_deps):
++	Convert switch label values to the type of the switch index.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-01  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127130
++	* tree-scalar-evolution.cc (simplify_peeled_chrec):
++	Guard against signed integer overflow UB.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-08-25  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127049
++	* tree-vect-data-refs.cc (vect_analyze_data_refs): Build
++	a MEM_REF of the DR_REF type for analyzing the innermost
++	loop behavior for outer loop vectorization.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-08-25  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127000
++	* match.pd ((T *)(ptr - ptr_cst)): Canonicalize directly
++	to (T *)ptr p+ cst.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-08-24  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127000
++	* match.pd ((T *)(ptr - ptr_cst)): Use build1 to build
++	an ADDR_EXPR.
++	* tree-ssa-sccvn.cc (vn_nary_build_or_lookup_1): Avoid
++	creating GIMPLE_SINGLE_RHS to insert stmts.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-15  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/126760
++	PR tree-optimization/127391
++	* tree-if-conv.cc (if_convertible_stmt_p): Delay switch
++	validation to ...
++	(if_convertible_loop_p_1): ... the loop iterating over
++	PHIs.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-08-10  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/126658
++	* gimple.cc (check_loadstore): Restrict TARGET_MEM_REF
++	handling.
++	* gimple-ssa-isolate-paths.cc (check_loadstore): Likewise.
++	* gimple-range-infer.cc (non_null_loadstore): Likewise.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-09  Richard Biener  <rguenther@suse.de>
++
++	PR ipa/126153
++	* ipa-fnsummary.cc (evaluate_conditions_for_known_args): Only
++	reinterpret a known aggregate value into the type of the
++	condition if both types have the same precision.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-09  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/126153
++	* tree-ssa-sccvn.cc (reverse_storage_order_for_component_p): Take
++	the operands by const reference.
++	(vn_reference_lookup_3): Punt when translating a reference through
++	an aggregate copy consumes all of its operands and either access
++	has reverse storage order.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-02  Richard Biener  <rguenther@suse.de>
++
++	PR ipa/126153
++	* ipa-fnsummary.cc (evaluate_conditions_for_known_args): Do not
++	look up an aggregate value for a condition whose offset is not
++	byte aligned.
++
++2026-09-16  Kishan Parmar  <kishan@linux.ibm.com>
++
++	Backported from master:
++	2026-09-02  Peter Bergner  <bergner@gcc.gnu.org>
++
++	* doc/install.texi: Remove incorrect mention of --with-long-double-64.
++	Co-authored-by: Kishan Parmar <kishan@linux.ibm.com>
++
+ 2026-09-14  Jeff Law  <jeffreyalaw@gmail.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index ad5c2ea5d68f..66bb3a1b7dd6 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260916
++20260917
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 01e4b18fb806..b6e4309fef86 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,95 @@
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-15  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127390
++	* gcc.dg/vect/vect-pr127390.c: New testcase.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-14  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127377
++	* gcc.dg/torture/pr127377.c: New testcase.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-09  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127262
++	* gcc.dg/pr127262.c: New testcase.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-01  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127130
++	* gcc.dg/torture/pr127130-1.c: New testcase.
++	* gcc.dg/torture/pr127130-2.c: Likewise.
++	* gcc.dg/gomp/static-chunk-size-one.c: Adjust.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-08-25  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127049
++	* g++.dg/torture/pr127049.C: New testcase.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-08-24  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127000
++	* gcc.dg/torture/pr127000.c: New testcase.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-15  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/126760
++	PR tree-optimization/127391
++	* gcc.dg/vect/vect-pr126760.c: New testcase.
++	* gcc.dg/vect/vect-pr127391.c: Likewise.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-08-10  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/126658
++	* gcc.dg/torture/pr126658.c: New testcase.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-09  Richard Biener  <rguenther@suse.de>
++
++	PR ipa/126153
++	* gcc.dg/torture/ipa-bitfield-predicate-1.c: New test.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-09  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/126153
++	* gcc.dg/torture/sso-fre-1.c: New test.
++
++2026-09-16  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-02  Richard Biener  <rguenther@suse.de>
++
++	PR ipa/126153
++	* gcc.dg/torture/pr126153.c: New test.
++
+ 2026-09-14  Jeff Law  <jeffreyalaw@gmail.com>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index 05d25baa455a..6e6701a0a867 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,45 @@
++2026-09-16  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-09-16  Jonathan Wakely  <jwakely@redhat.com>
++
++	* testsuite/20_util/function_objects/dr660.cc: Include the
++	testsuite_hooks.h header not testsuite_hooks.cc.
++
++2026-09-16  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-09-16  Jonathan Wakely  <jwakely@redhat.com>
++
++	* testsuite/27_io/basic_filebuf/close/char/4879.cc: Fix typo in
++	comment.
++
++2026-09-16  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-09-16  Jonathan Wakely  <jwakely@redhat.com>
++
++	* include/bits/atomic_wait.h: Fix typo in comment.
++
++2026-09-16  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-09-16  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/127430
++	* config/io/basic_file_stdio.cc (__basic_file::fd) Fix typo in
++	preprocessor condition.
++
++2026-09-16  Gerald Pfeifer  <gerald@pfeifer.com>
++
++	Backported from master:
++	2026-08-30  Gerald Pfeifer  <gerald@pfeifer.com>
++
++	* doc/xml/manual/status_cxx2017.xml: Update reference to openDPL
++	Parallel API.
++	* doc/xml/manual/status_cxx2020.xml: Ditto.
++	* doc/html/manual/status.html: Regenerate.
++
+ 2026-09-14  Tomasz Kamiński  <tkaminsk@redhat.com>
+ 
+ 	PR libstdc++/124121

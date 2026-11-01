@@ -1,0 +1,134 @@
+From ca782c28a522edad415a0f71698783203c9fefa4 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Wed, 2 Sep 2026 10:04:04 +0200
+Subject: [PATCH 166/385] ipa: require matching precision before
+ VIEW_CONVERT_EXPR of a known value
+
+evaluate_conditions_for_known_args reinterprets the aggregate constant
+found for a condition into the type of the condition whenever the two
+types have the same TYPE_SIZE.  TYPE_SIZE only says how much storage a
+type occupies, not how many of those bits carry the value, so a
+bit-field type and the byte containing it compare equal: TYPE_SIZE of
+<unnamed-signed:3> and of char are both 8.
+
+The resulting VIEW_CONVERT_EXPR is folded through native_encode_expr and
+native_interpret_expr, which keeps the least significant TYPE_PRECISION
+bits of the byte.  Those are the bit-field only under little-endian bit
+numbering.  With big-endian bit numbering, either because of the target
+or because of a reversed scalar storage order, the field lives in the
+most significant bits instead and the reinterpretation silently yields
+an unrelated value.
+
+In the testcase the byte 0x24 holds the value 1 in a reverse storage
+order 3-bit signed bit-field, but is misread as -4, which turns the
+guard ((int) p.f3.f7) >= 0 into a false predicate, and edge_set_predicate
+then replaces the guarded call with __builtin_unreachable.
+
+Require the precisions to be matching the modes.
+
+Assisted-by: Claude Opus 5 <noreply@anthropic.com>
+
+	PR ipa/126153
+	* ipa-fnsummary.cc (evaluate_conditions_for_known_args): Only
+	reinterpret a known aggregate value into the type of the
+	condition if both types have the same precision.
+
+	* gcc.dg/torture/ipa-bitfield-predicate-1.c: New test.
+
+(cherry picked from commit 73680e030d24d966121f608d7611848d75ae8045)
+---
+ gcc/ipa-fnsummary.cc                          | 11 +++-
+ .../gcc.dg/torture/ipa-bitfield-predicate-1.c | 62 +++++++++++++++++++
+ 2 files changed, 72 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/ipa-bitfield-predicate-1.c
+
+diff --git a/gcc/ipa-fnsummary.cc b/gcc/ipa-fnsummary.cc
+index b4fdab97958f..25c8097210fc 100644
+--- a/gcc/ipa-fnsummary.cc
++++ b/gcc/ipa-fnsummary.cc
+@@ -456,7 +456,16 @@ evaluate_conditions_for_known_args (struct cgraph_node *node,
+ 	  continue;
+ 	}
+ 
+-      if (val && TYPE_SIZE (c->type) == TYPE_SIZE (TREE_TYPE (val)))
++      if (val
++	  && (c->type == TREE_TYPE (val)
++	      || (TYPE_SIZE (c->type) == TYPE_SIZE (TREE_TYPE (val))
++		  /* Avoid precision mismatch like with bit-fields where the
++		     VIEW_CONVERT_EXPR does not truncate excess bits
++		     appropriately.  */
++		  && ((!INTEGRAL_TYPE_P (c->type)
++		       || type_has_mode_precision_p (c->type))
++		      && (!INTEGRAL_TYPE_P (TREE_TYPE (val))
++			  || type_has_mode_precision_p (TREE_TYPE (val)))))))
+ 	{
+ 	  if (c->type != TREE_TYPE (val))
+ 	    val = fold_unary (VIEW_CONVERT_EXPR, c->type, val);
+diff --git a/gcc/testsuite/gcc.dg/torture/ipa-bitfield-predicate-1.c b/gcc/testsuite/gcc.dg/torture/ipa-bitfield-predicate-1.c
+new file mode 100644
+index 000000000000..725d22e1e070
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/ipa-bitfield-predicate-1.c
+@@ -0,0 +1,62 @@
++/* { dg-do run } */
++/* { dg-require-effective-target le } */
++/* { dg-require-effective-target int32plus } */
++
++/* An IPA predicate condition on a bit-field was matched against the
++   aggregate constant recorded for the byte containing it.  The two were
++   considered interchangeable because TYPE_SIZE of a 3-bit bit-field type
++   and of char are both 8 bits, so the byte was reinterpreted as the field
++   with a VIEW_CONVERT_EXPR.  That reinterpretation keeps the least
++   significant bits of the byte, which are the bit-field only under
++   little-endian bit numbering.  Here the storage order is reversed, f7 is
++   the *top* three bits of the byte, and the byte 0x24 is misread as -4
++   instead of 1 -- turning the guard below into a false predicate and the
++   call to shifter() into __builtin_unreachable.  */
++
++struct __attribute__((scalar_storage_order("big-endian"))) S0
++{
++  signed f7 : 3;
++  unsigned f6 : 5;
++};
++
++struct S1 { int a; struct S0 f3; char pad; short s; };
++
++int g;
++
++__attribute__((noipa)) void ext (int x) { g += x; }
++
++__attribute__((noinline, noclone)) static long long
++shifter (long long l, int r)
++{
++  if (l < 0 || r < 0 || r >= 32 || l > (0x7fffffffffffffffLL >> r))
++    return l;
++  return l << r;
++}
++
++static void
++callee (struct S1 p, int n)
++{
++  ext (n);
++  if ((int) p.f3.f7 >= 0)
++    ext ((int) shifter (0x350631DD6B880108LL, (int) p.f3.f7));
++  ext (n);
++}
++
++/* A second caller, so that callee is not inlined before IPA.  */
++void other (struct S1 q, int n) { callee (q, n); }
++
++int
++main ()
++{
++  struct S1 l;
++  l.a = 5;
++  l.pad = 7;
++  l.s = 9;
++  *(char *) &l.f3 = 0x24;	/* reversed bit order: f7 = 1, f6 = 4 */
++  if ((int) l.f3.f7 != 1)
++    return 0;			/* not the layout this test is about */
++  callee (l, 3);
++  if (g != 3 + 3 + (int) (0x350631DD6B880108LL << 1))
++    __builtin_abort ();
++  return 0;
++}

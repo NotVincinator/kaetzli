@@ -1,0 +1,90 @@
+From af000a34117ccb29cb5bd18ef44a151d59947d89 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 8 Oct 2026 00:20:56 +0000
+Subject: [PATCH 250/385] Daily bump.
+
+---
+ gcc/DATESTAMP           |  2 +-
+ gcc/ada/ChangeLog       | 27 +++++++++++++++++++++++++++
+ gcc/cp/ChangeLog        |  6 ++++++
+ gcc/testsuite/ChangeLog | 14 ++++++++++++++
+ 4 files changed, 48 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 65b980db14cc..9f8a7f60d9a1 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261007
++20261008
+diff --git a/gcc/ada/ChangeLog b/gcc/ada/ChangeLog
+index 23b5fbb52c43..0b66362476f5 100644
+--- a/gcc/ada/ChangeLog
++++ b/gcc/ada/ChangeLog
+@@ -1,3 +1,30 @@
++2026-10-07  Hodong Kim  <hodong@nimfsoft.com>
++
++	PR ada/127759
++	* libgnat/g-socthi.adb (C_Accept): Do not call Disable_SIGPIPE
++	on failure.
++	(C_Socket): Likewise.
++
++2026-10-07  Eric Botcazou  <ebotcazou@adacore.com>
++
++	PR ada/126448
++	* sem_ch8.adb (Analyze_Subprogram_Renaming): Pass Nam instead of
++	Name (N) in the calls to Find_Renamed_Entity.  Remove if_statement
++	whose condition is always false.
++	(Find_Renamed_Entity): In the overloaded case and if the overload
++	resolution has succeeded, call Mark_Use_Clauses on the entity.
++
++2026-10-07  Eric Botcazou  <ebotcazou@adacore.com>
++
++	PR ada/126125
++	* sem_ch8.adb (Find_Direct_Name): Add missing guard to the manual
++	walk of the scope stack used to cope with the Rtsfind mechanism.
++
++2026-10-07  Eric Botcazou  <ebotcazou@adacore.com>
++
++	PR ada/127756
++	* exp_util.adb (Find_Protection_Type): Remove early return.
++
+ 2026-09-29  Yang Yujie  <yangyujie@loongson.cn>
+ 
+ 	* libgnat/s-objrea.ads (Object_Arch): Add LOONGARCH.
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index a9c40bd171bb..844425ecdce3 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,9 @@
++2026-10-07  Jason Merrill  <jason@redhat.com>
++
++	PR c++/122774
++	* name-lookup.cc (pushdecl): Check DECL_IS_UNDECLARED_BUILTIN rather
++	than iter.hidden_p ().
++
+ 2026-10-06  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index ba535a7726b1..de1bce74a73d 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,17 @@
++2026-10-07  Jason Merrill  <jason@redhat.com>
++
++	PR c++/122774
++	* g++.dg/modules/gmf-7_a.C: New test.
++	* g++.dg/modules/gmf-7_b.C: New test.
++
++2026-10-07  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* gnat.dg/renaming20.adb: New test.
++
++2026-10-07  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* gnat.dg/protected_subtype2.adb: New test.
++
+ 2026-10-06  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:

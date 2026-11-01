@@ -1,0 +1,512 @@
+From 73156e58cb62955b95a8ce4efe092ae9da70ba7d Mon Sep 17 00:00:00 2001
+From: Anlai Lu <agicy@qq.com>
+Date: Thu, 16 Jul 2026 12:03:45 +0000
+Subject: [PATCH 239/385] libstdc++: Add tests for format_to with
+ ostreambuf_iterator
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Cover format_to, format_to_n truncation, writing to sentinel,
+write failure, and large writes that exceed the internal buffer.
+These paths were previously untested.
+
+Additionally includes examples of formatters that observe
+if the output is buffered (string is created by call to format),
+before inserting to stream.
+
+libstdc++-v3/ChangeLog:
+
+	* testsuite/27_io/basic_ostream/print/buffered.cc: New test.
+	* testsuite/std/format/functions/format_to_ostreambuf.cc:
+	New test.
+
+Reviewed-by: Jonathan Wakely <jwakely@redhat.com>
+Co-authored-by: Tomasz Kamiński <tkaminsk@redhat.com>
+Signed-off-by: Anlai Lu <agicy@qq.com>
+---
+ .../27_io/basic_ostream/print/buffered.cc     |  90 +++++
+ .../format/functions/format_to_ostreambuf.cc  | 377 ++++++++++++++++++
+ 2 files changed, 467 insertions(+)
+ create mode 100644 libstdc++-v3/testsuite/27_io/basic_ostream/print/buffered.cc
+ create mode 100644 libstdc++-v3/testsuite/std/format/functions/format_to_ostreambuf.cc
+
+diff --git a/libstdc++-v3/testsuite/27_io/basic_ostream/print/buffered.cc b/libstdc++-v3/testsuite/27_io/basic_ostream/print/buffered.cc
+new file mode 100644
+index 000000000000..04ef159db392
+--- /dev/null
++++ b/libstdc++-v3/testsuite/27_io/basic_ostream/print/buffered.cc
+@@ -0,0 +1,90 @@
++// { dg-additional-options "-lstdc++exp" { target { *-*-mingw* } } }
++// { dg-do run { target c++23 } }
++
++#include <sstream>
++#include <algorithm>
++#include <testsuite_hooks.h>
++
++struct ThrowingFormat
++{
++  std::string val;
++  bool throw_from_format = false;
++};
++
++template<>
++struct std::formatter<ThrowingFormat, char>
++{
++   constexpr
++   std::format_parse_context::iterator
++   parse(std::format_parse_context& ctx) const
++   { return ctx.begin(); }
++
++   template<typename Out>
++   Out
++   format(const ThrowingFormat& t, std::basic_format_context<Out, char>& fc) const
++   {
++     if (t.throw_from_format)
++       throw std::logic_error("Formatting stopped");
++     return std::ranges::copy(t.val, fc.out()).out;
++   }
++};
++
++void
++test_throwing()
++{
++  std::string s;
++  s.reserve(100);
++  std::ostringstream out(std::move(s));
++  ThrowingFormat tf1{std::string(500, 'a'), false}, tf2{std::string(500, 'b'), true};
++
++  try
++  {
++    std::print(out, "{} {}", tf1, tf2);
++    VERIFY(false);
++  } catch (...) {
++    VERIFY(true);
++  }
++  VERIFY( out.view().empty() );
++}
++
++struct MixedFormat
++{
++  std::ostream* out;
++  std::string val;
++};
++
++template<>
++struct std::formatter<MixedFormat, char>
++{
++   constexpr
++   std::format_parse_context::iterator
++   parse(std::format_parse_context& ctx) const
++   { return ctx.begin(); }
++
++   template<typename Out>
++   Out
++   format(const MixedFormat& t, std::basic_format_context<Out, char>& fc) const
++   {
++     if (t.out)
++       *t.out << "<<[" << t.val << "]";
++     return std::ranges::copy(t.val, fc.out()).out;
++   }
++};
++
++void
++test_interleaved()
++{
++  std::string s;
++  s.reserve(100);
++  std::ostringstream out(std::move(s));
++  MixedFormat mf1{&out, "abc"}, mf2{&out, "DEF"};
++
++  std::print(out, "f[{}]f[{}]", mf1, mf2);
++  VERIFY( out.view() == "<<[abc]<<[DEF]f[abc]f[DEF]" );
++}
++
++int main()
++{
++  test_throwing();
++  test_interleaved();
++}
+diff --git a/libstdc++-v3/testsuite/std/format/functions/format_to_ostreambuf.cc b/libstdc++-v3/testsuite/std/format/functions/format_to_ostreambuf.cc
+new file mode 100644
+index 000000000000..81ac3a6c3d9e
+--- /dev/null
++++ b/libstdc++-v3/testsuite/std/format/functions/format_to_ostreambuf.cc
+@@ -0,0 +1,377 @@
++// { dg-do run { target c++20 } }
++
++#include <format>
++#include <sstream>
++#include <string>
++#include <testsuite_hooks.h>
++
++template<std::streamsize BufSize>
++struct ShortWriteStreambuf : std::streambuf
++{
++  std::string data;
++
++  std::streamsize
++  xsputn(const char_type* s, std::streamsize n) override
++  {
++    std::streamsize limit = std::max<std::streamsize>(0, BufSize - data.size());
++    std::streamsize to_write = std::min(n, limit);
++    if (to_write > 0)
++      data.append(s, to_write);
++    return to_write;
++  }
++
++  int_type
++  overflow(int_type c) override
++  {
++    if (data.size() < BufSize)
++      {
++	data.push_back(traits_type::to_char_type(c));
++	return c;
++      }
++    return traits_type::eof();
++  }
++};
++
++bool
++check_suffix(std::string_view s, size_t n, char c)
++{
++  if (s.size() < n)
++    return false;
++
++  s.remove_prefix(s.size() - n);
++  for (char v : s)
++    if (v != c)
++      return !n;
++    else if (!n)
++      return false;
++    else
++      --n;
++  return !n;
++}
++
++void
++test_format_to()
++{
++  {
++    std::ostringstream os;
++    std::format_to(std::ostreambuf_iterator<char>(os), "{}", 42);
++    VERIFY( os.view() == "42" );
++  }
++
++  {
++    std::ostringstream os;
++    std::string big(800, 'y');
++    std::format_to(std::ostreambuf_iterator<char>(os), "{}", big);
++    VERIFY( check_suffix(os.view(), 800, 'y') );
++  }
++
++  {
++    std::ostringstream os;
++    std::string part(700, 'P');
++    std::format_to(std::ostreambuf_iterator<char>(os),
++		   "{}{}{}", part, part, part);
++    VERIFY( check_suffix(os.view(), 2100, 'P') );
++  }
++
++  {
++    std::ostringstream os;
++    std::string body(400, 'B');
++    std::format_to(std::ostreambuf_iterator<char>(os),
++		   "header-{}-footer", body);
++
++    std::string_view sv = os.view();
++    VERIFY( sv.starts_with("header-") );
++    sv.remove_prefix(7);
++    VERIFY( sv.ends_with("-footer") );
++    sv.remove_suffix(7);
++    VERIFY( check_suffix(sv, 400, 'B') );
++  }
++}
++
++void
++test_format_to_n()
++{
++  {
++    std::ostringstream os;
++    auto res = std::format_to_n(std::ostreambuf_iterator<char>(os),
++				1, "{}", "A");
++    VERIFY( res.size == 1 );
++    VERIFY( os.view() == "A" );
++  }
++
++  {
++    std::ostringstream os;
++    auto res = std::format_to_n(std::ostreambuf_iterator<char>(os),
++				1, "{}", "AAA");
++    VERIFY( res.size == 3 );
++    VERIFY( os.view() == "A" );
++  }
++
++  {
++    std::ostringstream os;
++    auto res = std::format_to_n(std::ostreambuf_iterator<char>(os),
++				3, "{}", "hello");
++    VERIFY( res.size == 5 );
++    VERIFY( os.view() == "hel" );
++  }
++
++  {
++    std::ostringstream os;
++    auto res = std::format_to_n(std::ostreambuf_iterator<char>(os),
++				10, "{}", std::string(100, 'x'));
++    VERIFY( res.size == 100 );
++    VERIFY( check_suffix(os.view(), 10, 'x') );
++  }
++
++  {
++    std::ostringstream os;
++    auto res = std::format_to_n(std::ostreambuf_iterator<char>(os),
++				10, "{}", std::string(1000, 'x'));
++    VERIFY( res.size == 1000 );
++    VERIFY( check_suffix(os.view(), 10, 'x') );
++  }
++
++  {
++    std::ostringstream os;
++    auto res = std::format_to_n(std::ostreambuf_iterator<char>(os),
++				256, "{}", std::string(1000, 'x'));
++    VERIFY( res.size == 1000 );
++    VERIFY( check_suffix(os.view(), 256, 'x') );
++  }
++
++  {
++    std::ostringstream os;
++    auto res = std::format_to_n(std::ostreambuf_iterator<char>(os),
++				257, "{}", std::string(1000, 'x'));
++    VERIFY( res.size == 1000 );
++    VERIFY( check_suffix(os.view(), 257, 'x') );
++  }
++
++  {
++    std::ostringstream os;
++    auto res = std::format_to_n(std::ostreambuf_iterator<char>(os),
++				8, "{}{}{}", "AAAA", "BBBB", "CCCC");
++    VERIFY( res.size == 12 );
++    VERIFY( os.view() == "AAAABBBB" );
++  }
++
++  {
++    std::ostringstream os;
++    auto res = std::format_to_n(std::ostreambuf_iterator<char>(os),
++				2, "{}{}", "AAAA", "BBBB");
++    VERIFY( res.size == 8 );
++    VERIFY( os.view() == "AA" );
++  }
++
++  {
++    std::ostringstream os;
++    auto res = std::format_to_n(std::ostreambuf_iterator<char>(os),
++				8, "{}{}", "AAAA", "BBBB");
++    VERIFY( res.size == 8 );
++    VERIFY( os.view() == "AAAABBBB" );
++  }
++
++  {
++    std::string big(257, 'A');
++    std::ostringstream os;
++    auto res = std::format_to_n(std::ostreambuf_iterator<char>(os),
++                                257, "{}", big);
++    VERIFY( res.size == 257 );
++    std::string_view sv = os.view();
++    VERIFY( os.view() == big );
++  }
++
++  {
++    std::string big(300, 'A');
++    std::ostringstream os;
++    auto res = std::format_to_n(std::ostreambuf_iterator<char>(os),
++                                257, "{}", big);
++    VERIFY( res.size == 300 );
++    VERIFY( check_suffix(os.view(), 257, 'A') );
++  }
++}
++
++void
++test_format_to_n_padding()
++{
++  {
++    std::ostringstream os;
++    auto res = std::format_to_n(std::ostreambuf_iterator<char>(os),
++				3, "{:>10}", "hello");
++    VERIFY( res.size == 10 );
++    VERIFY( os.view().size() == 3 );
++  }
++
++  {
++    std::ostringstream os;
++    auto res = std::format_to_n(std::ostreambuf_iterator<char>(os),
++				3, "{:.5}", std::string(100, 'z'));
++    VERIFY( res.size == 5 );
++    VERIFY( check_suffix(os.view(), 3, 'z') );
++  }
++}
++
++void
++test_format_to_n_prefilled()
++{
++  // Pre-filled ostringstream: after seekp(0) the streambuf has a put
++  // area pointing into existing data.  This exercises the
++  // _M_use_put_area code path combined with format_to_n truncation.
++  {
++    std::string init(100, 'Z');
++    std::ostringstream os(init);
++    os.seekp(0);
++    auto res = std::format_to_n(std::ostreambuf_iterator<char>(os),
++				5, "{}", "1234567890");
++    VERIFY( res.size == 10 );
++    VERIFY( os.view().substr(0, 10) == "12345ZZZZZ" );
++    VERIFY( check_suffix(os.view(), 90, 'Z') );
++  }
++  {
++    std::string init(100, 'Z');
++    std::ostringstream os(init);
++    os.seekp(0);
++    auto res = std::format_to_n(std::ostreambuf_iterator<char>(os),
++				8, "{:=>15}", "1234567890");
++    VERIFY( res.size == 15 );
++    VERIFY( os.view().substr(0, 10) == "=====123ZZ" );
++    VERIFY( check_suffix(os.view(), 90, 'Z') );
++  }
++  {
++    std::string init(100, 'Z');
++    std::ostringstream os(init);
++    os.seekp(0);
++    auto res = std::format_to_n(std::ostreambuf_iterator<char>(os),
++				3, "{}", 12345);
++    VERIFY( res.size == 5 );
++    VERIFY( os.view().substr(0, 10) == "123ZZZZZZZ" );
++    VERIFY( check_suffix(os.view(), 90, 'Z') );
++  }
++  {
++    std::string init(100, 'Z');
++    std::ostringstream os(init);
++    os.seekp(0);
++    auto res = std::format_to_n(std::ostreambuf_iterator<char>(os),
++				7, "{:=>10}", 12345);
++    VERIFY( res.size == 10 );
++    VERIFY( os.view().substr(0, 10) == "=====12ZZZ" );
++    VERIFY( check_suffix(os.view(), 90, 'Z') );
++  }
++}
++
++void
++test_format_to_sentinel()
++{
++  // Test cases writting of default constructed (sentinel)
++  // ostream_iterator. No characters can be written.
++  const std::ostreambuf_iterator<char> sent;
++  {
++    auto res = std::format_to(sent, "");
++    VERIFY( res.failed() );
++  }
++  {
++    auto res = std::format_to(sent, "{}", "");
++    VERIFY( res.failed() );
++  }
++  {
++    auto res = std::format_to_n(sent, 0, "");
++    VERIFY( res.out.failed() );
++    VERIFY( res.size == 0 );
++  }
++  {
++    auto res = std::format_to_n(sent, 0, "{}", "");
++    VERIFY( res.out.failed() );
++    VERIFY( res.size == 0 );
++  }
++  {
++    auto res = std::format_to_n(sent, 0, "{}", "abc");
++    VERIFY( res.out.failed() );
++    VERIFY( res.size == 3 );
++  }
++  {
++    auto res = std::format_to_n(sent, 0, "{}", "10");
++    VERIFY( res.out.failed() );
++    VERIFY( res.size == 2 );
++  }
++}
++
++void
++test_write_failure()
++{
++  const std::string payload(20, 'Z');
++
++  {
++    ShortWriteStreambuf<20> buf;
++    auto it = std::ostreambuf_iterator<char>(&buf);
++    auto res = std::format_to(it, "{}", payload);
++    VERIFY( !res.failed() );
++    VERIFY( check_suffix(buf.data, 20, 'Z') );
++  }
++
++  {
++    ShortWriteStreambuf<19> buf;
++    auto it = std::ostreambuf_iterator<char>(&buf);
++    auto res = std::format_to(it, "{}", payload);
++    VERIFY( res.failed() );
++    VERIFY( check_suffix(buf.data, 19, 'Z') );
++  }
++
++  {
++    ShortWriteStreambuf<10> buf;
++    auto it = std::ostreambuf_iterator<char>(&buf);
++    auto res = std::format_to_n(it, 10, "{}", payload);
++    VERIFY( !res.out.failed() );
++    VERIFY( res.size == 20 );
++    VERIFY( check_suffix(buf.data, 10, 'Z') );
++  }
++
++  {
++    ShortWriteStreambuf<10> buf;
++    auto it = std::ostreambuf_iterator<char>(&buf);
++    auto res = std::format_to_n(it, 11, "{}", payload);
++    VERIFY( res.out.failed() );
++    VERIFY( res.size == 20 );
++    VERIFY( check_suffix(buf.data, 10, 'Z') );
++  }
++
++  {
++    ShortWriteStreambuf<100> buf;
++    auto it = std::ostreambuf_iterator<char>(&buf);
++    auto res = std::format_to(it, "{}", std::string(300, 'Y'));
++    VERIFY( res.failed() );
++    VERIFY( buf.data.size() == 100 );
++    VERIFY( check_suffix(buf.data, 100, 'Y') );
++  }
++  // format_to_n after write failure: size must still be the total
++  // number of characters that would have been produced.
++  {
++    ShortWriteStreambuf<50> buf;
++    auto it = std::ostreambuf_iterator<char>(&buf);
++    auto res = std::format_to_n(it, 100,
++				"{}{}{}",
++				std::string(20, 'A'),
++				std::string(30, 'B'),
++				std::string(40, 'C'));
++    // The first two arguments fill the buffer (20 + 30 == 50).
++    // The third argument (40 C's) triggers write failure and the
++    // remaining chars must still be counted in res.size.
++    VERIFY( res.out.failed() );
++    VERIFY( res.size == 90 );
++
++    std::string_view sv = buf.data;
++    VERIFY( buf.data.size() == 50 );
++    VERIFY( check_suffix(sv, 30, 'B') );
++    sv.remove_suffix(30);
++    VERIFY( check_suffix(sv, 20, 'A') );
++  }
++}
++
++int main()
++{
++  test_format_to();
++  test_format_to_n();
++  test_format_to_n_padding();
++  test_format_to_n_prefilled();
++  test_format_to_sentinel();
++  test_write_failure();
++}

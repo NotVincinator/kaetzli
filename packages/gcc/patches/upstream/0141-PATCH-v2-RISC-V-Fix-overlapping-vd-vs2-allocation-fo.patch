@@ -1,0 +1,262 @@
+From c457a158598614cc05abc46ce154c370b15628ef Mon Sep 17 00:00:00 2001
+From: Jin Ma <jinma@linux.alibaba.com>
+Date: Sat, 5 Sep 2026 10:07:33 -0600
+Subject: [PATCH 141/385] [PATCH v2] RISC-V: Fix overlapping vd/vs2 allocation
+ for vector crypto [PR126196]
+
+The RISC-V Vector Crypto specification reserves encodings where the
+vd register group overlaps vs2 for vsm3me.vv, vsm3c.vi, vaes*.vs and
+vsm4r.vs.  It also reserves encodings where vd overlaps either vs1 or
+vs2 for vsha2ms.vv, vsha2ch.vv and vsha2cl.vv.
+
+Use early-clobber destination constraints for the affected patterns.
+Select those constraints by UNSPEC where patterns are shared, keeping
+legal overlap for vghsh.vv, vaeskf2.vi, vgmul.vv and the .vv forms of
+AES and SM4.
+
+	PR target/126196
+
+gcc/ChangeLog:
+
+	* config/riscv/vector-crypto.md (vv_ins_con): New int attribute.
+	(vv_ins1_con): Likewise.
+	(vi_ins1_con): Likewise.
+	(@pred_v<vv_ins1_name><mode>): Use vv_ins1_con.
+	(@pred_crypto_vv<vv_ins_name><ins_type><mode>): Use vv_ins_con.
+	(@pred_vi<vi_ins1_name><mode>_nomaskedoff_scalar): Use vi_ins1_con.
+	(@pred_vsm3me<mode>): Mark the destination as early-clobber.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/pr126196-1.c: New test.
+	* gcc.target/riscv/pr126196-2.c: New test.
+	* gcc.target/riscv/pr126196-3.c: New test.
+	* gcc.target/riscv/pr126196-4.c: New test.
+
+(cherry picked from commit 7e88b4e76418b131268802ccba5f74cf1835fc66)
+---
+ gcc/config/riscv/vector-crypto.md           | 27 ++++++++++++--
+ gcc/testsuite/gcc.target/riscv/pr126196-1.c | 29 +++++++++++++++
+ gcc/testsuite/gcc.target/riscv/pr126196-2.c | 21 +++++++++++
+ gcc/testsuite/gcc.target/riscv/pr126196-3.c | 26 +++++++++++++
+ gcc/testsuite/gcc.target/riscv/pr126196-4.c | 41 +++++++++++++++++++++
+ 5 files changed, 140 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/pr126196-1.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/pr126196-2.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/pr126196-3.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/pr126196-4.c
+
+diff --git a/gcc/config/riscv/vector-crypto.md b/gcc/config/riscv/vector-crypto.md
+index f62d016bb03c..671b7814b294 100644
+--- a/gcc/config/riscv/vector-crypto.md
++++ b/gcc/config/riscv/vector-crypto.md
+@@ -65,13 +65,32 @@
+                               (UNSPEC_VAESDMVS "aesdm") (UNSPEC_VAESZVS  "aesz" )
+                               (UNSPEC_VSM4RVV  "sm4r" ) (UNSPEC_VSM4RVS  "sm4r" )])
+ 
++;; vd overlapping vs2 is reserved for vaes*.vs and vsm4r.vs, but not
++;; for the .vv instructions.
++(define_int_attr vv_ins_con
++  [(UNSPEC_VGMUL "=vr") (UNSPEC_VAESEFVV "=vr")
++   (UNSPEC_VAESEMVV "=vr") (UNSPEC_VAESDFVV "=vr")
++   (UNSPEC_VAESDMVV "=vr") (UNSPEC_VAESEFVS "=&vr")
++   (UNSPEC_VAESEMVS "=&vr") (UNSPEC_VAESDFVS "=&vr")
++   (UNSPEC_VAESDMVS "=&vr") (UNSPEC_VAESZVS "=&vr")
++   (UNSPEC_VSM4RVV "=vr") (UNSPEC_VSM4RVS "=&vr")])
++
+ (define_int_attr vv_ins1_name [(UNSPEC_VGHSH "ghsh")     (UNSPEC_VSHA2MS "sha2ms")
+                                (UNSPEC_VSHA2CH "sha2ch") (UNSPEC_VSHA2CL "sha2cl")])
+ 
++;; vd overlapping vs1 or vs2 is reserved for vsha2*, but not for vghsh.
++(define_int_attr vv_ins1_con
++  [(UNSPEC_VGHSH "=vr") (UNSPEC_VSHA2MS "=&vr")
++   (UNSPEC_VSHA2CH "=&vr") (UNSPEC_VSHA2CL "=&vr")])
++
+ (define_int_attr vi_ins_name [(UNSPEC_VAESKF1 "aeskf1") (UNSPEC_VSM4K "sm4k")])
+ 
+ (define_int_attr vi_ins1_name [(UNSPEC_VAESKF2 "aeskf2") (UNSPEC_VSM3C "sm3c")])
+ 
++;; vd overlapping vs2 is reserved for vsm3c, but not for vaeskf2.
++(define_int_attr vi_ins1_con
++  [(UNSPEC_VAESKF2 "=vr") (UNSPEC_VSM3C "=&vr")])
++
+ (define_int_attr ins_type [(UNSPEC_VGMUL    "vv") (UNSPEC_VAESEFVV "vv")
+                            (UNSPEC_VAESEMVV "vv") (UNSPEC_VAESDFVV "vv")
+                            (UNSPEC_VAESDMVV "vv") (UNSPEC_VAESEFVS "vs")
+@@ -464,7 +483,7 @@
+ ;; zvknh[ab] and zvkg instructions patterns.
+ ;; vsha2ms.vv vsha2ch.vv vsha2cl.vv vghsh.vv
+ (define_insn "@pred_v<vv_ins1_name><mode>"
+-  [(set (match_operand:VQEXTI 0 "register_operand"     "=vr")
++  [(set (match_operand:VQEXTI 0 "register_operand"     "<vv_ins1_con>")
+      (if_then_else:VQEXTI
+        (unspec:<VM>
+          [(match_operand 4 "vector_length_operand"     "rK")
+@@ -487,7 +506,7 @@
+ ;; vaesef.[vv,vs] vaesem.[vv,vs] vaesdf.[vv,vs] vaesdm.[vv,vs]
+ ;; vsm4r.[vv,vs]
+ (define_insn "@pred_crypto_vv<vv_ins_name><ins_type><mode>"
+-  [(set (match_operand:V_VLSI_S 0 "register_operand"    "=vr")
++  [(set (match_operand:V_VLSI_S 0 "register_operand"    "<vv_ins_con>")
+      (if_then_else:V_VLSI_S
+        (unspec:<VM>
+          [(match_operand 3 "vector_length_operand" " rK")
+@@ -615,7 +634,7 @@
+ 
+ ;; vaeskf2.vi vsm3c.vi
+ (define_insn "@pred_vi<vi_ins1_name><mode>_nomaskedoff_scalar"
+-  [(set (match_operand:V_VLSI_S 0 "register_operand"       "=vr")
++  [(set (match_operand:V_VLSI_S 0 "register_operand"       "<vi_ins1_con>")
+      (if_then_else:V_VLSI_S
+        (unspec:<VM>
+          [(match_operand 4 "vector_length_operand"    "rK")
+@@ -636,7 +655,7 @@
+ ;; zvksh instructions patterns.
+ ;; vsm3me.vv
+ (define_insn "@pred_vsm3me<mode>"
+-  [(set (match_operand:V_VLSI_S 0 "register_operand"    "=vr, vr")
++  [(set (match_operand:V_VLSI_S 0 "register_operand"    "=&vr, &vr")
+      (if_then_else:V_VLSI_S
+        (unspec:<VM>
+          [(match_operand 4 "vector_length_operand" " rK, rK")
+diff --git a/gcc/testsuite/gcc.target/riscv/pr126196-1.c b/gcc/testsuite/gcc.target/riscv/pr126196-1.c
+new file mode 100644
+index 000000000000..f94a3f3b38df
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/pr126196-1.c
+@@ -0,0 +1,29 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gcv_zvksh -mabi=lp64d -O2" { target { rv64 } } } */
++/* { dg-options "-march=rv32gcv_zvksh -mabi=ilp32d -O2" { target { rv32 } } } */
++/* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Oz" "-Og" } } */
++
++#include <riscv_vector.h>
++
++vuint32m1_t
++f (vuint32m1_t vs2, vuint32m1_t vs1, size_t vl)
++{
++  return __riscv_vsm3me_vv_u32m1 (vs2,
++				  __riscv_vsm3me_vv_u32m1 (vs2, vs1, vl),
++				  vl);
++}
++
++vuint32m1_t
++g (vuint32m1_t a, vuint32m1_t b, vuint32m1_t c, vuint32m1_t d,
++   vuint32m1_t e, vuint32m1_t h, vuint32m1_t i, vuint32m1_t j,
++   size_t vl)
++{
++  vuint32m1_t r1 = __riscv_vsm3me_vv_u32m1 (a, b, vl);
++  vuint32m1_t r2 = __riscv_vsm3me_vv_u32m1 (c, d, vl);
++  vuint32m1_t r3 = __riscv_vsm3me_vv_u32m1 (e, h, vl);
++  vuint32m1_t r4 = __riscv_vsm3me_vv_u32m1 (i, j, vl);
++  return __riscv_vxor_vv_u32m1 (__riscv_vxor_vv_u32m1 (r1, r2, vl),
++				 __riscv_vxor_vv_u32m1 (r3, r4, vl), vl);
++}
++
++/* { dg-final { scan-assembler-not {vsm3me\.vv\tv([0-9]+),v\1,} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/pr126196-2.c b/gcc/testsuite/gcc.target/riscv/pr126196-2.c
+new file mode 100644
+index 000000000000..e85b7e362a4d
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/pr126196-2.c
+@@ -0,0 +1,21 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gcv_zvkned_zvksh -mabi=lp64d -O2" { target { rv64 } } } */
++/* { dg-options "-march=rv32gcv_zvkned_zvksh -mabi=ilp32d -O2" { target { rv32 } } } */
++/* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Oz" "-Og" } } */
++
++#include <riscv_vector.h>
++
++vuint32m1_t
++f (vuint32m1_t a, size_t vl)
++{
++  return __riscv_vsm3c_vi_u32m1 (a, a, 2, vl);
++}
++
++vuint32m1_t
++g (vuint32m1_t a, size_t vl)
++{
++  return __riscv_vaeskf2_vi_u32m1 (a, a, 3, vl);
++}
++
++/* { dg-final { scan-assembler-not {vsm3c\.vi\tv([0-9]+),v\1,} } } */
++/* { dg-final { scan-assembler {vaeskf2\.vi\tv([0-9]+),v\1,} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/pr126196-3.c b/gcc/testsuite/gcc.target/riscv/pr126196-3.c
+new file mode 100644
+index 000000000000..ffa1553d48b6
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/pr126196-3.c
+@@ -0,0 +1,26 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gcv_zvknhb_zvkg -mabi=lp64d -O2" { target { rv64 } } } */
++/* { dg-options "-march=rv32gcv_zvknhb_zvkg -mabi=ilp32d -O2" { target { rv32 } } } */
++/* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Oz" "-Og" } } */
++
++#include <riscv_vector.h>
++
++vuint32m1_t
++f (vuint32m1_t a, vuint32m1_t b, size_t vl)
++{
++  vuint32m1_t r = __riscv_vsha2ms_vv_u32m1 (a, a, b, vl);
++  r = __riscv_vsha2ms_vv_u32m1 (r, b, r, vl);
++  r = __riscv_vsha2ch_vv_u32m1 (r, r, b, vl);
++  r = __riscv_vsha2ch_vv_u32m1 (r, b, r, vl);
++  r = __riscv_vsha2cl_vv_u32m1 (r, r, b, vl);
++  r = __riscv_vsha2cl_vv_u32m1 (r, b, r, vl);
++  return __riscv_vghsh_vv_u32m1 (r, r, b, vl);
++}
++
++/* { dg-final { scan-assembler-not {vsha2ms\.vv\tv([0-9]+),v\1,} } } */
++/* { dg-final { scan-assembler-not {vsha2ms\.vv\tv([0-9]+),v[0-9]+,v\1\s} } } */
++/* { dg-final { scan-assembler-not {vsha2ch\.vv\tv([0-9]+),v\1,} } } */
++/* { dg-final { scan-assembler-not {vsha2ch\.vv\tv([0-9]+),v[0-9]+,v\1\s} } } */
++/* { dg-final { scan-assembler-not {vsha2cl\.vv\tv([0-9]+),v\1,} } } */
++/* { dg-final { scan-assembler-not {vsha2cl\.vv\tv([0-9]+),v[0-9]+,v\1\s} } } */
++/* { dg-final { scan-assembler {vghsh\.vv\tv([0-9]+),v\1,} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/pr126196-4.c b/gcc/testsuite/gcc.target/riscv/pr126196-4.c
+new file mode 100644
+index 000000000000..197b78ead043
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/pr126196-4.c
+@@ -0,0 +1,41 @@
++/* { dg-do compile } */
++/* { dg-options "-march=rv64gcv_zvkg_zvkned_zvksed -mabi=lp64d -O2" { target { rv64 } } } */
++/* { dg-options "-march=rv32gcv_zvkg_zvkned_zvksed -mabi=ilp32d -O2" { target { rv32 } } } */
++/* { dg-skip-if "" { *-*-* } { "-O0" "-O1" "-Os" "-Oz" "-Og" } } */
++
++#include <riscv_vector.h>
++
++vuint32m1_t
++f (vuint32m1_t a, size_t vl)
++{
++  vuint32m1_t r = __riscv_vaesdf_vs_u32m1_u32m1 (a, a, vl);
++  r = __riscv_vaesdm_vs_u32m1_u32m1 (r, r, vl);
++  r = __riscv_vaesef_vs_u32m1_u32m1 (r, r, vl);
++  r = __riscv_vaesem_vs_u32m1_u32m1 (r, r, vl);
++  r = __riscv_vaesz_vs_u32m1_u32m1 (r, r, vl);
++  return __riscv_vsm4r_vs_u32m1_u32m1 (r, r, vl);
++}
++
++vuint32m1_t
++g (vuint32m1_t a, size_t vl)
++{
++  vuint32m1_t r = __riscv_vaesdf_vv_u32m1 (a, a, vl);
++  r = __riscv_vaesdm_vv_u32m1 (r, r, vl);
++  r = __riscv_vaesef_vv_u32m1 (r, r, vl);
++  r = __riscv_vaesem_vv_u32m1 (r, r, vl);
++  r = __riscv_vsm4r_vv_u32m1 (r, r, vl);
++  return __riscv_vgmul_vv_u32m1 (r, r, vl);
++}
++
++/* { dg-final { scan-assembler-not {vaesdf\.vs\tv([0-9]+),v\1\s} } } */
++/* { dg-final { scan-assembler-not {vaesdm\.vs\tv([0-9]+),v\1\s} } } */
++/* { dg-final { scan-assembler-not {vaesef\.vs\tv([0-9]+),v\1\s} } } */
++/* { dg-final { scan-assembler-not {vaesem\.vs\tv([0-9]+),v\1\s} } } */
++/* { dg-final { scan-assembler-not {vaesz\.vs\tv([0-9]+),v\1\s} } } */
++/* { dg-final { scan-assembler-not {vsm4r\.vs\tv([0-9]+),v\1\s} } } */
++/* { dg-final { scan-assembler {vaesdf\.vv\tv([0-9]+),v\1\s} } } */
++/* { dg-final { scan-assembler {vaesdm\.vv\tv([0-9]+),v\1\s} } } */
++/* { dg-final { scan-assembler {vaesef\.vv\tv([0-9]+),v\1\s} } } */
++/* { dg-final { scan-assembler {vaesem\.vv\tv([0-9]+),v\1\s} } } */
++/* { dg-final { scan-assembler {vsm4r\.vv\tv([0-9]+),v\1\s} } } */
++/* { dg-final { scan-assembler {vgmul\.vv\tv([0-9]+),v\1\s} } } */

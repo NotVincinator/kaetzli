@@ -1,0 +1,1949 @@
+From 355549a594cae4280838653827b8026ba23fa3c8 Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Tue, 13 Oct 2026 20:46:28 +0200
+Subject: [PATCH 299/385] fortran: Fix MINLOC/MAXLOC with MASK and BACK=.true.
+ [PR127846]
+
+The runtime library templates for MINLOC/MAXLOC did not advance properly
+through the array argument when MASK was present and BACK was .true. .
+
+Co-authored-by: Federico Perini <federico.perini@gmail.com>
+
+	PR fortran/127846
+
+libgfortran/ChangeLog:
+
+	* generated/maxloc0_16_i1.c (mmaxloc0_16_i1): Regenerate.
+	* generated/maxloc0_16_i16.c (mmaxloc0_16_i16): Likewise.
+	* generated/maxloc0_16_i2.c (mmaxloc0_16_i2): Likewise.
+	* generated/maxloc0_16_i4.c (mmaxloc0_16_i4): Likewise.
+	* generated/maxloc0_16_i8.c (mmaxloc0_16_i8): Likewise.
+	* generated/maxloc0_16_m1.c (mmaxloc0_16_m1): Likewise.
+	* generated/maxloc0_16_m16.c (mmaxloc0_16_m16): Likewise.
+	* generated/maxloc0_16_m2.c (mmaxloc0_16_m2): Likewise.
+	* generated/maxloc0_16_m4.c (mmaxloc0_16_m4): Likewise.
+	* generated/maxloc0_16_m8.c (mmaxloc0_16_m8): Likewise.
+	* generated/maxloc0_16_r10.c (mmaxloc0_16_r10): Likewise.
+	* generated/maxloc0_16_r16.c (mmaxloc0_16_r16): Likewise.
+	* generated/maxloc0_16_r17.c (mmaxloc0_16_r17): Likewise.
+	* generated/maxloc0_16_r4.c (mmaxloc0_16_r4): Likewise.
+	* generated/maxloc0_16_r8.c (mmaxloc0_16_r8): Likewise.
+	* generated/maxloc0_4_i1.c (mmaxloc0_4_i1): Likewise.
+	* generated/maxloc0_4_i16.c (mmaxloc0_4_i16): Likewise.
+	* generated/maxloc0_4_i2.c (mmaxloc0_4_i2): Likewise.
+	* generated/maxloc0_4_i4.c (mmaxloc0_4_i4): Likewise.
+	* generated/maxloc0_4_i8.c (mmaxloc0_4_i8): Likewise.
+	* generated/maxloc0_4_m1.c (mmaxloc0_4_m1): Likewise.
+	* generated/maxloc0_4_m16.c (mmaxloc0_4_m16): Likewise.
+	* generated/maxloc0_4_m2.c (mmaxloc0_4_m2): Likewise.
+	* generated/maxloc0_4_m4.c (mmaxloc0_4_m4): Likewise.
+	* generated/maxloc0_4_m8.c (mmaxloc0_4_m8): Likewise.
+	* generated/maxloc0_4_r10.c (mmaxloc0_4_r10): Likewise.
+	* generated/maxloc0_4_r16.c (mmaxloc0_4_r16): Likewise.
+	* generated/maxloc0_4_r17.c (mmaxloc0_4_r17): Likewise.
+	* generated/maxloc0_4_r4.c (mmaxloc0_4_r4): Likewise.
+	* generated/maxloc0_4_r8.c (mmaxloc0_4_r8): Likewise.
+	* generated/maxloc0_8_i1.c (mmaxloc0_8_i1): Likewise.
+	* generated/maxloc0_8_i16.c (mmaxloc0_8_i16): Likewise.
+	* generated/maxloc0_8_i2.c (mmaxloc0_8_i2): Likewise.
+	* generated/maxloc0_8_i4.c (mmaxloc0_8_i4): Likewise.
+	* generated/maxloc0_8_i8.c (mmaxloc0_8_i8): Likewise.
+	* generated/maxloc0_8_m1.c (mmaxloc0_8_m1): Likewise.
+	* generated/maxloc0_8_m16.c (mmaxloc0_8_m16): Likewise.
+	* generated/maxloc0_8_m2.c (mmaxloc0_8_m2): Likewise.
+	* generated/maxloc0_8_m4.c (mmaxloc0_8_m4): Likewise.
+	* generated/maxloc0_8_m8.c (mmaxloc0_8_m8): Likewise.
+	* generated/maxloc0_8_r10.c (mmaxloc0_8_r10): Likewise.
+	* generated/maxloc0_8_r16.c (mmaxloc0_8_r16): Likewise.
+	* generated/maxloc0_8_r17.c (mmaxloc0_8_r17): Likewise.
+	* generated/maxloc0_8_r4.c (mmaxloc0_8_r4): Likewise.
+	* generated/maxloc0_8_r8.c (mmaxloc0_8_r8): Likewise.
+	* generated/minloc0_16_i1.c (mminloc0_16_i1): Likewise.
+	* generated/minloc0_16_i16.c (mminloc0_16_i16): Likewise.
+	* generated/minloc0_16_i2.c (mminloc0_16_i2): Likewise.
+	* generated/minloc0_16_i4.c (mminloc0_16_i4): Likewise.
+	* generated/minloc0_16_i8.c (mminloc0_16_i8): Likewise.
+	* generated/minloc0_16_m1.c (mminloc0_16_m1): Likewise.
+	* generated/minloc0_16_m16.c (mminloc0_16_m16): Likewise.
+	* generated/minloc0_16_m2.c (mminloc0_16_m2): Likewise.
+	* generated/minloc0_16_m4.c (mminloc0_16_m4): Likewise.
+	* generated/minloc0_16_m8.c (mminloc0_16_m8): Likewise.
+	* generated/minloc0_16_r10.c (mminloc0_16_r10): Likewise.
+	* generated/minloc0_16_r16.c (mminloc0_16_r16): Likewise.
+	* generated/minloc0_16_r17.c (mminloc0_16_r17): Likewise.
+	* generated/minloc0_16_r4.c (mminloc0_16_r4): Likewise.
+	* generated/minloc0_16_r8.c (mminloc0_16_r8): Likewise.
+	* generated/minloc0_4_i1.c (mminloc0_4_i1): Likewise.
+	* generated/minloc0_4_i16.c (mminloc0_4_i16): Likewise.
+	* generated/minloc0_4_i2.c (mminloc0_4_i2): Likewise.
+	* generated/minloc0_4_i4.c (mminloc0_4_i4): Likewise.
+	* generated/minloc0_4_i8.c (mminloc0_4_i8): Likewise.
+	* generated/minloc0_4_m1.c (mminloc0_4_m1): Likewise.
+	* generated/minloc0_4_m16.c (mminloc0_4_m16): Likewise.
+	* generated/minloc0_4_m2.c (mminloc0_4_m2): Likewise.
+	* generated/minloc0_4_m4.c (mminloc0_4_m4): Likewise.
+	* generated/minloc0_4_m8.c (mminloc0_4_m8): Likewise.
+	* generated/minloc0_4_r10.c (mminloc0_4_r10): Likewise.
+	* generated/minloc0_4_r16.c (mminloc0_4_r16): Likewise.
+	* generated/minloc0_4_r17.c (mminloc0_4_r17): Likewise.
+	* generated/minloc0_4_r4.c (mminloc0_4_r4): Likewise.
+	* generated/minloc0_4_r8.c (mminloc0_4_r8): Likewise.
+	* generated/minloc0_8_i1.c (mminloc0_8_i1): Likewise.
+	* generated/minloc0_8_i16.c (mminloc0_8_i16): Likewise.
+	* generated/minloc0_8_i2.c (mminloc0_8_i2): Likewise.
+	* generated/minloc0_8_i4.c (mminloc0_8_i4): Likewise.
+	* generated/minloc0_8_i8.c (mminloc0_8_i8): Likewise.
+	* generated/minloc0_8_m1.c (mminloc0_8_m1): Likewise.
+	* generated/minloc0_8_m16.c (mminloc0_8_m16): Likewise.
+	* generated/minloc0_8_m2.c (mminloc0_8_m2): Likewise.
+	* generated/minloc0_8_m4.c (mminloc0_8_m4): Likewise.
+	* generated/minloc0_8_m8.c (mminloc0_8_m8): Likewise.
+	* generated/minloc0_8_r10.c (mminloc0_8_r10): Likewise.
+	* generated/minloc0_8_r16.c (mminloc0_8_r16): Likewise.
+	* generated/minloc0_8_r17.c (mminloc0_8_r17): Likewise.
+	* generated/minloc0_8_r4.c (mminloc0_8_r4): Likewise.
+	* generated/minloc0_8_r8.c (mminloc0_8_r8): Likewise.
+	* m4/maxloc0.m4: Fix looping through array argument when BACK=.true.
+	* m4/minloc0.m4: Likewise.
+
+gcc/testsuite/ChangeLog:
+
+	* gfortran.dg/minmaxloc_mask_back.f90: New test.
+
+(cherry picked from commit 9d3a1bc203a79ff547c92ad0fc0773bf328aeeb5)
+---
+ .../gfortran.dg/minmaxloc_mask_back.f90       | 32 +++++++++++++++++++
+ libgfortran/generated/maxloc0_16_i1.c         |  2 +-
+ libgfortran/generated/maxloc0_16_i16.c        |  2 +-
+ libgfortran/generated/maxloc0_16_i2.c         |  2 +-
+ libgfortran/generated/maxloc0_16_i4.c         |  2 +-
+ libgfortran/generated/maxloc0_16_i8.c         |  2 +-
+ libgfortran/generated/maxloc0_16_m1.c         |  2 +-
+ libgfortran/generated/maxloc0_16_m16.c        |  2 +-
+ libgfortran/generated/maxloc0_16_m2.c         |  2 +-
+ libgfortran/generated/maxloc0_16_m4.c         |  2 +-
+ libgfortran/generated/maxloc0_16_m8.c         |  2 +-
+ libgfortran/generated/maxloc0_16_r10.c        |  2 +-
+ libgfortran/generated/maxloc0_16_r16.c        |  2 +-
+ libgfortran/generated/maxloc0_16_r17.c        |  2 +-
+ libgfortran/generated/maxloc0_16_r4.c         |  2 +-
+ libgfortran/generated/maxloc0_16_r8.c         |  2 +-
+ libgfortran/generated/maxloc0_4_i1.c          |  2 +-
+ libgfortran/generated/maxloc0_4_i16.c         |  2 +-
+ libgfortran/generated/maxloc0_4_i2.c          |  2 +-
+ libgfortran/generated/maxloc0_4_i4.c          |  2 +-
+ libgfortran/generated/maxloc0_4_i8.c          |  2 +-
+ libgfortran/generated/maxloc0_4_m1.c          |  2 +-
+ libgfortran/generated/maxloc0_4_m16.c         |  2 +-
+ libgfortran/generated/maxloc0_4_m2.c          |  2 +-
+ libgfortran/generated/maxloc0_4_m4.c          |  2 +-
+ libgfortran/generated/maxloc0_4_m8.c          |  2 +-
+ libgfortran/generated/maxloc0_4_r10.c         |  2 +-
+ libgfortran/generated/maxloc0_4_r16.c         |  2 +-
+ libgfortran/generated/maxloc0_4_r17.c         |  2 +-
+ libgfortran/generated/maxloc0_4_r4.c          |  2 +-
+ libgfortran/generated/maxloc0_4_r8.c          |  2 +-
+ libgfortran/generated/maxloc0_8_i1.c          |  2 +-
+ libgfortran/generated/maxloc0_8_i16.c         |  2 +-
+ libgfortran/generated/maxloc0_8_i2.c          |  2 +-
+ libgfortran/generated/maxloc0_8_i4.c          |  2 +-
+ libgfortran/generated/maxloc0_8_i8.c          |  2 +-
+ libgfortran/generated/maxloc0_8_m1.c          |  2 +-
+ libgfortran/generated/maxloc0_8_m16.c         |  2 +-
+ libgfortran/generated/maxloc0_8_m2.c          |  2 +-
+ libgfortran/generated/maxloc0_8_m4.c          |  2 +-
+ libgfortran/generated/maxloc0_8_m8.c          |  2 +-
+ libgfortran/generated/maxloc0_8_r10.c         |  2 +-
+ libgfortran/generated/maxloc0_8_r16.c         |  2 +-
+ libgfortran/generated/maxloc0_8_r17.c         |  2 +-
+ libgfortran/generated/maxloc0_8_r4.c          |  2 +-
+ libgfortran/generated/maxloc0_8_r8.c          |  2 +-
+ libgfortran/generated/minloc0_16_i1.c         |  5 +--
+ libgfortran/generated/minloc0_16_i16.c        |  5 +--
+ libgfortran/generated/minloc0_16_i2.c         |  5 +--
+ libgfortran/generated/minloc0_16_i4.c         |  5 +--
+ libgfortran/generated/minloc0_16_i8.c         |  5 +--
+ libgfortran/generated/minloc0_16_m1.c         |  5 +--
+ libgfortran/generated/minloc0_16_m16.c        |  5 +--
+ libgfortran/generated/minloc0_16_m2.c         |  5 +--
+ libgfortran/generated/minloc0_16_m4.c         |  5 +--
+ libgfortran/generated/minloc0_16_m8.c         |  5 +--
+ libgfortran/generated/minloc0_16_r10.c        |  5 +--
+ libgfortran/generated/minloc0_16_r16.c        |  5 +--
+ libgfortran/generated/minloc0_16_r17.c        |  5 +--
+ libgfortran/generated/minloc0_16_r4.c         |  5 +--
+ libgfortran/generated/minloc0_16_r8.c         |  5 +--
+ libgfortran/generated/minloc0_4_i1.c          |  5 +--
+ libgfortran/generated/minloc0_4_i16.c         |  5 +--
+ libgfortran/generated/minloc0_4_i2.c          |  5 +--
+ libgfortran/generated/minloc0_4_i4.c          |  5 +--
+ libgfortran/generated/minloc0_4_i8.c          |  5 +--
+ libgfortran/generated/minloc0_4_m1.c          |  5 +--
+ libgfortran/generated/minloc0_4_m16.c         |  5 +--
+ libgfortran/generated/minloc0_4_m2.c          |  5 +--
+ libgfortran/generated/minloc0_4_m4.c          |  5 +--
+ libgfortran/generated/minloc0_4_m8.c          |  5 +--
+ libgfortran/generated/minloc0_4_r10.c         |  5 +--
+ libgfortran/generated/minloc0_4_r16.c         |  5 +--
+ libgfortran/generated/minloc0_4_r17.c         |  5 +--
+ libgfortran/generated/minloc0_4_r4.c          |  5 +--
+ libgfortran/generated/minloc0_4_r8.c          |  5 +--
+ libgfortran/generated/minloc0_8_i1.c          |  5 +--
+ libgfortran/generated/minloc0_8_i16.c         |  5 +--
+ libgfortran/generated/minloc0_8_i2.c          |  5 +--
+ libgfortran/generated/minloc0_8_i4.c          |  5 +--
+ libgfortran/generated/minloc0_8_i8.c          |  5 +--
+ libgfortran/generated/minloc0_8_m1.c          |  5 +--
+ libgfortran/generated/minloc0_8_m16.c         |  5 +--
+ libgfortran/generated/minloc0_8_m2.c          |  5 +--
+ libgfortran/generated/minloc0_8_m4.c          |  5 +--
+ libgfortran/generated/minloc0_8_m8.c          |  5 +--
+ libgfortran/generated/minloc0_8_r10.c         |  5 +--
+ libgfortran/generated/minloc0_8_r16.c         |  5 +--
+ libgfortran/generated/minloc0_8_r17.c         |  5 +--
+ libgfortran/generated/minloc0_8_r4.c          |  5 +--
+ libgfortran/generated/minloc0_8_r8.c          |  5 +--
+ libgfortran/m4/maxloc0.m4                     |  2 +-
+ libgfortran/m4/minloc0.m4                     |  5 +--
+ 93 files changed, 216 insertions(+), 138 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/minmaxloc_mask_back.f90
+
+diff --git a/gcc/testsuite/gfortran.dg/minmaxloc_mask_back.f90 b/gcc/testsuite/gfortran.dg/minmaxloc_mask_back.f90
+new file mode 100644
+index 000000000000..5d02376ccc2e
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/minmaxloc_mask_back.f90
+@@ -0,0 +1,32 @@
++! { dg-do run }
++!
++! PR fortran/127846 - MINLOC/MAXLOC with MASK and BACK=.true.
++!
++! Contributed by Federico Perini.
++
++program minloc_mask_back
++  implicit none
++  real(8) :: y(3,4)
++  logical :: m(3,4)
++  integer :: i, j, l
++  l = 0
++  do j = 1, 4; do i = 1, 3
++     y(i,j) = real(mod(l*7,5)+1, 8); m(i,j) = mod(l,3) /= 1; l = l + 1
++  end do; end do
++  if (any (minloc(y, mask=m, back=.true.) /= [ 3, 2 ])) then
++     do i = 1, 3
++        print '(4f4.1,6x,4l2)', y(i,:), m(i,:)
++     end do
++     print '(a,2i3,a)', 'minloc(y, mask=m, back=.true.) =', &
++          minloc(y, mask=m, back=.true.), '   expected  3  2 (m(2,4) is F)'
++     stop 1
++  end if
++  if (any (maxloc(y, mask=m, back=.true.) /= [ 3, 1 ])) then
++     do i = 1, 3
++        print '(4f4.1,6x,4l2)', y(i,:), m(i,:)
++     end do
++     print '(a,2i3,a)', 'maxloc(y, mask=m, back=.true.) =', &
++          maxloc(y, mask=m, back=.true.), '   expected  3  1 (m(2,3) is F)'
++     stop 2
++  end if
++end program minloc_mask_back
+diff --git a/libgfortran/generated/maxloc0_16_i1.c b/libgfortran/generated/maxloc0_16_i1.c
+index ab54fa01d12c..da8d76765b09 100644
+--- a/libgfortran/generated/maxloc0_16_i1.c
++++ b/libgfortran/generated/maxloc0_16_i1.c
+@@ -315,6 +315,7 @@ mmaxloc0_16_i1 (gfc_array_i16 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_16_i1 (gfc_array_i16 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_16_i1 (gfc_array_i16 * const restrict, 
+ 	gfc_array_i1 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_16_i1);
+diff --git a/libgfortran/generated/maxloc0_16_i16.c b/libgfortran/generated/maxloc0_16_i16.c
+index 2b15b8d57e72..feafd0fd490d 100644
+--- a/libgfortran/generated/maxloc0_16_i16.c
++++ b/libgfortran/generated/maxloc0_16_i16.c
+@@ -315,6 +315,7 @@ mmaxloc0_16_i16 (gfc_array_i16 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_16_i16 (gfc_array_i16 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_16_i16 (gfc_array_i16 * const restrict, 
+ 	gfc_array_i16 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_16_i16);
+diff --git a/libgfortran/generated/maxloc0_16_i2.c b/libgfortran/generated/maxloc0_16_i2.c
+index e79cd86479c7..09556e1df866 100644
+--- a/libgfortran/generated/maxloc0_16_i2.c
++++ b/libgfortran/generated/maxloc0_16_i2.c
+@@ -315,6 +315,7 @@ mmaxloc0_16_i2 (gfc_array_i16 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_16_i2 (gfc_array_i16 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_16_i2 (gfc_array_i16 * const restrict, 
+ 	gfc_array_i2 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_16_i2);
+diff --git a/libgfortran/generated/maxloc0_16_i4.c b/libgfortran/generated/maxloc0_16_i4.c
+index dc7fe6593d02..48b920f09433 100644
+--- a/libgfortran/generated/maxloc0_16_i4.c
++++ b/libgfortran/generated/maxloc0_16_i4.c
+@@ -315,6 +315,7 @@ mmaxloc0_16_i4 (gfc_array_i16 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_16_i4 (gfc_array_i16 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_16_i4 (gfc_array_i16 * const restrict, 
+ 	gfc_array_i4 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_16_i4);
+diff --git a/libgfortran/generated/maxloc0_16_i8.c b/libgfortran/generated/maxloc0_16_i8.c
+index 49f43a5ca402..47840a47016c 100644
+--- a/libgfortran/generated/maxloc0_16_i8.c
++++ b/libgfortran/generated/maxloc0_16_i8.c
+@@ -315,6 +315,7 @@ mmaxloc0_16_i8 (gfc_array_i16 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_16_i8 (gfc_array_i16 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_16_i8 (gfc_array_i16 * const restrict, 
+ 	gfc_array_i8 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_16_i8);
+diff --git a/libgfortran/generated/maxloc0_16_m1.c b/libgfortran/generated/maxloc0_16_m1.c
+index 289f444928f8..b962cdabe92b 100644
+--- a/libgfortran/generated/maxloc0_16_m1.c
++++ b/libgfortran/generated/maxloc0_16_m1.c
+@@ -315,6 +315,7 @@ mmaxloc0_16_m1 (gfc_array_i16 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_16_m1 (gfc_array_i16 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_16_m1 (gfc_array_i16 * const restrict, 
+ 	gfc_array_m1 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_16_m1);
+diff --git a/libgfortran/generated/maxloc0_16_m16.c b/libgfortran/generated/maxloc0_16_m16.c
+index 37981ea641fc..be381c8a2bcc 100644
+--- a/libgfortran/generated/maxloc0_16_m16.c
++++ b/libgfortran/generated/maxloc0_16_m16.c
+@@ -315,6 +315,7 @@ mmaxloc0_16_m16 (gfc_array_i16 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_16_m16 (gfc_array_i16 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_16_m16 (gfc_array_i16 * const restrict, 
+ 	gfc_array_m16 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_16_m16);
+diff --git a/libgfortran/generated/maxloc0_16_m2.c b/libgfortran/generated/maxloc0_16_m2.c
+index 83004a65cf6e..d3e7b97e6c15 100644
+--- a/libgfortran/generated/maxloc0_16_m2.c
++++ b/libgfortran/generated/maxloc0_16_m2.c
+@@ -315,6 +315,7 @@ mmaxloc0_16_m2 (gfc_array_i16 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_16_m2 (gfc_array_i16 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_16_m2 (gfc_array_i16 * const restrict, 
+ 	gfc_array_m2 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_16_m2);
+diff --git a/libgfortran/generated/maxloc0_16_m4.c b/libgfortran/generated/maxloc0_16_m4.c
+index c763d727bb00..7b93446cd73d 100644
+--- a/libgfortran/generated/maxloc0_16_m4.c
++++ b/libgfortran/generated/maxloc0_16_m4.c
+@@ -315,6 +315,7 @@ mmaxloc0_16_m4 (gfc_array_i16 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_16_m4 (gfc_array_i16 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_16_m4 (gfc_array_i16 * const restrict, 
+ 	gfc_array_m4 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_16_m4);
+diff --git a/libgfortran/generated/maxloc0_16_m8.c b/libgfortran/generated/maxloc0_16_m8.c
+index aa18d3e505b2..6ebd0dc43acc 100644
+--- a/libgfortran/generated/maxloc0_16_m8.c
++++ b/libgfortran/generated/maxloc0_16_m8.c
+@@ -315,6 +315,7 @@ mmaxloc0_16_m8 (gfc_array_i16 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_16_m8 (gfc_array_i16 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_16_m8 (gfc_array_i16 * const restrict, 
+ 	gfc_array_m8 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_16_m8);
+diff --git a/libgfortran/generated/maxloc0_16_r10.c b/libgfortran/generated/maxloc0_16_r10.c
+index f192e7f32ee0..8959e4c9811d 100644
+--- a/libgfortran/generated/maxloc0_16_r10.c
++++ b/libgfortran/generated/maxloc0_16_r10.c
+@@ -315,6 +315,7 @@ mmaxloc0_16_r10 (gfc_array_i16 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_16_r10 (gfc_array_i16 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_16_r10 (gfc_array_i16 * const restrict, 
+ 	gfc_array_r10 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_16_r10);
+diff --git a/libgfortran/generated/maxloc0_16_r16.c b/libgfortran/generated/maxloc0_16_r16.c
+index d16eb546d480..8cc678f5d284 100644
+--- a/libgfortran/generated/maxloc0_16_r16.c
++++ b/libgfortran/generated/maxloc0_16_r16.c
+@@ -315,6 +315,7 @@ mmaxloc0_16_r16 (gfc_array_i16 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_16_r16 (gfc_array_i16 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_16_r16 (gfc_array_i16 * const restrict, 
+ 	gfc_array_r16 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_16_r16);
+diff --git a/libgfortran/generated/maxloc0_16_r17.c b/libgfortran/generated/maxloc0_16_r17.c
+index fbd0c30f51f4..6fa3b28ff1f4 100644
+--- a/libgfortran/generated/maxloc0_16_r17.c
++++ b/libgfortran/generated/maxloc0_16_r17.c
+@@ -315,6 +315,7 @@ mmaxloc0_16_r17 (gfc_array_i16 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_16_r17 (gfc_array_i16 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_16_r17 (gfc_array_i16 * const restrict, 
+ 	gfc_array_r17 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_16_r17);
+diff --git a/libgfortran/generated/maxloc0_16_r4.c b/libgfortran/generated/maxloc0_16_r4.c
+index 815fb7aacb83..6e1b44d842c6 100644
+--- a/libgfortran/generated/maxloc0_16_r4.c
++++ b/libgfortran/generated/maxloc0_16_r4.c
+@@ -315,6 +315,7 @@ mmaxloc0_16_r4 (gfc_array_i16 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_16_r4 (gfc_array_i16 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_16_r4 (gfc_array_i16 * const restrict, 
+ 	gfc_array_r4 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_16_r4);
+diff --git a/libgfortran/generated/maxloc0_16_r8.c b/libgfortran/generated/maxloc0_16_r8.c
+index 730c6f1946ac..244d0225e90c 100644
+--- a/libgfortran/generated/maxloc0_16_r8.c
++++ b/libgfortran/generated/maxloc0_16_r8.c
+@@ -315,6 +315,7 @@ mmaxloc0_16_r8 (gfc_array_i16 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_16_r8 (gfc_array_i16 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_16_r8 (gfc_array_i16 * const restrict, 
+ 	gfc_array_r8 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_16_r8);
+diff --git a/libgfortran/generated/maxloc0_4_i1.c b/libgfortran/generated/maxloc0_4_i1.c
+index a33378711f99..13db16777395 100644
+--- a/libgfortran/generated/maxloc0_4_i1.c
++++ b/libgfortran/generated/maxloc0_4_i1.c
+@@ -315,6 +315,7 @@ mmaxloc0_4_i1 (gfc_array_i4 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_4_i1 (gfc_array_i4 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_4_i1 (gfc_array_i4 * const restrict, 
+ 	gfc_array_i1 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_4_i1);
+diff --git a/libgfortran/generated/maxloc0_4_i16.c b/libgfortran/generated/maxloc0_4_i16.c
+index b5af542084c4..8a0d394a0ca9 100644
+--- a/libgfortran/generated/maxloc0_4_i16.c
++++ b/libgfortran/generated/maxloc0_4_i16.c
+@@ -315,6 +315,7 @@ mmaxloc0_4_i16 (gfc_array_i4 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_4_i16 (gfc_array_i4 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_4_i16 (gfc_array_i4 * const restrict, 
+ 	gfc_array_i16 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_4_i16);
+diff --git a/libgfortran/generated/maxloc0_4_i2.c b/libgfortran/generated/maxloc0_4_i2.c
+index ba168348786d..0a75351da5f4 100644
+--- a/libgfortran/generated/maxloc0_4_i2.c
++++ b/libgfortran/generated/maxloc0_4_i2.c
+@@ -315,6 +315,7 @@ mmaxloc0_4_i2 (gfc_array_i4 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_4_i2 (gfc_array_i4 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_4_i2 (gfc_array_i4 * const restrict, 
+ 	gfc_array_i2 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_4_i2);
+diff --git a/libgfortran/generated/maxloc0_4_i4.c b/libgfortran/generated/maxloc0_4_i4.c
+index 471e6168bab4..f6d833859083 100644
+--- a/libgfortran/generated/maxloc0_4_i4.c
++++ b/libgfortran/generated/maxloc0_4_i4.c
+@@ -315,6 +315,7 @@ mmaxloc0_4_i4 (gfc_array_i4 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_4_i4 (gfc_array_i4 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_4_i4 (gfc_array_i4 * const restrict, 
+ 	gfc_array_i4 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_4_i4);
+diff --git a/libgfortran/generated/maxloc0_4_i8.c b/libgfortran/generated/maxloc0_4_i8.c
+index e0e6dc6948d7..7d7425ebeea9 100644
+--- a/libgfortran/generated/maxloc0_4_i8.c
++++ b/libgfortran/generated/maxloc0_4_i8.c
+@@ -315,6 +315,7 @@ mmaxloc0_4_i8 (gfc_array_i4 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_4_i8 (gfc_array_i4 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_4_i8 (gfc_array_i4 * const restrict, 
+ 	gfc_array_i8 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_4_i8);
+diff --git a/libgfortran/generated/maxloc0_4_m1.c b/libgfortran/generated/maxloc0_4_m1.c
+index afd88cb3c68b..0d001f39820c 100644
+--- a/libgfortran/generated/maxloc0_4_m1.c
++++ b/libgfortran/generated/maxloc0_4_m1.c
+@@ -315,6 +315,7 @@ mmaxloc0_4_m1 (gfc_array_i4 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_4_m1 (gfc_array_i4 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_4_m1 (gfc_array_i4 * const restrict, 
+ 	gfc_array_m1 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_4_m1);
+diff --git a/libgfortran/generated/maxloc0_4_m16.c b/libgfortran/generated/maxloc0_4_m16.c
+index 9ba1a5f73081..d9b4c09aeb71 100644
+--- a/libgfortran/generated/maxloc0_4_m16.c
++++ b/libgfortran/generated/maxloc0_4_m16.c
+@@ -315,6 +315,7 @@ mmaxloc0_4_m16 (gfc_array_i4 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_4_m16 (gfc_array_i4 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_4_m16 (gfc_array_i4 * const restrict, 
+ 	gfc_array_m16 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_4_m16);
+diff --git a/libgfortran/generated/maxloc0_4_m2.c b/libgfortran/generated/maxloc0_4_m2.c
+index 4876f15822bc..71f2ad958ab6 100644
+--- a/libgfortran/generated/maxloc0_4_m2.c
++++ b/libgfortran/generated/maxloc0_4_m2.c
+@@ -315,6 +315,7 @@ mmaxloc0_4_m2 (gfc_array_i4 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_4_m2 (gfc_array_i4 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_4_m2 (gfc_array_i4 * const restrict, 
+ 	gfc_array_m2 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_4_m2);
+diff --git a/libgfortran/generated/maxloc0_4_m4.c b/libgfortran/generated/maxloc0_4_m4.c
+index e7b54db638ba..5d3b962e6ef4 100644
+--- a/libgfortran/generated/maxloc0_4_m4.c
++++ b/libgfortran/generated/maxloc0_4_m4.c
+@@ -315,6 +315,7 @@ mmaxloc0_4_m4 (gfc_array_i4 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_4_m4 (gfc_array_i4 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_4_m4 (gfc_array_i4 * const restrict, 
+ 	gfc_array_m4 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_4_m4);
+diff --git a/libgfortran/generated/maxloc0_4_m8.c b/libgfortran/generated/maxloc0_4_m8.c
+index ddd4575f94e1..0489e55440d2 100644
+--- a/libgfortran/generated/maxloc0_4_m8.c
++++ b/libgfortran/generated/maxloc0_4_m8.c
+@@ -315,6 +315,7 @@ mmaxloc0_4_m8 (gfc_array_i4 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_4_m8 (gfc_array_i4 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_4_m8 (gfc_array_i4 * const restrict, 
+ 	gfc_array_m8 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_4_m8);
+diff --git a/libgfortran/generated/maxloc0_4_r10.c b/libgfortran/generated/maxloc0_4_r10.c
+index 47e666b7096a..2c0c0e9be232 100644
+--- a/libgfortran/generated/maxloc0_4_r10.c
++++ b/libgfortran/generated/maxloc0_4_r10.c
+@@ -315,6 +315,7 @@ mmaxloc0_4_r10 (gfc_array_i4 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_4_r10 (gfc_array_i4 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_4_r10 (gfc_array_i4 * const restrict, 
+ 	gfc_array_r10 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_4_r10);
+diff --git a/libgfortran/generated/maxloc0_4_r16.c b/libgfortran/generated/maxloc0_4_r16.c
+index 1d2132b1792a..77614a4ee7ca 100644
+--- a/libgfortran/generated/maxloc0_4_r16.c
++++ b/libgfortran/generated/maxloc0_4_r16.c
+@@ -315,6 +315,7 @@ mmaxloc0_4_r16 (gfc_array_i4 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_4_r16 (gfc_array_i4 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_4_r16 (gfc_array_i4 * const restrict, 
+ 	gfc_array_r16 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_4_r16);
+diff --git a/libgfortran/generated/maxloc0_4_r17.c b/libgfortran/generated/maxloc0_4_r17.c
+index 03b8f94c9bfa..bf3587b9f7af 100644
+--- a/libgfortran/generated/maxloc0_4_r17.c
++++ b/libgfortran/generated/maxloc0_4_r17.c
+@@ -315,6 +315,7 @@ mmaxloc0_4_r17 (gfc_array_i4 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_4_r17 (gfc_array_i4 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_4_r17 (gfc_array_i4 * const restrict, 
+ 	gfc_array_r17 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_4_r17);
+diff --git a/libgfortran/generated/maxloc0_4_r4.c b/libgfortran/generated/maxloc0_4_r4.c
+index 73a01c6d98e5..186232ad2bd8 100644
+--- a/libgfortran/generated/maxloc0_4_r4.c
++++ b/libgfortran/generated/maxloc0_4_r4.c
+@@ -315,6 +315,7 @@ mmaxloc0_4_r4 (gfc_array_i4 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_4_r4 (gfc_array_i4 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_4_r4 (gfc_array_i4 * const restrict, 
+ 	gfc_array_r4 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_4_r4);
+diff --git a/libgfortran/generated/maxloc0_4_r8.c b/libgfortran/generated/maxloc0_4_r8.c
+index 7941f3427a31..309c59405eb5 100644
+--- a/libgfortran/generated/maxloc0_4_r8.c
++++ b/libgfortran/generated/maxloc0_4_r8.c
+@@ -315,6 +315,7 @@ mmaxloc0_4_r8 (gfc_array_i4 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_4_r8 (gfc_array_i4 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_4_r8 (gfc_array_i4 * const restrict, 
+ 	gfc_array_r8 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_4_r8);
+diff --git a/libgfortran/generated/maxloc0_8_i1.c b/libgfortran/generated/maxloc0_8_i1.c
+index a233db2b918f..0cdc898f6b3c 100644
+--- a/libgfortran/generated/maxloc0_8_i1.c
++++ b/libgfortran/generated/maxloc0_8_i1.c
+@@ -315,6 +315,7 @@ mmaxloc0_8_i1 (gfc_array_i8 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_8_i1 (gfc_array_i8 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_8_i1 (gfc_array_i8 * const restrict, 
+ 	gfc_array_i1 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_8_i1);
+diff --git a/libgfortran/generated/maxloc0_8_i16.c b/libgfortran/generated/maxloc0_8_i16.c
+index 830498bae1fe..084ac6f54ebb 100644
+--- a/libgfortran/generated/maxloc0_8_i16.c
++++ b/libgfortran/generated/maxloc0_8_i16.c
+@@ -315,6 +315,7 @@ mmaxloc0_8_i16 (gfc_array_i8 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_8_i16 (gfc_array_i8 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_8_i16 (gfc_array_i8 * const restrict, 
+ 	gfc_array_i16 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_8_i16);
+diff --git a/libgfortran/generated/maxloc0_8_i2.c b/libgfortran/generated/maxloc0_8_i2.c
+index 2b71a8584c0f..bce26f9a34b8 100644
+--- a/libgfortran/generated/maxloc0_8_i2.c
++++ b/libgfortran/generated/maxloc0_8_i2.c
+@@ -315,6 +315,7 @@ mmaxloc0_8_i2 (gfc_array_i8 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_8_i2 (gfc_array_i8 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_8_i2 (gfc_array_i8 * const restrict, 
+ 	gfc_array_i2 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_8_i2);
+diff --git a/libgfortran/generated/maxloc0_8_i4.c b/libgfortran/generated/maxloc0_8_i4.c
+index 0a13ac93b75d..d40eec384985 100644
+--- a/libgfortran/generated/maxloc0_8_i4.c
++++ b/libgfortran/generated/maxloc0_8_i4.c
+@@ -315,6 +315,7 @@ mmaxloc0_8_i4 (gfc_array_i8 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_8_i4 (gfc_array_i8 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_8_i4 (gfc_array_i8 * const restrict, 
+ 	gfc_array_i4 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_8_i4);
+diff --git a/libgfortran/generated/maxloc0_8_i8.c b/libgfortran/generated/maxloc0_8_i8.c
+index 59d4e68d5296..f48d4097effb 100644
+--- a/libgfortran/generated/maxloc0_8_i8.c
++++ b/libgfortran/generated/maxloc0_8_i8.c
+@@ -315,6 +315,7 @@ mmaxloc0_8_i8 (gfc_array_i8 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_8_i8 (gfc_array_i8 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_8_i8 (gfc_array_i8 * const restrict, 
+ 	gfc_array_i8 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_8_i8);
+diff --git a/libgfortran/generated/maxloc0_8_m1.c b/libgfortran/generated/maxloc0_8_m1.c
+index 2029c8eae461..4785b7843591 100644
+--- a/libgfortran/generated/maxloc0_8_m1.c
++++ b/libgfortran/generated/maxloc0_8_m1.c
+@@ -315,6 +315,7 @@ mmaxloc0_8_m1 (gfc_array_i8 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_8_m1 (gfc_array_i8 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_8_m1 (gfc_array_i8 * const restrict, 
+ 	gfc_array_m1 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_8_m1);
+diff --git a/libgfortran/generated/maxloc0_8_m16.c b/libgfortran/generated/maxloc0_8_m16.c
+index f68b30dc0b24..78034dc880bb 100644
+--- a/libgfortran/generated/maxloc0_8_m16.c
++++ b/libgfortran/generated/maxloc0_8_m16.c
+@@ -315,6 +315,7 @@ mmaxloc0_8_m16 (gfc_array_i8 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_8_m16 (gfc_array_i8 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_8_m16 (gfc_array_i8 * const restrict, 
+ 	gfc_array_m16 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_8_m16);
+diff --git a/libgfortran/generated/maxloc0_8_m2.c b/libgfortran/generated/maxloc0_8_m2.c
+index 71c813b0d379..02c51c2a393d 100644
+--- a/libgfortran/generated/maxloc0_8_m2.c
++++ b/libgfortran/generated/maxloc0_8_m2.c
+@@ -315,6 +315,7 @@ mmaxloc0_8_m2 (gfc_array_i8 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_8_m2 (gfc_array_i8 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_8_m2 (gfc_array_i8 * const restrict, 
+ 	gfc_array_m2 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_8_m2);
+diff --git a/libgfortran/generated/maxloc0_8_m4.c b/libgfortran/generated/maxloc0_8_m4.c
+index bb4f3ee3ed8d..94fd47c3e251 100644
+--- a/libgfortran/generated/maxloc0_8_m4.c
++++ b/libgfortran/generated/maxloc0_8_m4.c
+@@ -315,6 +315,7 @@ mmaxloc0_8_m4 (gfc_array_i8 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_8_m4 (gfc_array_i8 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_8_m4 (gfc_array_i8 * const restrict, 
+ 	gfc_array_m4 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_8_m4);
+diff --git a/libgfortran/generated/maxloc0_8_m8.c b/libgfortran/generated/maxloc0_8_m8.c
+index 1ee1cf53cd86..a695e425cb26 100644
+--- a/libgfortran/generated/maxloc0_8_m8.c
++++ b/libgfortran/generated/maxloc0_8_m8.c
+@@ -315,6 +315,7 @@ mmaxloc0_8_m8 (gfc_array_i8 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_8_m8 (gfc_array_i8 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_8_m8 (gfc_array_i8 * const restrict, 
+ 	gfc_array_m8 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_8_m8);
+diff --git a/libgfortran/generated/maxloc0_8_r10.c b/libgfortran/generated/maxloc0_8_r10.c
+index 97eee7e20fb0..d04960c9901a 100644
+--- a/libgfortran/generated/maxloc0_8_r10.c
++++ b/libgfortran/generated/maxloc0_8_r10.c
+@@ -315,6 +315,7 @@ mmaxloc0_8_r10 (gfc_array_i8 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_8_r10 (gfc_array_i8 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_8_r10 (gfc_array_i8 * const restrict, 
+ 	gfc_array_r10 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_8_r10);
+diff --git a/libgfortran/generated/maxloc0_8_r16.c b/libgfortran/generated/maxloc0_8_r16.c
+index 0239b4ca7f99..af15785d6389 100644
+--- a/libgfortran/generated/maxloc0_8_r16.c
++++ b/libgfortran/generated/maxloc0_8_r16.c
+@@ -315,6 +315,7 @@ mmaxloc0_8_r16 (gfc_array_i8 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_8_r16 (gfc_array_i8 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_8_r16 (gfc_array_i8 * const restrict, 
+ 	gfc_array_r16 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_8_r16);
+diff --git a/libgfortran/generated/maxloc0_8_r17.c b/libgfortran/generated/maxloc0_8_r17.c
+index c07eaf19002c..529b3319a867 100644
+--- a/libgfortran/generated/maxloc0_8_r17.c
++++ b/libgfortran/generated/maxloc0_8_r17.c
+@@ -315,6 +315,7 @@ mmaxloc0_8_r17 (gfc_array_i8 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_8_r17 (gfc_array_i8 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_8_r17 (gfc_array_i8 * const restrict, 
+ 	gfc_array_r17 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_8_r17);
+diff --git a/libgfortran/generated/maxloc0_8_r4.c b/libgfortran/generated/maxloc0_8_r4.c
+index d6e71a093f88..a643ae2f2daa 100644
+--- a/libgfortran/generated/maxloc0_8_r4.c
++++ b/libgfortran/generated/maxloc0_8_r4.c
+@@ -315,6 +315,7 @@ mmaxloc0_8_r4 (gfc_array_i8 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_8_r4 (gfc_array_i8 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_8_r4 (gfc_array_i8 * const restrict, 
+ 	gfc_array_r4 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_8_r4);
+diff --git a/libgfortran/generated/maxloc0_8_r8.c b/libgfortran/generated/maxloc0_8_r8.c
+index 680e65b802dd..8d6d0f5ea0a1 100644
+--- a/libgfortran/generated/maxloc0_8_r8.c
++++ b/libgfortran/generated/maxloc0_8_r8.c
+@@ -315,6 +315,7 @@ mmaxloc0_8_r8 (gfc_array_i8 * const restrict retarray,
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -361,7 +362,6 @@ mmaxloc0_8_r8 (gfc_array_i8 * const restrict retarray,
+   }
+ }
+ 
+-
+ extern void smaxloc0_8_r8 (gfc_array_i8 * const restrict, 
+ 	gfc_array_r8 * const restrict, GFC_LOGICAL_4 *, GFC_LOGICAL_4);
+ export_proto(smaxloc0_8_r8);
+diff --git a/libgfortran/generated/minloc0_16_i1.c b/libgfortran/generated/minloc0_16_i1.c
+index b769f2853933..5eca4da644f6 100644
+--- a/libgfortran/generated/minloc0_16_i1.c
++++ b/libgfortran/generated/minloc0_16_i1.c
+@@ -314,9 +314,10 @@ mminloc0_16_i1 (gfc_array_i16 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_16_i16.c b/libgfortran/generated/minloc0_16_i16.c
+index 9e19de4035b3..c1569e14c6ae 100644
+--- a/libgfortran/generated/minloc0_16_i16.c
++++ b/libgfortran/generated/minloc0_16_i16.c
+@@ -314,9 +314,10 @@ mminloc0_16_i16 (gfc_array_i16 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_16_i2.c b/libgfortran/generated/minloc0_16_i2.c
+index 3279402005ad..fc01cb97590b 100644
+--- a/libgfortran/generated/minloc0_16_i2.c
++++ b/libgfortran/generated/minloc0_16_i2.c
+@@ -314,9 +314,10 @@ mminloc0_16_i2 (gfc_array_i16 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_16_i4.c b/libgfortran/generated/minloc0_16_i4.c
+index 5cfcd8387094..c6541b6cc0ef 100644
+--- a/libgfortran/generated/minloc0_16_i4.c
++++ b/libgfortran/generated/minloc0_16_i4.c
+@@ -314,9 +314,10 @@ mminloc0_16_i4 (gfc_array_i16 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_16_i8.c b/libgfortran/generated/minloc0_16_i8.c
+index 34956495d030..86b73cfdd635 100644
+--- a/libgfortran/generated/minloc0_16_i8.c
++++ b/libgfortran/generated/minloc0_16_i8.c
+@@ -314,9 +314,10 @@ mminloc0_16_i8 (gfc_array_i16 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_16_m1.c b/libgfortran/generated/minloc0_16_m1.c
+index dfd2ccbf363d..4d022eb848da 100644
+--- a/libgfortran/generated/minloc0_16_m1.c
++++ b/libgfortran/generated/minloc0_16_m1.c
+@@ -314,9 +314,10 @@ mminloc0_16_m1 (gfc_array_i16 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_16_m16.c b/libgfortran/generated/minloc0_16_m16.c
+index a5d777f60994..ecbb5238a31e 100644
+--- a/libgfortran/generated/minloc0_16_m16.c
++++ b/libgfortran/generated/minloc0_16_m16.c
+@@ -314,9 +314,10 @@ mminloc0_16_m16 (gfc_array_i16 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_16_m2.c b/libgfortran/generated/minloc0_16_m2.c
+index 8ebd57f9e138..a11e0b1fd349 100644
+--- a/libgfortran/generated/minloc0_16_m2.c
++++ b/libgfortran/generated/minloc0_16_m2.c
+@@ -314,9 +314,10 @@ mminloc0_16_m2 (gfc_array_i16 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_16_m4.c b/libgfortran/generated/minloc0_16_m4.c
+index 12852f297b32..9c3877f3b614 100644
+--- a/libgfortran/generated/minloc0_16_m4.c
++++ b/libgfortran/generated/minloc0_16_m4.c
+@@ -314,9 +314,10 @@ mminloc0_16_m4 (gfc_array_i16 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_16_m8.c b/libgfortran/generated/minloc0_16_m8.c
+index ad5a76e6fe85..bbb2eb0bb4f2 100644
+--- a/libgfortran/generated/minloc0_16_m8.c
++++ b/libgfortran/generated/minloc0_16_m8.c
+@@ -314,9 +314,10 @@ mminloc0_16_m8 (gfc_array_i16 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_16_r10.c b/libgfortran/generated/minloc0_16_r10.c
+index 26208455879d..0bfd84a0ba79 100644
+--- a/libgfortran/generated/minloc0_16_r10.c
++++ b/libgfortran/generated/minloc0_16_r10.c
+@@ -314,9 +314,10 @@ mminloc0_16_r10 (gfc_array_i16 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_16_r16.c b/libgfortran/generated/minloc0_16_r16.c
+index f26fc34bad8e..15906543804c 100644
+--- a/libgfortran/generated/minloc0_16_r16.c
++++ b/libgfortran/generated/minloc0_16_r16.c
+@@ -314,9 +314,10 @@ mminloc0_16_r16 (gfc_array_i16 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_16_r17.c b/libgfortran/generated/minloc0_16_r17.c
+index d18fe49d48b9..1d7af7633f1a 100644
+--- a/libgfortran/generated/minloc0_16_r17.c
++++ b/libgfortran/generated/minloc0_16_r17.c
+@@ -314,9 +314,10 @@ mminloc0_16_r17 (gfc_array_i16 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_16_r4.c b/libgfortran/generated/minloc0_16_r4.c
+index 1a128493fac3..e87af9511ab6 100644
+--- a/libgfortran/generated/minloc0_16_r4.c
++++ b/libgfortran/generated/minloc0_16_r4.c
+@@ -314,9 +314,10 @@ mminloc0_16_r4 (gfc_array_i16 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_16_r8.c b/libgfortran/generated/minloc0_16_r8.c
+index d8284b78a7d8..98b0fbbfce61 100644
+--- a/libgfortran/generated/minloc0_16_r8.c
++++ b/libgfortran/generated/minloc0_16_r8.c
+@@ -314,9 +314,10 @@ mminloc0_16_r8 (gfc_array_i16 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_4_i1.c b/libgfortran/generated/minloc0_4_i1.c
+index 1e96d950ffa7..7d8bb11c3ef3 100644
+--- a/libgfortran/generated/minloc0_4_i1.c
++++ b/libgfortran/generated/minloc0_4_i1.c
+@@ -314,9 +314,10 @@ mminloc0_4_i1 (gfc_array_i4 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_4_i16.c b/libgfortran/generated/minloc0_4_i16.c
+index 0a70e9fcb92b..ee6a7af14945 100644
+--- a/libgfortran/generated/minloc0_4_i16.c
++++ b/libgfortran/generated/minloc0_4_i16.c
+@@ -314,9 +314,10 @@ mminloc0_4_i16 (gfc_array_i4 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_4_i2.c b/libgfortran/generated/minloc0_4_i2.c
+index 497f6620b164..84deb721ac09 100644
+--- a/libgfortran/generated/minloc0_4_i2.c
++++ b/libgfortran/generated/minloc0_4_i2.c
+@@ -314,9 +314,10 @@ mminloc0_4_i2 (gfc_array_i4 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_4_i4.c b/libgfortran/generated/minloc0_4_i4.c
+index b5645fb34b83..9e71952ee38e 100644
+--- a/libgfortran/generated/minloc0_4_i4.c
++++ b/libgfortran/generated/minloc0_4_i4.c
+@@ -314,9 +314,10 @@ mminloc0_4_i4 (gfc_array_i4 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_4_i8.c b/libgfortran/generated/minloc0_4_i8.c
+index af7bc7e7a8fb..a4741771d5c5 100644
+--- a/libgfortran/generated/minloc0_4_i8.c
++++ b/libgfortran/generated/minloc0_4_i8.c
+@@ -314,9 +314,10 @@ mminloc0_4_i8 (gfc_array_i4 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_4_m1.c b/libgfortran/generated/minloc0_4_m1.c
+index 9346ca817420..0da1233c1e81 100644
+--- a/libgfortran/generated/minloc0_4_m1.c
++++ b/libgfortran/generated/minloc0_4_m1.c
+@@ -314,9 +314,10 @@ mminloc0_4_m1 (gfc_array_i4 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_4_m16.c b/libgfortran/generated/minloc0_4_m16.c
+index 6ea325209543..1d92dfc93a58 100644
+--- a/libgfortran/generated/minloc0_4_m16.c
++++ b/libgfortran/generated/minloc0_4_m16.c
+@@ -314,9 +314,10 @@ mminloc0_4_m16 (gfc_array_i4 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_4_m2.c b/libgfortran/generated/minloc0_4_m2.c
+index 8e4b8c95cbdc..2debf567e4ba 100644
+--- a/libgfortran/generated/minloc0_4_m2.c
++++ b/libgfortran/generated/minloc0_4_m2.c
+@@ -314,9 +314,10 @@ mminloc0_4_m2 (gfc_array_i4 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_4_m4.c b/libgfortran/generated/minloc0_4_m4.c
+index 3b2def4a007b..e8f7690fbefe 100644
+--- a/libgfortran/generated/minloc0_4_m4.c
++++ b/libgfortran/generated/minloc0_4_m4.c
+@@ -314,9 +314,10 @@ mminloc0_4_m4 (gfc_array_i4 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_4_m8.c b/libgfortran/generated/minloc0_4_m8.c
+index 4359663b61f8..5cbf1fba3e89 100644
+--- a/libgfortran/generated/minloc0_4_m8.c
++++ b/libgfortran/generated/minloc0_4_m8.c
+@@ -314,9 +314,10 @@ mminloc0_4_m8 (gfc_array_i4 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_4_r10.c b/libgfortran/generated/minloc0_4_r10.c
+index 48bd739803db..debcf4b632fd 100644
+--- a/libgfortran/generated/minloc0_4_r10.c
++++ b/libgfortran/generated/minloc0_4_r10.c
+@@ -314,9 +314,10 @@ mminloc0_4_r10 (gfc_array_i4 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_4_r16.c b/libgfortran/generated/minloc0_4_r16.c
+index 7abee92d70da..e1c744cf49fd 100644
+--- a/libgfortran/generated/minloc0_4_r16.c
++++ b/libgfortran/generated/minloc0_4_r16.c
+@@ -314,9 +314,10 @@ mminloc0_4_r16 (gfc_array_i4 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_4_r17.c b/libgfortran/generated/minloc0_4_r17.c
+index 00162d945fdb..01db36257b22 100644
+--- a/libgfortran/generated/minloc0_4_r17.c
++++ b/libgfortran/generated/minloc0_4_r17.c
+@@ -314,9 +314,10 @@ mminloc0_4_r17 (gfc_array_i4 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_4_r4.c b/libgfortran/generated/minloc0_4_r4.c
+index 00ec3bbc8683..737f7cb950e6 100644
+--- a/libgfortran/generated/minloc0_4_r4.c
++++ b/libgfortran/generated/minloc0_4_r4.c
+@@ -314,9 +314,10 @@ mminloc0_4_r4 (gfc_array_i4 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_4_r8.c b/libgfortran/generated/minloc0_4_r8.c
+index 129290a0c846..657484a1f24e 100644
+--- a/libgfortran/generated/minloc0_4_r8.c
++++ b/libgfortran/generated/minloc0_4_r8.c
+@@ -314,9 +314,10 @@ mminloc0_4_r8 (gfc_array_i4 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_8_i1.c b/libgfortran/generated/minloc0_8_i1.c
+index d0b4e902bbd3..cfa36b5ad2bd 100644
+--- a/libgfortran/generated/minloc0_8_i1.c
++++ b/libgfortran/generated/minloc0_8_i1.c
+@@ -314,9 +314,10 @@ mminloc0_8_i1 (gfc_array_i8 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_8_i16.c b/libgfortran/generated/minloc0_8_i16.c
+index 7bb8853555cf..a12ab0539536 100644
+--- a/libgfortran/generated/minloc0_8_i16.c
++++ b/libgfortran/generated/minloc0_8_i16.c
+@@ -314,9 +314,10 @@ mminloc0_8_i16 (gfc_array_i8 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_8_i2.c b/libgfortran/generated/minloc0_8_i2.c
+index 875338e3012c..17765908411e 100644
+--- a/libgfortran/generated/minloc0_8_i2.c
++++ b/libgfortran/generated/minloc0_8_i2.c
+@@ -314,9 +314,10 @@ mminloc0_8_i2 (gfc_array_i8 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_8_i4.c b/libgfortran/generated/minloc0_8_i4.c
+index 3fcefcdae0e5..a85a08c21244 100644
+--- a/libgfortran/generated/minloc0_8_i4.c
++++ b/libgfortran/generated/minloc0_8_i4.c
+@@ -314,9 +314,10 @@ mminloc0_8_i4 (gfc_array_i8 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_8_i8.c b/libgfortran/generated/minloc0_8_i8.c
+index 7c3f727d5d81..90533b6e8e3b 100644
+--- a/libgfortran/generated/minloc0_8_i8.c
++++ b/libgfortran/generated/minloc0_8_i8.c
+@@ -314,9 +314,10 @@ mminloc0_8_i8 (gfc_array_i8 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_8_m1.c b/libgfortran/generated/minloc0_8_m1.c
+index 5bd6070b16cc..b1305999e3c4 100644
+--- a/libgfortran/generated/minloc0_8_m1.c
++++ b/libgfortran/generated/minloc0_8_m1.c
+@@ -314,9 +314,10 @@ mminloc0_8_m1 (gfc_array_i8 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_8_m16.c b/libgfortran/generated/minloc0_8_m16.c
+index c8a705205a0f..6fc1d06b052d 100644
+--- a/libgfortran/generated/minloc0_8_m16.c
++++ b/libgfortran/generated/minloc0_8_m16.c
+@@ -314,9 +314,10 @@ mminloc0_8_m16 (gfc_array_i8 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_8_m2.c b/libgfortran/generated/minloc0_8_m2.c
+index f6501975ce58..428594dab109 100644
+--- a/libgfortran/generated/minloc0_8_m2.c
++++ b/libgfortran/generated/minloc0_8_m2.c
+@@ -314,9 +314,10 @@ mminloc0_8_m2 (gfc_array_i8 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_8_m4.c b/libgfortran/generated/minloc0_8_m4.c
+index 50a86ea0c971..81df40cb9ebb 100644
+--- a/libgfortran/generated/minloc0_8_m4.c
++++ b/libgfortran/generated/minloc0_8_m4.c
+@@ -314,9 +314,10 @@ mminloc0_8_m4 (gfc_array_i8 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_8_m8.c b/libgfortran/generated/minloc0_8_m8.c
+index 54bc8ab01acb..221c692173fb 100644
+--- a/libgfortran/generated/minloc0_8_m8.c
++++ b/libgfortran/generated/minloc0_8_m8.c
+@@ -314,9 +314,10 @@ mminloc0_8_m8 (gfc_array_i8 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_8_r10.c b/libgfortran/generated/minloc0_8_r10.c
+index f3f302b91878..9ad7e2d5c4ae 100644
+--- a/libgfortran/generated/minloc0_8_r10.c
++++ b/libgfortran/generated/minloc0_8_r10.c
+@@ -314,9 +314,10 @@ mminloc0_8_r10 (gfc_array_i8 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_8_r16.c b/libgfortran/generated/minloc0_8_r16.c
+index e05a1eec8fda..12aa9ecfb8e6 100644
+--- a/libgfortran/generated/minloc0_8_r16.c
++++ b/libgfortran/generated/minloc0_8_r16.c
+@@ -314,9 +314,10 @@ mminloc0_8_r16 (gfc_array_i8 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_8_r17.c b/libgfortran/generated/minloc0_8_r17.c
+index 23502a0de857..ef20ac74b0a7 100644
+--- a/libgfortran/generated/minloc0_8_r17.c
++++ b/libgfortran/generated/minloc0_8_r17.c
+@@ -314,9 +314,10 @@ mminloc0_8_r17 (gfc_array_i8 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_8_r4.c b/libgfortran/generated/minloc0_8_r4.c
+index 88c895798d6c..1ea99b97d9e0 100644
+--- a/libgfortran/generated/minloc0_8_r4.c
++++ b/libgfortran/generated/minloc0_8_r4.c
+@@ -314,9 +314,10 @@ mminloc0_8_r4 (gfc_array_i8 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/generated/minloc0_8_r8.c b/libgfortran/generated/minloc0_8_r8.c
+index a8826688ce5c..e87eaaec46e9 100644
+--- a/libgfortran/generated/minloc0_8_r8.c
++++ b/libgfortran/generated/minloc0_8_r8.c
+@@ -314,9 +314,10 @@ mminloc0_8_r8 (gfc_array_i8 * const restrict retarray,
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {
+diff --git a/libgfortran/m4/maxloc0.m4 b/libgfortran/m4/maxloc0.m4
+index 45663db15da2..b0b94402b59b 100644
+--- a/libgfortran/m4/maxloc0.m4
++++ b/libgfortran/m4/maxloc0.m4
+@@ -131,6 +131,7 @@ MASKED_FOREACH_FUNCTION(
+ 		    dest[n * dstride] = count[n] + 1;
+ 		}
+ 	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+ 	  while (++count[0] != extent[0]);
+ 	else
+@@ -142,6 +143,5 @@ MASKED_FOREACH_FUNCTION(
+ 		  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	        }')
+-
+ SCALAR_FOREACH_FUNCTION(`0')
+ #endif
+diff --git a/libgfortran/m4/minloc0.m4 b/libgfortran/m4/minloc0.m4
+index c7aed6864526..31871d898488 100644
+--- a/libgfortran/m4/minloc0.m4
++++ b/libgfortran/m4/minloc0.m4
+@@ -130,9 +130,10 @@ MASKED_FOREACH_FUNCTION(
+ 	      	  for (n = 0; n < rank; n++)
+ 		    dest[n * dstride] = count[n] + 1;
+ 	    	}
+-		base += sstride[0];
++	      base += sstride[0];
++	      mbase += mstride[0];
+ 	    }
+-	    while (++count[0] != extent[0]);
++	  while (++count[0] != extent[0]);
+ 	else
+ 	  do
+ 	    {

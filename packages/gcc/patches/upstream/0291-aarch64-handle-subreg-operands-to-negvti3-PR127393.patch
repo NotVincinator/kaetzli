@@ -1,0 +1,53 @@
+From a47b076a7ffeffba18cc0f56c59e9d9f12e4e90a Mon Sep 17 00:00:00 2001
+From: Richard Earnshaw <rearnsha@arm.com>
+Date: Tue, 15 Sep 2026 17:58:15 +0100
+Subject: [PATCH 291/385] aarch64: handle subreg operands to negvti3 [PR127393]
+
+gen_highpart will abort if the operand is a subreg; avoid this by
+rejecting SUBREGs.
+
+gcc/ChangeLog:
+
+	PR target/127393
+	* config/aarch64/predicates.md (pure_register_operand): New predicate.
+	* config/aarch64/aarch64.md (negvti3): Use it.
+
+(cherry picked from commit 4bb47c013d8fd815c6abe592f36f5c7547e0ed61)
+---
+ gcc/config/aarch64/aarch64.md    | 4 ++--
+ gcc/config/aarch64/predicates.md | 7 +++++++
+ 2 files changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/config/aarch64/aarch64.md b/gcc/config/aarch64/aarch64.md
+index cab4964fd012..9510025aef29 100644
+--- a/gcc/config/aarch64/aarch64.md
++++ b/gcc/config/aarch64/aarch64.md
+@@ -3740,8 +3740,8 @@
+ })
+ 
+ (define_expand "negvti3"
+-  [(match_operand:TI 0 "register_operand")
+-   (match_operand:TI 1 "register_operand")
++  [(match_operand:TI 0 "pure_register_operand")
++   (match_operand:TI 1 "pure_register_operand")
+    (label_ref (match_operand 2 "" ""))]
+   ""
+   {
+diff --git a/gcc/config/aarch64/predicates.md b/gcc/config/aarch64/predicates.md
+index 40b0e8b9f02c..6e97dd155424 100644
+--- a/gcc/config/aarch64/predicates.md
++++ b/gcc/config/aarch64/predicates.md
+@@ -20,6 +20,13 @@
+ 
+ (include "../arm/common.md")
+ 
++;; Similar to register_operand, but don't allow subregs.  This is needed
++;; if we want to use operations like gen_highpart while expanding
++;; a pattern.
++(define_predicate "pure_register_operand"
++  (and (match_code "reg")
++       (match_operand 0 "register_operand")))
++
+ (define_predicate "aarch64_sysreg_string"
+   (and (match_code "const_string")
+        (match_test "aarch64_valid_sysreg_name_p (XSTR (op, 0))")))

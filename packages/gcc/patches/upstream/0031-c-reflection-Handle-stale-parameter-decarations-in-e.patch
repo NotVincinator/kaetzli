@@ -1,0 +1,81 @@
+From 4d671ef9247d1752bce4f0edcf0a78b4ef82c46f Mon Sep 17 00:00:00 2001
+From: Wang Jinghao <zheng.xianyuwang@gmail.com>
+Date: Wed, 17 Jun 2026 11:17:47 -0400
+Subject: [PATCH 031/385] c++/reflection: Handle stale parameter decarations in
+ eval_is_explicit_object_parameter
+
+eval_is_explicit_object_parameter() determines whether a parameter is
+an explicit object parameter by checking whether the passed-in tree
+node is the first parameter in its parameter chain. As described in
+the comment for maybe_update_function_parm(), if the sequence is
+declaration -> reflection -> definition, the old PARM_DECL will be
+compared against the new PARM_DECL, causing the check to produce an
+incorrect result.
+Calling maybe_update_function_parm() before the comparison updates
+the old reflection to the new PARM_DECL in the chain, thereby
+avoiding this error.
+
+gcc/cp/ChangeLog:
+
+	* reflect.cc (eval_is_explicit_object_parameter): Call
+	maybe_update_function_parm before checking the parameter
+	against DECL_ARGUMENTS.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/reflect/is_explicit_object_parameter2.C: New test.
+
+Signed-off-by: Wang Jinghao <zheng.xianyuwang@gmail.com>
+Reviewed-by: Patrick Palka <ppalka@redhat.com>
+(cherry picked from commit 06429c88ecd5de5b597af3686e521b4e2c106588)
+---
+ gcc/cp/reflect.cc                               | 10 ++++++----
+ .../reflect/is_explicit_object_parameter2.C     | 17 +++++++++++++++++
+ 2 files changed, 23 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/reflect/is_explicit_object_parameter2.C
+
+diff --git a/gcc/cp/reflect.cc b/gcc/cp/reflect.cc
+index 66596fcb15e2..e9b0ab77eca3 100644
+--- a/gcc/cp/reflect.cc
++++ b/gcc/cp/reflect.cc
+@@ -1828,11 +1828,13 @@ eval_is_data_member_spec (const_tree r, reflect_kind kind)
+    object parameter.  Otherwise, false.  */
+ 
+ static tree
+-eval_is_explicit_object_parameter (const_tree r, reflect_kind kind)
++eval_is_explicit_object_parameter (tree r, reflect_kind kind)
+ {
+-  if (eval_is_function_parameter (r, kind) == boolean_true_node
+-      && r == DECL_ARGUMENTS (DECL_CONTEXT (r))
+-      && DECL_XOBJ_MEMBER_FUNCTION_P (DECL_CONTEXT (r)))
++  if (eval_is_function_parameter (r, kind) == boolean_false_node)
++    return boolean_false_node;
++  r = maybe_update_function_parm (r);
++  tree fn = DECL_CONTEXT (r);
++  if (r == DECL_ARGUMENTS (fn) && DECL_XOBJ_MEMBER_FUNCTION_P (fn))
+     return boolean_true_node;
+   else
+     return boolean_false_node;
+diff --git a/gcc/testsuite/g++.dg/reflect/is_explicit_object_parameter2.C b/gcc/testsuite/g++.dg/reflect/is_explicit_object_parameter2.C
+new file mode 100644
+index 000000000000..cc24e439bc81
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/reflect/is_explicit_object_parameter2.C
+@@ -0,0 +1,17 @@
++// { dg-do compile { target c++26 } }
++// { dg-additional-options "-freflection" }
++// Test std::meta::is_explicit_object_parameter.
++
++#include <meta>
++
++using namespace std::meta;
++
++struct S {
++  void f (this S, int);
++};
++
++constexpr auto p = parameters_of (^^S::f)[0];
++
++void S::f (this S, int) {}
++
++static_assert (is_explicit_object_parameter (p));

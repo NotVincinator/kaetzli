@@ -1,0 +1,80 @@
+From 5b3ff4e500a8b5850465e2a6713664d63ad40293 Mon Sep 17 00:00:00 2001
+From: Pietro Monteiro <pietro@sociotechnical.xyz>
+Date: Thu, 20 Aug 2026 11:54:58 -0400
+Subject: [PATCH 071/385] libstdc++: Use static_cast on OpenBSD ctype_base
+ masks
+
+Commit r17-3313-g15419a00a29342 fixed the build on newer OpenBSD
+versions.  However, on platforms where char is signed, the mask
+constants may be implicitly converted to negative values, causing
+overflow/signedness change warnings.  Add static_cast<mask>(...) to
+make the conversion explicit and silence the warnings.
+
+libstdc++-v3/ChangeLog:
+
+	* config/os/bsd/openbsd/ctype_base.h: Use static_cast when
+	setting the masks.
+
+Signed-off-by: Pietro Monteiro <pietro@sociotechnical.xyz>
+(cherry picked from commit 18f299849d3dd151b62e2214dfebaa5ecdebe9b5)
+---
+ .../config/os/bsd/openbsd/ctype_base.h        | 44 +++++++++----------
+ 1 file changed, 22 insertions(+), 22 deletions(-)
+
+diff --git a/libstdc++-v3/config/os/bsd/openbsd/ctype_base.h b/libstdc++-v3/config/os/bsd/openbsd/ctype_base.h
+index e1d982f81cd1..f77a8cc5f5fa 100644
+--- a/libstdc++-v3/config/os/bsd/openbsd/ctype_base.h
++++ b/libstdc++-v3/config/os/bsd/openbsd/ctype_base.h
+@@ -44,30 +44,30 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 
+ #ifdef _CTYPE_S
+     // OpenBSD 7.5 uses this style of define.
+-    static const mask upper	= _CTYPE_U;
+-    static const mask lower	= _CTYPE_L;
+-    static const mask alpha	= _CTYPE_U | _CTYPE_L;
+-    static const mask digit	= _CTYPE_N;
+-    static const mask xdigit	= _CTYPE_N | _CTYPE_X;
+-    static const mask space	= _CTYPE_S;
+-    static const mask print	= _CTYPE_P | _CTYPE_U | _CTYPE_L | _CTYPE_N | _CTYPE_B;
+-    static const mask graph	= _CTYPE_P | _CTYPE_U | _CTYPE_L | _CTYPE_N;
+-    static const mask cntrl	= _CTYPE_C;
+-    static const mask punct	= _CTYPE_P;
+-    static const mask alnum	= _CTYPE_U | _CTYPE_L | _CTYPE_N;
++    static const mask upper	= static_cast<mask>(_CTYPE_U);
++    static const mask lower	= static_cast<mask>(_CTYPE_L);
++    static const mask alpha	= static_cast<mask>(_CTYPE_U | _CTYPE_L);
++    static const mask digit	= static_cast<mask>(_CTYPE_N);
++    static const mask xdigit	= static_cast<mask>(_CTYPE_N | _CTYPE_X);
++    static const mask space	= static_cast<mask>(_CTYPE_S);
++    static const mask print	= static_cast<mask>(_CTYPE_P | _CTYPE_U | _CTYPE_L | _CTYPE_N | _CTYPE_B);
++    static const mask graph	= static_cast<mask>(_CTYPE_P | _CTYPE_U | _CTYPE_L | _CTYPE_N);
++    static const mask cntrl	= static_cast<mask>(_CTYPE_C);
++    static const mask punct	= static_cast<mask>(_CTYPE_P);
++    static const mask alnum	= static_cast<mask>(_CTYPE_U | _CTYPE_L | _CTYPE_N);
+ #else
+     // Older versions use this style.
+-    static const mask upper	= _U;
+-    static const mask lower	= _L;
+-    static const mask alpha	= _U | _L;
+-    static const mask digit	= _N;
+-    static const mask xdigit	= _N | _X;
+-    static const mask space	= _S;
+-    static const mask print	= _P | _U | _L | _N | _B;
+-    static const mask graph	= _P | _U | _L | _N;
+-    static const mask cntrl	= _C;
+-    static const mask punct	= _P;
+-    static const mask alnum	= _U | _L | _N;
++    static const mask upper	= static_cast<mask>(_U);
++    static const mask lower	= static_cast<mask>(_L);
++    static const mask alpha	= static_cast<mask>(_U | _L);
++    static const mask digit	= static_cast<mask>(_N);
++    static const mask xdigit	= static_cast<mask>(_N | _X);
++    static const mask space	= static_cast<mask>(_S);
++    static const mask print	= static_cast<mask>(_P | _U | _L | _N | _B);
++    static const mask graph	= static_cast<mask>(_P | _U | _L | _N);
++    static const mask cntrl	= static_cast<mask>(_C);
++    static const mask punct	= static_cast<mask>(_P);
++    static const mask alnum	= static_cast<mask>(_U | _L | _N);
+ #endif
+ #if __cplusplus >= 201103L
+     static const mask blank	= space;

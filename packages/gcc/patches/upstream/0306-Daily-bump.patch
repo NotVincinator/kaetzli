@@ -1,0 +1,55 @@
+From ad2160df97c4f99427f0a9042e884a143c315a93 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sat, 17 Oct 2026 00:20:42 +0000
+Subject: [PATCH 306/385] Daily bump.
+
+---
+ gcc/ChangeLog           | 13 +++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog |  8 ++++++++
+ 3 files changed, 22 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index aedaff2456c0..c2f0421b91bf 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,16 @@
++2026-10-16  Rasmus Villemoes  <rv@rasmusvillemoes.dk>
++
++	* doc/extend.texi (Common Attributes): Fix typo in example.
++
++2026-10-16  Jeff Law  <jeffreyalaw@gmail.com>
++
++	Backported from master:
++	2026-09-27  Jeff Law  <jeffreyalaw@gmail.com>
++
++	PR tree-optimization/126462
++	* match.pd (reassociate xor to expose rotate patterns): Rewrite using
++	wi:: interfaces for the xor constant operand.
++
+ 2026-10-14  Richard Earnshaw  <rearnsha@arm.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index c8a23a41608f..a28247f23e03 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261016
++20261017
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 72358bf548c8..09e6a7d138a8 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2026-10-16  Jeff Law  <jeffreyalaw@gmail.com>
++
++	Backported from master:
++	2026-09-27  Jeff Law  <jeffreyalaw@gmail.com>
++
++	PR tree-optimization/126462
++	* gcc.dg/torture/pr126462.c: New test.
++
+ 2026-10-15  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+ 
+ 	Backported from master:

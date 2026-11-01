@@ -1,0 +1,96 @@
+From 391b113a2b78e9ec66acfae75c1ca3679d166fb6 Mon Sep 17 00:00:00 2001
+From: Georg-Johann Lay <avr@gjlay.de>
+Date: Sat, 29 Aug 2026 13:25:49 +0200
+Subject: [PATCH 117/385] AVR: Provide pushti1 to fix passing vector(16) in
+ memory
+
+This patch adds TImode to the MPUSH mode iterator that
+determines which push<mode>1 insns are available.
+It fixes passing vector(16) in memory.
+
+Push insns work around expr.cc which doesn't work properly for
+STACK_GROWS_DOWNWARDS + POST_DEC push.
+
+	PR middle-end/127098
+gcc/
+	* config/avr/avr.md (MPUSH): Add TImode to mode iterator.
+	* config/avr/avr.h (PUSH_ROUNDING): Adjust comment.
+gcc/testsuite/
+	* gcc.target/avr/torture/pr127098.c: New test.
+
+(cherry picked from commit 96a3184a784fe96c19ca9b15866162a01045b9de)
+---
+ gcc/config/avr/avr.h                          | 10 ++++-----
+ gcc/config/avr/avr.md                         |  2 +-
+ .../gcc.target/avr/torture/pr127098.c         | 21 +++++++++++++++++++
+ 3 files changed, 27 insertions(+), 6 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/avr/torture/pr127098.c
+
+diff --git a/gcc/config/avr/avr.h b/gcc/config/avr/avr.h
+index 95ab03cb8e70..2b636c116630 100644
+--- a/gcc/config/avr/avr.h
++++ b/gcc/config/avr/avr.h
+@@ -321,10 +321,6 @@ enum reg_class {
+ 
+ #define RETURN_ADDR_RTX(count, tem) avr_return_addr_rtx (count, tem)
+ 
+-/* Don't use Push rounding. expr.cc: emit_single_push_insn is broken
+-   for POST_DEC targets (PR27386).  */
+-/*#define PUSH_ROUNDING(NPUSHED) (NPUSHED)*/
+-
+ typedef struct avr_args
+ {
+   /* # Registers available for passing */
+@@ -603,7 +599,11 @@ struct GTY(()) machine_function
+ };
+ 
+ /* AVR does not round pushes, but the existence of this macro is
+-   required in order for pushes to be generated.  */
++   required in order for pushes to be generated.
++   This macro was removed for PR27386 and then later re-added when
++   push insns were introduced.  Push insns can work around broken
++   argument setup in expr.cc that doesn't work properly for
++   STACK_GROWS_DOWNWARDS + POST_DEC push, see PR127098.  */
+ #define PUSH_ROUNDING(X)	(X)
+ 
+ /* Define prototype here to avoid build warning.  Some files using
+diff --git a/gcc/config/avr/avr.md b/gcc/config/avr/avr.md
+index 17b614a6d706..717ab82b8ef8 100644
+--- a/gcc/config/avr/avr.md
++++ b/gcc/config/avr/avr.md
+@@ -478,7 +478,7 @@
+    HI CHI HA UHA HQ UHQ
+    SI CSI SA USA SQ USQ
+    DI CDI DA UDA DQ UDQ
+-   TA UTA
++   TA UTA TI
+    SF DF SC DC
+    PSI])
+ 
+diff --git a/gcc/testsuite/gcc.target/avr/torture/pr127098.c b/gcc/testsuite/gcc.target/avr/torture/pr127098.c
+new file mode 100644
+index 000000000000..c3931f9e3ff1
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/avr/torture/pr127098.c
+@@ -0,0 +1,21 @@
++/* { dg-do run } */
++
++#define NI __attribute((noipa))
++
++typedef char U __attribute__ ((vector_size (16)));
++
++NI void fun (long i, U u)
++{
++  (void) i;
++  if (u[0] != 1)
++    __builtin_abort ();
++}
++
++U u = { 1 };
++
++int main (void)
++{
++  fun (0, u);
++
++  return 0;
++}

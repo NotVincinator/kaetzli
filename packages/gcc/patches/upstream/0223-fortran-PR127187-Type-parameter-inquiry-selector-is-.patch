@@ -1,0 +1,67 @@
+From 3e3771d80a37fd6c83799d6a8a8f54401f552c90 Mon Sep 17 00:00:00 2001
+From: Jerry DeLisle <jvdelisle@gcc.gnu.org>
+Date: Tue, 29 Sep 2026 10:04:39 -0700
+Subject: [PATCH 223/385] fortran: [PR127187] Type parameter inquiry selector
+ is not a variable
+
+A selector that is a LEN or KIND type parameter inquiry, e.g. s%len, was
+treated as a variable, so the associate-name pointed to the string length
+of s and followed later changes of it.  On targets where the charlen type
+is default INTEGER, associate_90.f90 failed with ERROR STOP 8.
+
+Assisted-by: Claude Opus 5.5
+
+	PR fortran/127187
+
+gcc/fortran/ChangeLog:
+
+	* resolve.cc (resolve_assoc_var): A selector with a LEN or KIND
+	inquiry reference is not a variable.
+
+gcc/testsuite/ChangeLog:
+
+	* gfortran.dg/associate_90.f90: Add -fdump-tree-original and check
+	that no associate-name points to a string length.
+
+(cherry picked from commit ea52b53ad8fe0025f973a70e32d32a6e9d342ca6)
+---
+ gcc/fortran/resolve.cc                     | 10 ++++++++++
+ gcc/testsuite/gfortran.dg/associate_90.f90 |  2 ++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/gcc/fortran/resolve.cc b/gcc/fortran/resolve.cc
+index e29cfe428715..95d8d50fcfce 100644
+--- a/gcc/fortran/resolve.cc
++++ b/gcc/fortran/resolve.cc
+@@ -10742,6 +10742,16 @@ resolve_assoc_var (gfc_symbol* sym, bool resolve_target)
+ 			   && !gfc_has_vector_subscript (target))
+ 			  || gfc_is_ptr_fcn (target));
+ 
++  /* A type parameter inquiry is not a variable.  */
++  if (sym->assoc->variable && target->expr_type == EXPR_VARIABLE)
++    for (gfc_ref *ref = target->ref; ref; ref = ref->next)
++      if (ref->type == REF_INQUIRY
++	  && (ref->u.i == INQUIRY_LEN || ref->u.i == INQUIRY_KIND))
++	{
++	  sym->assoc->variable = false;
++	  break;
++	}
++
+   /* Finally resolve if this is an array or not.  */
+   if (target->expr_type == EXPR_FUNCTION && target->rank == 0
+       && (sym->ts.type == BT_CLASS || sym->ts.type == BT_DERIVED))
+diff --git a/gcc/testsuite/gfortran.dg/associate_90.f90 b/gcc/testsuite/gfortran.dg/associate_90.f90
+index 2190aa83693a..5d071e57c16d 100644
+--- a/gcc/testsuite/gfortran.dg/associate_90.f90
++++ b/gcc/testsuite/gfortran.dg/associate_90.f90
+@@ -1,4 +1,5 @@
+ ! { dg-do run }
++! { dg-options "-fdump-tree-original" }
+ !
+ ! PR 127187
+ ! %LEN and %KIND inquiries of deferred-length character in ASSOCIATE.
+@@ -67,3 +68,4 @@ program assoc_len_kind
+   end associate
+   deallocate (p)
+ end program
++! { dg-final { scan-tree-dump-not "n = &" "original" } }

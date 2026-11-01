@@ -1,0 +1,72 @@
+From 75840de1c13e8a30a9f6e14dc43a4dd731a96dc9 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Wed, 30 Sep 2026 12:38:35 +0200
+Subject: [PATCH 272/385] testsuite: Fix up PR127492 test
+
+As I wrote earlier, I couldn't make
+On Tue, Sep 29, 2026 at 09:08:28AM +0200, Jakub Jelinek wrote:
+> --- a/gcc/testsuite/gcc.dg/pr127492.c 2026-09-22 14:58:11.232624179 +0200
+> +++ b/gcc/testsuite/gcc.dg/pr127492.c 2026-09-29 08:51:56.240821492 +0200
+> @@ -1,5 +1,5 @@
+>  /* PR middle-end/127492 */
+> -/* { dg-do run } */
+> +/* { dg-do run { target { { { int128 && sync_int_128_runtime } || { { ! int128 } && sync_long_long_runtime } } || libatomic_available } } } */
+>  /* { dg-options "-O2" } */
+>  /* { dg-additional-options "-latomic" { target libatomic_available } } */
+to work, dunno if multiple occurrences of the same effective target
+once not negated and once negated don't cause it.
+
+So, here is a patch which splits the test into two, one tests just
+__int128 atomics, one tests long long atomics, on lp64 targets
+we can test both.
+And the effective targets are so that either the target has hw
+support of the atomics with no need of -latomic, or -latomic is available.
+
+2026-09-30  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/127492
+	* gcc.dg/pr127492.c: Require int128 effective target and either
+	sync_int_128_runtime or libatomic_available.  Drop the long long
+	fallback, but define T only if it is not defined already.
+	* gcc.dg/pr127492-2.c: New test.
+
+Reviewed-by: Richard Biener <rguenth@suse.de>
+(cherry picked from commit 13fd34134abc930f473b558b97fdc6ec99d07a16)
+---
+ gcc/testsuite/gcc.dg/pr127492-2.c | 7 +++++++
+ gcc/testsuite/gcc.dg/pr127492.c   | 6 ++----
+ 2 files changed, 9 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/pr127492-2.c
+
+diff --git a/gcc/testsuite/gcc.dg/pr127492-2.c b/gcc/testsuite/gcc.dg/pr127492-2.c
+new file mode 100644
+index 000000000000..3ddd0835f50b
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr127492-2.c
+@@ -0,0 +1,7 @@
++/* PR middle-end/127492 */
++/* { dg-do run { target { sync_long_long_runtime || libatomic_available } } } */
++/* { dg-options "-O2" } */
++/* { dg-additional-options "-latomic" { target libatomic_available } } */
++
++#define T long long
++#include "pr127492.c"
+diff --git a/gcc/testsuite/gcc.dg/pr127492.c b/gcc/testsuite/gcc.dg/pr127492.c
+index 89c747602123..607565033c30 100644
+--- a/gcc/testsuite/gcc.dg/pr127492.c
++++ b/gcc/testsuite/gcc.dg/pr127492.c
+@@ -1,12 +1,10 @@
+ /* PR middle-end/127492 */
+-/* { dg-do run } */
++/* { dg-do run { target { int128 && { sync_int_128_runtime || libatomic_available } } } } */
+ /* { dg-options "-O2" } */
+ /* { dg-additional-options "-latomic" { target libatomic_available } } */
+ 
+-#ifdef __SIZEOF_INT128__
++#ifndef T
+ #define T __int128
+-#else
+-#define T long long
+ #endif
+ T v = 1;
+ 

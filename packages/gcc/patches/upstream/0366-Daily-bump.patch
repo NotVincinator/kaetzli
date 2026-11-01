@@ -1,0 +1,305 @@
+From 85288acc8becaf4588a6404f190669786e5522e0 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 29 Oct 2026 00:21:08 +0000
+Subject: [PATCH 366/385] Daily bump.
+
+---
+ gcc/ChangeLog           | 123 ++++++++++++++++++++++++++++++++++++++++
+ gcc/DATESTAMP           |   2 +-
+ gcc/testsuite/ChangeLog |  91 +++++++++++++++++++++++++++++
+ libstdc++-v3/ChangeLog  |  48 ++++++++++++++++
+ 4 files changed, 263 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index a909d7362c0e..1061e5c2bdac 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,126 @@
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-10-13  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127858
++	* tree-ssa-loop-im.cc (gather_mem_refs_stmt): When merging
++	accesses with differing access path always reset base and
++	offset to the canonical form by re-using the already canonical
++	ao_ref.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-10-12  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127814
++	* tree-vect-loop-manip.cc (vect_loop_versioning): Emit
++	versioning for niter assumption conditions first and
++	split those to the separate BB together with the cost model
++	check after rewriting all of it to unconditional defined operations.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-10-08  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127764
++	* ipa-fnsummary.cc (set_switch_stmt_execution_predicate):
++	Use wi::to_widest to preserve sign when extending min to type.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-10-09  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127762
++	* gimple-fold.cc (decode_field_reference): Change psignbit to
++	int * and set it to 1 for sign extensions, -1 if all extension
++	bits are clear, or 0 otherwise.
++	(fold_truth_andor_for_ifcombine): Change ll_signbit, lr_signbit,
++	rl_signbit, and rr_signbit to int.  Check for signbit > 0 when
++	including sign bit in test, and signbit < 0 when checking for
++	zero-extension.  Only reject positive lr_signbit and
++	rr_signbit.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-25  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127601
++	* tree-vect-stmts.cc (get_load_store_type): Move overrun
++	flags and final handling to the relevant section, after
++	determining the step direction and the memory access type.
++	Only elide overrun with half-vector accesses for the
++	memory access types supporting that.  Do not claim
++	VMAT_STRIDED_SLP can handle overruns when the step is
++	negative.
++	(vectorizable_load): For the last memory access type group
++	analysis/transform assert what memory access type that covers.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-25  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127600
++	* tree-vect-loop.cc (vect_is_simple_iv_evolution): Explicitly
++	initialize STMT_VINFO_LOOP_PHI_EVOLUTION_TYPE.
++	(is_nonwrapping_integer_induction): Bail out for alternate
++	induction types.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-25  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127588
++	* tree-vect-loop-manip.cc (vect_update_ivs_after_vectorizer):
++	Use an unsigned type to compute the epilog start value.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-10-09  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127521
++	* gimple-fold.cc (fold_truth_andor_for_ifcombine): Reject
++	non-constant compares that test the same bit in different ways.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-17  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127407
++	* tree-vect-data-refs.cc (vect_analyze_data_ref_dependence):
++	Also call vect_preserves_scalar_order_p for negative dependence
++	distance.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-17  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127405
++	* tree-ssa-loop-manip.cc (tree_transform_and_unroll_loop): Only
++	set nb_iterations_upper_bound of the epilogue loop and scale its
++	profile when the control IV is known not to wrap.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-10-09  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/126563
++	* tree-ssa-ifcombine.cc (recognize_bits_test): Do not call
++	get_name_for_bit_test on rhs1.
++	(ifcombine_ifandif): Check all operands for abnormal PHIs.
++	Look through conversions via get_name_for_bit_test on the names
++	only when direct matching fails.
++
+ 2026-10-27  Igor Shevlyakov  <igor@tachyum.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 989891298ee4..2e398bcbd4e5 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261028
++20261029
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 508a952a4a0a..e0105ab04eec 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,94 @@
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-10-13  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127858
++	* gcc.dg/torture/pr127858.c: New testcase.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-10-12  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127814
++	* gcc.dg/vect/vect-pr127814.c: New testcase.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-10-08  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127764
++	* gcc.dg/torture/pr127764.c: New testcase.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-10-09  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127762
++	* gcc.dg/field-merge-27.c: New test.
++	* gcc.dg/field-merge-29.c: New test.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-25  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127601
++	* gcc.dg/vect/vect-pr127601.c: New testcase.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-25  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127600
++	* gcc.dg/vect/vect-cond-reduc-7.c: New testcase.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-25  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127588
++	* gcc.dg/vect/vect-iv-15.c: New testcase.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-10-09  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127521
++	* gcc.dg/field-merge-30.c: New test.
++	* gcc.dg/field-merge-31.c: New test.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-17  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127407
++	* gcc.dg/vect/vect-pr127407.c: New testcase.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-17  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127405
++	* gcc.dg/tree-ssa/predcom-10.c: New test.
++
++2026-10-28  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-10-09  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/126563
++	* gcc.dg/tree-ssa/ssa-ifcombine-14.c: New test.
++	* gcc.dg/tree-ssa/ssa-ifcombine-15.c: New test.
++
+ 2026-10-27  Thomas Koenig  <tkoenig@gcc.gnu.org>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index 92db65e9cd94..12eeb467c368 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,51 @@
++2026-10-28  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-10-20  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/127476
++	* include/std/memory [!_GLIBCXX_HOSTED]: Do not include
++	bits/indirect.h.
++
++2026-10-28  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-10-02  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/127675
++	* include/ext/pb_ds/detail/debug_map_base.hpp (split, join): Use
++	std::list::splice to move elements without reallocating.
++	* include/ext/pb_ds/detail/ov_tree_map_/constructors_destructor_fn_imps.hpp
++	(copy_from_ordered_range(It, It, It, It)): Do not allocate new
++	storage for an empty container.
++	* include/ext/pb_ds/detail/ov_tree_map_/erase_fn_imps.hpp
++	(erase_if): Do not modify this->debug_base::m_keys until all
++	allocations and other potentially-throwing operations have
++	completed successfully.
++	(erase_imp): Do not allocate new storage for an empty container.
++	* testsuite/ext/pb_ds/regression/127675.cc: New test.
++	* testsuite/util/testsuite_rng.h (get_time_determined_seed): Use
++	getenv("GLIBCXX_SEED_TEST_RNG") to allow the seed to be fixed.
++
++2026-10-28  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-10-01  Jonathan Wakely  <jwakely@redhat.com>
++
++	* testsuite/ext/pb_ds/regression/hash_map_rand.cc: Remove c++17
++	target selector.
++	* testsuite/ext/pb_ds/regression/hash_set_rand.cc: Likewise.
++	* testsuite/ext/pb_ds/regression/list_update_map_rand.cc:
++	Likewise.
++	* testsuite/ext/pb_ds/regression/list_update_set_rand.cc:
++	Likewise.
++	* testsuite/ext/pb_ds/regression/priority_queue_rand.cc:
++	Likewise.
++	* testsuite/ext/pb_ds/regression/tree_map_rand.cc: Likewise.
++	* testsuite/ext/pb_ds/regression/tree_set_rand.cc: Likewise.
++	* testsuite/ext/pb_ds/regression/trie_map_rand.cc: Likewise.
++	* testsuite/ext/pb_ds/regression/trie_set_rand.cc: Likewise.
++
+ 2026-10-26  Tomasz Kamiński  <tkaminsk@redhat.com>
+ 
+ 	* include/std/mdspan (layout_stride::mapping::_M_check_unique):

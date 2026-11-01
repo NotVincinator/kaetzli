@@ -1,0 +1,92 @@
+From 8d06be85e7b25e32eb98613f3dc52ce8cd6efd72 Mon Sep 17 00:00:00 2001
+From: Jerry DeLisle <jvdelisle@gcc.gnu.org>
+Date: Sun, 12 Jul 2026 15:51:13 -0700
+Subject: [PATCH 302/385] fortran: [PR110421] Fix ICE sizing CLASS component
+ from derived value
+
+Allocating a CLASS component of a structure constructor from a
+non-polymorphic derived-type value ICEd, because
+alloc_scalar_allocatable_subcomponent passed the type's own symbol to
+gfc_get_symbol_decl to get the size.  The patch uses
+gfc_typenode_for_spec for derived types too, as it already does for
+every other type.
+
+	PR fortran/110421
+
+gcc/fortran/ChangeLog:
+
+	* trans-expr.cc (alloc_scalar_allocatable_subcomponent): Use
+	gfc_typenode_for_spec for BT_DERIVED values too.
+
+gcc/testsuite/ChangeLog:
+
+	* gfortran.dg/pr110421.f90: New test.
+
+(cherry picked from commit 51ade34151dff8e444bfe3623373f42c1a29b5fa)
+---
+ gcc/fortran/trans-expr.cc              |  5 +---
+ gcc/testsuite/gfortran.dg/pr110421.f90 | 39 ++++++++++++++++++++++++++
+ 2 files changed, 40 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr110421.f90
+
+diff --git a/gcc/fortran/trans-expr.cc b/gcc/fortran/trans-expr.cc
+index f087e803155d..bd1ea109d772 100644
+--- a/gcc/fortran/trans-expr.cc
++++ b/gcc/fortran/trans-expr.cc
+@@ -9998,10 +9998,7 @@ alloc_scalar_allocatable_subcomponent (stmtblock_t *block, tree comp,
+ 	    }
+ 	  else
+ 	    {
+-	      if (expr2->ts.type == BT_DERIVED)
+-		tmp = gfc_get_symbol_decl (expr2->ts.u.derived);
+-	      else
+-		tmp = gfc_typenode_for_spec (&expr2->ts);
++	      tmp = gfc_typenode_for_spec (&expr2->ts);
+ 	      size = TYPE_SIZE_UNIT (tmp);
+ 	    }
+ 	}
+diff --git a/gcc/testsuite/gfortran.dg/pr110421.f90 b/gcc/testsuite/gfortran.dg/pr110421.f90
+new file mode 100644
+index 000000000000..7d1b50d305a8
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr110421.f90
+@@ -0,0 +1,39 @@
++! { dg-do run }
++! PR 110421
++!
++! Allocate a CLASS component from an extended-type structure constructor
++! value; without the fix this ICEs in gfc_get_symbol_decl.
++
++program pr110421
++
++    implicit none
++
++    type :: typ1
++        integer :: i
++    end type
++
++    type, extends(typ1) :: typ1a
++        integer :: j
++    end type
++
++    type :: typ2
++        class(typ1), allocatable :: t1
++    end type
++
++    type(typ2) :: t2
++
++    t2 = typ2(t1=typ1(1))
++    if (.not. allocated(t2%t1)) stop 1
++    if (t2%t1%i /= 1) stop 2
++
++    t2 = typ2(t1=typ1a(2, 3))
++    if (.not. allocated(t2%t1)) stop 3
++    if (t2%t1%i /= 2) stop 4
++    select type (x => t2%t1)
++      type is (typ1a)
++        if (x%j /= 3) stop 5
++      class default
++        stop 6
++    end select
++
++end program pr110421

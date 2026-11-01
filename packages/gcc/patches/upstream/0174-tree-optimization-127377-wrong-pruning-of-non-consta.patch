@@ -1,0 +1,86 @@
+From adb9e99ab70b559f512922a2492e8e55d8dcc9ce Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Mon, 14 Sep 2026 11:08:37 +0200
+Subject: [PATCH 174/385] tree-optimization/127377 - wrong pruning of
+ non-constant partial defs
+
+The following fixes the failure to adjust for sub-byte padding of
+the partial definition before the object when pruning the size
+to sub-byte padding after the object.
+
+	PR tree-optimization/127377
+	* tree-ssa-sccvn.cc (vn_walk_cb_data::push_partial_def):
+	Properly consider the padding before the object when
+	pruning the size.
+
+	* gcc.dg/torture/pr127377.c: New testcase.
+
+(cherry picked from commit 492fbdbf99dc9d8c4f13d8afe654f36d47811a2f)
+---
+ gcc/testsuite/gcc.dg/torture/pr127377.c | 40 +++++++++++++++++++++++++
+ gcc/tree-ssa-sccvn.cc                   |  5 ++--
+ 2 files changed, 43 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/pr127377.c
+
+diff --git a/gcc/testsuite/gcc.dg/torture/pr127377.c b/gcc/testsuite/gcc.dg/torture/pr127377.c
+new file mode 100644
+index 000000000000..13fb8f25ca7d
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/pr127377.c
+@@ -0,0 +1,40 @@
++/* { dg-do run } */
++/* { dg-require-effective-target int32plus } */
++
++__attribute__((noipa))
++int q(void) {
++  struct h {
++    unsigned i : 1;
++    int : 1;
++    unsigned j : 3;
++    int k : 7;
++    int : 3;
++    int aa : 6;
++    unsigned l : 7;
++  };
++  union {
++    int m;
++    signed char b[4];
++    struct h ab;
++  } n = {};
++  int o;
++  n.m = 0x550f;
++  for (int i = 0; i < 1; i++) 
++  {
++    n.b[2] = n.ab.i + n.ab.aa;
++    n.m = n.m & ~28u | ((0x7 ^ n.ab.aa) & 7) << 2;
++  }
++  n.b[3] = 0;
++  n.m = n.m | 0x08000000;
++  n.b[2] = 0x7;
++  o = n.ab.l;
++  return o;
++}
++
++int main()
++{
++  int t1 =  q();
++  if (t1 != 64)
++    __builtin_abort ();
++  return 0;
++}
+diff --git a/gcc/tree-ssa-sccvn.cc b/gcc/tree-ssa-sccvn.cc
+index 0da9e250b521..c2e861067979 100644
+--- a/gcc/tree-ssa-sccvn.cc
++++ b/gcc/tree-ssa-sccvn.cc
+@@ -2078,8 +2078,9 @@ vn_walk_cb_data::push_partial_def (pd_data pd,
+ 	  pd.size -= o;
+ 	  pd.offset += o;
+ 	}
+-      if (pd.size > maxsizei)
+-	pd.size = maxsizei + ((pd.size - maxsizei) % BITS_PER_UNIT);
++      if (pd.size + pd.offset > offseti + maxsizei)
++	pd.size = maxsizei + ((pd.size + pd.offset - offseti - maxsizei)
++			      % BITS_PER_UNIT);
+     }
+ 
+   pd.offset -= offseti;

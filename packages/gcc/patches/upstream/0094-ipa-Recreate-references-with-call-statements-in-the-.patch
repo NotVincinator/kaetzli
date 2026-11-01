@@ -1,0 +1,65 @@
+From b9fd7202c05aa2c1e69cf373183b476b90854e73 Mon Sep 17 00:00:00 2001
+From: Josef Melcr <josef.melcr@suse.com>
+Date: Mon, 24 Aug 2026 12:20:41 +0200
+Subject: [PATCH 094/385] ipa: Recreate references with call statements in the
+ target clone pass [PR127023]
+
+References are recreated when redirecting edges in the target clone
+pass. However, the references are not created with their corresponding
+call statements, potentially leading to ICEs as shown in PR127023.  This
+patch fixes that.
+
+	PR ipa/127023
+
+gcc/ChangeLog:
+
+	* multiple_target.cc (create_dispatcher_calls): Use the call
+	statement variant of create_reference.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/i386/pr127023.c: New test.
+
+Signed-off-by: Josef Melcr <josef.melcr@suse.com>
+(cherry picked from commit 56773f432d94f5e2f1e3f2d5b106e4e60bbebcea)
+---
+ gcc/multiple_target.cc                   |  2 +-
+ gcc/testsuite/gcc.target/i386/pr127023.c | 16 ++++++++++++++++
+ 2 files changed, 17 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr127023.c
+
+diff --git a/gcc/multiple_target.cc b/gcc/multiple_target.cc
+index 3f8676f59435..01d3ff84bf34 100644
+--- a/gcc/multiple_target.cc
++++ b/gcc/multiple_target.cc
+@@ -190,7 +190,7 @@ create_dispatcher_calls (struct cgraph_node *node)
+ 		}
+ 
+ 	      symtab_node *source = ref->referring;
+-	      source->create_reference (inode, IPA_REF_ADDR);
++	      source->create_reference (inode, IPA_REF_ADDR, ref->stmt);
+ 	    }
+ 	  else if (ref->use == IPA_REF_ALIAS)
+ 	    {
+diff --git a/gcc/testsuite/gcc.target/i386/pr127023.c b/gcc/testsuite/gcc.target/i386/pr127023.c
+new file mode 100644
+index 000000000000..ecd6af57cf64
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr127023.c
+@@ -0,0 +1,16 @@
++/* PR ipa/127023 */
++/* { dg-do compile } */
++/* { dg-options "-O2 -fopenmp" } */
++/* { dg-require-ifunc "" } */
++
++__attribute__((target_clones("default", "fma4"), noinline))
++static void e(int f) {
++  if (!f)
++#pragma omp parallel
++    for (;;)
++      ;
++}
++__attribute__((target_clones("default", "fma4")))
++void g(void) {
++  e(1);
++}

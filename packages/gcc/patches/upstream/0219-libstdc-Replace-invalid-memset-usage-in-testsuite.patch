@@ -1,0 +1,61 @@
+From 37b61808f7e6ce007b1070154864c177f02cd1d4 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Tue, 29 Sep 2026 15:12:51 +0100
+Subject: [PATCH 219/385] libstdc++: Replace invalid memset usage in testsuite
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The __gnu_test::MallocInfo struct has a non-trivial default constructor
+which causes -Wclass-memaccess warnings when it is cleared using memset.
+Use assignment from value-initialized objects instead of memset.
+
+For consistency, clear rusage structs the same way.
+
+libstdc++-v3/ChangeLog:
+
+	* testsuite/util/testsuite_performance.h (resource_counter): Do
+	not use memset to clear non-trivial objects.
+
+Reviewed-by: Tomasz Kamiński <tkaminsk@redhat.com>
+(cherry picked from commit 166f136e186619e84ab64427bf106383982a96ab)
+---
+ libstdc++-v3/testsuite/util/testsuite_performance.h | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/libstdc++-v3/testsuite/util/testsuite_performance.h b/libstdc++-v3/testsuite/util/testsuite_performance.h
+index 524a1a577858..ff85d77eb45d 100644
+--- a/libstdc++-v3/testsuite/util/testsuite_performance.h
++++ b/libstdc++-v3/testsuite/util/testsuite_performance.h
+@@ -157,17 +157,17 @@ namespace __gnu_test
+     void
+     clear() throw()
+     {
+-      memset(&rusage_begin, 0, sizeof(rusage_begin));
+-      memset(&rusage_end, 0, sizeof(rusage_end));
+-      memset(&allocation_begin, 0, sizeof(allocation_begin));
+-      memset(&allocation_end, 0, sizeof(allocation_end));
++      rusage_begin = rusage();
++      rusage_end = rusage();
++      allocation_begin = MallocInfo();
++      allocation_end = MallocInfo();
+     }
+ 
+     void
+     start()
+     {
+       if (getrusage(who, &rusage_begin) != 0 )
+-	memset(&rusage_begin, 0, sizeof(rusage_begin));
++	rusage_begin = rusage();
+       void* p __attribute__((unused)) = malloc(0); // Needed for some implementations.
+       allocation_begin = malloc_info();
+     }
+@@ -176,7 +176,7 @@ namespace __gnu_test
+     stop()
+     {
+       if (getrusage(who, &rusage_end) != 0 )
+-	memset(&rusage_end, 0, sizeof(rusage_end));
++	rusage_end = rusage();
+       allocation_end = malloc_info();
+     }
+ 

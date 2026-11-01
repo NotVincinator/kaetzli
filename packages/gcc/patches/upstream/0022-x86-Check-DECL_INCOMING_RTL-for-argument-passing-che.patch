@@ -1,0 +1,290 @@
+From 01c7083b70a6bbf620d2cb2ce887baf501fe2f1f Mon Sep 17 00:00:00 2001
+From: "H.J. Lu" <hjl.tools@gmail.com>
+Date: Sat, 1 Aug 2026 06:07:43 +0800
+Subject: [PATCH 022/385] x86: Check DECL_INCOMING_RTL for argument passing
+ check
+
+For argument declaration, its DECL_INCOMING_RTL holds an RTL for the
+stack slot or register where the data was actually passed.  If an
+argument's DECL_INCOMING_RTL is a memory operand, it is passed on stack
+by caller.  Change ix86_argument_passed_on_stack_p to return true if the
+argument's DECL_INCOMING_RTL is a memory operand.
+
+gcc/
+
+	PR target/126320
+	PR target/126450
+	PR target/126529
+	* config/i386/i386.cc (ix86_spill_register_argument_p): Removed.
+	(ix86_argument_passed_on_stack_p): Remove the second argument.
+	Return true if the argument's DECL_INCOMING_RTL is a memory
+	operand.
+	(ix86_update_stack_alignment): Updated.
+
+gcc/testsuite/
+
+	PR target/126320
+	PR target/126450
+	PR target/126529
+	* gcc.target/i386/pr126529-1.c: New test.
+	* gcc.target/i386/pr126529-2.c: Likewise.
+	* gcc.target/i386/pr126529-3.c: Likewise.
+	* gcc.target/i386/pr126529-4.c: Likewise.
+
+Signed-off-by: H.J. Lu <hjl.tools@gmail.com>
+(cherry picked from commit b06b1ea150558cfe83111b48b94b4297cb3dec05)
+---
+ gcc/config/i386/i386.cc                    | 48 ++++------------------
+ gcc/testsuite/gcc.target/i386/pr126529-1.c | 39 ++++++++++++++++++
+ gcc/testsuite/gcc.target/i386/pr126529-2.c | 40 ++++++++++++++++++
+ gcc/testsuite/gcc.target/i386/pr126529-3.c | 32 +++++++++++++++
+ gcc/testsuite/gcc.target/i386/pr126529-4.c | 33 +++++++++++++++
+ 5 files changed, 151 insertions(+), 41 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr126529-1.c
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr126529-2.c
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr126529-3.c
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr126529-4.c
+
+diff --git a/gcc/config/i386/i386.cc b/gcc/config/i386/i386.cc
+index 4dfb90acf3f6..bf2a3bdfbea1 100644
+--- a/gcc/config/i386/i386.cc
++++ b/gcc/config/i386/i386.cc
+@@ -8625,42 +8625,10 @@ struct stack_access_data
+   unsigned int *stack_alignment;
+ };
+ 
+-/* SET stores into OP, a MEM linked to parameter BASE.  Return true if
+-   SET stores BASE's argument register into OP.  This is a spill: the
+-   callee saves its own register argument to the stack.  It is not a
+-   stack argument set up by the caller:
+-
+-     (set (mem/c:V2DI (plus:DI (reg/f:DI 7 sp)
+-		(const_int -16 [0xfffffffffffffff0])) [4 a1+0 S16 A128])
+-	  (reg:V2DI 20 xmm0 [ a1 ]))
+- */
+-
+-static bool
+-ix86_spill_register_argument_p (const_rtx set, const_rtx op, tree base)
+-{
+-  rtx src = SET_SRC (set);
+-
+-  /* Not a hard register store, so not a spill.  */
+-  if (!REG_P (src) || !HARD_REGISTER_P (src))
+-    return false;
+-
+-  rtx dest = SET_DEST (set);
+-  tree reg_expr = REG_EXPR (src);
+-
+-  /* If spilling an SSA_NAME into OP, the argument-linked memory is
+-     also used to store a local variable.  */
+-  return dest == op && (reg_expr == base
+-			|| (reg_expr
+-			    && TREE_CODE (reg_expr) == SSA_NAME));
+-}
+-
+-/* Return true if OP, found in PAT, is a stack argument set up by the
+-   caller.  Return false if OP is a register argument that the callee
+-   spilled to its own stack frame.  Both cases share the same MEM_EXPR,
+-   so we must check PAT to tell them apart.  */
++/* Return true if OP is a stack argument set up by the caller.  */
+ 
+ static bool
+-ix86_argument_passed_on_stack_p (const_rtx op, const_rtx pat)
++ix86_argument_passed_on_stack_p (const_rtx op)
+ {
+   tree mem_expr = MEM_EXPR (op);
+   if (!mem_expr)
+@@ -8670,12 +8638,10 @@ ix86_argument_passed_on_stack_p (const_rtx op, const_rtx pat)
+   if (TREE_CODE (var) != PARM_DECL)
+     return false;
+ 
+-  /* PAT is always a single SET here: note_stores splits PARALLEL
+-     patterns into separate SETs before calling this function.  */
+-  if (GET_CODE (pat) == SET)
+-    return !ix86_spill_register_argument_p (pat, op, var);
+-
+-  return true;
++  /* For PARM_DECL, DECL_INCOMING_RTL holds an RTL for the stack slot
++     or register where the data was actually passed.  Return true if
++     OP is passed in memory.  */
++  return DECL_INCOMING_RTL (var) && MEM_P (DECL_INCOMING_RTL (var));
+ }
+ 
+ /* Update the maximum stack slot alignment from memory alignment in PAT.  */
+@@ -8697,7 +8663,7 @@ ix86_update_stack_alignment (rtx, const_rtx pat, void *data)
+ 	     responsible to align the outgoing stack for arguments
+ 	     passed on stack.  */
+ 	  if (reg_mentioned_p (p->reg, XEXP (op, 0))
+-	      && !ix86_argument_passed_on_stack_p (op, pat))
++	      && !ix86_argument_passed_on_stack_p (op))
+ 	    {
+ 	      unsigned int alignment = MEM_ALIGN (op);
+ 
+diff --git a/gcc/testsuite/gcc.target/i386/pr126529-1.c b/gcc/testsuite/gcc.target/i386/pr126529-1.c
+new file mode 100644
+index 000000000000..aa53283e5e36
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr126529-1.c
+@@ -0,0 +1,39 @@
++/* { dg-do run } */
++/* { dg-options "-O2 -march=x86-64" } */
++
++typedef signed char A[[gnu::vector_size (2)]];
++typedef short B[[gnu::vector_size (16)]];
++int a, b, c, d;
++B e;
++[[gnu::vector_size(8 * sizeof (int))]] int f;
++_Bool g;
++
++__attribute__((noipa, noinline, target("avx2")))
++void *
++foo (long long x, _Bool y, int z, B w)
++{
++  A h = {};
++  short i = h[z];
++  f = 0 % f;
++  w = e;
++  d = w[g];
++  h = ((union { short s; A t; }) { i }).t;
++  b = 3 / x;
++  h = __builtin_shufflevector (h, h, 3, 2);
++lab:
++  c = h[0];
++  if (y)
++    return 0;
++  y = 1;
++  h = ~h;
++  goto lab;
++}
++
++int
++main (void)
++{
++ if (__builtin_cpu_supports ("avx2"))
++   foo (3355934481768670720LL, 0, a, e);
++
++  return 0;
++}
+diff --git a/gcc/testsuite/gcc.target/i386/pr126529-2.c b/gcc/testsuite/gcc.target/i386/pr126529-2.c
+new file mode 100644
+index 000000000000..d37c0bf59978
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr126529-2.c
+@@ -0,0 +1,40 @@
++/* { dg-do run } */
++/* { dg-options "-O2 -march=x86-64" } */
++
++typedef signed char A[[gnu::vector_size (2)]];
++typedef short B[[gnu::vector_size (16)]];
++int a, b, c, d;
++B e;
++[[gnu::vector_size(8 * sizeof (int))]] int f;
++_Bool g;
++
++__attribute__((noipa, noinline, target("avx2")))
++void *
++foo (float f1, float f2, float f3, float f4, float f5, float f6, float f7,
++     float f8, long long x, _Bool y, int z, B w)
++{
++  A h = {};
++  short i = h[z];
++  f = 0 % f;
++  w = e;
++  d = w[g];
++  h = ((union { short s; A t; }) { i }).t;
++  b = 3 / x;
++  h = __builtin_shufflevector (h, h, 3, 2);
++lab:
++  c = h[0];
++  if (y)
++    return 0;
++  y = 1;
++  h = ~h;
++  goto lab;
++}
++
++int
++main (void)
++{
++ if (__builtin_cpu_supports ("avx2"))
++   foo (1, 2, 3, 4, 5, 6, 7, 8, 3355934481768670720LL, 0, a, e);
++
++  return 0;
++}
+diff --git a/gcc/testsuite/gcc.target/i386/pr126529-3.c b/gcc/testsuite/gcc.target/i386/pr126529-3.c
+new file mode 100644
+index 000000000000..740b21b1b286
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr126529-3.c
+@@ -0,0 +1,32 @@
++/* { dg-do compile { target *-*-linux* } } */
++/* { dg-options "-O2 -march=x86-64-v3" } */
++/* { dg-final { scan-assembler "and\[lq\]?\[\\t \]+\\$-32,\[\\t \]*%\[re\]?sp" } } */
++/* { dg-final { scan-assembler "vmovdqa\[\\t \]+%ymm" } } */
++
++typedef signed char A[[gnu::vector_size (2)]];
++typedef short B[[gnu::vector_size (32)]];
++int a, b, c, d;
++B e;
++[[gnu::vector_size(8 * sizeof (int))]] int f;
++_Bool g;
++
++[[gnu::noipa]] void *
++foo (float f1, float f2, float f3, float f4, float f5, float f6, float f7,
++     long long x, _Bool y, int z, B w)
++{
++  A h = {};
++  short i = h[z];
++  f = 0 % f;
++  w = e;
++  d = w[g];
++  h = ((union { short s; A t; }) { i }).t;
++  b = 3 / x;
++  h = __builtin_shufflevector (h, h, 3, 2);
++lab:
++  c = h[0];
++  if (y)
++    return 0;
++  y = 1;
++  h = ~h;
++  goto lab;
++}
+diff --git a/gcc/testsuite/gcc.target/i386/pr126529-4.c b/gcc/testsuite/gcc.target/i386/pr126529-4.c
+new file mode 100644
+index 000000000000..2c08d56ca236
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr126529-4.c
+@@ -0,0 +1,33 @@
++/* { dg-do compile { target *-*-linux* } } */
++/* { dg-options "-O2 -march=x86-64-v3" } */
++/* { dg-final { scan-assembler "and\[lq\]?\[\\t \]+\\$-32,\[\\t \]*%\[re\]?sp" { target ia32 } } } */
++/* { dg-final { scan-assembler-not "and\[lq\]?\[\\t \]+\\$-32,\[\\t \]*%\[re\]?sp" { target { ! ia32 } } } } */
++/* { dg-final { scan-assembler "vmovdqa\[\\t \]+%ymm" } } */
++
++typedef signed char A[[gnu::vector_size (2)]];
++typedef short B[[gnu::vector_size (32)]];
++int a, b, c, d;
++B e;
++[[gnu::vector_size(8 * sizeof (int))]] int f;
++_Bool g;
++
++[[gnu::noipa]] void *
++foo (float f1, float f2, float f3, float f4, float f5, float f6, float f7,
++     float f8, long long x, _Bool y, int z, B w)
++{
++  A h = {};
++  short i = h[z];
++  f = 0 % f;
++  w = e;
++  d = w[g];
++  h = ((union { short s; A t; }) { i }).t;
++  b = 3 / x;
++  h = __builtin_shufflevector (h, h, 3, 2);
++lab:
++  c = h[0];
++  if (y)
++    return 0;
++  y = 1;
++  h = ~h;
++  goto lab;
++}

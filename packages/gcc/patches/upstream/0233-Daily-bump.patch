@@ -1,0 +1,113 @@
+From 74ad99597478c5bbc2fc5af9dbc11cadbc5014ce Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sat, 3 Oct 2026 00:20:50 +0000
+Subject: [PATCH 233/385] Daily bump.
+
+---
+ gcc/ChangeLog           | 18 +++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog |  8 ++++++++
+ libstdc++-v3/ChangeLog  | 44 +++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 71 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index d90ce25a874a..b821cb64a1af 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,21 @@
++2026-10-02  Tamar Christina  <tamar.christina@arm.com>
++
++	Backported from master:
++	2026-09-24  Tamar Christina  <tamar.christina@arm.com>
++
++	PR tree-optimization/127579
++	* tree-vect-loop.cc (info_for_reduction): Add assert.
++	* tree-vect-stmts.cc (vectorizable_operation): Pass SLP node.
++
++2026-10-02  Alexey Lapshin  <alexey.lapshin@espressif.com>
++
++	Backported from master:
++	2026-09-29  Alexey Lapshin  <alexey.lapshin@espressif.com>
++
++	PR target/107549
++	* config/xtensa/xtensa.cc (xt_true_regnum): Don't index
++	reg_renumber before LRA starts.
++
+ 2026-09-30  Alfie Richards  <alfie.richards@arm.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 8b2dfd12ad46..76956e8cd411 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261002
++20261003
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 3004963825c3..402cc200cf99 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2026-10-02  Tamar Christina  <tamar.christina@arm.com>
++
++	Backported from master:
++	2026-09-24  Tamar Christina  <tamar.christina@arm.com>
++
++	PR tree-optimization/127579
++	* gcc.target/aarch64/pr127579.c: New test.
++
+ 2026-10-01  Christophe Lyon  <christophe.lyon@arm.com>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index f08446501cc9..4a74f171c79a 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,47 @@
++2026-10-02  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-10-02  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/125785
++	* include/std/ranges (enable_borrowed_range<as_input_view<T>>):
++	Define partial specialization.
++	* testsuite/std/ranges/adaptors/as_input/1.cc: Test
++	specialization for as_input_view.
++	* testsuite/std/ranges/adaptors/as_const/1.cc: Test
++	specialization for as_const_view.
++	* testsuite/std/ranges/adaptors/as_rvalue/1.cc: Test
++	specialization for as_rvalue_view.
++
++2026-10-02  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-10-02  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/127666
++	* src/c++17/floating_from_chars.cc (pattern): Avoid reading past
++	the end of the input. Remove unused variable.
++	* testsuite/20_util/from_chars/127666.cc: New test.
++
++2026-10-02  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-07-31  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/126364
++	* include/bits/chrono_io.h (_Parser::operator()) <R>: Only break
++	early when setting failbit.
++	* testsuite/std/time/parse/126364.cc: New test.
++
++2026-10-02  Tomasz Kamiński  <tkaminsk@redhat.com>
++
++	Backported from master:
++	2026-05-13  Tomasz Kamiński  <tkaminsk@redhat.com>
++
++	PR libstdc++/114400
++	* include/std/string_view (operator<=>): Use type_identity_t
++	instead of __type_identity_t.
++
+ 2026-09-30  Jonathan Wakely  <jwakely@redhat.com>
+ 
+ 	Backported from master:

@@ -1,0 +1,96 @@
+From 4520a26b9ba46a7f7c59265c8d26f9d2ed761ecd Mon Sep 17 00:00:00 2001
+From: Jeff Law <jeffreyalaw@gmail.com>
+Date: Sun, 27 Sep 2026 08:54:33 -0600
+Subject: [PATCH 304/385] [PATCH][PR tree-optimization/126462] Fix
+ reassociation exposing rotate+xor to work correctly for int128 and BitInt
+
+This has been pending in my queue for a while.   Just keeps getting pushed
+down.
+
+As the PR notes, I added a patch a while back that could reassociate an xor
+operation out of certain sequences which in turn would allow the sequence to be
+recognized as rotate+xor.
+
+That patch did not handle 128 bit integers as I used the HOST_WIDE_INT
+interfaces.  Similarly it didn't handle BitInt.
+
+This patch changes it to use the wi:: interfaces which fix the code generation
+issue on aarch64 with int128 and allow the sequence to safely fire for BitInt.
+The recommendations for adjustment were Jakub's.
+
+Bootstrapped and regression tested on x86, aarch64 and riscv. Crosses also
+tested without regressions, though I don't think they provide meaningfully more
+coverage for int128 and BitInt.
+
+	PR tree-optimization/126462
+gcc/
+	* match.pd (reassociate xor to expose rotate patterns): Rewrite using
+	wi:: interfaces for the xor constant operand.
+
+gcc/testsuite/
+	* gcc.dg/torture/pr126462.c: New test.
+
+(cherry picked from commit 55867c37ec0dd0c4f1872183a6e43ea7dc16d479)
+---
+ gcc/match.pd                            |  6 ++----
+ gcc/testsuite/gcc.dg/torture/pr126462.c | 26 +++++++++++++++++++++++++
+ 2 files changed, 28 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/pr126462.c
+
+diff --git a/gcc/match.pd b/gcc/match.pd
+index c23df0086080..5dd1f9c3ca19 100644
+--- a/gcc/match.pd
++++ b/gcc/match.pd
+@@ -12259,8 +12259,7 @@ and,
+    (if (type_has_mode_precision_p (type)
+ 	&& tree_fits_uhwi_p (@1)
+ 	&& tree_fits_uhwi_p (@3)
+-	&& tree_fits_uhwi_p (@4)
+-	&& ((~((HOST_WIDE_INT_1U << tree_to_uhwi (@1)) - 1)) & tree_to_uhwi (@4)) == 0
++	&& (wi::mask (tree_to_uhwi (@1), true, TYPE_PRECISION (type)) & wi::to_wide (@4)) == 0
+         && (tree_to_uhwi (@1) + tree_to_uhwi (@3)) == TYPE_PRECISION (type)
+         && TYPE_UNSIGNED (type)
+         && @0 == @2)
+@@ -12273,9 +12272,8 @@ and,
+ 	     (rshift @3 INTEGER_CST@4))
+    (if (type_has_mode_precision_p (type)
+ 	&& tree_fits_uhwi_p (@1)
+-	&& tree_fits_uhwi_p (@2)
+ 	&& tree_fits_uhwi_p (@4)
+-	&& (((((HOST_WIDE_INT_1U << tree_to_uhwi (@1)) - 1)) & tree_to_uhwi (@2)) == 0)
++	&& ((wi::mask (tree_to_uhwi (@1), false, TYPE_PRECISION (type)) & wi::to_wide (@2)) == 0)
+         && (tree_to_uhwi (@1) + tree_to_uhwi (@4)) == TYPE_PRECISION (type)
+         && TYPE_UNSIGNED (type)
+         && @0 == @3)
+diff --git a/gcc/testsuite/gcc.dg/torture/pr126462.c b/gcc/testsuite/gcc.dg/torture/pr126462.c
+new file mode 100644
+index 000000000000..d32ba6f04edb
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/pr126462.c
+@@ -0,0 +1,26 @@
++/* { dg-do run { target int128 } } */
++
++typedef unsigned __int128 u128;
++
++__attribute__((noipa)) u128
++f (u128 x)
++{
++  return ((x << 64) ^ (u128) 1) | (x >> 64);
++}
++
++__attribute__((noipa)) u128
++g (u128 x)
++{
++  return ((x << 96) ^ ((u128) 1 << 32)) | (x >> 32);
++}
++
++int
++main (void)
++{
++  u128 x = (u128) 1 << 64;
++  if (f (x) != 1)
++    __builtin_abort ();
++  if (g (x) != ((u128) 1 << 32))
++    __builtin_abort ();
++  return 0;
++}

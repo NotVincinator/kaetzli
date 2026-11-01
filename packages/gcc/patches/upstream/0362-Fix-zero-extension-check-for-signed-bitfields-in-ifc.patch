@@ -1,0 +1,328 @@
+From 096324c2ac68ec08ac32a8641382da3c08d50e05 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Thu, 8 Oct 2026 14:26:04 +0200
+Subject: [PATCH 362/385] Fix zero-extension check for signed bitfields in
+ ifcombine
+
+In fold_truth_andor_for_ifcombine, when checking if a constant compared
+against a widened bitfield operand needs to be zero-extended rather than
+sign-extended, commit 91fa9c15cc4 incorrectly checked !ll_signbit and
+!rl_signbit.
+
+decode_field_reference only set signbit to true when the AND mask had
+precision greater than the field bitsize and had non-zero bits in the
+extension positions.  When the mask precision was less than or equal to
+the field bitsize, signbit remained false (0) because no extension bits
+were tested.
+
+Because !ll_signbit / !rl_signbit was checked, any signed field with a mask
+of the same precision (e.g. c & ~0x3fc00) was incorrectly treated as
+zero-extended, even though the sign bit was preserved and the subsequent
+conversion to a wider type performed a sign extension.  Consequently,
+equality comparisons with sign-extended constants were erroneously
+evaluated as false.
+
+Fix this by having decode_field_reference distinguish masks with extension
+bits that zero them out (returning -1) from masks that do not test
+extension bits (returning 0), and checking for signbit < 0 in
+fold_truth_andor_for_ifcombine.  Only bail out on lr_signbit and rr_signbit
+when they are positive, so that masks that zero out extension bits on the
+right-hand operands do not prevent combination.
+
+	PR tree-optimization/127762
+	* gimple-fold.cc (decode_field_reference): Change psignbit to
+	int * and set it to 1 for sign extensions, -1 if all extension
+	bits are clear, or 0 otherwise.
+	(fold_truth_andor_for_ifcombine): Change ll_signbit, lr_signbit,
+	rl_signbit, and rr_signbit to int.  Check for signbit > 0 when
+	including sign bit in test, and signbit < 0 when checking for
+	zero-extension.  Only reject positive lr_signbit and
+	rr_signbit.
+
+	* gcc.dg/field-merge-27.c: New test.
+	* gcc.dg/field-merge-29.c: New test.
+
+(cherry picked from commit bab00098c33a53a6dc36a6126c6226fe9bb2e15e)
+---
+ gcc/gimple-fold.cc                    |  49 +++++++-----
+ gcc/testsuite/gcc.dg/field-merge-27.c |  22 ++++++
+ gcc/testsuite/gcc.dg/field-merge-29.c | 110 ++++++++++++++++++++++++++
+ 3 files changed, 160 insertions(+), 21 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/field-merge-27.c
+ create mode 100644 gcc/testsuite/gcc.dg/field-merge-29.c
+
+diff --git a/gcc/gimple-fold.cc b/gcc/gimple-fold.cc
+index 4c14cd377dd3..325347820c05 100644
+--- a/gcc/gimple-fold.cc
++++ b/gcc/gimple-fold.cc
+@@ -7715,8 +7715,10 @@ gimple_binop_def_p (enum tree_code code, tree t, tree op[2])
+    *PAND_MASK is initially set to a mask with nonzero precision, that mask is
+    combined with the found mask, or adjusted in precision to match.
+ 
+-   *PSIGNBIT is set to TRUE if, before clipping to *PBITSIZE, the mask
+-   encompassed bits that corresponded to extensions of the sign bit.
++   *PSIGNBIT is set to 1 if, before clipping to *PBITSIZE, the mask
++   encompassed bits that corresponded to extensions of the sign bit, or to -1
++   if the mask encompassed bits that would be extensions of the sign bit
++   and zeroed them out.  Otherwise, it is set to 0.
+ 
+    *PXORP is to be FALSE if EXP might be a XOR used in a compare, in which
+    case, if PXOR_CMP_OP is a zero constant, it will be overridden with *PEXP,
+@@ -7738,7 +7740,7 @@ static tree
+ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
+ 			HOST_WIDE_INT *pbitpos,
+ 			bool *punsignedp, bool *preversep, bool *pvolatilep,
+-			wide_int *pand_mask, bool *psignbit,
++			wide_int *pand_mask, int *psignbit,
+ 			bool *pxorp, tree *pxor_cmp_op, wide_int *pxor_and_mask,
+ 			gimple **pload, location_t loc[4])
+ {
+@@ -7750,7 +7752,7 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
+   tree res_ops[2];
+   machine_mode mode;
+   bool convert_before_shift = false;
+-  bool signbit = false;
++  int signbit = 0;
+   bool xorp = false;
+   tree xor_cmp_op;
+   wide_int xor_and_mask;
+@@ -7943,11 +7945,16 @@ decode_field_reference (tree *pexp, HOST_WIDE_INT *pbitsize,
+   if (and_mask.get_precision () != 0)
+     {
+       /* If the AND_MASK encompasses bits that would be extensions of
+-	 the sign bit, set SIGNBIT.  */
++	 the sign bit, set SIGNBIT to 1 if any such bit is set, or -1 if
++	 they are all clear.  */
+       if (!unsignedp
+-	  && and_mask.get_precision () > bs
+-	  && (and_mask & wi::mask (bs, true, and_mask.get_precision ())) != 0)
+-	signbit = true;
++	  && and_mask.get_precision () > bs)
++	{
++	  if ((and_mask & wi::mask (bs, true, and_mask.get_precision ())) != 0)
++	    signbit = 1;
++	  else
++	    signbit = -1;
++	}
+       and_mask = wide_int::from (and_mask, bs, UNSIGNED);
+     }
+ 
+@@ -8247,7 +8254,7 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
+   HOST_WIDE_INT rnbitsize, rnbitpos, rnprec;
+   bool ll_unsignedp, lr_unsignedp, rl_unsignedp, rr_unsignedp;
+   bool ll_reversep, lr_reversep, rl_reversep, rr_reversep;
+-  bool ll_signbit, lr_signbit, rl_signbit, rr_signbit;
++  int ll_signbit, lr_signbit, rl_signbit, rr_signbit;
+   scalar_int_mode lnmode, lnmode2, rnmode;
+   wide_int ll_and_mask, lr_and_mask, rl_and_mask, rr_and_mask;
+   wide_int l_const, r_const;
+@@ -8431,7 +8438,7 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
+     return 0;
+ 
+   /* ??? Can we do anything with these?  */
+-  if (lr_signbit || rr_signbit)
++  if (lr_signbit > 0 || rr_signbit > 0)
+     return 0;
+ 
+   /* If the mask encompassed extensions of the sign bit before
+@@ -8439,7 +8446,7 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
+      comparing with zero, don't even try to deal with it (for now?).
+      If we've already commited to a sign test, the extended (before
+      clipping) mask could already be messing with it.  */
+-  if (ll_signbit)
++  if (ll_signbit > 0)
+     {
+       if (!integer_zerop (lr_arg) || lsignbit)
+ 	return 0;
+@@ -8450,7 +8457,7 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
+ 	ll_and_mask |= sign;
+     }
+ 
+-  if (rl_signbit)
++  if (rl_signbit > 0)
+     {
+       if (!integer_zerop (rr_arg) || rsignbit)
+ 	return 0;
+@@ -8755,18 +8762,18 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
+ 	 check that they're sign or zero extensions, depending on how the
+ 	 left-hand operand would be extended.  If it is unsigned, or if there's
+ 	 a mask that zeroes out extension bits, whether because we've checked
+-	 for upper bits in the mask and did not set ll_signbit, or because the
+-	 sign bit itself is masked out, check that the right-hand operand is
+-	 zero-extended.  */
++	 for upper bits in the mask and found them all clear (ll_signbit < 0),
++	 or because the sign bit itself is masked out, check that the
++	 right-hand operand is zero-extended.  */
+       bool l_non_ext_bits = false;
+       if (ll_bitsize < lr_bitsize)
+ 	{
+ 	  wide_int zext = wi::zext (l_const, ll_bitsize);
+ 	  if ((ll_unsignedp
++	       || ll_signbit < 0
+ 	       || (ll_and_mask.get_precision ()
+-		   && (!ll_signbit
+-		       || ((ll_and_mask & wi::mask (ll_bitsize - 1, true, ll_bitsize))
+-			   == 0)))
++		   && ((ll_and_mask & wi::mask (ll_bitsize - 1, true, ll_bitsize))
++		       == 0))
+ 	       ? zext : wi::sext (l_const, ll_bitsize)) == l_const)
+ 	    l_const = zext;
+ 	  else
+@@ -8794,10 +8801,10 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
+ 	{
+ 	  wide_int zext = wi::zext (r_const, rl_bitsize);
+ 	  if ((rl_unsignedp
++	       || rl_signbit < 0
+ 	       || (rl_and_mask.get_precision ()
+-		   && (!rl_signbit
+-		       || ((rl_and_mask & wi::mask (rl_bitsize - 1, true, rl_bitsize))
+-			   == 0)))
++		   && ((rl_and_mask & wi::mask (rl_bitsize - 1, true, rl_bitsize))
++		       == 0))
+ 	       ? zext : wi::sext (r_const, rl_bitsize)) == r_const)
+ 	    r_const = zext;
+ 	  else
+diff --git a/gcc/testsuite/gcc.dg/field-merge-27.c b/gcc/testsuite/gcc.dg/field-merge-27.c
+new file mode 100644
+index 000000000000..97d917f97395
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/field-merge-27.c
+@@ -0,0 +1,22 @@
++/* { dg-do run } */
++/* { dg-options "-O1" } */
++
++#define a() 0
++int b, c, d;
++int __attribute__((noipa)) fn1() {
++  unsigned long e = b = 7;
++  for (; b; b--) {
++    c = ~e;
++    c >>= 10;
++  }
++  e = c & 8 ? c & ~0x3fc00 : a();
++  if (e != ~0x3fc00UL)
++    return 3;
++  return 2;
++}
++int main() {
++  d = fn1();
++  if (d != 2)
++    __builtin_abort ();
++  return 0;
++}
+diff --git a/gcc/testsuite/gcc.dg/field-merge-29.c b/gcc/testsuite/gcc.dg/field-merge-29.c
+new file mode 100644
+index 000000000000..64f1f39402b9
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/field-merge-29.c
+@@ -0,0 +1,110 @@
++/* { dg-do run } */
++/* { dg-options "-O2 -fgimple -fdump-tree-ifcombine-details" } */
++
++/* Check that a widened signed field compared with another one is still
++   combined when a mask zeroes out all of its extension bits.  */
++
++struct S { signed char a, b; short c; } __attribute__ ((aligned (4)));
++struct S p, q;
++
++int __GIMPLE (ssa,startwith("ifcombine")) __attribute__((noipa))
++f1 ()
++{
++  signed char _1;
++  signed char _2;
++  int _3;
++  int _4;
++  int _5;
++  int _6;
++  signed char _7;
++  signed char _8;
++  int r;
++
++  __BB(2):
++  _1 = p.a;
++  _3 = (int) _1;
++  _5 = _3 & 127;
++  _2 = q.a;
++  _4 = (int) _2;
++  _6 = _4 & 127;
++  if (_5 == _6)
++    goto __BB3;
++  else
++    goto __BB4;
++
++  __BB(3):
++  _7 = p.b;
++  _8 = q.b;
++  if (_7 == _8)
++    goto __BB5;
++  else
++    goto __BB4;
++
++  __BB(4):
++  goto __BB5;
++
++  __BB(5):
++  r_9 = __PHI (__BB3: 1, __BB4: 0);
++  return r_9;
++}
++
++int __GIMPLE (ssa,startwith("ifcombine")) __attribute__((noipa))
++f2 ()
++{
++  signed char _1;
++  signed char _2;
++  int _3;
++  int _4;
++  int _5;
++  int _6;
++  signed char _7;
++  signed char _8;
++  int r;
++
++  __BB(2):
++  _1 = p.a;
++  _3 = (int) _1;
++  _5 = _3 & 255;
++  _2 = q.a;
++  _4 = (int) _2;
++  _6 = _4 & 255;
++  if (_5 == _6)
++    goto __BB3;
++  else
++    goto __BB4;
++
++  __BB(3):
++  _7 = p.b;
++  _8 = q.b;
++  if (_7 == _8)
++    goto __BB5;
++  else
++    goto __BB4;
++
++  __BB(4):
++  goto __BB5;
++
++  __BB(5):
++  r_9 = __PHI (__BB3: 1, __BB4: 0);
++  return r_9;
++}
++
++int
++main ()
++{
++  p.a = -1;
++  q.a = 127;
++  p.b = q.b = -2;
++  if (f1 () != 1 || f2 () != 0)
++    __builtin_abort ();
++  q.b = 2;
++  if (f1 () != 0 || f2 () != 0)
++    __builtin_abort ();
++  q.a = -1;
++  q.b = -2;
++  if (f1 () != 1 || f2 () != 1)
++    __builtin_abort ();
++  return 0;
++}
++
++/* { dg-final { scan-tree-dump-times "optimizing two comparisons" 2 "ifcombine" } } */

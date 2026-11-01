@@ -1,0 +1,87 @@
+From 887a62fd0fd79cea79c5f292764aa79b1b039859 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Fri, 7 Aug 2026 17:33:53 +0200
+Subject: [PATCH 017/385] s390: Fix ICE in usubc5 [PR126667]
+
+The following testcase ICEs on s390x-linux I believe since r15-6791
+when usubc<mode>5 named pattern has been introduced.
+It intentionally uses general_operand predicate for operands[4],
+so that it can test it against const0_rtx and handle that differently,
+but otherwise it uses xor<mode>3 insn with operands[4] as first input,
+which has nonimmediate_operand.  So we emit (xor:DI (const1_rtx) (const1_rtx))
+and then fail to recognize it.
+
+The following patch just forces it into a register in that case, cse or
+combine can then simplify it.  The other option would be
+to check for CONSTANT_P, force into REG unless it is CONST_INT and if it
+is CONST_INT, perform the xor at compile time, but then the compare
+too and unsure what to pass to the subsequent insn.
+
+The testcase is simplified from a larger botan real-world testcase (though
+there isn't usubc with a constant 1 carry in visible in the source).
+
+2026-08-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/126667
+	* config/s390/s390.md (usubc<mode>5): If operands[4] is
+	an immediate operand other than const0_rtx, force it into reg
+	before using it in xor<mode>3 insn.
+
+	* gcc.dg/pr126667.c: New test.
+	* gcc.target/s390/pr126667.c: New test.
+
+Reviewed-by: Andreas Krebbel <krebbel@linux.ibm.com>
+(cherry picked from commit 8d0676db179aa31207bc4dd29e1c310823988f4b)
+---
+ gcc/config/s390/s390.md                  | 4 +++-
+ gcc/testsuite/gcc.dg/pr126667.c          | 9 +++++++++
+ gcc/testsuite/gcc.target/s390/pr126667.c | 9 +++++++++
+ 3 files changed, 21 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.dg/pr126667.c
+ create mode 100644 gcc/testsuite/gcc.target/s390/pr126667.c
+
+diff --git a/gcc/config/s390/s390.md b/gcc/config/s390/s390.md
+index 52e9014e416d..0343007d9b1e 100644
+--- a/gcc/config/s390/s390.md
++++ b/gcc/config/s390/s390.md
+@@ -7329,7 +7329,9 @@
+   else
+     {
+       rtx tmp = gen_reg_rtx (<MODE>mode);
+-      emit_insn (gen_xor<mode>3 (tmp, operands[4], const1_rtx));
++      emit_insn (gen_xor<mode>3 (tmp, CONSTANT_P (operands[4])
++				      ? force_reg (<MODE>mode, operands[4])
++				      : operands[4], const1_rtx));
+       rtx slb_cond = s390_emit_compare (<MODE>mode, LEU, tmp, const0_rtx);
+       emit_insn (gen_sub<mode>3_slb_borrow1_cc (operands[0], operands[2], operands[3], slb_cond));
+     }
+diff --git a/gcc/testsuite/gcc.dg/pr126667.c b/gcc/testsuite/gcc.dg/pr126667.c
+new file mode 100644
+index 000000000000..f9e4a2120add
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr126667.c
+@@ -0,0 +1,9 @@
++/* PR target/126667 */
++/* { dg-do compile } */
++/* { dg-options "-O2" } */
++
++unsigned long
++foo (unsigned long x, unsigned long y, unsigned long *p)
++{
++  return __builtin_subcl (x, y, 1UL, p);
++}
+diff --git a/gcc/testsuite/gcc.target/s390/pr126667.c b/gcc/testsuite/gcc.target/s390/pr126667.c
+new file mode 100644
+index 000000000000..0e6cd1467a2c
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/s390/pr126667.c
+@@ -0,0 +1,9 @@
++/* PR target/126667 */
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=z14" } */
++
++unsigned long
++foo (unsigned long x, unsigned long y, unsigned long *p)
++{
++  return __builtin_subcl (x, y, 1UL, p);
++}

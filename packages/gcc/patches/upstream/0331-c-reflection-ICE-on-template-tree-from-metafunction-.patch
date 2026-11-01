@@ -1,0 +1,121 @@
+From 22b698e6c1a2f1ca0d2a9ef86697e4cc1f177dd8 Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Wed, 7 Oct 2026 13:16:03 -0400
+Subject: [PATCH 331/385] c++/reflection: ICE on template tree from
+ metafunction [PR127749]
+
+Here we are in a generic lambda and want to process a call to
+identifier_of.  Since it's a generic lambda, the lambda's operator()
+is a template.  eval_identifier_of calls build_special_member_call
+which calls build_new_method_call which, in a template, creates:
+
+      call = (build_min_non_dep_call_vec
+              (call,
+               build_min (COMPONENT_REF, TREE_TYPE (CALL_EXPR_FN (call)),
+                          orig_instance, orig_fns, NULL_TREE),
+               orig_args));
+
+but that can't be evaluated by cxx_eval_constant_expression that we
+call after process_metafunction.  (In this test, we are called from
+tsubst_lambda_expr -> finish_if_stmt_cond -> cxx_constant_value.)
+
+Since in process_metafunction we shouldn't encounter calls that are
+instantiation-dependent, a simple fix is to force a non-template
+context.  To be sure I ran a full regtest with
+
+  gcc_checking_assert (!instantiation_dependent_expression_p (call));
+
+just before the sentinel and found no problems.
+
+	PR c++/127749
+
+gcc/cp/ChangeLog:
+
+	* reflect.cc (process_metafunction): Add
+	processing_template_decl_sentinel.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/reflect/dep17.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 4b1320d229dcbf6966aff194219eb2bbd8727801)
+---
+ gcc/cp/reflect.cc                    |  6 ++++
+ gcc/testsuite/g++.dg/reflect/dep17.C | 50 ++++++++++++++++++++++++++++
+ 2 files changed, 56 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/reflect/dep17.C
+
+diff --git a/gcc/cp/reflect.cc b/gcc/cp/reflect.cc
+index 7391dbd150e7..45be0013f902 100644
+--- a/gcc/cp/reflect.cc
++++ b/gcc/cp/reflect.cc
+@@ -8108,6 +8108,12 @@ process_metafunction (const constexpr_ctx *ctx, tree fun, tree call,
+ 	gcc_unreachable ();
+       }
+ 
++  /* Some of the eval_ functions build new trees and in a template
++     that could produce template trees.  The subsequent evaluation
++     cannot process such trees, though, so force a non-template
++     context.  This assumes that the call is not instantiation-dependent.  */
++  processing_template_decl_sentinel ptds;
++
+   switch (minfo->code)
+     {
+     case METAFN_OPERATOR_OF:
+diff --git a/gcc/testsuite/g++.dg/reflect/dep17.C b/gcc/testsuite/g++.dg/reflect/dep17.C
+new file mode 100644
+index 000000000000..b7f1b7be8735
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/reflect/dep17.C
+@@ -0,0 +1,50 @@
++// PR c++/127749
++// { dg-do compile { target c++26 } }
++// { dg-options "-freflection" }
++
++#include <meta>
++
++struct S {
++    int mem = 0;
++};
++
++template<std::meta::info member>
++auto constexpr inline fn = [](auto...) {
++    static_assert(std::meta::identifier_of(member) == "mem");
++    if constexpr (std::meta::identifier_of(member) == "mem")
++        throw 0;
++};
++
++template<std::meta::info member>
++auto constexpr inline fn2 = []() {
++    static_assert(std::meta::identifier_of(member) == "mem");
++    if constexpr (std::meta::identifier_of(member) == "mem")
++        throw 0;
++};
++
++template<class T>
++constexpr inline auto foo = [](auto x)
++{
++  return std::meta::identifier_of(^^x) == "x";
++};
++
++void
++g ()
++{
++  fn<^^S::mem>();
++  fn2<^^S::mem>();
++  constexpr auto a = foo<int>(1);
++}
++
++template<typename T>
++void
++h (T t)
++{
++  fn<^^S::mem>(t);
++}
++
++void
++k ()
++{
++  h (0);
++}

@@ -1,0 +1,230 @@
+From a239230fc45aa9b4a34c754009f14adc9a48406e Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Torbj=C3=B6rn=20SVENSSON?= <torbjorn.svensson@foss.st.com>
+Date: Sun, 4 Oct 2026 11:37:44 +0200
+Subject: [PATCH 237/385] testsuite: arm: Set tuning for MVE FP intrinsic tests
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Override any DejaGNU-provided -mtune so the tests generate the expected
+assembly.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/arm/mve/intrinsics/vcmpeqq_n_f16.c: Set
+	-mtune=cortex-m55 to get stable assembly.
+	* gcc.target/arm/mve/intrinsics/vcmpeqq_n_f32.c: Likewise.
+	* gcc.target/arm/mve/intrinsics/vcmpgeq_n_f16.c: Likewise.
+	* gcc.target/arm/mve/intrinsics/vcmpgeq_n_f32.c: Likewise.
+	* gcc.target/arm/mve/intrinsics/vcmpgtq_n_f16.c: Likewise.
+	* gcc.target/arm/mve/intrinsics/vcmpgtq_n_f32.c: Likewise.
+	* gcc.target/arm/mve/intrinsics/vcmpleq_n_f16.c: Likewise.
+	* gcc.target/arm/mve/intrinsics/vcmpleq_n_f32.c: Likewise.
+	* gcc.target/arm/mve/intrinsics/vcmpltq_n_f16.c: Likewise.
+	* gcc.target/arm/mve/intrinsics/vcmpltq_n_f32.c: Likewise.
+	* gcc.target/arm/mve/intrinsics/vcmpneq_n_f16.c: Likewise.
+	* gcc.target/arm/mve/intrinsics/vcmpneq_n_f32.c: Likewise.
+	* gcc.target/arm/mve/intrinsics/vdupq_n_f16.c: Likewise.
+	* gcc.target/arm/mve/intrinsics/vdupq_n_f32.c: Likewise.
+	* gcc.target/arm/mve/dlstp-invalid-asm.c: Likewise.
+
+Signed-off-by: Torbjörn SVENSSON <torbjorn.svensson@foss.st.com>
+(cherry picked from commit 8a5c76ca173f25012ab9ba21fed11eb598bf777a)
+---
+ gcc/testsuite/gcc.target/arm/mve/dlstp-invalid-asm.c        | 2 +-
+ gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpeqq_n_f16.c | 2 +-
+ gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpeqq_n_f32.c | 2 +-
+ gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgeq_n_f16.c | 2 +-
+ gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgeq_n_f32.c | 2 +-
+ gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgtq_n_f16.c | 2 +-
+ gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgtq_n_f32.c | 2 +-
+ gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpleq_n_f16.c | 2 +-
+ gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpleq_n_f32.c | 2 +-
+ gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpltq_n_f16.c | 2 +-
+ gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpltq_n_f32.c | 2 +-
+ gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpneq_n_f16.c | 2 +-
+ gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpneq_n_f32.c | 2 +-
+ gcc/testsuite/gcc.target/arm/mve/intrinsics/vdupq_n_f16.c   | 2 +-
+ gcc/testsuite/gcc.target/arm/mve/intrinsics/vdupq_n_f32.c   | 2 +-
+ 15 files changed, 15 insertions(+), 15 deletions(-)
+
+diff --git a/gcc/testsuite/gcc.target/arm/mve/dlstp-invalid-asm.c b/gcc/testsuite/gcc.target/arm/mve/dlstp-invalid-asm.c
+index eb0782ebd0de..bd9a60665606 100644
+--- a/gcc/testsuite/gcc.target/arm/mve/dlstp-invalid-asm.c
++++ b/gcc/testsuite/gcc.target/arm/mve/dlstp-invalid-asm.c
+@@ -1,6 +1,6 @@
+ /* { dg-do compile { target { arm*-*-* } } } */
+ /* { dg-require-effective-target arm_v8_1m_mve_ok } */
+-/* { dg-options "-O3 -save-temps" } */
++/* { dg-options "-O3 -mtune=cortex-m55 -save-temps" } */
+ /* { dg-add-options arm_v8_1m_mve } */
+ 
+ #include <limits.h>
+diff --git a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpeqq_n_f16.c b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpeqq_n_f16.c
+index 335e511b17bb..fedba8c4c94d 100644
+--- a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpeqq_n_f16.c
++++ b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpeqq_n_f16.c
+@@ -1,6 +1,6 @@
+ /* { dg-require-effective-target arm_v8_1m_mve_fp_ok } */
+ /* { dg-add-options arm_v8_1m_mve_fp } */
+-/* { dg-additional-options "-O2" } */
++/* { dg-additional-options "-O2 -mtune=cortex-m55" } */
+ /* { dg-final { check-function-bodies "**" "" } } */
+ 
+ #include "arm_mve.h"
+diff --git a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpeqq_n_f32.c b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpeqq_n_f32.c
+index e5c16be65e3d..89353081a9c2 100644
+--- a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpeqq_n_f32.c
++++ b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpeqq_n_f32.c
+@@ -1,6 +1,6 @@
+ /* { dg-require-effective-target arm_v8_1m_mve_fp_ok } */
+ /* { dg-add-options arm_v8_1m_mve_fp } */
+-/* { dg-additional-options "-O2" } */
++/* { dg-additional-options "-O2 -mtune=cortex-m55" } */
+ /* { dg-final { check-function-bodies "**" "" } } */
+ 
+ #include "arm_mve.h"
+diff --git a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgeq_n_f16.c b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgeq_n_f16.c
+index 47d54863a859..9030bbcfa105 100644
+--- a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgeq_n_f16.c
++++ b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgeq_n_f16.c
+@@ -1,6 +1,6 @@
+ /* { dg-require-effective-target arm_v8_1m_mve_fp_ok } */
+ /* { dg-add-options arm_v8_1m_mve_fp } */
+-/* { dg-additional-options "-O2" } */
++/* { dg-additional-options "-O2 -mtune=cortex-m55" } */
+ /* { dg-final { check-function-bodies "**" "" } } */
+ 
+ #include "arm_mve.h"
+diff --git a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgeq_n_f32.c b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgeq_n_f32.c
+index 1b775eaf8a06..b5d9299c6183 100644
+--- a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgeq_n_f32.c
++++ b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgeq_n_f32.c
+@@ -1,6 +1,6 @@
+ /* { dg-require-effective-target arm_v8_1m_mve_fp_ok } */
+ /* { dg-add-options arm_v8_1m_mve_fp } */
+-/* { dg-additional-options "-O2" } */
++/* { dg-additional-options "-O2 -mtune=cortex-m55" } */
+ /* { dg-final { check-function-bodies "**" "" } } */
+ 
+ #include "arm_mve.h"
+diff --git a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgtq_n_f16.c b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgtq_n_f16.c
+index 89d8e2b91096..b77ec5cf8c2b 100644
+--- a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgtq_n_f16.c
++++ b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgtq_n_f16.c
+@@ -1,6 +1,6 @@
+ /* { dg-require-effective-target arm_v8_1m_mve_fp_ok } */
+ /* { dg-add-options arm_v8_1m_mve_fp } */
+-/* { dg-additional-options "-O2" } */
++/* { dg-additional-options "-O2 -mtune=cortex-m55" } */
+ /* { dg-final { check-function-bodies "**" "" } } */
+ 
+ #include "arm_mve.h"
+diff --git a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgtq_n_f32.c b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgtq_n_f32.c
+index a5510e852d5b..ff6373b068d4 100644
+--- a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgtq_n_f32.c
++++ b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpgtq_n_f32.c
+@@ -1,6 +1,6 @@
+ /* { dg-require-effective-target arm_v8_1m_mve_fp_ok } */
+ /* { dg-add-options arm_v8_1m_mve_fp } */
+-/* { dg-additional-options "-O2" } */
++/* { dg-additional-options "-O2 -mtune=cortex-m55" } */
+ /* { dg-final { check-function-bodies "**" "" } } */
+ 
+ #include "arm_mve.h"
+diff --git a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpleq_n_f16.c b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpleq_n_f16.c
+index c94b3119d59f..d93de5131eaf 100644
+--- a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpleq_n_f16.c
++++ b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpleq_n_f16.c
+@@ -1,6 +1,6 @@
+ /* { dg-require-effective-target arm_v8_1m_mve_fp_ok } */
+ /* { dg-add-options arm_v8_1m_mve_fp } */
+-/* { dg-additional-options "-O2" } */
++/* { dg-additional-options "-O2 -mtune=cortex-m55" } */
+ /* { dg-final { check-function-bodies "**" "" } } */
+ 
+ #include "arm_mve.h"
+diff --git a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpleq_n_f32.c b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpleq_n_f32.c
+index 80e2cfa10791..47ed9e374adc 100644
+--- a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpleq_n_f32.c
++++ b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpleq_n_f32.c
+@@ -1,6 +1,6 @@
+ /* { dg-require-effective-target arm_v8_1m_mve_fp_ok } */
+ /* { dg-add-options arm_v8_1m_mve_fp } */
+-/* { dg-additional-options "-O2" } */
++/* { dg-additional-options "-O2 -mtune=cortex-m55" } */
+ /* { dg-final { check-function-bodies "**" "" } } */
+ 
+ #include "arm_mve.h"
+diff --git a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpltq_n_f16.c b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpltq_n_f16.c
+index c3a106455cbd..1daf451a1c00 100644
+--- a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpltq_n_f16.c
++++ b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpltq_n_f16.c
+@@ -1,6 +1,6 @@
+ /* { dg-require-effective-target arm_v8_1m_mve_fp_ok } */
+ /* { dg-add-options arm_v8_1m_mve_fp } */
+-/* { dg-additional-options "-O2" } */
++/* { dg-additional-options "-O2 -mtune=cortex-m55" } */
+ /* { dg-final { check-function-bodies "**" "" } } */
+ 
+ #include "arm_mve.h"
+diff --git a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpltq_n_f32.c b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpltq_n_f32.c
+index b485f75e769e..f8a584545eb3 100644
+--- a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpltq_n_f32.c
++++ b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpltq_n_f32.c
+@@ -1,6 +1,6 @@
+ /* { dg-require-effective-target arm_v8_1m_mve_fp_ok } */
+ /* { dg-add-options arm_v8_1m_mve_fp } */
+-/* { dg-additional-options "-O2" } */
++/* { dg-additional-options "-O2 -mtune=cortex-m55" } */
+ /* { dg-final { check-function-bodies "**" "" } } */
+ 
+ #include "arm_mve.h"
+diff --git a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpneq_n_f16.c b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpneq_n_f16.c
+index 1156caafda1e..a807ca2fcf82 100644
+--- a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpneq_n_f16.c
++++ b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpneq_n_f16.c
+@@ -1,6 +1,6 @@
+ /* { dg-require-effective-target arm_v8_1m_mve_fp_ok } */
+ /* { dg-add-options arm_v8_1m_mve_fp } */
+-/* { dg-additional-options "-O2" } */
++/* { dg-additional-options "-O2 -mtune=cortex-m55" } */
+ /* { dg-final { check-function-bodies "**" "" } } */
+ 
+ #include "arm_mve.h"
+diff --git a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpneq_n_f32.c b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpneq_n_f32.c
+index c3ffbd1335f5..83ab23699633 100644
+--- a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpneq_n_f32.c
++++ b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vcmpneq_n_f32.c
+@@ -1,6 +1,6 @@
+ /* { dg-require-effective-target arm_v8_1m_mve_fp_ok } */
+ /* { dg-add-options arm_v8_1m_mve_fp } */
+-/* { dg-additional-options "-O2" } */
++/* { dg-additional-options "-O2 -mtune=cortex-m55" } */
+ /* { dg-final { check-function-bodies "**" "" } } */
+ 
+ #include "arm_mve.h"
+diff --git a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vdupq_n_f16.c b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vdupq_n_f16.c
+index f9aae2fd1200..56c3734b6454 100644
+--- a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vdupq_n_f16.c
++++ b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vdupq_n_f16.c
+@@ -1,6 +1,6 @@
+ /* { dg-require-effective-target arm_v8_1m_mve_fp_ok } */
+ /* { dg-add-options arm_v8_1m_mve_fp } */
+-/* { dg-additional-options "-O2" } */
++/* { dg-additional-options "-O2 -mtune=cortex-m55" } */
+ /* { dg-final { check-function-bodies "**" "" } } */
+ 
+ #include "arm_mve.h"
+diff --git a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vdupq_n_f32.c b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vdupq_n_f32.c
+index 6a01ce47b6df..5cbcb273e5f0 100644
+--- a/gcc/testsuite/gcc.target/arm/mve/intrinsics/vdupq_n_f32.c
++++ b/gcc/testsuite/gcc.target/arm/mve/intrinsics/vdupq_n_f32.c
+@@ -1,6 +1,6 @@
+ /* { dg-require-effective-target arm_v8_1m_mve_fp_ok } */
+ /* { dg-add-options arm_v8_1m_mve_fp } */
+-/* { dg-additional-options "-O2" } */
++/* { dg-additional-options "-O2 -mtune=cortex-m55" } */
+ /* { dg-final { check-function-bodies "**" "" } } */
+ 
+ #include "arm_mve.h"

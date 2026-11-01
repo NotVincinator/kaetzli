@@ -1,0 +1,114 @@
+From cafd139767627981b675daff29933edcdd210230 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Mon, 31 Aug 2026 09:38:43 +0200
+Subject: [PATCH 257/385] c++: Fix mangling of aggregates containing
+ std::meta::info [PR126922]
+
+We ICE during mangling on the following testcase.
+There are two problems on it.
+One is the use of build_zero_cst for skipped members when
+using designated initializers.  build_zero_cst is a gcc/tree.cc
+function, so it doesn't know about META_TYPE and how to create a zero
+constant for it.
+We could call probably build_zero_init instead, but it does significantly
+more work and apparently (from what I've been playing with e.g. using
+pointer-to-data-member types etc.) it isn't needed except for the reflection
+case, so this patch just calls get_null_reflection () for reflections
+and keeps using build_zero_cst for everything else.
+Another problem is that we mangle
+A { .a = {}, .b = {} }
+vs.
+A { .a = {} }
+differently, although both have the same value.  If a and b fields have
+pointer-to-data-member type instead (or int), the zero initialized members
+are skipped from the tl value list, and this patch changes zero_init_expr_p
+so that it handles null reflections the same way (before P4101 mangling
+is probably the only way to observe whether null reflection is all zeros or
+not).
+
+2026-08-31  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/126922
+	* mangle.cc (write_expression): For CONSTRUCTOR skipped
+	member of std::meta::info type, call write_expression on
+	get_null_reflection rather than build_zero_cst.
+	* tree.cc (zero_init_expr_p): If type is std::meta::info,
+	return true iff t is null reflection.
+
+	* g++.dg/reflect/mangle10.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 7c459132de478dbede44e323e195073e8d2bca55)
+---
+ gcc/cp/mangle.cc                        | 10 ++++++++--
+ gcc/cp/tree.cc                          |  2 ++
+ gcc/testsuite/g++.dg/reflect/mangle10.C | 26 +++++++++++++++++++++++++
+ 3 files changed, 36 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/reflect/mangle10.C
+
+diff --git a/gcc/cp/mangle.cc b/gcc/cp/mangle.cc
+index 3d0da42939e7..1779b28349fd 100644
+--- a/gcc/cp/mangle.cc
++++ b/gcc/cp/mangle.cc
+@@ -3888,8 +3888,14 @@ write_expression (tree expr)
+ 				if (field == ce->index)
+ 				  break;
+ 				if (abi_check (21))
+-				  write_expression (build_zero_cst
+-						    (TREE_TYPE (field)));
++				  {
++				    tree type = TREE_TYPE (field), expr;
++				    if (REFLECTION_TYPE_P (type))
++				      expr = get_null_reflection ();
++				    else
++				      expr = build_zero_cst (type);
++				    write_expression (expr);
++				  }
+ 				field = DECL_CHAIN (field);
+ 			      }
+ 			  }
+diff --git a/gcc/cp/tree.cc b/gcc/cp/tree.cc
+index 084dfd70f6bd..ffc347ff15ef 100644
+--- a/gcc/cp/tree.cc
++++ b/gcc/cp/tree.cc
+@@ -5301,6 +5301,8 @@ zero_init_expr_p (tree t)
+     return false;
+   if (TYPE_PTRMEM_P (type))
+     return null_member_pointer_value_p (t);
++  if (REFLECTION_TYPE_P (type))
++    return REFLECT_EXPR_P (t) && REFLECT_EXPR_HANDLE (t) == unknown_type_node;
+   if (TREE_CODE (t) == CONSTRUCTOR)
+     {
+       if (COMPOUND_LITERAL_P (t)
+diff --git a/gcc/testsuite/g++.dg/reflect/mangle10.C b/gcc/testsuite/g++.dg/reflect/mangle10.C
+new file mode 100644
+index 000000000000..84751e3fe8f2
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/reflect/mangle10.C
+@@ -0,0 +1,26 @@
++// PR c++/126922
++// { dg-do compile { target c++26 } }
++// { dg-additional-options "-freflection -O0 -fno-short-enums" }
++
++struct A { decltype (^^::) a, b; };
++struct B { A c; };
++
++template <int N, auto C>
++[[gnu::noipa]] void
++foo ()
++{
++}
++
++int
++main ()
++{
++  foo <1, A { .a = {}, .b = {} }> ();
++  foo <2, A { .a = {} }> ();
++  foo <3, A { .b = {} }> ();
++  foo <4, B { .c = {} }> ();
++}
++
++// { dg-final { scan-assembler "_Z3fooILi1ETnDaXtl1AEEEvv" } }
++// { dg-final { scan-assembler "_Z3fooILi2ETnDaXtl1AEEEvv" } }
++// { dg-final { scan-assembler "_Z3fooILi3ETnDaXtl1AEEEvv" } }
++// { dg-final { scan-assembler "_Z3fooILi4ETnDaXtl1BEEEvv" } }

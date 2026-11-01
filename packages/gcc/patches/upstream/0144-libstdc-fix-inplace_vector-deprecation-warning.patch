@@ -1,0 +1,44 @@
+From d950dec5180bf11b27858829a658709d134c25ff Mon Sep 17 00:00:00 2001
+From: Avi Kivity <avi@scylladb.com>
+Date: Thu, 10 Sep 2026 23:56:33 +0300
+Subject: [PATCH 144/385] libstdc++: fix inplace_vector deprecation warning
+
+Practically anything that touches std::inplace_vector causes
+this warning to be generated:
+
+inplace_vector:853:20: warning: 'is_trivial_v<unsigned int>' is deprecated: use 'is_trivially_default_constructible_v && is_trivially_copyable_v' instead [-Wdeprecated-declarations]
+  853 |             if constexpr (is_trivial_v<_Tp>)
+      |                           ^
+inplace_vector:128:2: note: in instantiation of member function 'std::inplace_vector<unsigned int, 2>::_M_init' requested here
+  128 |         _M_init();
+      |         ^
+
+Fix it by following the warning's recommendation.
+
+	PR libstdc++/127325
+
+libstdc++-v3/ChangeLog:
+
+	* include/std/inplace_vector: replace is_trivial_v with
+	is_trivially_default_constructible_v and is_trivially_copyable_v.
+
+Signed-off-by: Avi Kivity <avi@scylladb.com>
+(cherry picked from commit 20d1487f74ea914d2b8d7be71886275d59b166fd)
+---
+ libstdc++-v3/include/std/inplace_vector | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/libstdc++-v3/include/std/inplace_vector b/libstdc++-v3/include/std/inplace_vector
+index 5ad92332a02c..131bdc4ca47f 100644
+--- a/libstdc++-v3/include/std/inplace_vector
++++ b/libstdc++-v3/include/std/inplace_vector
+@@ -850,7 +850,8 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
+ 	else
+ 	  {
+ 	    // TODO: use new(_M_elems) _Tp[_Nm]() once PR121068 is fixed
+-	    if constexpr (is_trivial_v<_Tp>)
++	    if constexpr (is_trivially_default_constructible_v<_Tp>
++			    && is_trivially_copyable_v<_Tp>)
+ 	      for (size_t __i = 0; __i < _Nm; ++__i)
+ 		_M_elems[__i] = _Tp();
+ 	    else

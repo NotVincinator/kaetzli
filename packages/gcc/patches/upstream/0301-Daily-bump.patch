@@ -1,0 +1,369 @@
+From 4d6471901d76fe7381b5c2c5120cb47a99b9e576 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 15 Oct 2026 00:20:34 +0000
+Subject: [PATCH 301/385] Daily bump.
+
+---
+ gcc/ChangeLog           |  26 +++++++++
+ gcc/DATESTAMP           |   2 +-
+ gcc/ada/ChangeLog       |  31 ++++++++++
+ gcc/fortran/ChangeLog   |  10 ++++
+ gcc/testsuite/ChangeLog |  25 ++++++++
+ libgfortran/ChangeLog   | 126 ++++++++++++++++++++++++++++++++++++++++
+ libstdc++-v3/ChangeLog  |  81 ++++++++++++++++++++++++++
+ 7 files changed, 300 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 48d9e3c99f7f..aedaff2456c0 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,29 @@
++2026-10-14  Richard Earnshaw  <rearnsha@arm.com>
++
++	Backported from master:
++	2026-10-14  Richard Earnshaw  <rearnsha@arm.com>
++
++	PR target/127393
++	* config/aarch64/aarch64.md (movti):  Ensure we don't call
++	gen_highpart on a subreg.
++	(addti3): Use pure_register_operand for the destination.
++	(addvti4): Likewise.
++	(uaddvti4): Likewise.
++	(subti3): Likewise.
++	(subvti4): Likewise.
++	(usubti4): Likewise.
++	(<su_optab>mulditi3): Likewise.
++	(multi3): Require pure_register_operand for all operands.
++
++2026-10-14  Richard Earnshaw  <rearnsha@arm.com>
++
++	Backported from master:
++	2026-09-22  Richard Earnshaw  <rearnsha@arm.com>
++
++	PR target/127393
++	* config/aarch64/predicates.md (pure_register_operand): New predicate.
++	* config/aarch64/aarch64.md (negvti3): Use it.
++
+ 2026-10-13  John David Anglin  <danglin@gcc.gnu.org>
+ 
+ 	* config/pa/pa.cc (hppa_rtx_costs_shadd_p): Strip SUBREG wrappers
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 619f8fa5c81d..5d5c53fbebe1 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261014
++20261015
+diff --git a/gcc/ada/ChangeLog b/gcc/ada/ChangeLog
+index 689704aa9d82..04d35eb7ae74 100644
+--- a/gcc/ada/ChangeLog
++++ b/gcc/ada/ChangeLog
+@@ -1,3 +1,34 @@
++2026-10-14  Eric Botcazou  <ebotcazou@adacore.com>
++
++	PR ada/127880
++	* contracts.adb (Make_Class_Precondition_Subps): Accept another
++	kind of wrapper subprograms.
++
++2026-10-14  Gary Dismukes  <dismukes@adacore.com>
++
++	PR ada/127880
++	* sem_ch12.adb (Build_Subprogram_Wrapper): Remove the subprogram
++	renaming created for the formal-to-actual association from the
++	list of renamings (only when such a subprogram renaming is present).
++	Also, change the name from plural to singular, since the procedure
++	only creates one wrapper, update the spec comment to reflect that,
++	and clarify the state and use of the Renamings parameter.
++
++2026-10-14  Gary Dismukes  <dismukes@adacore.com>
++
++	PR ada/127880
++	* contracts.adb (Analyze_Contracts): Add cases for formal subprogram
++	Nkinds so that Analyze_Entry_Or_Subprogram_Contract will be called
++	for them.
++	* sem_attr.adb (Analyze_Attribute_Old_Result): Account for the cases
++	of formal subprogram Nkinds, allowing Old attributes for those.
++	* sem_ch12.adb (Build_Subprogram_Wrappers): Add a formal for passing
++	the unanalyzed generic formal, and use it for copying any aspect
++	specifications of the generic formal rather than copying the analyzed
++	generic formal's aspects.
++	(Analyze_One_Association): Pass Assoc.Un_Formal as an additional
++	actual in the call to Build_Subprogram_Wrappers.
++
+ 2026-10-12  Eric Botcazou  <ebotcazou@adacore.com>
+ 
+ 	* libgnat/system-linux-loongarch.ads (Address): Add size clause.
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index 75fafb417cee..97acc646a591 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,13 @@
++2026-10-14  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2026-10-03  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/127683
++	* primary.cc (gfc_match_varspec): Fix two minor frontend memleaks.
++	* symbol.cc (gfc_find_derived_types): Return 0 when sym->assoc is
++	NULL.
++
+ 2026-09-30  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 3ce4a426d9c8..9c8a219a6f98 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,28 @@
++2026-10-14  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2026-10-13  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/127845
++	* gfortran.dg/findloc_11.f90: New test.
++
++2026-10-14  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2026-10-13  Harald Anlauf  <anlauf@gmx.de>
++		    Federico Perini  <federico.perini@gmail.com>
++
++	PR fortran/127846
++	* gfortran.dg/minmaxloc_mask_back.f90: New test.
++
++2026-10-14  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2026-10-03  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/127683
++	* gfortran.dg/pr127683.f90: New test.
++
+ 2026-10-13  liuhongt  <hongtao.liu@intel.com>
+ 
+ 	Backported from master:
+diff --git a/libgfortran/ChangeLog b/libgfortran/ChangeLog
+index 93ffe86e1526..6beb82ea8f82 100644
+--- a/libgfortran/ChangeLog
++++ b/libgfortran/ChangeLog
+@@ -1,3 +1,129 @@
++2026-10-14  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2026-10-13  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/127845
++	* generated/findloc1_c10.c (mfindloc1_c10): Regenerate.
++	* generated/findloc1_c16.c (mfindloc1_c16): Likewise.
++	* generated/findloc1_c17.c (mfindloc1_c17): Likewise.
++	* generated/findloc1_c4.c (mfindloc1_c4): Likewise.
++	* generated/findloc1_c8.c (mfindloc1_c8): Likewise.
++	* generated/findloc1_i1.c (mfindloc1_i1): Likewise.
++	* generated/findloc1_i16.c (mfindloc1_i16): Likewise.
++	* generated/findloc1_i2.c (mfindloc1_i2): Likewise.
++	* generated/findloc1_i4.c (mfindloc1_i4): Likewise.
++	* generated/findloc1_i8.c (mfindloc1_i8): Likewise.
++	* generated/findloc1_r10.c (mfindloc1_r10): Likewise.
++	* generated/findloc1_r16.c (mfindloc1_r16): Likewise.
++	* generated/findloc1_r17.c (mfindloc1_r17): Likewise.
++	* generated/findloc1_r4.c (mfindloc1_r4): Likewise.
++	* generated/findloc1_r8.c (mfindloc1_r8): Likewise.
++	* generated/findloc1_s1.c (mfindloc1_s1): Likewise.
++	* generated/findloc1_s4.c (mfindloc1_s4): Likewise.
++	* m4/ifindloc1.m4: Properly advance through MASK array argument when
++	MASK and DIM are present.
++
++2026-10-14  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2026-10-13  Harald Anlauf  <anlauf@gmx.de>
++		    Federico Perini  <federico.perini@gmail.com>
++
++	PR fortran/127846
++	* generated/maxloc0_16_i1.c (mmaxloc0_16_i1): Regenerate.
++	* generated/maxloc0_16_i16.c (mmaxloc0_16_i16): Likewise.
++	* generated/maxloc0_16_i2.c (mmaxloc0_16_i2): Likewise.
++	* generated/maxloc0_16_i4.c (mmaxloc0_16_i4): Likewise.
++	* generated/maxloc0_16_i8.c (mmaxloc0_16_i8): Likewise.
++	* generated/maxloc0_16_m1.c (mmaxloc0_16_m1): Likewise.
++	* generated/maxloc0_16_m16.c (mmaxloc0_16_m16): Likewise.
++	* generated/maxloc0_16_m2.c (mmaxloc0_16_m2): Likewise.
++	* generated/maxloc0_16_m4.c (mmaxloc0_16_m4): Likewise.
++	* generated/maxloc0_16_m8.c (mmaxloc0_16_m8): Likewise.
++	* generated/maxloc0_16_r10.c (mmaxloc0_16_r10): Likewise.
++	* generated/maxloc0_16_r16.c (mmaxloc0_16_r16): Likewise.
++	* generated/maxloc0_16_r17.c (mmaxloc0_16_r17): Likewise.
++	* generated/maxloc0_16_r4.c (mmaxloc0_16_r4): Likewise.
++	* generated/maxloc0_16_r8.c (mmaxloc0_16_r8): Likewise.
++	* generated/maxloc0_4_i1.c (mmaxloc0_4_i1): Likewise.
++	* generated/maxloc0_4_i16.c (mmaxloc0_4_i16): Likewise.
++	* generated/maxloc0_4_i2.c (mmaxloc0_4_i2): Likewise.
++	* generated/maxloc0_4_i4.c (mmaxloc0_4_i4): Likewise.
++	* generated/maxloc0_4_i8.c (mmaxloc0_4_i8): Likewise.
++	* generated/maxloc0_4_m1.c (mmaxloc0_4_m1): Likewise.
++	* generated/maxloc0_4_m16.c (mmaxloc0_4_m16): Likewise.
++	* generated/maxloc0_4_m2.c (mmaxloc0_4_m2): Likewise.
++	* generated/maxloc0_4_m4.c (mmaxloc0_4_m4): Likewise.
++	* generated/maxloc0_4_m8.c (mmaxloc0_4_m8): Likewise.
++	* generated/maxloc0_4_r10.c (mmaxloc0_4_r10): Likewise.
++	* generated/maxloc0_4_r16.c (mmaxloc0_4_r16): Likewise.
++	* generated/maxloc0_4_r17.c (mmaxloc0_4_r17): Likewise.
++	* generated/maxloc0_4_r4.c (mmaxloc0_4_r4): Likewise.
++	* generated/maxloc0_4_r8.c (mmaxloc0_4_r8): Likewise.
++	* generated/maxloc0_8_i1.c (mmaxloc0_8_i1): Likewise.
++	* generated/maxloc0_8_i16.c (mmaxloc0_8_i16): Likewise.
++	* generated/maxloc0_8_i2.c (mmaxloc0_8_i2): Likewise.
++	* generated/maxloc0_8_i4.c (mmaxloc0_8_i4): Likewise.
++	* generated/maxloc0_8_i8.c (mmaxloc0_8_i8): Likewise.
++	* generated/maxloc0_8_m1.c (mmaxloc0_8_m1): Likewise.
++	* generated/maxloc0_8_m16.c (mmaxloc0_8_m16): Likewise.
++	* generated/maxloc0_8_m2.c (mmaxloc0_8_m2): Likewise.
++	* generated/maxloc0_8_m4.c (mmaxloc0_8_m4): Likewise.
++	* generated/maxloc0_8_m8.c (mmaxloc0_8_m8): Likewise.
++	* generated/maxloc0_8_r10.c (mmaxloc0_8_r10): Likewise.
++	* generated/maxloc0_8_r16.c (mmaxloc0_8_r16): Likewise.
++	* generated/maxloc0_8_r17.c (mmaxloc0_8_r17): Likewise.
++	* generated/maxloc0_8_r4.c (mmaxloc0_8_r4): Likewise.
++	* generated/maxloc0_8_r8.c (mmaxloc0_8_r8): Likewise.
++	* generated/minloc0_16_i1.c (mminloc0_16_i1): Likewise.
++	* generated/minloc0_16_i16.c (mminloc0_16_i16): Likewise.
++	* generated/minloc0_16_i2.c (mminloc0_16_i2): Likewise.
++	* generated/minloc0_16_i4.c (mminloc0_16_i4): Likewise.
++	* generated/minloc0_16_i8.c (mminloc0_16_i8): Likewise.
++	* generated/minloc0_16_m1.c (mminloc0_16_m1): Likewise.
++	* generated/minloc0_16_m16.c (mminloc0_16_m16): Likewise.
++	* generated/minloc0_16_m2.c (mminloc0_16_m2): Likewise.
++	* generated/minloc0_16_m4.c (mminloc0_16_m4): Likewise.
++	* generated/minloc0_16_m8.c (mminloc0_16_m8): Likewise.
++	* generated/minloc0_16_r10.c (mminloc0_16_r10): Likewise.
++	* generated/minloc0_16_r16.c (mminloc0_16_r16): Likewise.
++	* generated/minloc0_16_r17.c (mminloc0_16_r17): Likewise.
++	* generated/minloc0_16_r4.c (mminloc0_16_r4): Likewise.
++	* generated/minloc0_16_r8.c (mminloc0_16_r8): Likewise.
++	* generated/minloc0_4_i1.c (mminloc0_4_i1): Likewise.
++	* generated/minloc0_4_i16.c (mminloc0_4_i16): Likewise.
++	* generated/minloc0_4_i2.c (mminloc0_4_i2): Likewise.
++	* generated/minloc0_4_i4.c (mminloc0_4_i4): Likewise.
++	* generated/minloc0_4_i8.c (mminloc0_4_i8): Likewise.
++	* generated/minloc0_4_m1.c (mminloc0_4_m1): Likewise.
++	* generated/minloc0_4_m16.c (mminloc0_4_m16): Likewise.
++	* generated/minloc0_4_m2.c (mminloc0_4_m2): Likewise.
++	* generated/minloc0_4_m4.c (mminloc0_4_m4): Likewise.
++	* generated/minloc0_4_m8.c (mminloc0_4_m8): Likewise.
++	* generated/minloc0_4_r10.c (mminloc0_4_r10): Likewise.
++	* generated/minloc0_4_r16.c (mminloc0_4_r16): Likewise.
++	* generated/minloc0_4_r17.c (mminloc0_4_r17): Likewise.
++	* generated/minloc0_4_r4.c (mminloc0_4_r4): Likewise.
++	* generated/minloc0_4_r8.c (mminloc0_4_r8): Likewise.
++	* generated/minloc0_8_i1.c (mminloc0_8_i1): Likewise.
++	* generated/minloc0_8_i16.c (mminloc0_8_i16): Likewise.
++	* generated/minloc0_8_i2.c (mminloc0_8_i2): Likewise.
++	* generated/minloc0_8_i4.c (mminloc0_8_i4): Likewise.
++	* generated/minloc0_8_i8.c (mminloc0_8_i8): Likewise.
++	* generated/minloc0_8_m1.c (mminloc0_8_m1): Likewise.
++	* generated/minloc0_8_m16.c (mminloc0_8_m16): Likewise.
++	* generated/minloc0_8_m2.c (mminloc0_8_m2): Likewise.
++	* generated/minloc0_8_m4.c (mminloc0_8_m4): Likewise.
++	* generated/minloc0_8_m8.c (mminloc0_8_m8): Likewise.
++	* generated/minloc0_8_r10.c (mminloc0_8_r10): Likewise.
++	* generated/minloc0_8_r16.c (mminloc0_8_r16): Likewise.
++	* generated/minloc0_8_r17.c (mminloc0_8_r17): Likewise.
++	* generated/minloc0_8_r4.c (mminloc0_8_r4): Likewise.
++	* generated/minloc0_8_r8.c (mminloc0_8_r8): Likewise.
++	* m4/maxloc0.m4: Fix looping through array argument when BACK=.true.
++	* m4/minloc0.m4: Likewise.
++
+ 2026-08-07  Release Manager
+ 
+ 	* GCC 16.2.0 released.
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index b2cb92da27b9..6ed88efbcdf4 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,84 @@
++2026-10-14  Hugo Beauzée-Luyssen  <hugo.beauzee@datadoghq.com>
++
++	Backported from master:
++	2026-10-14  Hugo Beauzée-Luyssen  <hugo.beauzee@datadoghq.com>
++		    Jonathan Wakely  <jwakely@redhat.com>
++
++	* include/bits/chrono_io.h: Check __glibcxx_chrono for C++20
++	tzdb features instead of the ABI macros.
++	* include/bits/version.def (chrono): Use extra_cond instead of
++	cxx11abi to also define 201907 for old-ABI-only builds.
++	* include/bits/version.h: Regenerate.
++	* include/std/chrono: Check __cpp_lib_chrono instead of the
++	ABI macros.
++	* testsuite/lib/libstdc++.exp (check_effective_target_tzdb):
++	Replace cxx11_abi check with hosted check and check
++	__cpp_lib_chrono in preprocessor condition.
++	* testsuite/libstdc++-prettyprinters/chrono.cc: Use
++	__cpp_lib_chrono for preprocessor condition and use tzdb for
++	effective target.  Remove dg-additional-options.
++	* testsuite/std/time/format/data_not_present_neg.cc: Use
++	__cpp_lib_chrono for preprocessor conditions and use tzdb for
++	effective target.
++	* testsuite/std/time/format/empty_spec.cc: Use __cpp_lib_chrono
++	for preprocessor conditions.
++	* testsuite/std/time/format/nonlocking.cc: Likewise.
++	* testsuite/std/time/format/pr117214.cc: Likewise.
++	* testsuite/std/time/format/pr119517.cc: Likewise.
++	* testsuite/std/time/format/whitespace.cc: Likewise.
++	* testsuite/std/time/hash.cc: Likewise.
++	* testsuite/std/time/syn_c++20.cc: Fix typo in macro name and
++	expect new value for !_GLIBCXX_USE_DUAL_ABI.
++	* testsuite/std/time/tzdb/1.cc: Require tzdb effective target
++	instead of cxx11_abi.
++	* testsuite/std/time/tzdb_list/requirements.cc: Likewise.
++	* testsuite/std/time/zoned_time/deduction.cc: Likewise.
++	* testsuite/std/time/zoned_time/io.cc: Likewise.
++	* testsuite/std/time/zoned_time/req_neg.cc: Likewise.
++	* testsuite/std/time/zoned_time/requirements.cc: Likewise.
++	* testsuite/std/time/zoned_traits.cc: Likewise.
++
++2026-10-14  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-10-13  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/127757
++	* src/c++20/atomic.cc (__waitable_state::_M_enter_wait): Add
++	comment.
++	(__waitable_state::_M_waiting): Add seq_cst fence and comments.
++	* testsuite/29_atomics/atomic/wait_notify/127757.cc: New test.
++
++2026-10-14  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-10-05  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/115955
++	* src/c++20/atomic.cc (__waitable_state::_S_state_for): Use a
++	real hash function to map addresses to waitable states.
++
++2026-10-14  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-10-05  Jonathan Wakely  <jwakely@redhat.com>
++
++	* include/std/bitset (operator>>): Define __array_len to ensure
++	that the array size is never zero. Add uninitialized attribute
++	to __buf.
++
++2026-10-14  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-10-02  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/124370
++	* include/std/bitset (operator>>): Use array inside _Buffer
++	instead of __builtin_alloca.
++	* testsuite/20_util/bitset/io/input.cc: Suppress pedwarn about
++	C++14 binary literal.
++	* testsuite/20_util/bitset/io/wchar_t.cc: New test.
++
+ 2026-10-08  Tomasz Kamiński  <tkaminsk@redhat.com>
+ 
+ 	Backported from master:

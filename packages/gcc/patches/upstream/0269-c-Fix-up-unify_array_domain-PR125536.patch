@@ -1,0 +1,72 @@
+From 3dfc02c5bfc79e1ab5c282d274c8a1c1aff0f9b2 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Wed, 23 Sep 2026 09:24:55 +0200
+Subject: [PATCH 269/385] c++: Fix up unify_array_domain [PR125536]
+
+The following testcase is incorrectly rejected on lp64 targets.
+The bug is that unify_array_domain uses forcefully
+integer_type_node/integer_one_node to add 1 to parm_max or arg_max,
+regardless of the type it has.  From playing with testcases,
+at least arg_max seems to be pretty much always sizetype/size_t.
+
+2026-09-23  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/125536
+	* pt.cc (unify_array_domain): When adding 1 to parm_max or
+	arg_max, perform the addition in the type of those trees
+	rather than unconditionally in int type.
+
+	* g++.dg/template/unify14.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 70f3c5413a3c8d2dd57a8f716dab8e90334b5e96)
+---
+ gcc/cp/pt.cc                            |  8 ++++----
+ gcc/testsuite/g++.dg/template/unify14.C | 15 +++++++++++++++
+ 2 files changed, 19 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/template/unify14.C
+
+diff --git a/gcc/cp/pt.cc b/gcc/cp/pt.cc
+index a60696dcdd8f..d67d6ac3262f 100644
+--- a/gcc/cp/pt.cc
++++ b/gcc/cp/pt.cc
+@@ -26128,14 +26128,14 @@ unify_array_domain (tree tparms, tree targs,
+      by adding one to the other bound.  */
+   if (parm_cst && !arg_cst)
+     parm_max = fold_build2_loc (input_location, PLUS_EXPR,
+-				integer_type_node,
++				TREE_TYPE (parm_max),
+ 				parm_max,
+-				integer_one_node);
++				build_int_cst (TREE_TYPE (parm_max), 1));
+   else if (arg_cst && !parm_cst)
+     arg_max = fold_build2_loc (input_location, PLUS_EXPR,
+-			       integer_type_node,
++			       TREE_TYPE (arg_max),
+ 			       arg_max,
+-			       integer_one_node);
++			       build_int_cst (TREE_TYPE (arg_max), 1));
+ 
+   return unify (tparms, targs, parm_max, arg_max,
+ 		UNIFY_ALLOW_INTEGER, explain_p);
+diff --git a/gcc/testsuite/g++.dg/template/unify14.C b/gcc/testsuite/g++.dg/template/unify14.C
+new file mode 100644
+index 000000000000..8f9ca9e098aa
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/template/unify14.C
+@@ -0,0 +1,15 @@
++// PR c++/125536
++// { dg-do compile { target c++14 } }
++
++template <typename>
++constexpr bool x = false;
++
++template <unsigned long long N>
++constexpr bool x <char [N]> = true;
++
++#if __PTRDIFF_MAX__ >= 2147483647
++static_assert (x <char [2147483647]>, "");
++#endif
++#if __PTRDIFF_MAX__ > 2147483647
++static_assert (x <char [2147483648U]>, "");
++#endif

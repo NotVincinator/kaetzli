@@ -1,0 +1,61 @@
+From b2232186255291a666a9914d60f0259f79adb00c Mon Sep 17 00:00:00 2001
+From: Andrew Teylu <Andrew.Teylu@vector.com>
+Date: Tue, 22 Sep 2026 14:49:01 +0200
+Subject: [PATCH 197/385] Ada: Close the DWARF 5 line-string stream
+
+System.Dwarf_Lines.Open creates a mapped stream for .debug_line_str when
+the optional DWARF 5 section is present.  Close omits that stream, losing
+one mapped-region allocation on every complete open/close cycle.
+
+This changes the procedure to close that stream along with the other debug
+streams, before closing the object file.
+
+gcc/ada/
+	* libgnat/s-dwalin.ads (Dwarf_Context): Add Has_Line_Str.
+	* libgnat/s-dwalin.adb (Open): Set Has_Line_Str when creating the
+	line-string stream.
+	(Close): Close the line-string stream if it was created.
+---
+ gcc/ada/libgnat/s-dwalin.adb | 7 +++++++
+ gcc/ada/libgnat/s-dwalin.ads | 3 +++
+ 2 files changed, 10 insertions(+)
+
+diff --git a/gcc/ada/libgnat/s-dwalin.adb b/gcc/ada/libgnat/s-dwalin.adb
+index 678716be8404..589e736b259c 100644
+--- a/gcc/ada/libgnat/s-dwalin.adb
++++ b/gcc/ada/libgnat/s-dwalin.adb
+@@ -283,6 +283,10 @@ package body System.Dwarf_Lines is
+          Close (C.Abbrev);
+          Close (C.Info);
+          Close (C.Aranges);
++
++         if C.Has_Line_Str then
++            Close (C.Line_Str);
++         end if;
+       end if;
+ 
+       Close (C.Obj.all);
+@@ -516,6 +520,9 @@ package body System.Dwarf_Lines is
+ 
+       if Line_Str /= Null_Section then
+          C.Line_Str := Create_Stream (C.Obj.all, Line_Str);
++         C.Has_Line_Str := True;
++      else
++         C.Has_Line_Str := False;
+       end if;
+ 
+       --  All operations are successful, context is valid
+diff --git a/gcc/ada/libgnat/s-dwalin.ads b/gcc/ada/libgnat/s-dwalin.ads
+index 3b7087f5a926..936389e0046f 100644
+--- a/gcc/ada/libgnat/s-dwalin.ads
++++ b/gcc/ada/libgnat/s-dwalin.ads
+@@ -192,6 +192,9 @@ private
+       Has_Debug : Boolean;
+       --  True if all debug sections are available
+ 
++      Has_Line_Str : Boolean;
++      --  True if the .debug_line_str section is available
++
+       Cache : Search_Array_Access;
+       --  Quick access to symbol and debug info (when present).
+ 

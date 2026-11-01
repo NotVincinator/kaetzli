@@ -1,0 +1,170 @@
+From 78ab5a476a9be81031a182b103271814344f0ded Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Fri, 28 Aug 2026 00:21:04 +0000
+Subject: [PATCH 113/385] Daily bump.
+
+---
+ ChangeLog               |  5 +++
+ gcc/ChangeLog           | 83 +++++++++++++++++++++++++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 39 +++++++++++++++++++
+ 4 files changed, 128 insertions(+), 1 deletion(-)
+
+diff --git a/ChangeLog b/ChangeLog
+index 9c0c58a3856f..7a4696334dcc 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,8 @@
++2026-08-27  Michael Meissner  <meissner@linux.ibm.com>
++
++	* MAINTAINERS: Update Michael Meissner's information.
++	Backported from master from 2026-08-07.1
++
+ 2026-08-07  Release Manager
+ 
+ 	* GCC 16.2.0 released.
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index d8b5084fe509..4f7531af694d 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,86 @@
++2026-08-27  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-08-27  Jakub Jelinek  <jakub@redhat.com>
++
++	PR tree-optimization/127100
++	* doc/md.texi (vec_mask_len_load_lanes@var{m}@var{n}): Use
++	operand4 - operand5 rather than operand4 + operand5.
++	(vec_mask_len_store_lanes@var{m}@var{n}): Use
++	operand3 - operand4 rather than operand3 + operand4.
++	(mask_len_gather_load@var{m}@var{n}): Use operand 7 - operand 8
++	rather than operand 7 + operand 8.
++	(mask_len_strided_load@var{m}): Use operand 4 - operand 5 rather
++	than operand 4 + operand 5.
++	(mask_len_scatter_store@var{m}@var{n}): Use operand 6 - operand 7
++	rather than operand 6 + operand 7.
++	(mask_len_strided_store@var{m}): Use operand 4 - operand 5 rather
++	than operand 4 + operand 5.
++	(len_load_@var{m}): Use operand 3 - operand 4 rather than
++	operand 3 + operand 4.
++	(len_store_@var{m}): Use operand 2 - operand 3 rather than
++	operand 2 + operand 3.
++	(mask_len_load@var{m}@var{n}): Use operand 4 - operand 5 rather
++	than operand 3 + operand 4 or operand 4 + operand 5.  Use
++	Operand 5 rather than Operand 4 when talking about bias QI mode.
++	(mask_len_store@var{m}@var{n}): Use operand 3 - operand 4 rather
++	than operand 3 + operand 4 or operand 2 + operand 4.
++	(cond_len_neg@var{mode}): Use operand 4 - operand 5 rather than
++	operand 4 + operand 5.  Use ops[4] - ops[5] rather than
++	ops[4] + ops[5].
++	(cond_len_add@var{mode}): Use operand 5 - operand 6 rather than
++	operand 5 + operand 6.  Use ops[5] - ops[6] rather than
++	ops[5] + ops[6].
++	(cond_len_fma@var{mode}): Use ops[6] - ops[7] rather than
++	ops[6] + ops[7].
++	* gimple-fold.cc (partial_load_store_mask_state): Compute wlen
++	as wi::to_poly_widest (len) - wi::to_widest (bias) rather than
++	wi::to_poly_widest (len) + wi::to_widest (bias).
++
++2026-08-27  Michael Meissner  <meissner@linux.ibm.com>
++
++	PR target/120681
++	* config/rs6000/linux64.h (PCREL_SUPPORTED_BY_OS): Allow large
++	code model as well as medium code model.
++	* config/rs6000/rs6000.cc (rs6000_option_override_internal):
++	Likewise.
++	(rs6000_elf_declare_function_name): Don't create the
++	local/non-local labels for large code model if we are using
++	PC-relative addressing.
++
++2026-08-27  Michael Meissner  <meissner@linux.ibm.com>
++
++	PR target/120528
++	* config/rs6000/rs6000.md (zero_extend??ti2 peephole2): Add a
++	peephole2 to simplify zero extending a QI/HI/SI/DImode value in
++	memory to a TImode target in a vector register to use the
++	LXVR{B,H,W,D}X instructins.
++
++2026-08-27  Michael Meissner  <meissner@linux.ibm.com>
++
++	PR target/99293
++	* config/rs6000/vsx.md (vsx_splat_extract_<mode>): New insn.
++
++2026-08-27  Michael Meissner  <meissner@linux.ibm.com>
++
++	PR target/117487
++	* config/rs6000/vsx.md (SFmode logical peephoole): Update comments in
++	the original code that supports power8.
++	(SFBOOL2_*): New constants.
++	(power9/power10 define_peephol2): Add a new define_peephole2 to optimize
++	float and logical operations on power9/power10/power11 similar to the
++	optimiztion that is done on power8.
++
++2026-08-27  Michael Meissner  <meissner@linux.ibm.com>
++
++	* config/rs6000/rs6000-cpus.def (FUTURE_MASKS_SERVER): Enable using load
++	vector pair and store vector pair instructions for memory and string
++	built-in functions.
++	(POWERPC_MASKS): Make -mblock-ops-vector-pair an option that is set by
++	the -mcpu=<xxx> command line option.
++	* config/rs6000/rs6000.cc (rs6000_machine_from_flags): Disable
++	-mblock-ops-vector-pair from influencing .machine selection.
++
+ 2026-08-26  Eric Botcazou  <ebotcazou@adacore.com>
+ 
+ 	PR ada/125984
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index f258e973dfcb..f5d0fa89a72b 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260827
++20260828
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 10be844aa71d..12afbfa8dfd0 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,42 @@
++2026-08-27  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-08-27  Jakub Jelinek  <jakub@redhat.com>
++
++	PR tree-optimization/127100
++	* gfortran.dg/pr127100.f90: New test.
++
++2026-08-27  Michael Meissner  <meissner@linux.ibm.com>
++
++	PR target/120681
++	* gcc.target/powerpc/pr120681.c: New test.
++
++2026-08-27  Michael Meissner  <meissner@linux.ibm.com>
++
++	PR target/120528
++	* gcc.target/powerpc/pr120528.c: New test.
++
++2026-08-27  Michael Meissner  <meissner@linux.ibm.com>
++
++	PR target/99293
++	* gcc.target/powerpc/pr99293.c: New test.
++
++2026-08-27  Michael Meissner  <meissner@linux.ibm.com>
++
++	PR target/117487
++	* gcc.target/powerpc/pr117487.c: New test.
++
++2026-08-27  Michael Meissner  <meissner@linux.ibm.com>
++
++	* gcc.target/powerpc/future-3.c: New test.
++
++2026-08-27  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-08-24  Jakub Jelinek  <jakub@redhat.com>
++
++	* gcc.dg/builtin-stdc-bit-1.c (main): Fix two pastos.
++
+ 2026-08-26  Eric Botcazou  <ebotcazou@adacore.com>
+ 
+ 	* gnat.dg/opt110.adb: New test.

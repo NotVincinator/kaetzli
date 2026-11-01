@@ -1,0 +1,867 @@
+From 7799a75054edd195627f794b4766f80566f5d368 Mon Sep 17 00:00:00 2001
+From: Zhongyao Chen <chenzhongyao.hit@gmail.com>
+Date: Tue, 8 Sep 2026 09:10:52 -0600
+Subject: [PATCH 149/385] [PATCH] RISC-V: Rewrite vector FMA patterns using fma
+ rtxes [PR126932].
+
+The vector FMA patterns currently match multiply/add trees, which lets
+combine fuse operations into FMA instructions even with -ffp-contract=off.
+
+Rewrite these patterns using fma rtxes:
+  - fma/fnma/fms/fnms in autovec.md.
+  - *dual_widen_*, *single_widen_* in autovec-opt.md.
+  - .vf patterns in autovec-opt.md:
+    *vfmacc_vf, *vfmsac_vf,
+    *vfwmacc_vf_v_f, *vfwmsac_vf_v_f,
+    *vfwnmacc_vf_neg_v_f, *vfwnmsac_vf_neg_v_f.
+
+Unlike the old (plus (mult ...)) form, fma folds neg and sub into its operands.
+Operands with or without neg create different RTL shapes for vector-scalar
+pairs.  Cover these by adding:
+  - *vfnmsac_vf_neg_f_v, *vfnmsac_vf_neg_v_f.
+  - *vfnmacc_vf_neg_f_v, *vfnmacc_vf_neg_v_f.
+  - *vfwmacc_vf_f_v, *vfwmsac_vf_f_v.
+  - *vfwnmacc_vf_neg_f_v, *vfwnmsac_vf_neg_f_v.
+
+Also, testing showed vf-3-f32.c regressed.  That's because a scalar is
+reused across multiple loop statements and shares a single widening broadcast.
+Combine failed to match the inlined broadcast and fell back to vfnmsac.vv.
+Add to fix it:
+  - *vfnmsac_vf_extend_f.
+And add the remaining three extend_f variants as well:
+  - *vfnmacc_vf_extend_f, *vfmacc_vf_extend_f, *vfmsac_vf_extend_f.
+
+	PR target/126932
+
+gcc/ChangeLog:
+
+	* config/riscv/autovec.md: Rewrite vector FMA patterns.
+	* config/riscv/autovec-opt.md: Likewise and add new patterns.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/rvv/autovec/ternop/pr126932.c: New test.
+
+Signed-off-by: Zhongyao Chen <chen.zhongyao@zte.com.cn>
+(cherry picked from commit c44d962721818ba4eaef0e344ca4e123eea8cbb8)
+---
+ gcc/config/riscv/autovec-opt.md               | 531 ++++++++++++++----
+ gcc/config/riscv/autovec.md                   |  35 +-
+ .../riscv/rvv/autovec/ternop/pr126932.c       |  55 ++
+ 3 files changed, 492 insertions(+), 129 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/rvv/autovec/ternop/pr126932.c
+
+diff --git a/gcc/config/riscv/autovec-opt.md b/gcc/config/riscv/autovec-opt.md
+index afd4168afdbf..5a768de864a4 100644
+--- a/gcc/config/riscv/autovec-opt.md
++++ b/gcc/config/riscv/autovec-opt.md
+@@ -1048,12 +1048,11 @@
+ ;; Combine extend + fma to widen_fma (vfwmacc)
+ (define_insn_and_split "*dual_widen_fma<mode>"
+   [(set (match_operand:VWEXTF 0 "register_operand")
+-        (plus:VWEXTF
+-	  (mult:VWEXTF
+-            (float_extend:VWEXTF
+-	      (match_operand:<V_DOUBLE_TRUNC> 2 "register_operand"))
+-            (float_extend:VWEXTF
+-	      (match_operand:<V_DOUBLE_TRUNC> 3 "register_operand")))
++	(fma:VWEXTF
++	  (float_extend:VWEXTF
++	    (match_operand:<V_DOUBLE_TRUNC> 2 "register_operand"))
++	  (float_extend:VWEXTF
++	    (match_operand:<V_DOUBLE_TRUNC> 3 "register_operand"))
+ 	  (match_operand:VWEXTF 1 "register_operand")))]
+   "TARGET_VECTOR && can_create_pseudo_p ()"
+   "#"
+@@ -1073,11 +1072,10 @@
+ ;; pattern and non-widen fma pattern.
+ (define_insn_and_split "*single_widen_fma<mode>"
+   [(set (match_operand:VWEXTF 0 "register_operand")
+-        (plus:VWEXTF
+-	  (mult:VWEXTF
+-            (float_extend:VWEXTF
+-	      (match_operand:<V_DOUBLE_TRUNC> 2 "register_operand"))
+-	    (match_operand:VWEXTF 3 "register_operand"))
++	(fma:VWEXTF
++	  (float_extend:VWEXTF
++	    (match_operand:<V_DOUBLE_TRUNC> 2 "register_operand"))
++	  (match_operand:VWEXTF 3 "register_operand")
+ 	  (match_operand:VWEXTF 1 "register_operand")))]
+   "TARGET_VECTOR && can_create_pseudo_p ()"
+   "#"
+@@ -1100,13 +1098,13 @@
+ ;; Combine extend + fnma to widen_fnma (vfwnmsac)
+ (define_insn_and_split "*dual_widen_fnma<mode>"
+   [(set (match_operand:VWEXTF 0 "register_operand")
+-        (minus:VWEXTF
+-          (match_operand:VWEXTF 1 "register_operand")
+-	  (mult:VWEXTF
+-            (float_extend:VWEXTF
+-	      (match_operand:<V_DOUBLE_TRUNC> 2 "register_operand"))
+-            (float_extend:VWEXTF
+-	      (match_operand:<V_DOUBLE_TRUNC> 3 "register_operand")))))]
++	(fma:VWEXTF
++	  (neg:VWEXTF
++	    (float_extend:VWEXTF
++	      (match_operand:<V_DOUBLE_TRUNC> 2 "register_operand")))
++	  (float_extend:VWEXTF
++	    (match_operand:<V_DOUBLE_TRUNC> 3 "register_operand"))
++	  (match_operand:VWEXTF 1 "register_operand")))]
+   "TARGET_VECTOR && can_create_pseudo_p ()"
+   "#"
+   "&& 1"
+@@ -1125,12 +1123,12 @@
+ ;; pattern and non-widen fnma pattern.
+ (define_insn_and_split "*single_widen_fnma<mode>"
+   [(set (match_operand:VWEXTF 0 "register_operand")
+-        (minus:VWEXTF
+-          (match_operand:VWEXTF 1 "register_operand")
+-	  (mult:VWEXTF
+-            (float_extend:VWEXTF
+-	      (match_operand:<V_DOUBLE_TRUNC> 2 "register_operand"))
+-	    (match_operand:VWEXTF 3 "register_operand"))))]
++	(fma:VWEXTF
++	  (neg:VWEXTF
++	    (float_extend:VWEXTF
++	      (match_operand:<V_DOUBLE_TRUNC> 2 "register_operand")))
++	  (match_operand:VWEXTF 3 "register_operand")
++	  (match_operand:VWEXTF 1 "register_operand")))]
+   "TARGET_VECTOR && can_create_pseudo_p ()"
+   "#"
+   "&& 1"
+@@ -1152,13 +1150,12 @@
+ ;; Combine extend + fms to widen_fms (vfwmsac)
+ (define_insn_and_split "*dual_widen_fms<mode>"
+   [(set (match_operand:VWEXTF 0 "register_operand")
+-        (minus:VWEXTF
+-	  (mult:VWEXTF
+-            (float_extend:VWEXTF
+-	      (match_operand:<V_DOUBLE_TRUNC> 2 "register_operand"))
+-            (float_extend:VWEXTF
+-	      (match_operand:<V_DOUBLE_TRUNC> 3 "register_operand")))
+-	  (match_operand:VWEXTF 1 "register_operand")))]
++	(fma:VWEXTF
++	  (float_extend:VWEXTF
++	    (match_operand:<V_DOUBLE_TRUNC> 2 "register_operand"))
++	  (float_extend:VWEXTF
++	    (match_operand:<V_DOUBLE_TRUNC> 3 "register_operand"))
++	  (neg:VWEXTF (match_operand:VWEXTF 1 "register_operand"))))]
+   "TARGET_VECTOR && can_create_pseudo_p ()"
+   "#"
+   "&& 1"
+@@ -1177,12 +1174,11 @@
+ ;; pattern and non-widen fms pattern.
+ (define_insn_and_split "*single_widen_fms<mode>"
+   [(set (match_operand:VWEXTF 0 "register_operand")
+-        (minus:VWEXTF
+-	  (mult:VWEXTF
+-            (float_extend:VWEXTF
+-	      (match_operand:<V_DOUBLE_TRUNC> 2 "register_operand"))
+-	    (match_operand:VWEXTF 3 "register_operand"))
+-	  (match_operand:VWEXTF 1 "register_operand")))]
++	(fma:VWEXTF
++	  (float_extend:VWEXTF
++	    (match_operand:<V_DOUBLE_TRUNC> 2 "register_operand"))
++	  (match_operand:VWEXTF 3 "register_operand")
++	  (neg:VWEXTF (match_operand:VWEXTF 1 "register_operand"))))]
+   "TARGET_VECTOR && can_create_pseudo_p ()"
+   "#"
+   "&& 1"
+@@ -1204,14 +1200,13 @@
+ ;; Combine extend + fnms to widen_fnms (vfwnmacc)
+ (define_insn_and_split "*dual_widen_fnms<mode>"
+   [(set (match_operand:VWEXTF 0 "register_operand")
+-        (minus:VWEXTF
+-	  (mult:VWEXTF
+-            (neg:VWEXTF
+-              (float_extend:VWEXTF
+-	        (match_operand:<V_DOUBLE_TRUNC> 2 "register_operand")))
+-            (float_extend:VWEXTF
+-	      (match_operand:<V_DOUBLE_TRUNC> 3 "register_operand")))
+-	  (match_operand:VWEXTF 1 "register_operand")))]
++	(fma:VWEXTF
++	  (neg:VWEXTF
++	    (float_extend:VWEXTF
++	      (match_operand:<V_DOUBLE_TRUNC> 2 "register_operand")))
++	  (float_extend:VWEXTF
++	    (match_operand:<V_DOUBLE_TRUNC> 3 "register_operand"))
++	  (neg:VWEXTF (match_operand:VWEXTF 1 "register_operand"))))]
+   "TARGET_VECTOR && can_create_pseudo_p ()"
+   "#"
+   "&& 1"
+@@ -1230,13 +1225,12 @@
+ ;; pattern and non-widen fnms pattern.
+ (define_insn_and_split "*single_widen_fnms<mode>"
+   [(set (match_operand:VWEXTF 0 "register_operand")
+-        (minus:VWEXTF
+-          (mult:VWEXTF
+-	    (neg:VWEXTF
+-              (match_operand:VWEXTF 3 "register_operand"))
+-            (float_extend:VWEXTF
++	(fma:VWEXTF
++	  (neg:VWEXTF
++	    (float_extend:VWEXTF
+ 	      (match_operand:<V_DOUBLE_TRUNC> 2 "register_operand")))
+-	  (match_operand:VWEXTF 1 "register_operand")))]
++	  (match_operand:VWEXTF 3 "register_operand")
++	  (neg:VWEXTF (match_operand:VWEXTF 1 "register_operand"))))]
+   "TARGET_VECTOR && can_create_pseudo_p ()"
+   "#"
+   "&& 1"
+@@ -2021,23 +2015,46 @@
+ ;; - vfwmsac.vf
+ ;; =============================================================================
+ 
+-;; vfmadd.vf, vfmsub.vf, vfmacc.vf, vfmsac.vf
+-(define_insn_and_split "*<optab>_vf_<mode>"
++;; vfmadd.vf, vfmacc.vf
++;; f * v + v
++(define_insn_and_split "*vfmacc_vf_<mode>"
+   [(set (match_operand:V_VLSF 0 "register_operand")
+-    (plus_minus:V_VLSF
+-	    (mult:V_VLSF
+-	      (vec_duplicate:V_VLSF
+-		(match_operand:<VEL> 1 "register_operand"))
+-	      (match_operand:V_VLSF 2 "register_operand"))
+-	    (match_operand:V_VLSF 3 "register_operand")))]
++	(fma:V_VLSF
++	  (vec_duplicate:V_VLSF
++	    (match_operand:<VEL> 1 "register_operand"))
++	  (match_operand:V_VLSF 2 "register_operand")
++	  (match_operand:V_VLSF 3 "register_operand")))]
+   "TARGET_VECTOR && can_create_pseudo_p ()"
+   "#"
+   "&& 1"
+   [(const_int 0)]
+   {
+     rtx ops[] = {operands[0], operands[1], operands[2], operands[3],
+-		 RVV_VUNDEF(<MODE>mode)};
+-    riscv_vector::emit_vlmax_insn (code_for_pred_mul_scalar (<CODE>, <MODE>mode),
++		 RVV_VUNDEF (<MODE>mode)};
++    riscv_vector::emit_vlmax_insn (code_for_pred_mul_scalar (PLUS, <MODE>mode),
++				   riscv_vector::TERNARY_OP_FRM_DYN, ops);
++    DONE;
++  }
++  [(set_attr "type" "vfmuladd")]
++)
++
++;; vfmsub.vf, vfmsac.vf
++;; f * v - v
++(define_insn_and_split "*vfmsac_vf_<mode>"
++  [(set (match_operand:V_VLSF 0 "register_operand")
++	(fma:V_VLSF
++	  (vec_duplicate:V_VLSF
++	    (match_operand:<VEL> 1 "register_operand"))
++	  (match_operand:V_VLSF 2 "register_operand")
++	  (neg:V_VLSF (match_operand:V_VLSF 3 "register_operand"))))]
++  "TARGET_VECTOR && can_create_pseudo_p ()"
++  "#"
++  "&& 1"
++  [(const_int 0)]
++  {
++    rtx ops[] = {operands[0], operands[1], operands[2], operands[3],
++		 RVV_VUNDEF (<MODE>mode)};
++    riscv_vector::emit_vlmax_insn (code_for_pred_mul_scalar (MINUS, <MODE>mode),
+ 				   riscv_vector::TERNARY_OP_FRM_DYN, ops);
+     DONE;
+   }
+@@ -2045,71 +2062,200 @@
+ )
+ 
+ ;; vfnmsub.vf, vfnmsac.vf
+-(define_insn_and_split "*vfnmsub_<mode>"
++;; -f * v + v
++(define_insn_and_split "*vfnmsac_vf_neg_f_v_<mode>"
+   [(set (match_operand:V_VLSF 0 "register_operand")
+-    (minus:V_VLSF
+-      (match_operand:V_VLSF 3 "register_operand")
+-      (mult:V_VLSF
++    (fma:V_VLSF
++      (neg:V_VLSF
+ 	(vec_duplicate:V_VLSF
+-	  (match_operand:<VEL> 1 "register_operand"))
+-	(match_operand:V_VLSF 2 "register_operand"))))]
++	  (match_operand:<VEL> 1 "register_operand")))
++      (match_operand:V_VLSF 2 "register_operand")
++      (match_operand:V_VLSF 3 "register_operand")))]
+   "TARGET_VECTOR && can_create_pseudo_p ()"
+   "#"
+   "&& 1"
+   [(const_int 0)]
+   {
+     rtx ops[] = {operands[0], operands[1], operands[2], operands[3],
+-		 RVV_VUNDEF(<MODE>mode)};
+-    riscv_vector::emit_vlmax_insn (code_for_pred_mul_neg_scalar (PLUS, <MODE>mode),
+-				   riscv_vector::TERNARY_OP_FRM_DYN, ops);
++		 RVV_VUNDEF (<MODE>mode)};
++    riscv_vector::emit_vlmax_insn
++      (code_for_pred_mul_neg_scalar (PLUS, <MODE>mode),
++       riscv_vector::TERNARY_OP_FRM_DYN, ops);
++    DONE;
++  }
++  [(set_attr "type" "vfmuladd")]
++)
++
++;; vfnmsub.vf, vfnmsac.vf
++;; -v * f + v
++(define_insn_and_split "*vfnmsac_vf_neg_v_f_<mode>"
++  [(set (match_operand:V_VLSF 0 "register_operand")
++    (fma:V_VLSF
++      (neg:V_VLSF
++	(match_operand:V_VLSF 2 "register_operand"))
++      (vec_duplicate:V_VLSF
++	(match_operand:<VEL> 1 "register_operand"))
++      (match_operand:V_VLSF 3 "register_operand")))]
++  "TARGET_VECTOR && can_create_pseudo_p ()"
++  "#"
++  "&& 1"
++  [(const_int 0)]
++  {
++    rtx ops[] = {operands[0], operands[1], operands[2], operands[3],
++		 RVV_VUNDEF (<MODE>mode)};
++    riscv_vector::emit_vlmax_insn
++      (code_for_pred_mul_neg_scalar (PLUS, <MODE>mode),
++       riscv_vector::TERNARY_OP_FRM_DYN, ops);
+     DONE;
+   }
+   [(set_attr "type" "vfmuladd")]
+ )
+ 
+ ;; vfnmadd.vf, vfnmacc.vf
+-(define_insn_and_split "*vfnmadd_<mode>"
++;; -f * v - v
++(define_insn_and_split "*vfnmacc_vf_neg_f_v_<mode>"
+   [(set (match_operand:V_VLSF 0 "register_operand")
+-    (minus:V_VLSF
+-      (mult:V_VLSF
+-	(neg:V_VLSF
+-	  (match_operand:V_VLSF 2 "register_operand"))
++    (fma:V_VLSF
++      (neg:V_VLSF
+ 	(vec_duplicate:V_VLSF
+ 	  (match_operand:<VEL> 1 "register_operand")))
+-      (match_operand:V_VLSF 3 "register_operand")))]
++      (match_operand:V_VLSF 2 "register_operand")
++      (neg:V_VLSF (match_operand:V_VLSF 3 "register_operand"))))]
+   "TARGET_VECTOR && can_create_pseudo_p ()"
+   "#"
+   "&& 1"
+   [(const_int 0)]
+   {
+     rtx ops[] = {operands[0], operands[1], operands[2], operands[3],
+-		 RVV_VUNDEF(<MODE>mode)};
+-    riscv_vector::emit_vlmax_insn (code_for_pred_mul_neg_scalar (MINUS, <MODE>mode),
+-				   riscv_vector::TERNARY_OP_FRM_DYN, ops);
++		 RVV_VUNDEF (<MODE>mode)};
++    riscv_vector::emit_vlmax_insn
++      (code_for_pred_mul_neg_scalar (MINUS, <MODE>mode),
++       riscv_vector::TERNARY_OP_FRM_DYN, ops);
++    DONE;
++  }
++  [(set_attr "type" "vfmuladd")]
++)
++
++;; vfnmadd.vf, vfnmacc.vf
++;; -v * f - v
++(define_insn_and_split "*vfnmacc_vf_neg_v_f_<mode>"
++  [(set (match_operand:V_VLSF 0 "register_operand")
++    (fma:V_VLSF
++      (neg:V_VLSF
++	(match_operand:V_VLSF 2 "register_operand"))
++      (vec_duplicate:V_VLSF
++	(match_operand:<VEL> 1 "register_operand"))
++      (neg:V_VLSF (match_operand:V_VLSF 3 "register_operand"))))]
++  "TARGET_VECTOR && can_create_pseudo_p ()"
++  "#"
++  "&& 1"
++  [(const_int 0)]
++  {
++    rtx ops[] = {operands[0], operands[1], operands[2], operands[3],
++		 RVV_VUNDEF (<MODE>mode)};
++    riscv_vector::emit_vlmax_insn
++      (code_for_pred_mul_neg_scalar (MINUS, <MODE>mode),
++       riscv_vector::TERNARY_OP_FRM_DYN, ops);
+     DONE;
+   }
+   [(set_attr "type" "vfmuladd")]
+ )
+ 
+-;; vfwmacc.vf, vfwmsac.vf
+-(define_insn_and_split "*vfwmacc_vf_<mode>"
++;; vfwmacc.vf
++;; v * f + v
++(define_insn_and_split "*vfwmacc_vf_v_f_<mode>"
+   [(set (match_operand:VWEXTF 0 "register_operand")
+-    (plus_minus:VWEXTF
+-	    (mult:VWEXTF
+-	      (float_extend:VWEXTF
+-	        (match_operand:<V_DOUBLE_TRUNC> 3 "register_operand"))
+-	      (vec_duplicate:VWEXTF
+-	        (float_extend:<VEL>
+-		  (match_operand:<VSUBEL> 2 "register_operand"))))
+-	    (match_operand:VWEXTF 1 "register_operand")))]
++    (fma:VWEXTF
++      (float_extend:VWEXTF
++	(match_operand:<V_DOUBLE_TRUNC> 3 "register_operand"))
++      (vec_duplicate:VWEXTF
++	(float_extend:<VEL>
++	  (match_operand:<VSUBEL> 2 "register_operand")))
++      (match_operand:VWEXTF 1 "register_operand")))]
+   "TARGET_VECTOR && can_create_pseudo_p ()"
+   "#"
+   "&& 1"
+   [(const_int 0)]
+   {
+     rtx ops[] = {operands[0], operands[1], operands[2], operands[3]};
+-    riscv_vector::emit_vlmax_insn (code_for_pred_widen_mul_scalar (<CODE>, <MODE>mode),
+-				   riscv_vector::WIDEN_TERNARY_OP_FRM_DYN, ops);
++    riscv_vector::emit_vlmax_insn
++      (code_for_pred_widen_mul_scalar (PLUS, <MODE>mode),
++       riscv_vector::WIDEN_TERNARY_OP_FRM_DYN, ops);
++    DONE;
++  }
++  [(set_attr "type" "vfwmuladd")]
++)
++
++;; vfwmsac.vf
++;; v * f - v
++(define_insn_and_split "*vfwmsac_vf_v_f_<mode>"
++  [(set (match_operand:VWEXTF 0 "register_operand")
++    (fma:VWEXTF
++      (float_extend:VWEXTF
++	(match_operand:<V_DOUBLE_TRUNC> 3 "register_operand"))
++      (vec_duplicate:VWEXTF
++	(float_extend:<VEL>
++	  (match_operand:<VSUBEL> 2 "register_operand")))
++      (neg:VWEXTF (match_operand:VWEXTF 1 "register_operand"))))]
++  "TARGET_VECTOR && can_create_pseudo_p ()"
++  "#"
++  "&& 1"
++  [(const_int 0)]
++  {
++    rtx ops[] = {operands[0], operands[1], operands[2], operands[3]};
++    riscv_vector::emit_vlmax_insn
++      (code_for_pred_widen_mul_scalar (MINUS, <MODE>mode),
++       riscv_vector::WIDEN_TERNARY_OP_FRM_DYN, ops);
++    DONE;
++  }
++  [(set_attr "type" "vfwmuladd")]
++)
++
++;; vfwmacc.vf
++;; f * v + v
++(define_insn_and_split "*vfwmacc_vf_f_v_<mode>"
++  [(set (match_operand:VWEXTF 0 "register_operand")
++    (fma:VWEXTF
++      (vec_duplicate:VWEXTF
++	(float_extend:<VEL>
++	  (match_operand:<VSUBEL> 2 "register_operand")))
++      (float_extend:VWEXTF
++	(match_operand:<V_DOUBLE_TRUNC> 3 "register_operand"))
++      (match_operand:VWEXTF 1 "register_operand")))]
++  "TARGET_VECTOR && can_create_pseudo_p ()"
++  "#"
++  "&& 1"
++  [(const_int 0)]
++  {
++    rtx ops[] = {operands[0], operands[1], operands[2], operands[3]};
++    riscv_vector::emit_vlmax_insn
++      (code_for_pred_widen_mul_scalar (PLUS, <MODE>mode),
++       riscv_vector::WIDEN_TERNARY_OP_FRM_DYN, ops);
++    DONE;
++  }
++  [(set_attr "type" "vfwmuladd")]
++)
++
++;; vfwmsac.vf
++;; f * v - v
++(define_insn_and_split "*vfwmsac_vf_f_v_<mode>"
++  [(set (match_operand:VWEXTF 0 "register_operand")
++    (fma:VWEXTF
++      (vec_duplicate:VWEXTF
++	(float_extend:<VEL>
++	  (match_operand:<VSUBEL> 2 "register_operand")))
++      (float_extend:VWEXTF
++	(match_operand:<V_DOUBLE_TRUNC> 3 "register_operand"))
++      (neg:VWEXTF (match_operand:VWEXTF 1 "register_operand"))))]
++  "TARGET_VECTOR && can_create_pseudo_p ()"
++  "#"
++  "&& 1"
++  [(const_int 0)]
++  {
++    rtx ops[] = {operands[0], operands[1], operands[2], operands[3]};
++    riscv_vector::emit_vlmax_insn
++      (code_for_pred_widen_mul_scalar (MINUS, <MODE>mode),
++       riscv_vector::WIDEN_TERNARY_OP_FRM_DYN, ops);
+     DONE;
+   }
+   [(set_attr "type" "vfwmuladd")]
+@@ -2137,16 +2283,42 @@
+ )
+ 
+ ;; vfwnmacc.vf
+-(define_insn_and_split "*vfwnmacc_vf_<mode>"
++;; -v * f - v
++(define_insn_and_split "*vfwnmacc_vf_neg_v_f_<mode>"
+   [(set (match_operand:VWEXTF 0 "register_operand")
+-    (minus:VWEXTF
+-      (mult:VWEXTF
+-	(neg:VWEXTF
+-	  (vec_duplicate:VWEXTF
+-	    (float_extend:<VEL>
+-	      (match_operand:<VSUBEL> 2 "register_operand"))))
++    (fma:VWEXTF
++      (neg:VWEXTF
++	(float_extend:VWEXTF
++	  (match_operand:<V_DOUBLE_TRUNC> 3 "register_operand")))
++      (vec_duplicate:VWEXTF
++	(float_extend:<VEL>
++	  (match_operand:<VSUBEL> 2 "register_operand")))
++      (neg:VWEXTF (match_operand:VWEXTF 1 "register_operand"))))]
++  "TARGET_VECTOR && can_create_pseudo_p ()"
++  "#"
++  "&& 1"
++  [(const_int 0)]
++  {
++    rtx ops[] = {operands[0], operands[1], operands[2], operands[3]};
++    riscv_vector::emit_vlmax_insn
++      (code_for_pred_widen_mul_neg_scalar (MINUS, <MODE>mode),
++       riscv_vector::WIDEN_TERNARY_OP_FRM_DYN, ops);
++    DONE;
++  }
++  [(set_attr "type" "vfwmuladd")]
++)
++
++;; vfwnmsac.vf
++;; -v * f + v
++(define_insn_and_split "*vfwnmsac_vf_neg_v_f_<mode>"
++  [(set (match_operand:VWEXTF 0 "register_operand")
++    (fma:VWEXTF
++      (neg:VWEXTF
+ 	(float_extend:VWEXTF
+ 	  (match_operand:<V_DOUBLE_TRUNC> 3 "register_operand")))
++      (vec_duplicate:VWEXTF
++	(float_extend:<VEL>
++	  (match_operand:<VSUBEL> 2 "register_operand")))
+       (match_operand:VWEXTF 1 "register_operand")))]
+   "TARGET_VECTOR && can_create_pseudo_p ()"
+   "#"
+@@ -2155,38 +2327,179 @@
+   {
+     rtx ops[] = {operands[0], operands[1], operands[2], operands[3]};
+     riscv_vector::emit_vlmax_insn(
+-	code_for_pred_widen_mul_neg_scalar(MINUS, <MODE>mode),
++	code_for_pred_widen_mul_neg_scalar (PLUS, <MODE>mode),
+ 	riscv_vector::WIDEN_TERNARY_OP_FRM_DYN, ops);
+     DONE;
+   }
+   [(set_attr "type" "vfwmuladd")]
+ )
+ 
++;; vfwnmacc.vf
++;; -f * v - v
++(define_insn_and_split "*vfwnmacc_vf_neg_f_v_<mode>"
++  [(set (match_operand:VWEXTF 0 "register_operand")
++    (fma:VWEXTF
++      (neg:VWEXTF
++	(vec_duplicate:VWEXTF
++	  (float_extend:<VEL>
++	    (match_operand:<VSUBEL> 2 "register_operand"))))
++      (float_extend:VWEXTF
++	(match_operand:<V_DOUBLE_TRUNC> 3 "register_operand"))
++      (neg:VWEXTF (match_operand:VWEXTF 1 "register_operand"))))]
++  "TARGET_VECTOR && can_create_pseudo_p ()"
++  "#"
++  "&& 1"
++  [(const_int 0)]
++  {
++    rtx ops[] = {operands[0], operands[1], operands[2], operands[3]};
++    riscv_vector::emit_vlmax_insn
++      (code_for_pred_widen_mul_neg_scalar (MINUS, <MODE>mode),
++       riscv_vector::WIDEN_TERNARY_OP_FRM_DYN, ops);
++    DONE;
++  }
++  [(set_attr "type" "vfwmuladd")]
++)
++
+ ;; vfwnmsac.vf
+-(define_insn_and_split "*vfwnmsac_vf_<mode>"
++;; -f * v + v
++(define_insn_and_split "*vfwnmsac_vf_neg_f_v_<mode>"
+   [(set (match_operand:VWEXTF 0 "register_operand")
+-    (minus:VWEXTF
+-      (match_operand:VWEXTF 1 "register_operand")
+-      (mult:VWEXTF
+-	(float_extend:VWEXTF
+-	  (match_operand:<V_DOUBLE_TRUNC> 3 "register_operand"))
++    (fma:VWEXTF
++      (neg:VWEXTF
+ 	(vec_duplicate:VWEXTF
+ 	  (float_extend:<VEL>
+-	    (match_operand:<VSUBEL> 2 "register_operand"))))))]
++	    (match_operand:<VSUBEL> 2 "register_operand"))))
++      (float_extend:VWEXTF
++	(match_operand:<V_DOUBLE_TRUNC> 3 "register_operand"))
++      (match_operand:VWEXTF 1 "register_operand")))]
+   "TARGET_VECTOR && can_create_pseudo_p ()"
+   "#"
+   "&& 1"
+   [(const_int 0)]
+   {
+     rtx ops[] = {operands[0], operands[1], operands[2], operands[3]};
+-    riscv_vector::emit_vlmax_insn(
+-	code_for_pred_widen_mul_neg_scalar (PLUS, <MODE>mode),
+-	riscv_vector::WIDEN_TERNARY_OP_FRM_DYN, ops);
++    riscv_vector::emit_vlmax_insn
++      (code_for_pred_widen_mul_neg_scalar (PLUS, <MODE>mode),
++       riscv_vector::WIDEN_TERNARY_OP_FRM_DYN, ops);
+     DONE;
+   }
+   [(set_attr "type" "vfwmuladd")]
+ )
+ 
++;; vfnmsub.vf, vfnmsac.vf
++;; -(extend)f * v + v
++(define_insn_and_split "*vfnmsac_vf_extend_f_<mode>"
++  [(set (match_operand:VWEXTF 0 "register_operand")
++    (fma:VWEXTF
++      (neg:VWEXTF
++	(vec_duplicate:VWEXTF
++	  (float_extend:<VEL>
++	    (match_operand:<VSUBEL> 2 "register_operand"))))
++      (match_operand:VWEXTF 3 "register_operand")
++      (match_operand:VWEXTF 1 "register_operand")))]
++  "TARGET_VECTOR && can_create_pseudo_p ()"
++  "#"
++  "&& 1"
++  [(const_int 0)]
++  {
++    rtx wide_scalar = gen_reg_rtx (<VEL>mode);
++    emit_insn (gen_extend<vsubel><vel>2 (wide_scalar, operands[2]));
++
++    rtx ops[] = {operands[0], wide_scalar, operands[3], operands[1],
++		 RVV_VUNDEF (<MODE>mode)};
++    riscv_vector::emit_vlmax_insn
++      (code_for_pred_mul_neg_scalar (PLUS, <MODE>mode),
++       riscv_vector::TERNARY_OP_FRM_DYN, ops);
++    DONE;
++  }
++  [(set_attr "type" "vfmuladd")]
++)
++
++;; vfnmadd.vf, vfnmacc.vf
++;; -(extend)f * v - v
++(define_insn_and_split "*vfnmacc_vf_extend_f_<mode>"
++  [(set (match_operand:VWEXTF 0 "register_operand")
++    (fma:VWEXTF
++      (neg:VWEXTF
++	(vec_duplicate:VWEXTF
++	  (float_extend:<VEL>
++	    (match_operand:<VSUBEL> 2 "register_operand"))))
++      (match_operand:VWEXTF 3 "register_operand")
++      (neg:VWEXTF (match_operand:VWEXTF 1 "register_operand"))))]
++  "TARGET_VECTOR && can_create_pseudo_p ()"
++  "#"
++  "&& 1"
++  [(const_int 0)]
++  {
++    rtx wide_scalar = gen_reg_rtx (<VEL>mode);
++    emit_insn (gen_extend<vsubel><vel>2 (wide_scalar, operands[2]));
++
++    rtx ops[] = {operands[0], wide_scalar, operands[3], operands[1],
++		 RVV_VUNDEF (<MODE>mode)};
++    riscv_vector::emit_vlmax_insn
++      (code_for_pred_mul_neg_scalar (MINUS, <MODE>mode),
++       riscv_vector::TERNARY_OP_FRM_DYN, ops);
++    DONE;
++  }
++  [(set_attr "type" "vfmuladd")]
++)
++
++;; vfmadd.vf, vfmacc.vf
++;; (extend)f * v + v
++(define_insn_and_split "*vfmacc_vf_extend_f_<mode>"
++  [(set (match_operand:VWEXTF 0 "register_operand")
++    (fma:VWEXTF
++      (vec_duplicate:VWEXTF
++	(float_extend:<VEL>
++	  (match_operand:<VSUBEL> 2 "register_operand")))
++      (match_operand:VWEXTF 3 "register_operand")
++      (match_operand:VWEXTF 1 "register_operand")))]
++  "TARGET_VECTOR && can_create_pseudo_p ()"
++  "#"
++  "&& 1"
++  [(const_int 0)]
++  {
++    rtx wide_scalar = gen_reg_rtx (<VEL>mode);
++    emit_insn (gen_extend<vsubel><vel>2 (wide_scalar, operands[2]));
++
++    rtx ops[] = {operands[0], wide_scalar, operands[3], operands[1],
++		 RVV_VUNDEF (<MODE>mode)};
++    riscv_vector::emit_vlmax_insn
++      (code_for_pred_mul_scalar (PLUS, <MODE>mode),
++       riscv_vector::TERNARY_OP_FRM_DYN, ops);
++    DONE;
++  }
++  [(set_attr "type" "vfmuladd")]
++)
++
++;; vfmsub.vf, vfmsac.vf
++;; (extend)f * v - v
++(define_insn_and_split "*vfmsac_vf_extend_f_<mode>"
++  [(set (match_operand:VWEXTF 0 "register_operand")
++    (fma:VWEXTF
++      (vec_duplicate:VWEXTF
++	(float_extend:<VEL>
++	  (match_operand:<VSUBEL> 2 "register_operand")))
++      (match_operand:VWEXTF 3 "register_operand")
++      (neg:VWEXTF (match_operand:VWEXTF 1 "register_operand"))))]
++  "TARGET_VECTOR && can_create_pseudo_p ()"
++  "#"
++  "&& 1"
++  [(const_int 0)]
++  {
++    rtx wide_scalar = gen_reg_rtx (<VEL>mode);
++    emit_insn (gen_extend<vsubel><vel>2 (wide_scalar, operands[2]));
++
++    rtx ops[] = {operands[0], wide_scalar, operands[3], operands[1],
++		 RVV_VUNDEF (<MODE>mode)};
++    riscv_vector::emit_vlmax_insn
++      (code_for_pred_mul_scalar (MINUS, <MODE>mode),
++       riscv_vector::TERNARY_OP_FRM_DYN, ops);
++    DONE;
++  }
++  [(set_attr "type" "vfmuladd")]
++)
++
+ ;; vfmul.vf
+ (define_insn_and_split "*vfmul_vf_<mode>"
+   [(set (match_operand:V_VLSF 0 "register_operand")
+diff --git a/gcc/config/riscv/autovec.md b/gcc/config/riscv/autovec.md
+index b22fb3ced313..334b46efc4dc 100644
+--- a/gcc/config/riscv/autovec.md
++++ b/gcc/config/riscv/autovec.md
+@@ -1241,10 +1241,9 @@
+ 
+ (define_insn_and_split "fma<mode>4"
+   [(set (match_operand:V_VLSF 0 "register_operand")
+-        (plus:V_VLSF
+-	  (mult:V_VLSF
+-	    (match_operand:V_VLSF 1 "register_operand")
+-	    (match_operand:V_VLSF 2 "register_operand"))
++	(fma:V_VLSF
++	  (match_operand:V_VLSF 1 "register_operand")
++	  (match_operand:V_VLSF 2 "register_operand")
+ 	  (match_operand:V_VLSF 3 "register_operand")))]
+   "TARGET_VECTOR && can_create_pseudo_p ()"
+   "#"
+@@ -1269,11 +1268,10 @@
+ 
+ (define_insn_and_split "fnma<mode>4"
+   [(set (match_operand:V_VLSF 0 "register_operand")
+-        (minus:V_VLSF
+-          (match_operand:V_VLSF 3 "register_operand")
+-	  (mult:V_VLSF
+-	    (match_operand:V_VLSF 1 "register_operand")
+-	    (match_operand:V_VLSF 2 "register_operand"))))]
++	(fma:V_VLSF
++	  (neg:V_VLSF (match_operand:V_VLSF 1 "register_operand"))
++	  (match_operand:V_VLSF 2 "register_operand")
++	  (match_operand:V_VLSF 3 "register_operand")))]
+   "TARGET_VECTOR && can_create_pseudo_p ()"
+   "#"
+   "&& 1"
+@@ -1297,11 +1295,10 @@
+ 
+ (define_insn_and_split "fms<mode>4"
+   [(set (match_operand:V_VLSF 0 "register_operand")
+-        (minus:V_VLSF
+-	  (mult:V_VLSF
+-	    (match_operand:V_VLSF 1 "register_operand")
+-	    (match_operand:V_VLSF 2 "register_operand"))
+-	  (match_operand:V_VLSF 3 "register_operand")))]
++	(fma:V_VLSF
++	  (match_operand:V_VLSF 1 "register_operand")
++	  (match_operand:V_VLSF 2 "register_operand")
++	  (neg:V_VLSF (match_operand:V_VLSF 3 "register_operand"))))]
+   "TARGET_VECTOR && can_create_pseudo_p ()"
+   "#"
+   "&& 1"
+@@ -1325,12 +1322,10 @@
+ 
+ (define_insn_and_split "fnms<mode>4"
+   [(set (match_operand:V_VLSF 0 "register_operand")
+-        (minus:V_VLSF
+-          (neg:V_VLSF
+-	    (mult:V_VLSF
+-	      (match_operand:V_VLSF 1 "register_operand")
+-	      (match_operand:V_VLSF 2 "register_operand")))
+-	  (match_operand:V_VLSF 3 "register_operand")))]
++	(fma:V_VLSF
++	  (neg:V_VLSF (match_operand:V_VLSF 1 "register_operand"))
++	  (match_operand:V_VLSF 2 "register_operand")
++	  (neg:V_VLSF (match_operand:V_VLSF 3 "register_operand"))))]
+   "TARGET_VECTOR && can_create_pseudo_p ()"
+   "#"
+   "&& 1"
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/ternop/pr126932.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/ternop/pr126932.c
+new file mode 100644
+index 000000000000..3b8a9c749ae8
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/ternop/pr126932.c
+@@ -0,0 +1,55 @@
++/* { dg-do compile } */
++/* { dg-options "-O3 -march=rv64gcv -mabi=lp64d -ffp-contract=off" } */
++/* { dg-require-effective-target rv64 } */
++
++typedef struct { float x, y, z, w; } vec4;
++
++vec4 mul_add(vec4 a, vec4 b, vec4 c)
++{
++  vec4 v;
++  v.x = a.x + b.x * c.x;
++  v.y = a.y + b.y * c.y;
++  v.z = a.z + b.z * c.z;
++  v.w = a.w + b.w * c.w;
++  return v;
++}
++
++vec4 neg_mul_add(vec4 a, vec4 b, vec4 c)
++{
++  vec4 v;
++  v.x = c.x - a.x * b.x;
++  v.y = c.y - a.y * b.y;
++  v.z = c.z - a.z * b.z;
++  v.w = c.w - a.w * b.w;
++  return v;
++}
++
++vec4 mul_sub(vec4 a, vec4 b, vec4 c)
++{
++  vec4 v;
++  v.x = a.x * b.x - c.x;
++  v.y = a.y * b.y - c.y;
++  v.z = a.z * b.z - c.z;
++  v.w = a.w * b.w - c.w;
++  return v;
++}
++
++vec4 neg_mul_sub(vec4 a, vec4 b, vec4 c)
++{
++  vec4 v;
++  v.x = -(a.x * b.x) - c.x;
++  v.y = -(a.y * b.y) - c.y;
++  v.z = -(a.z * b.z) - c.z;
++  v.w = -(a.w * b.w) - c.w;
++  return v;
++}
++
++/* No FMA variants should be emitted with -ffp-contract=off.  */
++/* { dg-final { scan-assembler-not {\tvfmadd\.vv} } } */
++/* { dg-final { scan-assembler-not {\tvfmsub\.vv} } } */
++/* { dg-final { scan-assembler-not {\tvfnmadd\.vv} } } */
++/* { dg-final { scan-assembler-not {\tvfnmsub\.vv} } } */
++/* { dg-final { scan-assembler-not {\tvfmacc\.vv} } } */
++/* { dg-final { scan-assembler-not {\tvfmsac\.vv} } } */
++/* { dg-final { scan-assembler-not {\tvfnmacc\.vv} } } */
++/* { dg-final { scan-assembler-not {\tvfnmsac\.vv} } } */

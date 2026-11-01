@@ -1,0 +1,184 @@
+From 9d7f5369bd888a1c62376db5065cea49007a7eb8 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Tomasz=20Kami=C5=84ski?= <tkaminsk@redhat.com>
+Date: Thu, 13 Aug 2026 09:51:56 +0200
+Subject: [PATCH 072/385] libstdc++: Format std::float16_t and std::bfloat16_t
+ using respective std::to_chars overloads [PR126731]
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This patch removes the partial specialization for float16_t and bfloat16_t
+that formatted the values by casting to float. In consequence an implicit
+specialization of generic floating-point specialization is used, and
+to_chars overloads for their types are used.
+As explained in r13-3591-g0ae26533b3e268 (that adds corresponding to_chars
+overload), the shortest string (produced when no precision is specified)
+is shorter than float for above.
+
+As formatter specializations were defined under the same condition as
+corresponding to_chars overloads, the __formattable_float constrain on
+formatter floating-point specialization makes it enable in same cases.
+
+This reverted parts of r14-3305-g6cf214b4fc97f5 (revereted partially
+in r14-3329-g27d0cfcb2b33de), leading to (necessary for correctness)
+increase of the number template specializations. It also depends on
+preserving values of above types (instead of float) in basic_format_arg
+introduced r16-616-g9c9a7316adb996.
+
+The specializations for float32_t and float64_t are left unchanged,
+as their to_chars overloads are also implemented in terms of casting
+to float/double respectivelly.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/126731
+	* include/std/format (std::formatter<_Float16, _CharT>)
+	(std::formatter<__format::__bflt16_t, _CharT>): Remove
+	partial specializations.
+	* testsuite/std/format/formatter/ext_float.cc: Test output
+	for closest value to 1/10.
+
+Reviewed-by: Jonathan Wakely <jwakely@redhat.com>
+Signed-off-by: Tomasz Kamiński <tkaminsk@redhat.com>
+(cherry picked from commit 4b6ce501c4f1db06c8084170a68796622266b671)
+---
+ libstdc++-v3/include/std/format               | 44 -------------------
+ .../std/format/formatter/ext_float.cc         | 22 ++++++----
+ 2 files changed, 13 insertions(+), 53 deletions(-)
+
+diff --git a/libstdc++-v3/include/std/format b/libstdc++-v3/include/std/format
+index ee7eea58f34a..a90a0b03597d 100644
+--- a/libstdc++-v3/include/std/format
++++ b/libstdc++-v3/include/std/format
+@@ -2941,28 +2941,6 @@ namespace __format
+     };
+ #endif
+ 
+-#if defined(__STDCPP_FLOAT16_T__) && defined(_GLIBCXX_FLOAT_IS_IEEE_BINARY32)
+-  // Reuse __formatter_fp<C>::format<float, Out> for _Float16.
+-  template<__format::__char _CharT>
+-    struct formatter<_Float16, _CharT>
+-    {
+-      formatter() = default;
+-
+-      [[__gnu__::__always_inline__]]
+-      constexpr typename basic_format_parse_context<_CharT>::iterator
+-      parse(basic_format_parse_context<_CharT>& __pc)
+-      { return _M_f.parse(__pc); }
+-
+-      template<typename _Out>
+-	typename basic_format_context<_Out, _CharT>::iterator
+-	format(_Float16 __u, basic_format_context<_Out, _CharT>& __fc) const
+-	{ return _M_f.format((float)__u, __fc); }
+-
+-    private:
+-      __format::__formatter_fp<_CharT> _M_f;
+-    };
+-#endif
+-
+ #if defined(__FLT32_DIG__) && defined(_GLIBCXX_FLOAT_IS_IEEE_BINARY32)
+   // Reuse __formatter_fp<C>::format<float, Out> for _Float32.
+   template<__format::__char _CharT>
+@@ -3052,28 +3030,6 @@ namespace __format
+     };
+ #endif
+ 
+-#if defined(__STDCPP_BFLOAT16_T__) && defined(_GLIBCXX_FLOAT_IS_IEEE_BINARY32)
+-  // Reuse __formatter_fp<C>::format<float, Out> for bfloat16_t.
+-  template<__format::__char _CharT>
+-    struct formatter<__format::__bflt16_t, _CharT>
+-    {
+-      formatter() = default;
+-
+-      [[__gnu__::__always_inline__]]
+-      constexpr typename basic_format_parse_context<_CharT>::iterator
+-      parse(basic_format_parse_context<_CharT>& __pc)
+-      { return _M_f.parse(__pc); }
+-
+-      template<typename _Out>
+-	typename basic_format_context<_Out, _CharT>::iterator
+-	format(__gnu_cxx::__bfloat16_t __u,
+-	       basic_format_context<_Out, _CharT>& __fc) const
+-	{ return _M_f.format((float)__u, __fc); }
+-
+-    private:
+-      __format::__formatter_fp<_CharT> _M_f;
+-    };
+-#endif
+ #endif // __cpp_lib_to_chars
+ 
+   /** Format a pointer.
+diff --git a/libstdc++-v3/testsuite/std/format/formatter/ext_float.cc b/libstdc++-v3/testsuite/std/format/formatter/ext_float.cc
+index 82e696fa797c..7b231b070060 100644
+--- a/libstdc++-v3/testsuite/std/format/formatter/ext_float.cc
++++ b/libstdc++-v3/testsuite/std/format/formatter/ext_float.cc
+@@ -4,10 +4,14 @@
+ #include <testsuite_hooks.h>
+ 
+ template<typename T>
+-bool format_float()
++void
++verify_output()
+ {
+-    auto s = std::format("{:#} != {:<+7.3f}", (T)-0.0, (T)0.5);
+-    return s == "-0. != +0.500 ";
++  auto s = std::format("{:#} != {:<+7.3f}", T(-0.0), T(0.5));
++  VERIFY( s == "-0. != +0.500 ");
++
++  s = std::format("{}", T(1)/T(10));
++  VERIFY( s == "0.1");
+ }
+ 
+ #if __cplusplus > 202002L
+@@ -23,7 +27,7 @@ test_float16()
+ {
+ #if __FLT16_DIG__
+   if constexpr (formattable<_Float16>)
+-    VERIFY( format_float<_Float16>() );
++    verify_output<_Float16>();
+   else
+     std::puts("Cannot format _Float16 on this target");
+ #endif
+@@ -34,7 +38,7 @@ test_float32()
+ {
+ #if __FLT32_DIG__
+   if constexpr (formattable<_Float32>)
+-    VERIFY( format_float<_Float32>() );
++    verify_output<_Float32>();
+   else
+     std::puts("Cannot format _Float32 on this target");
+ #endif
+@@ -45,7 +49,7 @@ test_float64()
+ {
+ #if __FLT64_DIG__
+   if constexpr (formattable<_Float64>)
+-    VERIFY( format_float<_Float64>() );
++    verify_output<_Float64>();
+   else
+     std::puts("Cannot format _Float64 on this target");
+ #endif
+@@ -56,13 +60,13 @@ test_float128()
+ {
+ #ifdef __SIZEOF_FLOAT128__
+   if constexpr (formattable<__float128>)
+-    VERIFY( format_float<__float128>() );
++    verify_output<__float128>();
+   else
+     std::puts("Cannot format __float128 on this target");
+ #endif
+ #if __FLT128_DIG__
+   if constexpr (formattable<_Float128>)
+-    VERIFY( format_float<_Float128>() );
++    verify_output<_Float128>();
+   else
+     std::puts("Cannot format _Float128 on this target");
+ #endif
+@@ -75,7 +79,7 @@ test_bfloat16()
+   using bfloat16_t = decltype(0.0bf16);
+ 
+   if constexpr (formattable<bfloat16_t>)
+-    VERIFY( format_float<bfloat16_t>() );
++    verify_output<bfloat16_t>();
+   else
+     std::puts("Cannot format bfloat16_t on this target");
+ #endif

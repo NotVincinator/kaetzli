@@ -1,0 +1,205 @@
+From 08d27169190cd6ac183bf1d67478b69c456bbf13 Mon Sep 17 00:00:00 2001
+From: Paul Thomas <pault@gcc.gnu.org>
+Date: Wed, 12 Aug 2026 17:24:12 +0100
+Subject: [PATCH 038/385] Fortran: Fix ICE with recursively defined derived
+ type [PR104048]
+
+2026-08-14  Paul Thomas  <pault@gcc.gnu.org>
+
+gcc/fortran
+	PR fortran/104048
+	* trans-array.cc (structure_alloc_comps): Extend the wrapper
+	mechanism for same type allocatable arrays to scalars, creating
+	descriptors for them and passing to the deep copy library fcn..
+
+gcc/testsuite/
+	PR fortran/104048
+	* gfortran.dg/recursive_alloc_comp_7.f90: New test.
+	* gfortran.dg/recursive_alloc_comp_8.f90: New test.
+
+(cherry picked from commit 4f1c60804531475ad86206f3cc298da6ce001d83)
+---
+ gcc/fortran/trans-array.cc                    | 29 +++++++---
+ .../gfortran.dg/recursive_alloc_comp_7.f90    | 52 ++++++++++++++++++
+ .../gfortran.dg/recursive_alloc_comp_8.f90    | 54 +++++++++++++++++++
+ 3 files changed, 129 insertions(+), 6 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/recursive_alloc_comp_7.f90
+ create mode 100644 gcc/testsuite/gfortran.dg/recursive_alloc_comp_8.f90
+
+diff --git a/gcc/fortran/trans-array.cc b/gcc/fortran/trans-array.cc
+index 858d2b4c629d..f984e18f3bd6 100644
+--- a/gcc/fortran/trans-array.cc
++++ b/gcc/fortran/trans-array.cc
+@@ -11264,7 +11264,7 @@ structure_alloc_comps (gfc_symbol * der_type, tree decl, tree dest,
+ 	 runtime helpers to avoid compile-time infinite recursion.  Generate
+ 	 a call to _gfortran_cfi_deep_copy_array with an element copy
+ 	 wrapper.  When inside a wrapper, reuse current_function_decl.  */
+-      else if (c->attr.allocatable && c->as && cmp_has_alloc_comps && same_type
++      else if (c->attr.allocatable && cmp_has_alloc_comps && same_type
+ 	       && purpose == COPY_ALLOC_COMP && !c->attr.proc_pointer
+ 	       && !c->attr.codimension && !caf_in_coarray (caf_mode)
+ 	       && c->ts.type == BT_DERIVED && c->ts.u.derived != NULL)
+@@ -11282,6 +11282,8 @@ structure_alloc_comps (gfc_symbol * der_type, tree decl, tree dest,
+ 		elem_type = gfc_get_element_type (ctype);
+ 	      else if (TREE_CODE (ctype) == ARRAY_TYPE)
+ 		elem_type = TREE_TYPE (ctype);
++	      else if (!c->as)
++		elem_type = TREE_TYPE (TREE_TYPE (comp));
+ 
+ 	      helper_ptr_type = get_copy_helper_pointer_type ();
+ 
+@@ -11302,16 +11304,31 @@ structure_alloc_comps (gfc_symbol * der_type, tree decl, tree dest,
+ 						   purpose, caf_mode);
+ 	      copy_wrapper = fold_convert (helper_ptr_type, copy_wrapper);
+ 
+-	      /* Build addresses of descriptors.  */
+-	      dest_addr = gfc_build_addr_expr (pvoid_type_node, dcmp);
+-	      src_addr = gfc_build_addr_expr (pvoid_type_node, comp);
++	      if (c->as)
++		{
++		  /* Build addresses of descriptors.  */
++		  dest_addr = gfc_build_addr_expr (pvoid_type_node, dcmp);
++		  src_addr = gfc_build_addr_expr (pvoid_type_node, comp);
++		}
++	      else
++		{
++		  /* For scalars, create separate descriptors for source and
++		     dest, then pass their addresses.  */
++		  gfc_se se;
++		  gfc_init_se (&se, NULL);
++		  tmp = gfc_conv_scalar_to_descriptor (&se, dcmp, c->attr);
++		  dest_addr = gfc_build_addr_expr (pvoid_type_node, tmp);
++		  tmp = gfc_conv_scalar_to_descriptor (&se, comp, c->attr);
++		  src_addr = gfc_build_addr_expr (pvoid_type_node, tmp);
++		  gfc_add_block_to_block (&fnblock, &se.pre);
++		}
+ 
+-	      /* Build call: _gfortran_cfi_deep_copy_array (&dcmp, &comp,
+-		 wrapper).  */
++	      /* Build call: _gfortran_cfi_deep_copy_array (&dcmp, &comp, wrapper).  */
+ 	      call = build_call_expr_loc (input_location,
+ 					  gfor_fndecl_cfi_deep_copy_array, 3,
+ 					  dest_addr, src_addr,
+ 					  copy_wrapper);
++
+ 	      gfc_add_expr_to_block (&fnblock, call);
+ 	    }
+ 	  /* For allocatable arrays with nested allocatable components,
+diff --git a/gcc/testsuite/gfortran.dg/recursive_alloc_comp_7.f90 b/gcc/testsuite/gfortran.dg/recursive_alloc_comp_7.f90
+new file mode 100644
+index 000000000000..47a8a12bda66
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/recursive_alloc_comp_7.f90
+@@ -0,0 +1,52 @@
++! { dg-do run }
++!
++! Test the fix for pr104048, which used to ICE, as shown below.
++!
++! Contributed by Arjen MArkus  <arjen.markus895@gmail.com>
++!
++MODULE moa_view_types
++
++    IMPLICIT NONE
++
++    TYPE moa_basic_view
++        integer, allocatable :: shp(:)
++    END TYPE moa_basic_view
++
++    TYPE :: moa_view_type
++        TYPE(moa_basic_view)             :: left_array
++        TYPE(moa_basic_view)             :: right_array
++        TYPE(moa_view_type), ALLOCATABLE :: left_view
++        TYPE(moa_view_type), ALLOCATABLE :: right_view
++    END TYPE moa_view_type
++
++CONTAINS
++
++FUNCTION catenate_view_view( view1, view2 ) result(new_view)
++    CLASS(moa_view_type), TARGET, INTENT(IN) :: view1
++    CLASS(moa_view_type), TARGET, INTENT(IN) :: view2
++    CLASS(moa_view_type),  ALLOCATABLE        :: new_view
++
++    ALLOCATE( new_view )
++
++    new_view%left_view  = view1 ! Used to cause an ICE
++    new_view%right_view = view2 !      -ditto-
++END FUNCTION catenate_view_view
++
++END MODULE moa_view_types
++
++    call test104048
++contains
++    subroutine test104048
++        use moa_view_types
++        class(moa_view_type), allocatable :: view1, view2, new_view
++        allocate (view1, view2)
++        view1%left_array%shp = [1 , 2]
++        view2%right_array%shp = [3 , 4]
++        new_view = catenate_view_view( view1, view2 )
++        select type (new_view)
++           type is (moa_view_type)
++               if (any (new_view%left_view%left_array%shp .ne. [1,2])) stop 1
++               if (any (new_view%right_view%right_array%shp .ne. [3,4])) stop 2
++        end select
++    end subroutine
++end
+diff --git a/gcc/testsuite/gfortran.dg/recursive_alloc_comp_8.f90 b/gcc/testsuite/gfortran.dg/recursive_alloc_comp_8.f90
+new file mode 100644
+index 000000000000..e24f233ce958
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/recursive_alloc_comp_8.f90
+@@ -0,0 +1,54 @@
++! { dg-do run }
++!
++! Test the fix for pr104048, which used to ICE, as shown below.
++! This is a copy of recursive_alloc_comp_7.f90 with the recursive components
++! moa_view_type CLASS rather than TYPE.
++!
++! Contributed by Arjen MArkus  <arjen.markus895@gmail.com>
++!
++MODULE moa_view_types
++
++    IMPLICIT NONE
++
++    TYPE moa_basic_view
++        integer, allocatable :: shp(:)
++    END TYPE moa_basic_view
++
++    TYPE :: moa_view_type
++        TYPE(moa_basic_view)             :: left_array
++        TYPE(moa_basic_view)             :: right_array
++        CLASS(moa_view_type), ALLOCATABLE :: left_view
++        CLASS(moa_view_type), ALLOCATABLE :: right_view
++    END TYPE moa_view_type
++
++CONTAINS
++
++FUNCTION catenate_view_view( view1, view2 ) result(new_view)
++    CLASS(moa_view_type), TARGET, INTENT(IN) :: view1
++    CLASS(moa_view_type), TARGET, INTENT(IN) :: view2
++    CLASS(moa_view_type),  ALLOCATABLE        :: new_view
++
++    ALLOCATE( new_view )
++
++    new_view%left_view  = view1 ! Used to cause an ICE
++    new_view%right_view = view2 !      -ditto-
++END FUNCTION catenate_view_view
++
++END MODULE moa_view_types
++
++    call test104048
++contains
++    subroutine test104048
++        use moa_view_types
++        class(moa_view_type), allocatable :: view1, view2, new_view
++        allocate (view1, view2)
++        view1%left_array%shp = [1 , 2]
++        view2%right_array%shp = [3 , 4]
++        new_view = catenate_view_view( view1, view2 )
++        select type (new_view)
++           type is (moa_view_type)
++               if (any (new_view%left_view%left_array%shp .ne. [1,2])) stop 1
++               if (any (new_view%right_view%right_array%shp .ne. [3,4])) stop 2
++        end select
++    end subroutine
++end

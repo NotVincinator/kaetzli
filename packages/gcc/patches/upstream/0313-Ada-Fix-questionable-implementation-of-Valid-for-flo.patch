@@ -1,0 +1,48 @@
+From c35d40973a2413ba48c047c10a090433e731759c Mon Sep 17 00:00:00 2001
+From: Liam Powell <liam@liampwll.com>
+Date: Mon, 19 Oct 2026 20:48:27 +0200
+Subject: [PATCH 313/385] Ada: Fix questionable implementation of 'Valid for
+ floating point
+
+This only pertains to obsolete targets that do not support denormals, but is
+worth fixing because it also improves the generated code for the others.
+
+gcc/ada
+	PR ada/127974
+	* libgnat/s-fatgen.adb (Valid): Turn Rep into an imported constant
+	and mask out the sign for the test on its Most Significant Word.
+---
+ gcc/ada/libgnat/s-fatgen.adb | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/gcc/ada/libgnat/s-fatgen.adb b/gcc/ada/libgnat/s-fatgen.adb
+index 394dac5db2c2..febd9f9e2919 100644
+--- a/gcc/ada/libgnat/s-fatgen.adb
++++ b/gcc/ada/libgnat/s-fatgen.adb
+@@ -945,8 +945,8 @@ package body System.Fat_Gen is
+       function To_Address is
+         new Ada.Unchecked_Conversion (Access_T, System.Address);
+ 
+-      Rep : Float_Rep;
+-      for Rep'Address use To_Address (Access_T (X));
++      Rep : constant Float_Rep
++        with Import, Address => To_Address (Access_T (X));
+       --  Rep is a view of the input floating-point parameter. Note that we
+       --  must avoid reading the actual bits of this parameter in float form
+       --  since it may be a signalling NaN.
+@@ -977,11 +977,11 @@ package body System.Fat_Gen is
+          --  hardware may evaluate it to True for all denormalized numbers.
+ 
+          else
+-            --  First clear the sign bit (the exponent is already zero)
+-
+-            Rep (MSW) := Rep (MSW) and not Sign_Mask;
++            --  Ignore the sign bit (the exponent is already zero)
+ 
+-            return (for all J in 0 .. Rep_Last => Rep (J) = 0);
++            return (Rep (MSW) and not Sign_Mask) = 0
++              and then
++                (for all J in 0 .. Rep_Last when J /= MSW => Rep (J) = 0);
+          end if;
+       end if;
+    end Valid;

@@ -1,0 +1,29 @@
+From f308ae230870e3edc5c1fb921ca51368ad5eb1e8 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Wed, 16 Sep 2026 11:35:57 +0100
+Subject: [PATCH 179/385] libstdc++: Fix typo in comment in
+ 27_io/basic_filebuf/close/char/4879.cc
+
+libstdc++-v3/ChangeLog:
+
+	* testsuite/27_io/basic_filebuf/close/char/4879.cc: Fix typo in
+	comment.
+
+(cherry picked from commit 1d8b0cfa3474c0a9854b8d8340792eaff62b70e7)
+---
+ libstdc++-v3/testsuite/27_io/basic_filebuf/close/char/4879.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/libstdc++-v3/testsuite/27_io/basic_filebuf/close/char/4879.cc b/libstdc++-v3/testsuite/27_io/basic_filebuf/close/char/4879.cc
+index 3ea586ada7c9..3e0b134edb95 100644
+--- a/libstdc++-v3/testsuite/27_io/basic_filebuf/close/char/4879.cc
++++ b/libstdc++-v3/testsuite/27_io/basic_filebuf/close/char/4879.cc
+@@ -76,7 +76,7 @@ test_04()
+   ofs.put('t');
+ 
+   /*
+-   * ISO/IED 14882:1998(E) 27.8.1.10.4
++   * ISO/IEC 14882:1998(E) 27.8.1.10.4
+    *
+    * void close();
+    *

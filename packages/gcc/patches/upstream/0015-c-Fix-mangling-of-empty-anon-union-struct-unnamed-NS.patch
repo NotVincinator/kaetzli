@@ -1,0 +1,147 @@
+From fac66e827216a5593fdf501929babf01338a4e79 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Thu, 6 Aug 2026 13:24:08 +0200
+Subject: [PATCH 015/385] c++: Fix mangling of empty anon union/struct unnamed
+ NSDMs [PR125541]
+
+Non-static data members are currently mangled as
+dm <prefix> <unqualified-name>
+This works fine for NSDMs with a name, or even the unnamed anon union/struct
+NSDMs iff they have any named members in them (in that case the
+<unqualified-name> is using anon_aggr_naming_decl).
+As the following testcases show, if the anon union/struct is empty,
+we ICE, because there is nothing we can print as the name.
+The following patch mangles it similarly to unnamed bitfields in that case,
+simply counts the index of such problematic empty unnamed anon union/struct
+within the class and emits _ for the first one, etc.
+
+2026-06-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/125541
+	* mangle.cc (write_reflection): Mangle empty anonymous union/struct
+	data members as "da" rather than "dm" and use index of such a data
+	member instead of name.
+
+	* g++.dg/reflect/mangle1.C: Add further 2 tests.
+	* g++.dg/reflect/mangle9.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 24754ac2629968fba1681ba51a96ed5bfd51546f)
+---
+ gcc/cp/mangle.cc                       | 22 ++++++++++++++++++
+ gcc/testsuite/g++.dg/reflect/mangle1.C |  5 +++++
+ gcc/testsuite/g++.dg/reflect/mangle9.C | 31 ++++++++++++++++++++++++++
+ 3 files changed, 58 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/reflect/mangle9.C
+
+diff --git a/gcc/cp/mangle.cc b/gcc/cp/mangle.cc
+index d8a70233beab..6da1484affa9 100644
+--- a/gcc/cp/mangle.cc
++++ b/gcc/cp/mangle.cc
+@@ -4186,6 +4186,8 @@ write_expression (tree expr)
+ 		      [ <alias template-args> ] _ <type> # type alias
+ 		  ::= ty <type>				# type
+ 		  ::= dm <prefix> <unqualified-name>	# ns data member
++		  ::= da <prefix> [ <nonnegative number> ] _ # empty anon union
++							     # data member
+ 		  ::= un <prefix> [ <nonnegative number> ] _ # unnamed bitfld
+ 		  ::= ct [ <prefix> ] <unqualified-name> # class template
+ 		  ::= ft [ <prefix> ] <unqualified-name> # function template
+@@ -4207,6 +4209,11 @@ write_reflection (tree refl)
+ {
+   char prefix[3];
+   tree arg = reflection_mangle_prefix (refl, prefix);
++  if (strcmp (prefix, "dm") == 0
++      && DECL_NAME (arg) == NULL_TREE
++      && ANON_AGGR_TYPE_P (TREE_TYPE (arg))
++      && anon_aggr_naming_decl (TREE_TYPE (arg)) == NULL_TREE)
++    strcpy (prefix, "da");
+   write_string (prefix);
+   /* If there is no argument, nothing further needs to be mangled.  */
+   if (arg == NULL_TREE)
+@@ -4259,6 +4266,21 @@ write_reflection (tree refl)
+       write_prefix (ctx);
+       write_unqualified_name (arg);
+     }
++  else if (strcmp (prefix, "da") == 0)
++    {
++      int idx = 0;
++      tree ctx = decl_mangling_context (arg);
++      for (tree f = TYPE_FIELDS (ctx); f; f = DECL_CHAIN (f))
++	if (f == arg)
++	  break;
++	else if (TREE_CODE (f) == FIELD_DECL
++		 && DECL_NAME (f) == NULL_TREE
++		 && ANON_AGGR_TYPE_P (TREE_TYPE (f))
++		 && anon_aggr_naming_decl (TREE_TYPE (f)) == NULL_TREE)
++	  ++idx;
++      write_prefix (ctx);
++      write_compact_number (idx);
++    }
+   else if (strcmp (prefix, "un") == 0)
+     {
+       tree ctx = DECL_CONTEXT (arg);
+diff --git a/gcc/testsuite/g++.dg/reflect/mangle1.C b/gcc/testsuite/g++.dg/reflect/mangle1.C
+index e0e609943122..e0232837e662 100644
+--- a/gcc/testsuite/g++.dg/reflect/mangle1.C
++++ b/gcc/testsuite/g++.dg/reflect/mangle1.C
+@@ -15,6 +15,7 @@ struct S : B {
+   int : 0;
+   static int var;
+ };
++struct W { union {}; union {}; union {}; union {}; };
+ template <auto> struct TCls {};
+ template <auto> void TFn ();
+ template <auto> int TVar;
+@@ -172,6 +173,8 @@ baz (int x)
+ 							    std::meta::reflect_constant (43L),
+ 							    std::meta::reflect_constant (NS2::AA { 1, 2 }) } })> (); // data member description
+   bar <340, ^^NS2::X::~X> (); // function
++  bar <350, members_of (^^W, ctx)[1]> (); // empty anon union non-static data member
++  bar <351, members_of (^^W, ctx)[7]> (); // empty anon union non-static data member
+ }
+ 
+ // { dg-final { scan-assembler "_Z3fooILi1EDmEvv" } }
+@@ -258,3 +261,5 @@ baz (int x)
+ // { dg-final { scan-assembler "_Z3barILi334ELDmdsi___0_EEvv" } }
+ // { dg-final { scan-assembler "_Z3barILi335ELDmdsi_1____Li42ELl43EXtlN3NS22AAELi1ELi2EEEEEvv" } }
+ // { dg-final { scan-assembler "_Z3barILi340ELDmfnN3NS21XD4EvEEvv" } }
++// { dg-final { scan-assembler "_Z3barILi350ELDmda1W_EEvv" } }
++// { dg-final { scan-assembler "_Z3barILi351ELDmda1W2_EEvv" } }
+diff --git a/gcc/testsuite/g++.dg/reflect/mangle9.C b/gcc/testsuite/g++.dg/reflect/mangle9.C
+new file mode 100644
+index 000000000000..1f78daa6dd56
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/reflect/mangle9.C
+@@ -0,0 +1,31 @@
++// { dg-do compile { target c++26 } }
++// { dg-options "-freflection -O0" }
++
++#include <meta>
++
++struct W { union { union {}; union {}; union {}; union {}; };
++	   union { union {}; union {}; union {}; union {}; }; };
++
++constexpr auto ctx = std::meta::access_context::current ();
++
++template <int N, std::meta::info I>
++void
++bar ()
++{
++}
++
++void
++baz (int x)
++{
++  constexpr auto a = members_of (^^W, ctx)[0];
++  bar <10, members_of (a, ctx)[1]> (); // empty anon union non-static data member
++  bar <11, members_of (a, ctx)[7]> (); // empty anon union non-static data member
++  constexpr auto b = members_of (^^W, ctx)[2];
++  bar <12, members_of (b, ctx)[1]> (); // empty anon union non-static data member
++  bar <13, members_of (b, ctx)[7]> (); // empty anon union non-static data member
++}
++
++// { dg-final { scan-assembler "_Z3barILi10ELDmda1WUt__EEvv" } }
++// { dg-final { scan-assembler "_Z3barILi11ELDmda1WUt_2_EEvv" } }
++// { dg-final { scan-assembler "_Z3barILi12ELDmda1WUt0__EEvv" } }
++// { dg-final { scan-assembler "_Z3barILi13ELDmda1WUt0_2_EEvv" } }

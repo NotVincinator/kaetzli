@@ -1,0 +1,133 @@
+From 877ce5e4ec4476be2167def58e35b393bd4e5e82 Mon Sep 17 00:00:00 2001
+From: Gary Dismukes <dismukes@adacore.com>
+Date: Wed, 7 Jan 2026 20:23:55 +0000
+Subject: [PATCH 288/385] Ada: Visibility bug in instantiation with
+ precondition on formal subprogram
+
+The compiler may issue an error saying that a global entity referenced in
+the precondition of a formal subprogram is not visible when the containing
+generic is instantiated at a place where the entity is not directly visible.
+This was due to the formal subprogram's contract not having been analyzed
+in the generic template.  As a result, the nodes with global references were
+not properly captured (by Save_Global_References).
+
+An additional problem was exposed, which was that references within
+contract aspect specifications of generic formals to other formals of the
+same generic were not being properly analyzed/resolved, due to copying
+the aspect specifications of the already-analyzed copy of the generic
+formal when building subprogram wrappers for the contracts.  This could
+lead to blowups in the back end due to references to the original formals
+occurring in the expansion of the instantiation.  This is addressed by
+copying the aspect specifications of the unanalyzed formals rather than
+those that were analyzed in the copy of the generic template.
+
+gcc/ada/
+	PR ada/127880
+	* contracts.adb (Analyze_Contracts): Add cases for formal subprogram
+	Nkinds so that Analyze_Entry_Or_Subprogram_Contract will be called
+	for them.
+	* sem_attr.adb (Analyze_Attribute_Old_Result): Account for the cases
+	of formal subprogram Nkinds, allowing Old attributes for those.
+	* sem_ch12.adb (Build_Subprogram_Wrappers): Add a formal for passing
+	the unanalyzed generic formal, and use it for copying any aspect
+	specifications of the generic formal rather than copying the analyzed
+	generic formal's aspects.
+	(Analyze_One_Association): Pass Assoc.Un_Formal as an additional
+	actual in the call to Build_Subprogram_Wrappers.
+---
+ gcc/ada/contracts.adb |  2 ++
+ gcc/ada/sem_attr.adb  |  2 ++
+ gcc/ada/sem_ch12.adb  | 24 +++++++++++++++++++-----
+ 3 files changed, 23 insertions(+), 5 deletions(-)
+
+diff --git a/gcc/ada/contracts.adb b/gcc/ada/contracts.adb
+index 81a04facfc97..bde66171cbc0 100644
+--- a/gcc/ada/contracts.adb
++++ b/gcc/ada/contracts.adb
+@@ -452,6 +452,8 @@ package body Contracts is
+ 
+          if Nkind (Decl) in N_Abstract_Subprogram_Declaration
+                           | N_Entry_Declaration
++                          | N_Formal_Abstract_Subprogram_Declaration
++                          | N_Formal_Concrete_Subprogram_Declaration
+                           | N_Generic_Subprogram_Declaration
+                           | N_Subprogram_Declaration
+          then
+diff --git a/gcc/ada/sem_attr.adb b/gcc/ada/sem_attr.adb
+index e912293f039a..cb650c01ac1e 100644
+--- a/gcc/ada/sem_attr.adb
++++ b/gcc/ada/sem_attr.adb
+@@ -1519,6 +1519,8 @@ package body Sem_Attr is
+          if Nkind (Subp_Decl) not in N_Abstract_Subprogram_Declaration
+                                    | N_Entry_Declaration
+                                    | N_Expression_Function
++                                   | N_Formal_Abstract_Subprogram_Declaration
++                                   | N_Formal_Concrete_Subprogram_Declaration
+                                    | N_Full_Type_Declaration
+                                    | N_Generic_Subprogram_Declaration
+                                    | N_Subprogram_Body
+diff --git a/gcc/ada/sem_ch12.adb b/gcc/ada/sem_ch12.adb
+index 520f41701e29..2ec42f07d543 100644
+--- a/gcc/ada/sem_ch12.adb
++++ b/gcc/ada/sem_ch12.adb
+@@ -524,7 +524,10 @@ package body Sem_Ch12 is
+    --  pre/postconditon checks added.
+ 
+    procedure Build_Subprogram_Wrappers
+-     (Match, Analyzed_Formal : Node_Id; Renamings : List_Id);
++     (Match             : Node_Id;
++      Analyzed_Formal   : Node_Id;
++      Unanalyzed_Formal : Node_Id;
++      Renamings         : List_Id);
+    --  Ada 2022: AI12-0272 introduces pre/postconditions for formal
+    --  subprograms. The implementation of making the formal into a renaming
+    --  of the actual does not work, given that subprogram renaming cannot
+@@ -534,6 +537,10 @@ package body Sem_Ch12 is
+    --  The wrapper declaration and body are appended to Renamings.
+    --  ???But renaming declarations CAN have aspects specs,
+    --  and that was true from the start (see AI05-0183-1).
++   --
++   --  The procedure also copies the aspect specifications from the unanalyzed
++   --  formal subprogram to the wrapper subprogram for later analysis in the
++   --  context of the instantiation.
+ 
+    procedure Check_Abbreviated_Instance
+      (N                : Node_Id;
+@@ -2758,7 +2765,10 @@ package body Sem_Ch12 is
+                  and then (Expander_Active or GNATprove_Mode)
+                then
+                   Build_Subprogram_Wrappers
+-                    (Match, Assoc.An_Formal, Result_Renamings);
++                    (Match             => Match,
++                     Analyzed_Formal   => Assoc.An_Formal,
++                     Unanalyzed_Formal => Assoc.Un_Formal,
++                     Renamings         => Result_Renamings);
+                end if;
+ 
+                --  An instantiation is a freeze point for the actuals,
+@@ -7560,7 +7570,10 @@ package body Sem_Ch12 is
+    -------------------------------
+ 
+    procedure Build_Subprogram_Wrappers
+-     (Match, Analyzed_Formal : Node_Id; Renamings : List_Id)
++     (Match             : Node_Id;
++      Analyzed_Formal   : Node_Id;
++      Unanalyzed_Formal : Node_Id;
++      Renamings         : List_Id)
+    is
+       function Adjust_Aspect_Sloc (N : Node_Id) return Traverse_Result;
+       --  Adjust Sloc so that errors will be reported on the instance rather
+@@ -7618,10 +7631,11 @@ package body Sem_Ch12 is
+ 
+       Decl_Node := Build_Subprogram_Decl_Wrapper (Formal);
+ 
+-      --  Transfer aspect specifications from formal subprogram to wrapper
++      --  Transfer aspect specifications from the unanalyzed formal subprogram
++      --  to the wrapper for later analysis.
+ 
+       Set_Aspect_Specifications (Decl_Node,
+-        New_Copy_List_Tree (Aspect_Specifications (Analyzed_Formal)));
++        New_Copy_List_Tree (Aspect_Specifications (Unanalyzed_Formal)));
+ 
+       Aspect_Spec := First (Aspect_Specifications (Decl_Node));
+       while Present (Aspect_Spec) loop

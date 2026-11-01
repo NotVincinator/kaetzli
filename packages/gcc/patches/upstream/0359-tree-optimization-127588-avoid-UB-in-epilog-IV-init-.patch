@@ -1,0 +1,98 @@
+From 387ecb88e60fd276e84b8952e1c2f37ed911c3fa Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Fri, 25 Sep 2026 09:36:09 +0200
+Subject: [PATCH 359/385] tree-optimization/127588 - avoid UB in epilog IV init
+ computation
+
+The following avoids UB when computing the start value of the epilog
+IV value which we compute as init + step * vect-niters where
+the step * vect-niters computation can overflow.
+
+	PR tree-optimization/127588
+	* tree-vect-loop-manip.cc (vect_update_ivs_after_vectorizer):
+	Use an unsigned type to compute the epilog start value.
+
+	* gcc.dg/vect/vect-iv-15.c: New testcase.
+
+(cherry picked from commit 0a970b2702183d290df044858fd4df13ef698924)
+---
+ gcc/testsuite/gcc.dg/vect/vect-iv-15.c | 25 +++++++++++++++++++++++++
+ gcc/tree-vect-loop-manip.cc            | 26 ++++++++++++++------------
+ 2 files changed, 39 insertions(+), 12 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/vect/vect-iv-15.c
+
+diff --git a/gcc/testsuite/gcc.dg/vect/vect-iv-15.c b/gcc/testsuite/gcc.dg/vect/vect-iv-15.c
+new file mode 100644
+index 000000000000..912b18be75ff
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/vect/vect-iv-15.c
+@@ -0,0 +1,25 @@
++/* PR127588 */
++/* { dg-require-effective-target int32plus } */
++
++#include "tree-vect.h"
++
++int s;
++
++__attribute__((noipa))
++void foo (int init)
++{
++  s = init;
++  do {
++    s += 1074790400;
++  } while (s <= 1073741823);
++}
++
++int main ()
++{
++  check_vect ();
++
++  foo (-1264552634);
++  if (s != 1959818566)
++    __builtin_abort ();
++  return 0;
++}
+diff --git a/gcc/tree-vect-loop-manip.cc b/gcc/tree-vect-loop-manip.cc
+index c217fd1390f0..493f7584e94f 100644
+--- a/gcc/tree-vect-loop-manip.cc
++++ b/gcc/tree-vect-loop-manip.cc
+@@ -2444,7 +2444,7 @@ vect_update_ivs_after_vectorizer (loop_vec_info loop_vinfo,
+        gsi_next (&gsi), gsi_next (&gsi1))
+     {
+       tree init_expr;
+-      tree step_expr, off;
++      tree step_expr;
+       tree type;
+       tree var, ni, ni_name;
+ 
+@@ -2480,17 +2480,19 @@ vect_update_ivs_after_vectorizer (loop_vec_info loop_vinfo,
+ 
+       if (induction_type == vect_step_op_add)
+ 	{
+-	  tree stype = TREE_TYPE (step_expr);
+-	  off = fold_build2 (MULT_EXPR, stype,
+-			       fold_convert (stype, niters), step_expr);
+-
+-	  if (POINTER_TYPE_P (type))
+-	    ni = fold_build_pointer_plus (init_expr, off);
+-	  else
+-	    ni = fold_convert (type,
+-			       fold_build2 (PLUS_EXPR, stype,
+-					    fold_convert (stype, init_expr),
+-					    off));
++	  /* Use an unsigned type because we compute 'off' without
++	     accounting for 'init_expr', thus the computation might
++	     overflow.  Note we can also have FP inductions.  */
++	  tree ctype = (INTEGRAL_TYPE_P (TREE_TYPE (step_expr))
++			? unsigned_type_for (TREE_TYPE (step_expr))
++			: TREE_TYPE (step_expr));
++	  tree off = fold_build2 (MULT_EXPR, ctype,
++				  fold_convert (ctype, niters),
++				  fold_convert (ctype, step_expr));
++	  ni = fold_convert (type,
++			     fold_build2 (PLUS_EXPR, ctype,
++					  fold_convert (ctype, init_expr),
++					  off));
+ 	}
+       /* Don't bother call vect_peel_nonlinear_iv_init.  */
+       else if (induction_type == vect_step_op_neg)

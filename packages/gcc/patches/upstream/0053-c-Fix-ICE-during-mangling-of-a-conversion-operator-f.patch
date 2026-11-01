@@ -1,0 +1,96 @@
+From 9960824ebdee198f3dfff5545b630f5ab3c5ebfa Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Tue, 18 Aug 2026 17:49:11 +0200
+Subject: [PATCH 053/385] c++: Fix ICE during mangling of a conversion operator
+ function template [PR126093]
+
+On Tue, Aug 11, 2026 at 04:25:19PM -0400, Jason Merrill wrote:
+> On 8/7/26 8:45 AM, Jakub Jelinek wrote:
+> > We ICE when trying to mangle the TEMPLATE_DECL of a conversion operator,
+> > because FNDECL_USED_AUTO macro requires FUNCTION_DECL, but here we
+> > have a TEMPLATE_DECL instead.
+> > In this case, DECL_CONV_FN_TYPE contains the right type, so this patch
+> > just guards the FNDECL_USED_AUTO macro use on FUNCTION_DECLs.
+>
+> Hmm, if it's valid to get a TEMPLATE_DECL here I think we want to
+> STRIP_TEMPLATE earlier in the function to avoid the need for this; lots of
+> other things here seem to assume we're looking at the inner decl.
+
+Ok, here is a different patch then to use STRIP_TEMPLATE before calling
+write_unqualified_name in the {class,function,variable,alias} template,
+concept, namespace alias and namespace (for the last two STRIP_TEMPLATE
+will do nothing, so I haven't moved it to a separate handling).
+
+2026-08-17  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/126093
+	* mangle.cc (write_reflection): Call write_unqualified_name on
+	STRIP_TEMPLATE (arg) rather than just arg.
+
+	* g++.dg/reflect/mangle1.C: Add 2 new tests for reflections of
+	conversion templates.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 91e2f5a8aac9c9825e4a13e8f7451bc6d8f75790)
+---
+ gcc/cp/mangle.cc                       |  2 +-
+ gcc/testsuite/g++.dg/reflect/mangle1.C | 12 ++++++++++++
+ 2 files changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/cp/mangle.cc b/gcc/cp/mangle.cc
+index 6da1484affa9..3d0da42939e7 100644
+--- a/gcc/cp/mangle.cc
++++ b/gcc/cp/mangle.cc
+@@ -4302,7 +4302,7 @@ write_reflection (tree refl)
+ 	   || strcmp (prefix, "ns") == 0)
+     {
+       write_prefix (decl_mangling_context (arg));
+-      write_unqualified_name (arg);
++      write_unqualified_name (STRIP_TEMPLATE (arg));
+     }
+   else if (strcmp (prefix, "ba") == 0)
+     {
+diff --git a/gcc/testsuite/g++.dg/reflect/mangle1.C b/gcc/testsuite/g++.dg/reflect/mangle1.C
+index e0232837e662..cc07ef6ec49a 100644
+--- a/gcc/testsuite/g++.dg/reflect/mangle1.C
++++ b/gcc/testsuite/g++.dg/reflect/mangle1.C
+@@ -15,6 +15,10 @@ struct S : B {
+   int : 0;
+   static int var;
+ };
++struct Q {
++  template <typename T>
++  operator T () { return T (); }
++};
+ struct W { union {}; union {}; union {}; union {}; };
+ template <auto> struct TCls {};
+ template <auto> void TFn ();
+@@ -65,6 +69,10 @@ namespace NS2 {
+   struct Z {
+   };
+   struct AA { int a, b; };
++  struct Q {
++    template <int N>
++    operator int () { return N; }
++  };
+ }
+ 
+ constexpr auto ctx = std::meta::access_context::current ();
+@@ -147,6 +155,8 @@ baz (int x)
+   bar <241, ^^NS2::TCls> (); // class template
+   bar <250, ^^TFn> (); // function template
+   bar <251, ^^NS2::TFn> (); // function template
++  bar <252, members_of (^^Q, ctx)[0]> (); // function template
++  bar <253, members_of (^^NS2::Q, ctx)[0]> (); // function template
+   bar <260, ^^TVar> (); // variable template
+   bar <261, ^^NS2::TVar> (); // variable template
+   bar <270, ^^TAlias> (); // alias template
+@@ -239,6 +249,8 @@ baz (int x)
+ // { dg-final { scan-assembler "_Z3barILi241ELDmct3NS24TClsEEvv" } }
+ // { dg-final { scan-assembler "_Z3barILi250ELDmft3TFnEEvv" } }
+ // { dg-final { scan-assembler "_Z3barILi251ELDmft3NS23TFnEEvv" } }
++// { dg-final { scan-assembler "_Z3barILi252ELDmft1QcvT_EEvv" } }
++// { dg-final { scan-assembler "_Z3barILi253ELDmft3NS21QcviEEvv" } }
+ // { dg-final { scan-assembler "_Z3barILi260ELDmvt4TVarEEvv" } }
+ // { dg-final { scan-assembler "_Z3barILi261ELDmvt3NS24TVarEEvv" } }
+ // { dg-final { scan-assembler "_Z3barILi270ELDmat6TAliasEEvv" } }

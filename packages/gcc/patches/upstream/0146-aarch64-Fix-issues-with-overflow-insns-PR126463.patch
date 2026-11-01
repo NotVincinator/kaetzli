@@ -1,0 +1,178 @@
+From e5883b45adb12a5a2092a9b5b7d4e4db0c386a86 Mon Sep 17 00:00:00 2001
+From: Richard Earnshaw <rearnsha@arm.com>
+Date: Wed, 2 Sep 2026 17:14:16 +0100
+Subject: [PATCH 146/385] aarch64: Fix issues with 'overflow' insns [PR126463]
+
+This issue looked like a simple 1-character typo, but when trying to
+construct a suitable testcase, I found that the patterns were hardly
+ever being used.  In the end there turned out to be three underlying
+issues:
+- we were selecting the wrong CCmode for NEG and MINUS overflow
+  checks (more precisely, we weren't detecting these at all and
+  then falling back to CCmode).
+- The patterns were not in canonical form, preventing combine
+  from finding a match while optimizing.
+- Finally, when we did eventually get the preferred form, we
+  had the invalid output template, causing the reported ICE.
+
+gcc/ChangeLog:
+
+	PR target/126463
+	* config/aarch64/aarch64.cc (aarch64_select_cc_mode): Correctly
+	match overflow detection idioms using MINUS and NEG.
+	* config/aarch64/aarch64.md (subv<GPI:mode>4): Re-order the
+	compare into canonical form.
+	(subv<GPI:mode>4_insn): Likewise.
+	(negv<GPI:mode>4): Likewise.
+	(negv<GPI:mode>_insn): Likewise.  Fix typo in output template.
+
+gcc/testsuite/ChangeLog:
+
+	PR target/126463
+	* gcc.target/aarch64/negv.c: New test.
+
+(cherry picked from commit 8ab2af4964f41248c3b1330f331a78ba6b5a6cc0)
+---
+ gcc/config/aarch64/aarch64.cc           | 10 ++++---
+ gcc/config/aarch64/aarch64.md           | 38 ++++++++++++-------------
+ gcc/testsuite/gcc.target/aarch64/negv.c | 27 ++++++++++++++++++
+ 3 files changed, 52 insertions(+), 23 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/negv.c
+
+diff --git a/gcc/config/aarch64/aarch64.cc b/gcc/config/aarch64/aarch64.cc
+index ab8c6d0dff6e..df7bc5f3ca11 100644
+--- a/gcc/config/aarch64/aarch64.cc
++++ b/gcc/config/aarch64/aarch64.cc
+@@ -12563,11 +12563,13 @@ aarch64_select_cc_mode (RTX_CODE code, rtx x, rtx y)
+ 	      << (GET_MODE_BITSIZE (mode_x).to_constant () / 2))))
+     return CC_ADCmode;
+ 
+-  /* A test for signed overflow.  */
++  /* Tests for signed overflow.  */
+   if ((mode_x == DImode || mode_x == TImode)
+-      && code == NE
+-      && code_x == PLUS
+-      && GET_CODE (y) == SIGN_EXTEND)
++      && (code == NE || code == EQ)
++      && (code_x == PLUS || code_x == MINUS || code_x == NEG)
++      && GET_CODE (XEXP (x, 0)) == SIGN_EXTEND
++      && GET_CODE (y) == SIGN_EXTEND
++      && GET_CODE (XEXP (y, 0)) == code_x)
+     return CC_Vmode;
+ 
+   /* For everything else, return CCmode.  */
+diff --git a/gcc/config/aarch64/aarch64.md b/gcc/config/aarch64/aarch64.md
+index 0ef01e889a6d..71ea4b8aa999 100644
+--- a/gcc/config/aarch64/aarch64.md
++++ b/gcc/config/aarch64/aarch64.md
+@@ -3537,12 +3537,11 @@
+ (define_insn "subv<GPI:mode>_insn"
+   [(set (reg:CC_V CC_REGNUM)
+ 	(compare:CC_V
++	 (minus:<DWI>
++	  (sign_extend:<DWI> (match_operand:GPI 1 "register_operand" "rk"))
++	  (sign_extend:<DWI> (match_operand:GPI 2 "register_operand" "r")))
+ 	 (sign_extend:<DWI>
+-	  (minus:GPI
+-	   (match_operand:GPI 1 "register_operand" "rk")
+-	   (match_operand:GPI 2 "register_operand" "r")))
+-	 (minus:<DWI> (sign_extend:<DWI> (match_dup 1))
+-		      (sign_extend:<DWI> (match_dup 2)))))
++	  (minus:GPI (match_dup 1) (match_dup 2)))))
+    (set (match_operand:GPI 0 "register_operand" "=r")
+ 	(minus:GPI (match_dup 1) (match_dup 2)))]
+   ""
+@@ -3553,12 +3552,11 @@
+ (define_insn "subv<GPI:mode>_imm"
+   [(set (reg:CC_V CC_REGNUM)
+ 	(compare:CC_V
++	 (minus:<DWI>
++	  (sign_extend:<DWI> (match_operand:GPI 1 "register_operand"))
++	  (match_operand:GPI 2 "aarch64_plus_immediate"))
+ 	 (sign_extend:<DWI>
+-	  (minus:GPI
+-	   (match_operand:GPI 1 "register_operand")
+-	   (match_operand:GPI 2 "aarch64_plus_immediate")))
+-	 (minus:<DWI> (sign_extend:<DWI> (match_dup 1))
+-		      (match_dup 2))))
++	  (minus:GPI (match_dup 1) (match_dup 2)))))
+    (set (match_operand:GPI 0 "register_operand")
+ 	(minus:GPI (match_dup 1) (match_dup 2)))]
+   ""
+@@ -3585,9 +3583,10 @@
+ (define_insn "negv<GPI:mode>_insn"
+   [(set (reg:CC_V CC_REGNUM)
+ 	(compare:CC_V
++	 (neg:<DWI>
++	  (sign_extend:<DWI> (match_operand:GPI 1 "register_operand" "r")))
+ 	 (sign_extend:<DWI>
+-	  (neg:GPI (match_operand:GPI 1 "register_operand" "r")))
+-	 (neg:<DWI> (sign_extend:<DWI> (match_dup 1)))))
++	  (neg:GPI (match_dup 1)))))
+    (set (match_operand:GPI 0 "register_operand" "=r")
+ 	(neg:GPI (match_dup 1)))]
+   ""
+@@ -3598,22 +3597,23 @@
+ (define_insn "negv<GPI:mode>_cmp_only"
+   [(set (reg:CC_V CC_REGNUM)
+ 	(compare:CC_V
++	 (neg:<DWI>
++	  (sign_extend:<DWI> (match_operand:GPI 0 "register_operand" "r")))
+ 	 (sign_extend:<DWI>
+-	  (neg:GPI (match_operand:GPI 0 "register_operand" "r")))
+-	 (neg:<DWI> (sign_extend:<DWI> (match_dup 0)))))]
++	  (neg:GPI (match_dup 0)))))]
+   ""
+-  "negs\\t%<w>zr, %<w>0"
++  "negs\\t<w>zr, %<w>0"
+   [(set_attr "type" "alus_sreg")]
+ )
+ 
+ (define_insn "*cmpv<GPI:mode>_insn"
+   [(set (reg:CC_V CC_REGNUM)
+ 	(compare:CC_V
++	 (minus:<DWI>
++	  (sign_extend:<DWI> (match_operand:GPI 0 "register_operand"))
++	  (sign_extend:<DWI> (match_operand:GPI 1 "aarch64_plus_operand")))
+ 	 (sign_extend:<DWI>
+-	  (minus:GPI (match_operand:GPI 0 "register_operand")
+-		     (match_operand:GPI 1 "aarch64_plus_operand")))
+-	 (minus:<DWI> (sign_extend:<DWI> (match_dup 0))
+-		    (sign_extend:<DWI> (match_dup 1)))))]
++	  (minus:GPI (match_dup 0) (match_dup 1)))))]
+   ""
+   {@ [ cons: 0 , 1  ]
+      [ r       , r  ] cmp\t%<w>0, %<w>1
+diff --git a/gcc/testsuite/gcc.target/aarch64/negv.c b/gcc/testsuite/gcc.target/aarch64/negv.c
+new file mode 100644
+index 000000000000..91abd96e8b19
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/negv.c
+@@ -0,0 +1,27 @@
++/* { dg-do compile } */
++/* { dg-options "-O" } */
++/* { dg-final { check-function-bodies "**" "" "" } } */
++
++_Bool negvsi (int x)
++{
++  int result;
++  return __builtin_sub_overflow (0, x, &result);
++}
++/*
++** negvsi:
++**	negs	wzr, w0
++**	cset	w0, vs
++**	ret
++*/
++
++_Bool negvdi (long x)
++{
++  long result;
++  return __builtin_sub_overflow (0, x, &result);
++}
++/*
++** negvdi:
++**	negs	xzr, x0
++**	cset	w0, vs
++**	ret
++*/

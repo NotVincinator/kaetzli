@@ -1,0 +1,46 @@
+From 1a2c8d335a9936efa16a2fcdae9441f53516badd Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Tue, 20 Oct 2026 10:13:26 +0200
+Subject: [PATCH 376/385] i386: Fix up a typo in __enclv_generic macro in
+ sgxintrin.h [PR128015]
+
+This macro contains an obvious typo, compared to other __en*_generic
+which contain after the asm template:
+	   : "=a" (retval), "=b" (b), "=c" (c), "=d" (d)\
+	   : "a" (leaf), "b" (b), "c" (c), "d" (d)	\
+	   : "cc")
+it had:
+	   : "=a" (retval), "=b" (b), "=c" (b), "=d" (d)\
+	   : "a" (leaf), "b" (b), "c" (c), "d" (d)	\
+	   : "cc")
+so, the value of bx and cx registers was stored into the same
+macro argument (__D[0]) instead of bx stored into __D[0] and
+cx stored into __D[1].  I've grepped around and didn't find
+similar typos elsewhere in the header and I think this is kind of
+hard to test in the testsuite in userland.
+
+Fixed the obvious way.
+
+2026-10-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/128015
+	* config/i386/sgxintrin.h (__enclv_generic): Fix a typo.
+
+(cherry picked from commit d5b9d3a458a58766d03445441e3952d43824c402)
+---
+ gcc/config/i386/sgxintrin.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/config/i386/sgxintrin.h b/gcc/config/i386/sgxintrin.h
+index 671b6deb41fc..62dc461de724 100644
+--- a/gcc/config/i386/sgxintrin.h
++++ b/gcc/config/i386/sgxintrin.h
+@@ -103,7 +103,7 @@
+ 
+ #define __enclv_generic(leaf, b, c, d, retval)		\
+   __asm__ __volatile__("enclv\n\t"			\
+-	   : "=a" (retval), "=b" (b), "=c" (b), "=d" (d)\
++	   : "=a" (retval), "=b" (b), "=c" (c), "=d" (d)\
+ 	   : "a" (leaf), "b" (b), "c" (c), "d" (d)	\
+ 	   : "cc")
+ 

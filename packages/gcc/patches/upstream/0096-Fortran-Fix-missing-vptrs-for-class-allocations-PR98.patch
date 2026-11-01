@@ -1,0 +1,200 @@
+From 6a0c0ec82f8a9eac222af25eb8d83b14eb241bd7 Mon Sep 17 00:00:00 2001
+From: Paul Thomas <pault@gcc.gnu.org>
+Date: Sun, 9 Aug 2026 15:38:50 +0100
+Subject: [PATCH 096/385] Fortran: Fix missing vptrs for class allocations
+ [PR98573]
+
+2026-08-09  Paul Thomas  <pault@gcc.gnu.org>
+
+gcc/fortran
+	PR fortran/98573
+	* trans-array.cc (gfc_array_init_size): If the expr3_desc is an
+	array descriptor, use it for 'type'.
+	* trans-stmt.cc (gfc_trans_allocate): Use trans_assignment to
+	assign the source for class sources.
+
+gcc/testsuite/
+	PR fortran/98573
+	* gfortran.dg/allocate_class_5.f90: New test.
+
+(cherry picked from commit d4a985f88b45bef56a5ad3be00af53dfa8136422)
+---
+ gcc/fortran/trans-array.cc                    |   8 +-
+ gcc/fortran/trans-stmt.cc                     |   3 +-
+ .../gfortran.dg/allocate_class_5.f90          | 134 ++++++++++++++++++
+ 3 files changed, 143 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/allocate_class_5.f90
+
+diff --git a/gcc/fortran/trans-array.cc b/gcc/fortran/trans-array.cc
+index f984e18f3bd6..49d829bbae6c 100644
+--- a/gcc/fortran/trans-array.cc
++++ b/gcc/fortran/trans-array.cc
+@@ -6495,7 +6495,13 @@ gfc_array_init_size (tree descriptor, int rank, int corank, tree * poffset,
+   gfc_se se;
+   int n;
+ 
+-  type = TREE_TYPE (descriptor);
++  if (expr->ts.type == BT_CLASS
++      && expr3_desc != NULL_TREE
++      && GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (expr3_desc)))
++    type = TREE_TYPE (expr3_desc);
++  else
++    type = TREE_TYPE (descriptor);
++
+ 
+   stride = gfc_index_one_node;
+   offset = gfc_index_zero_node;
+diff --git a/gcc/fortran/trans-stmt.cc b/gcc/fortran/trans-stmt.cc
+index c1b545fa9d1b..fbc61869f00a 100644
+--- a/gcc/fortran/trans-stmt.cc
++++ b/gcc/fortran/trans-stmt.cc
+@@ -7538,7 +7538,8 @@ gfc_trans_allocate (gfc_code * code, gfc_omp_namelist *omp_allocate)
+ 
+       /* Set the vptr only when no source= is set.  When source= is set, then
+ 	 the trans_assignment below will set the vptr.  */
+-      if (al_vptr != NULL_TREE && (!code->expr3 || code->expr3->mold))
++      if (al_vptr != NULL_TREE && (!code->expr3 || code->expr3->mold
++				   || code->expr3->ts.type == BT_CLASS))
+ 	{
+ 	  if (expr3_vptr != NULL_TREE)
+ 	    /* The vtab is already known, so just assign it.  */
+diff --git a/gcc/testsuite/gfortran.dg/allocate_class_5.f90 b/gcc/testsuite/gfortran.dg/allocate_class_5.f90
+new file mode 100644
+index 000000000000..6ecaf67a8198
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/allocate_class_5.f90
+@@ -0,0 +1,134 @@
++! { dg-do run }
++!
++! Tests the fix of PR98573. Fixed missing vptrs for class allocations.
++!
++! Contributed by Davis Asanza  <davidhneill@gmail.com>
++!
++module counts
++  integer :: integer_count = 0
++  integer :: other_count = 0
++  integer :: alloc_counts = 0
++end module counts
++
++module foo1
++  use counts
++  type, public:: box
++    class(*), allocatable :: val(:)
++  end type
++contains
++  subroutine store1(this, val)
++    class(box), intent(out) :: this
++    class(*), intent(in) :: val(:)
++    this%val = val
++  end subroutine store1
++  subroutine store2(this, val)
++    class(box), intent(out) :: this
++    class(*), intent(in) :: val(:)
++    allocate(this%val, source=val)
++  end subroutine store2
++  subroutine vector_type(val)
++    class(*), intent(in) :: val(:)
++    select type (val)
++    type is (integer)
++      integer_count = integer_count + 1
++    class default
++      other_count = other_count + 1
++    end select
++  end subroutine vector_type
++end module foo1
++
++module foo2
++  use counts
++contains
++  subroutine store1(arr, val)
++    class(*), allocatable, intent(out) :: arr(:)
++    class(*), intent(in) :: val(:)
++    arr = val
++  end subroutine store1
++  subroutine store2(arr, val)
++    class(*), allocatable, intent(out) :: arr(:)
++    class(*), intent(in) :: val(:)
++    allocate(arr, source=val)
++  end subroutine store2
++end module foo2
++
++module foo3
++  use counts
++  type, public:: box
++    class(*), allocatable :: val(:)
++  end type
++contains
++  subroutine store1(this, val)
++    class(box), intent(out) :: this
++    class(*), intent(in) :: val(:)
++    this%val = val
++  end subroutine store1
++  subroutine store2(this, val)
++    class(box), intent(out) :: this
++    class(*), intent(in) :: val(:)
++    allocate(this%val, source=val)
++  end subroutine store2
++  subroutine vector_type(val)
++    class(*), intent(in) :: val(:)
++    select type (val)
++    type is (integer)
++      integer_count = integer_count + 1
++    class default
++      other_count = other_count + 1
++    end select
++  end subroutine vector_type
++end module foo3
++
++program prog
++  use counts
++  implicit none
++  call bar1  ! Test the original problem
++  call bar2  ! Test comment 1
++  call bar3  ! Test comment 3
++  if (integer_count .ne. 6) stop 1
++  if (other_count .ne. 0) stop 2
++  if (alloc_counts .ne. 2) stop 3
++contains
++  subroutine bar1
++    use foo1
++    type(box) :: b
++    call store1(b, [1, 2, 3])
++    call vector_type(b%val)  ! OTHER
++    call store2(b, [1, 2, 3])
++    call vector_type(b%val)  ! INTEGER
++  end subroutine bar1
++
++  subroutine bar2
++    use foo2
++    class(*), allocatable :: arr(:)
++    call store1(arr, [1, 2, 3])  ! SEGFAULT
++    select type (a => arr)
++      type is (integer)
++        if (all (a .eq. [1, 2, 3])) alloc_counts = alloc_counts + 1
++    end select
++    deallocate (arr)
++    call store2(arr, [1, 2, 3])  ! NO PROBLEM
++    select type (a => arr)
++      type is (integer)
++        if (all (a .eq. [1, 2, 3])) alloc_counts = alloc_counts + 1
++    end select
++  end subroutine bar2
++
++  subroutine bar3
++    use foo3
++    type(box) :: b
++    integer, allocatable :: arr1(:)
++    integer, dimension(0) :: arr2
++
++    allocate(arr1(0))
++    call store1(b, arr1)
++    call vector_type(b%val)  ! OTHER
++    call store2(b, arr1)
++    call vector_type(b%val)  ! OTHER
++
++    call store1(b, arr2)
++    call vector_type(b%val)  ! OTHER
++    call store2(b, arr2)
++    call vector_type(b%val)  ! OTHER
++  end subroutine bar3
++end program

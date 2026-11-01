@@ -1,0 +1,142 @@
+From 5fabd422db500a046b063c2075ef65b382d8f7d7 Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Tue, 22 Sep 2026 21:31:08 +0200
+Subject: [PATCH 198/385] Ada: Fix bogus validity failure for reverse SSO array
+ converted to FP
+
+The expander already knows that special care must be taken for 'Valid in
+the presence of floating-point objects with reverse scalar storage order,
+but this was not done in this particular case.
+
+gcc/ada/
+	* exp_attr.adb (Expand_N_Attribute_Reference) <Attribute_Valid>:
+	Call Is_Reverse_Storage_Order_Object to detect cases where a copy
+	needs to be created for the prefix.
+	* sem_util.ads (In_Reverse_Storage_Order_Object): Delete.
+	(Is_Reverse_Storage_Order_Object): New predicate.
+	* sem_util.adb (In_Reverse_Storage_Order_Object): Delete.
+	(Is_Reverse_Storage_Order_Object): New predicate subsuming original
+	In_Reverse_Storage_Order_Object predicate.
+---
+ gcc/ada/exp_attr.adb |  4 ++--
+ gcc/ada/sem_util.adb | 50 +++++++++++++++++++++++++-------------------
+ gcc/ada/sem_util.ads |  9 ++++----
+ 3 files changed, 35 insertions(+), 28 deletions(-)
+
+diff --git a/gcc/ada/exp_attr.adb b/gcc/ada/exp_attr.adb
+index 04c6700a4538..1aebcf36cb9e 100644
+--- a/gcc/ada/exp_attr.adb
++++ b/gcc/ada/exp_attr.adb
+@@ -8170,7 +8170,7 @@ package body Exp_Attr is
+             begin
+                Find_Fat_Info (PBtyp, Ftp, Pkg);
+ 
+-               --  If the prefix is a reverse SSO component, or is possibly
++               --  If the prefix is a reverse SSO object, or is possibly
+                --  unaligned, first create a temporary copy that is in
+                --  native SSO, and properly aligned. Make it Volatile to
+                --  prevent folding in the back-end. Note that we use an
+@@ -8179,7 +8179,7 @@ package body Exp_Attr is
+                --  that case it cannot be copied using a floating point
+                --  register.
+ 
+-               if In_Reverse_Storage_Order_Object (Pref)
++               if Is_Reverse_Storage_Order_Object (Pref)
+                  or else Is_Possibly_Unaligned_Object (Pref)
+                then
+                   declare
+diff --git a/gcc/ada/sem_util.adb b/gcc/ada/sem_util.adb
+index e564558c51e7..ad32b25936b2 100644
+--- a/gcc/ada/sem_util.adb
++++ b/gcc/ada/sem_util.adb
+@@ -14918,28 +14918,6 @@ package body Sem_Util is
+       return False;
+    end In_Return_Value;
+ 
+-   -------------------------------------
+-   -- In_Reverse_Storage_Order_Object --
+-   -------------------------------------
+-
+-   function In_Reverse_Storage_Order_Object (N : Node_Id) return Boolean is
+-      Pref : Node_Id;
+-      Btyp : Entity_Id;
+-
+-   begin
+-      if Nkind (N) in N_Indexed_Component | N_Selected_Component then
+-         Pref := Prefix (N);
+-         Btyp := Base_Type (Etype (Pref));
+-
+-         return Present (Btyp)
+-           and then (Is_Record_Type (Btyp) or else Is_Array_Type (Btyp))
+-           and then Reverse_Storage_Order (Btyp);
+-
+-      else
+-         return False;
+-      end if;
+-   end In_Reverse_Storage_Order_Object;
+-
+    ------------------------------
+    -- In_Same_Declarative_Part --
+    ------------------------------
+@@ -21364,6 +21342,34 @@ package body Sem_Util is
+       return False;
+    end Is_Renamed_Entry;
+ 
++   -------------------------------------
++   -- Is_Reverse_Storage_Order_Object --
++   -------------------------------------
++
++   function Is_Reverse_Storage_Order_Object (N : Node_Id) return Boolean is
++      Btyp : Entity_Id;
++
++   begin
++      if not Is_Elementary_Type (Etype (N)) then
++         return False;
++      end if;
++
++      case Nkind (N) is
++         when N_Indexed_Component | N_Selected_Component =>
++            Btyp := Base_Type (Etype (Prefix (N)));
++
++         when N_Unchecked_Type_Conversion =>
++            Btyp := Base_Type (Etype (Expression (N)));
++
++         when others =>
++            return False;
++      end case;
++
++      return Present (Btyp)
++        and then (Is_Record_Type (Btyp) or else Is_Array_Type (Btyp))
++        and then Reverse_Storage_Order (Btyp);
++   end Is_Reverse_Storage_Order_Object;
++
+    ----------------------------
+    -- Is_Reversible_Iterator --
+    ----------------------------
+diff --git a/gcc/ada/sem_util.ads b/gcc/ada/sem_util.ads
+index a74f658b9dce..149f79f984fb 100644
+--- a/gcc/ada/sem_util.ads
++++ b/gcc/ada/sem_util.ads
+@@ -1759,10 +1759,6 @@ package Sem_Util is
+    --  the return value and have its accessibility level tied to that of the
+    --  result of the enclosing function.
+ 
+-   function In_Reverse_Storage_Order_Object (N : Node_Id) return Boolean;
+-   --  Returns True if N denotes a component in an array or a record that has
+-   --  Reverse_Storage_Order.
+-
+    function In_Same_Declarative_Part
+      (Context : Node_Id;
+       N       : Node_Id) return Boolean;
+@@ -2466,6 +2462,11 @@ package Sem_Util is
+    function Is_Renamed_Entry (Proc_Nam : Entity_Id) return Boolean;
+    --  Return True if Proc_Nam is a procedure renaming of an entry
+ 
++   function Is_Reverse_Storage_Order_Object (N : Node_Id) return Boolean;
++   --  Return True if N denotes an elementary component of an array or record
++   --  that has Reverse_Storage_Order set, or an unchecked conversion to an
++   --  elementary type of such an array or record.
++
+    function Is_Reversible_Iterator (Typ : Entity_Id) return Boolean;
+    --  AI05-0139-2: Check whether Typ is derived from the predefined interface
+    --  Ada.Iterator_Interfaces.Reversible_Iterator.

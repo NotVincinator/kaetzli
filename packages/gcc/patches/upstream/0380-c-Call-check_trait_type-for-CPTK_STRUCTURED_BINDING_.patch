@@ -1,0 +1,77 @@
+From ca57ad11199ea822a5e72131b3f154de93853fe6 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Wed, 21 Oct 2026 09:04:21 +0200
+Subject: [PATCH 380/385] c++: Call check_trait_type for
+ CPTK_STRUCTURED_BINDING_SIZE [PR127766]
+
+The following testcase is rejected because we don't even try to complete
+the type, so if it wasn't instantiated with those arguments before, we
+reject it.
+Fixed up calling check_trait_type, with kind 4, for non-class I think
+cp_decomp_size already does the right thing, for arrays we actually just
+care about number of elements.
+On the pt.cc side, fixed by removing the special casing of this exact
+trait and instead passing complain to all finish_trait_expr calls in
+TRAIT_EXPR case.
+
+2026-10-21  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/127766
+	* semantics.cc (finish_structured_binding_size): Call
+	check_trait_type with kind 4.
+
+	* g++.dg/ext/builtin-structured-binding-size2.C: Expect different
+	diagnostics.
+	* g++.dg/ext/builtin-structured-binding-size7.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 1498f0547eb1692c39c63ad3e8e22859dc526e3e)
+---
+ gcc/cp/semantics.cc                                    |  2 ++
+ .../g++.dg/ext/builtin-structured-binding-size2.C      |  2 +-
+ .../g++.dg/ext/builtin-structured-binding-size7.C      | 10 ++++++++++
+ 3 files changed, 13 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/ext/builtin-structured-binding-size7.C
+
+diff --git a/gcc/cp/semantics.cc b/gcc/cp/semantics.cc
+index 7e9a29aa3ba0..3b5f61ef4ccf 100644
+--- a/gcc/cp/semantics.cc
++++ b/gcc/cp/semantics.cc
+@@ -14321,6 +14321,8 @@ tree
+ finish_structured_binding_size (location_t loc, tree type,
+ 				tsubst_flags_t complain)
+ {
++  if (!check_trait_type (type, /* kind = */ 4, complain))
++    return error_mark_node;
+   if (TYPE_REF_P (type))
+     {
+       if (complain & tf_error)
+diff --git a/gcc/testsuite/g++.dg/ext/builtin-structured-binding-size2.C b/gcc/testsuite/g++.dg/ext/builtin-structured-binding-size2.C
+index 9abd80fec9d5..ebdc08ec19ff 100644
+--- a/gcc/testsuite/g++.dg/ext/builtin-structured-binding-size2.C
++++ b/gcc/testsuite/g++.dg/ext/builtin-structured-binding-size2.C
+@@ -21,7 +21,7 @@ template <>
+ struct std::tuple_size <C> { static constexpr double value = 42; };
+ template <>
+ struct std::tuple_size <D> { static constexpr int value = -1; };
+-int a = __builtin_structured_binding_size (A);			// { dg-error "structured binding refers to incomplete class type 'A'" }
++int a = __builtin_structured_binding_size (A);			// { dg-error "invalid use of incomplete type 'struct A'" }
+ int b = __builtin_structured_binding_size (A &);		// { dg-error "'__builtin_structured_binding_size' argument 'A\\\&' is a reference" }
+ int c = __builtin_structured_binding_size (B[]);		// { dg-error "cannot decompose array of unknown bound 'B \\\[\\\]'" }
+ int d = __builtin_structured_binding_size (C);			// { dg-error "'std::tuple_size<C>::value' is not an integral constant expression" }
+diff --git a/gcc/testsuite/g++.dg/ext/builtin-structured-binding-size7.C b/gcc/testsuite/g++.dg/ext/builtin-structured-binding-size7.C
+new file mode 100644
+index 000000000000..d12934b5ac75
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/ext/builtin-structured-binding-size7.C
+@@ -0,0 +1,10 @@
++// PR c++/127766
++// { dg-do compile { target c++11 } }
++
++template <typename T> struct A { T a, b; };
++static_assert (__builtin_structured_binding_size (A <int>) == 2, "");
++
++template <typename T> struct B { T a, b, c; };
++template <typename T>
++constexpr int foo () { return __builtin_structured_binding_size (B<T>); }
++static_assert (foo <int> () == 3, "");

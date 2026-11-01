@@ -1,0 +1,55 @@
+From f1b362d4927ba5fe91e27bb49183644e0ac3d1ca Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Thu, 24 Sep 2026 12:28:48 +0200
+Subject: [PATCH 270/385] libgomp: Check for overflows in some cases
+
+Given the https://gcc.gnu.org/pipermail/libstdc++/2026-September/067867.html
+changes, I had a brief look at gomp_aligned_alloc and omp_aligned_{,c}alloc.
+At least when alignment is power of two, omp_aligned* seems to perform all the
+overflow checking they should I think.  gomp_aligned_alloc is used internally,
+if it uses posix_memalign or memalign, it relies on libc performing overflow
+checking, for the aligned_alloc case it already performs overflow checking
+itself.  Given the above libstdc++ change, seems at least Mingw _aligned_alloc
+performs no overflow checking, so this patch adds overflow checking for it
+(but relies on NULL/EINVAL if al is not a power of two from Mingw/Win).
+And for the fallback also adds overflow checking.
+
+2026-09-23  Jakub Jelinek  <jakub@redhat.com>
+
+	* alloc.c (gomp_aligned_alloc): Check for overflows in the
+	_aligned_malloc case and in the last fallback.
+
+(cherry picked from commit 04106ce784babdaa721bc1f1cabcdf6f44f45efb)
+---
+ libgomp/alloc.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/libgomp/alloc.c b/libgomp/alloc.c
+index 47ff605660f2..34ece6248465 100644
+--- a/libgomp/alloc.c
++++ b/libgomp/alloc.c
+@@ -82,12 +82,22 @@ gomp_aligned_alloc (size_t al, size_t size)
+       ret = NULL;
+   }
+ #elif defined(HAVE__ALIGNED_MALLOC)
+-  ret = _aligned_malloc (size, al);
++  /* Mingw64 doesn't perform overflow checking, so do it ourselves.
++     It does power of two checking though.  */
++  if (__builtin_add_overflow_p (size, al + 2 * sizeof (void *), (size_t) 0))
++    ret = NULL;
++  else
++    ret = _aligned_malloc (size, al);
+ #else
+   ret = NULL;
+   if ((al & (al - 1)) == 0 && size)
+     {
+-      void *p = malloc (size + al);
++      void *p;
++      size_t sz;
++      if (__builtin_add_overflow (size, al, &sz))
++	p = NULL;
++      else
++	p = malloc (sz);
+       if (p)
+ 	{
+ 	  void *ap = (void *) (((uintptr_t) p + al) & -al);

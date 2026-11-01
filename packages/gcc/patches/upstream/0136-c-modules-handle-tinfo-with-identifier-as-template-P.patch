@@ -1,0 +1,91 @@
+From 5f11a4625a875fd297e34b8d8587e2a8781d024d Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Fri, 4 Sep 2026 23:00:29 -0400
+Subject: [PATCH 136/385] c++/modules: handle tinfo with identifier as template
+ [PR127207]
+
+A couple of sanity checks need to be made robust to TEMPLATE_INFO that
+has IDENTIFIER_NODE as its TI_TEMPLATE, which is how we express the
+friend template specialization createFoo<T>() when there is no existing
+declaration of createFoo.
+
+	PR c++/127207
+
+gcc/cp/ChangeLog:
+
+	* module.cc (trees_out::decl_value): Relax checking assert
+	to accept IDENTIFIER_NODE as TI_TEMPLATE.
+	(get_originating_module_decl): Likewise.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/modules/friend-15_a.H: New test.
+	* g++.dg/modules/friend-15_b.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit dad0fca70f5a35b1016189eb544ea729b0144417)
+---
+ gcc/cp/module.cc                           |  3 ++-
+ gcc/testsuite/g++.dg/modules/friend-15_a.H | 17 +++++++++++++++++
+ gcc/testsuite/g++.dg/modules/friend-15_b.C |  7 +++++++
+ 3 files changed, 26 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/modules/friend-15_a.H
+ create mode 100644 gcc/testsuite/g++.dg/modules/friend-15_b.C
+
+diff --git a/gcc/cp/module.cc b/gcc/cp/module.cc
+index b7c1eae2df61..4cc06533d67c 100644
+--- a/gcc/cp/module.cc
++++ b/gcc/cp/module.cc
+@@ -8371,6 +8371,7 @@ trees_out::decl_value (tree decl, depset *dep)
+       int use_tpl = -1;
+       if (tree ti = node_template_info (decl, use_tpl))
+ 	gcc_checking_assert (TREE_CODE (TI_TEMPLATE (ti)) == OVERLOAD
++			     || TREE_CODE (TI_TEMPLATE (ti)) == IDENTIFIER_NODE
+ 			     || TREE_CODE (TI_TEMPLATE (ti)) == FIELD_DECL
+ 			     || (DECL_TEMPLATE_RESULT (TI_TEMPLATE (ti))
+ 				 != decl));
+@@ -21902,7 +21903,7 @@ get_originating_module_decl (tree decl)
+ 	  if (TREE_CODE (decl) != TEMPLATE_DECL)
+ 	    {
+ 	      /* A friend template specialization.  */
+-	      gcc_checking_assert (OVL_P (decl));
++	      gcc_checking_assert (OVL_P (decl) || identifier_p (decl));
+ 	      return global_namespace;
+ 	    }
+ 	}
+diff --git a/gcc/testsuite/g++.dg/modules/friend-15_a.H b/gcc/testsuite/g++.dg/modules/friend-15_a.H
+new file mode 100644
+index 000000000000..3219a317fc46
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/modules/friend-15_a.H
+@@ -0,0 +1,17 @@
++// PR c++/127207
++// { dg-do compile { target c++20 } }
++// { dg-additional-options "-fmodule-header" }
++
++template <typename T>
++class Foo
++{
++    friend auto createFoo<T>() -> Foo;
++
++    Foo(){}
++};
++
++template <typename T>
++auto createFoo() -> Foo<T>
++{
++    return Foo<T>{};
++}
+diff --git a/gcc/testsuite/g++.dg/modules/friend-15_b.C b/gcc/testsuite/g++.dg/modules/friend-15_b.C
+new file mode 100644
+index 000000000000..6bee1a41fcb2
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/modules/friend-15_b.C
+@@ -0,0 +1,7 @@
++// PR c++/127207
++// { dg-do compile { target c++20 } }
++// { dg-additional-options "-fmodules" }
++
++import "friend-15_a.H";
++
++Foo<int> x = createFoo<int>();

@@ -1,0 +1,102 @@
+From 66aa293e29ebeb841ff89019d7b7954c6807a39c Mon Sep 17 00:00:00 2001
+From: Georg-Johann Lay <avr@gjlay.de>
+Date: Mon, 5 Oct 2026 17:16:50 +0200
+Subject: [PATCH 254/385] AVR: target/127482 - Fix prologue_saves + noreturn
+ wrong code
+
+This patch fixes wrong code when a noreturn function is compiled
+with -mcall-prologues and the function gets arguments on the stack.
+The bug is that prologue_saves saves more registers than calculated
+by avr_regs_to_save() so that the argument pointer is wrong.
+
+The fix is to behave like avr_regs_to_save(), i.e. don't save any
+regs in a noreturn function so that prologue_saves is not used.
+
+	PR target/127482
+gcc/
+	* config/avr/avr.cc (sequent_regs_live): Return 0 for
+	noreturn functions, OS_task and OS_main.
+	(avr_prologue_setup_frame, avr_expand_epilogue) <minimize>: Move
+	OS_task and OS_main tests to sequent_regs_live.
+gcc/testsuite/
+	* gcc.target/avr/torture/pr127482.c: New test.
+
+(cherry picked from commit a3028a9ab546ca16147d927eeb765b35b6956c2f)
+---
+ gcc/config/avr/avr.cc                         | 10 +++---
+ .../gcc.target/avr/torture/pr127482.c         | 31 +++++++++++++++++++
+ 2 files changed, 37 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/avr/torture/pr127482.c
+
+diff --git a/gcc/config/avr/avr.cc b/gcc/config/avr/avr.cc
+index b47d10d8f0ae..958cfae6ab98 100644
+--- a/gcc/config/avr/avr.cc
++++ b/gcc/config/avr/avr.cc
+@@ -1339,6 +1339,12 @@ avr_simple_epilogue (void)
+ static int
+ sequent_regs_live (void)
+ {
++  // Behave according to avr_regs_to_save().
++  if (TREE_THIS_VOLATILE (current_function_decl)
++      || cfun->machine->is_OS_task
++      || cfun->machine->is_OS_main)
++    return 0;
++
+   int live_seq = 0;
+   int cur_seq = 0;
+ 
+@@ -1518,8 +1524,6 @@ avr_prologue_setup_frame (HOST_WIDE_INT size, HARD_REG_SET set)
+ 		   && size < size_max
+ 		   && live_seq
+ 		   && !isr_p
+-		   && !cfun->machine->is_OS_task
+-		   && !cfun->machine->is_OS_main
+ 		   && !AVR_TINY);
+ 
+   if (minimize
+@@ -2044,8 +2048,6 @@ avr_expand_epilogue (bool sibcall_p)
+   bool minimize = (TARGET_CALL_PROLOGUES
+ 		   && live_seq
+ 		   && !isr_p
+-		   && !cfun->machine->is_OS_task
+-		   && !cfun->machine->is_OS_main
+ 		   && !AVR_TINY);
+ 
+   if (minimize
+diff --git a/gcc/testsuite/gcc.target/avr/torture/pr127482.c b/gcc/testsuite/gcc.target/avr/torture/pr127482.c
+new file mode 100644
+index 000000000000..0c02d5c05c0c
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/avr/torture/pr127482.c
+@@ -0,0 +1,31 @@
++/* { dg-do run } */
++/* { dg-additional-options "-mcall-prologues" } */
++
++#include <stdarg.h>
++#include <stdlib.h>
++
++#define NI __attribute((noipa))
++
++NI void xx_fun (void) {}
++NI void xx_vprintf (const char *fmt, va_list args)
++{
++  int i = va_arg (args, int);
++  if (i != 0x1234)
++    exit (10);
++}
++
++void error (const char *msg, ...)
++{
++  va_list args;
++  xx_fun ();
++  va_start (args, msg);
++  xx_vprintf (msg, args);
++  va_end (args);
++  exit (0);
++}
++
++int main (void)
++{
++  error ("bad %d\n", 0x1234);
++  return 0;
++}

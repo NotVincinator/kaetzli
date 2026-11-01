@@ -1,0 +1,183 @@
+From 9954ab48cfdfd4accb54885ea6bfdf8709a97579 Mon Sep 17 00:00:00 2001
+From: Igor Shevlyakov <igor@tachyum.com>
+Date: Thu, 22 Oct 2026 20:16:36 -0700
+Subject: [PATCH 336/385] match.pd: Keep the ORDERED & NE to LTGT fold quiet
+ [PR127785]
+
+ORDERED and NE do not raise an invalid operation exception for a quiet
+NaN, but LTGT does.  The (ordered & ne) -> ltgt rule added with
+"i386: Optimize ordered and nonequal" has no trapping-math check, so
+!__builtin_isunordered (a, b) & (a != b) raises FE_INVALID for a NaN
+operand even at -O0, since the rule also fires in GENERIC.  On x86 the
+result is a signaling comiss.
+
+Fold only with -fno-trapping-math or when NaNs are not honored, as the
+(ltgt @0 @0) rule next to it does.  GCC has no quiet comparison code
+for "ordered and not equal", so under the default flags the two
+comparisons stay separate, and x86 goes back to the quiet
+ucomiss/setp/setnp sequence that the rule replaced.
+
+The tests added with the rule check the fold itself, so they now pass
+-fno-trapping-math.  With that option GENERIC can already fold the &&
+forms through combine_comparisons, so opt-ordered-and-nonequal-1.c
+scans the optimized dump instead of forwprop1.  The new
+opt-ordered-and-nonequal-2.c checks that the default flags keep <> out,
+and cmp-of-cmp-fenv-1.c checks at run time that FE_INVALID is not
+raised.
+
+Assisted-by: Claude Opus 5.5
+
+	PR middle-end/127785
+
+gcc/ChangeLog:
+
+	* match.pd ((ordered @0 @1) & (ne @0 @1)): Only fold to LTGT
+	without trapping math or when NaNs are not honored.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.dg/opt-ordered-and-nonequal-1.c: Add -fno-trapping-math and
+	scan the optimized dump.
+	* gcc.dg/opt-ordered-and-nonequal-2.c: New test.
+	* gcc.dg/torture/cmp-of-cmp-fenv-1.c: New test.
+	* gcc.target/i386/opt-comi-1.c: Add -fno-trapping-math.
+	* gcc.target/i386/avx10_2-compare-1b.c: Likewise.
+
+Signed-off-by: Igor Shevlyakov <igor@tachyum.com>
+---
+ gcc/match.pd                                  |  4 ++-
+ .../gcc.dg/opt-ordered-and-nonequal-1.c       |  4 +--
+ .../gcc.dg/opt-ordered-and-nonequal-2.c       | 27 ++++++++++++++++
+ .../gcc.dg/torture/cmp-of-cmp-fenv-1.c        | 31 +++++++++++++++++++
+ .../gcc.target/i386/avx10_2-compare-1b.c      |  2 +-
+ gcc/testsuite/gcc.target/i386/opt-comi-1.c    |  2 +-
+ 6 files changed, 65 insertions(+), 5 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/opt-ordered-and-nonequal-2.c
+ create mode 100644 gcc/testsuite/gcc.dg/torture/cmp-of-cmp-fenv-1.c
+
+diff --git a/gcc/match.pd b/gcc/match.pd
+index 54bbf8b8856b..135e17bbac37 100644
+--- a/gcc/match.pd
++++ b/gcc/match.pd
+@@ -7598,9 +7598,11 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
+  (ltgt @0 @0)
+  (if (!flag_trapping_math || !tree_expr_maybe_nan_p (@0))
+   { constant_boolean_node (false, type); }))
++/* LTGT raises an exception for a quiet NaN, ORDERED and NE do not.  */
+ (simplify
+  (bit_and:c (ordered @0 @1) (ne @0 @1))
+- (ltgt @0 @1))
++ (if (!flag_trapping_math || !HONOR_NANS (@0))
++  (ltgt @0 @1)))
+ 
+ /* x == ~x -> false */
+ /* x != ~x -> true */
+diff --git a/gcc/testsuite/gcc.dg/opt-ordered-and-nonequal-1.c b/gcc/testsuite/gcc.dg/opt-ordered-and-nonequal-1.c
+index d61c3322214b..de7d4324816d 100644
+--- a/gcc/testsuite/gcc.dg/opt-ordered-and-nonequal-1.c
++++ b/gcc/testsuite/gcc.dg/opt-ordered-and-nonequal-1.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O2 -fdump-tree-forwprop1-details" } */
++/* { dg-options "-O2 -fno-trapping-math -fdump-tree-optimized" } */
+ /* Make this work for default 'LOGICAL_OP_NON_SHORT_CIRCUIT == false' configurations:
+    { dg-additional-options "--param logical-op-non-short-circuit=1" } */
+ 
+@@ -48,4 +48,4 @@ int is_ordered_or_nonequal_sh_9 (float a, float b)
+   return !((a == b) || __builtin_isunordered (b, a));
+ }
+ 
+-/* { dg-final { scan-tree-dump-times "gimple_simplified to\[^\n\r]*<>" 9 "forwprop1" } } */
++/* { dg-final { scan-tree-dump-times "<>" 9 "optimized" } } */
+diff --git a/gcc/testsuite/gcc.dg/opt-ordered-and-nonequal-2.c b/gcc/testsuite/gcc.dg/opt-ordered-and-nonequal-2.c
+new file mode 100644
+index 000000000000..d1fbae9d5e79
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/opt-ordered-and-nonequal-2.c
+@@ -0,0 +1,27 @@
++/* ORDERED and NE do not raise FE_INVALID for a quiet NaN but LTGT does,
++   so without -fno-trapping-math they must not be combined.  */
++/* { dg-do compile } */
++/* { dg-options "-O2 -fdump-tree-optimized" } */
++/* { dg-add-options ieee } */
++
++int is_ordered_and_nonequal_1 (double a, double b)
++{
++  return !__builtin_isunordered (a, b) & (a != b);
++}
++
++int is_ordered_and_nonequal_2 (double a, double b)
++{
++  return (b != a) & !__builtin_isunordered (a, b);
++}
++
++int is_ordered_and_nonequal_3 (double a, double b)
++{
++  return !__builtin_isunordered (a, b) && (a != b);
++}
++
++int is_ordered_or_nonequal_4 (double a, double b)
++{
++  return !(__builtin_isunordered (a, b) || (a == b));
++}
++
++/* { dg-final { scan-tree-dump-not "<>" "optimized" } } */
+diff --git a/gcc/testsuite/gcc.dg/torture/cmp-of-cmp-fenv-1.c b/gcc/testsuite/gcc.dg/torture/cmp-of-cmp-fenv-1.c
+new file mode 100644
+index 000000000000..043f51fcb54e
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/cmp-of-cmp-fenv-1.c
+@@ -0,0 +1,31 @@
++/* PR middle-end/127785 */
++/* Combining ORDERED and NE must not raise FE_INVALID for a quiet NaN.  */
++/* { dg-do run } */
++/* { dg-add-options ieee } */
++/* { dg-require-effective-target fenv_exceptions_double } */
++
++#include <fenv.h>
++
++#define NOIPA __attribute__ ((noipa))
++
++/* Quiet & quiet: LTGT would signal.  */
++NOIPA int ord_and_ne (double a, double b)
++{ return !__builtin_isunordered (a, b) & (a != b); }
++
++int
++main (void)
++{
++  static const double as[4] = { __builtin_nan (""), 0.0, 1.0, 2.0 };
++  /* Results for (NaN, 1), (0, 1), (1, 1) and (2, 1).  */
++  static const int res[4] = { 0, 1, 0, 1 };
++
++  for (unsigned j = 0; j < 4; j++)
++    {
++      feclearexcept (FE_INVALID);
++      if (ord_and_ne (as[j], 1.0) != res[j])
++	__builtin_abort ();
++      if (fetestexcept (FE_INVALID))
++	__builtin_abort ();
++    }
++  return 0;
++}
+diff --git a/gcc/testsuite/gcc.target/i386/avx10_2-compare-1b.c b/gcc/testsuite/gcc.target/i386/avx10_2-compare-1b.c
+index cc7f8205f5f1..73457c9096a6 100644
+--- a/gcc/testsuite/gcc.target/i386/avx10_2-compare-1b.c
++++ b/gcc/testsuite/gcc.target/i386/avx10_2-compare-1b.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O2 -march=x86-64-v3 -mavx10.2 -mfpmath=sse" } */
++/* { dg-options "-O2 -fno-trapping-math -march=x86-64-v3 -mavx10.2 -mfpmath=sse" } */
+ /* { dg-final { scan-assembler-times "comi" 6 } } */
+ /* { dg-final { scan-assembler-times "comx" 12 } } */
+ 
+diff --git a/gcc/testsuite/gcc.target/i386/opt-comi-1.c b/gcc/testsuite/gcc.target/i386/opt-comi-1.c
+index a2c5219d98df..715847faf33e 100644
+--- a/gcc/testsuite/gcc.target/i386/opt-comi-1.c
++++ b/gcc/testsuite/gcc.target/i386/opt-comi-1.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-O2 -mfpmath=sse -msse2" } */
++/* { dg-options "-O2 -fno-trapping-math -mfpmath=sse -msse2" } */
+ /* { dg-additional-options "-fno-unwind-tables -fno-asynchronous-unwind-tables" { target *-*-darwin* } } */
+ /* { dg-final { scan-assembler-times "comiss" 9 } } */
+ /* { dg-final { scan-assembler-times "set" 9 } } */

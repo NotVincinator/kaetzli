@@ -1,0 +1,216 @@
+From bb120923cbe548209106264d588c3e74cd882278 Mon Sep 17 00:00:00 2001
+From: Julio Sotoriva De Bastiani <Julio.SotorivaDeBastiani@arm.com>
+Date: Tue, 1 Sep 2026 10:22:05 +0000
+Subject: [PATCH 241/385] aarch64: Fix folding for svwhilel*_c* builtins
+ [PR126096]
+
+This fixes an ICE that occurred when trying to fold svwhilelt and
+svwhilele predicate-as-counter builtins as if they were
+predicate-as-mask builtins.
+
+gcc/ChangeLog:
+
+	PR target/126096
+	* config/aarch64/aarch64-sve-builtins.cc
+	(gimple_folder::fold_to_pfalse): Handle svcount_t.
+	* config/aarch64/aarch64-sve-builtins-base.cc
+	(svpfalse_impl::fold): Handle svcount_t.
+	(svwhilelx_impl::fold_type): Punt for non-pfalse svcount_t.
+
+gcc/testsuite/ChangeLog:
+
+	PR target/126096
+	* gcc.target/aarch64/sve2/acle/general/whilele_1.c: New test.
+	* gcc.target/aarch64/sve2/acle/general/whilelt_1.c: New test.
+---
+ .../aarch64/aarch64-sve-builtins-base.cc      |  9 +--
+ gcc/config/aarch64/aarch64-sve-builtins.cc    | 11 +++-
+ .../aarch64/sve2/acle/general/whilele_1.c     | 61 +++++++++++++++++++
+ .../aarch64/sve2/acle/general/whilelt_1.c     | 61 +++++++++++++++++++
+ 4 files changed, 137 insertions(+), 5 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/sve2/acle/general/whilele_1.c
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/sve2/acle/general/whilelt_1.c
+
+diff --git a/gcc/config/aarch64/aarch64-sve-builtins-base.cc b/gcc/config/aarch64/aarch64-sve-builtins-base.cc
+index 9f9a35f748e0..3f9f32dc7924 100644
+--- a/gcc/config/aarch64/aarch64-sve-builtins-base.cc
++++ b/gcc/config/aarch64/aarch64-sve-builtins-base.cc
+@@ -2525,10 +2525,7 @@ public:
+   gimple *
+   fold (gimple_folder &f) const override
+   {
+-    if (f.type_suffix (0).tclass == TYPE_bool)
+-      return f.fold_to_pfalse ();
+-
+-    return nullptr;
++    return f.fold_to_pfalse ();
+   }
+ 
+   rtx
+@@ -3410,6 +3407,10 @@ public:
+     if (m_eq_p ? known_gt (arg0, arg1) : known_ge (arg0, arg1))
+       return f.fold_to_pfalse ();
+ 
++    /* Punt if we are trying to fold a predicate-as-counter builtin.  */
++    if (f.type_suffix (0).tclass == TYPE_count)
++      return NULL;
++
+     /* Punt if we can't tell at compile time whether the result
+        is all-false.  */
+     if (m_eq_p ? maybe_gt (arg0, arg1) : maybe_ge (arg0, arg1))
+diff --git a/gcc/config/aarch64/aarch64-sve-builtins.cc b/gcc/config/aarch64/aarch64-sve-builtins.cc
+index d25e5437ba82..faff93ece733 100644
+--- a/gcc/config/aarch64/aarch64-sve-builtins.cc
++++ b/gcc/config/aarch64/aarch64-sve-builtins.cc
+@@ -3758,7 +3758,16 @@ gimple_folder::fold_to_ptrue ()
+ gimple *
+ gimple_folder::fold_to_pfalse ()
+ {
+-  return gimple_build_assign (lhs, build_zero_cst (TREE_TYPE (lhs)));
++  if (type_suffix (0).tclass == TYPE_bool)
++    return gimple_build_assign (lhs, build_zero_cst (TREE_TYPE (lhs)));
++
++  if (type_suffix (0).tclass == TYPE_count)
++    {
++      tree svbool_type = abi_vector_types[VECTOR_TYPE_svbool_t];
++      return fold_call_to (build_zero_cst (svbool_type));
++    }
++
++  return NULL;
+ }
+ 
+ /* Fold an operation to a constant predicate in which the first VL
+diff --git a/gcc/testsuite/gcc.target/aarch64/sve2/acle/general/whilele_1.c b/gcc/testsuite/gcc.target/aarch64/sve2/acle/general/whilele_1.c
+new file mode 100644
+index 000000000000..7e5905fd3c7f
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/sve2/acle/general/whilele_1.c
+@@ -0,0 +1,61 @@
++/* { dg-do compile { target { ! aarch64_asm_sve2p1_ok } } } */
++/* { dg-do assemble { target { aarch64_asm_sve2p1_ok } } } */
++/* { dg-options "-O2" } */
++
++#include <arm_sve.h>
++
++#pragma GCC target "+sve2p1"
++
++/* { dg-final { scan-assembler-not {\twhilele\t} } } */
++/* { dg-final { scan-assembler-not {\twhilelt\t} } } */
++/* { dg-final { scan-assembler-not {\tptrue\t} } } */
++
++void
++test1 (svcount_t *ptr)
++{
++  *ptr = svwhilele_c8_s64 (0, -57, 2);
++}
++
++void
++test2 (svcount_t *ptr)
++{
++  *ptr = svwhilele_c8_u64 (50, 0, 2);
++}
++
++void
++test3 (svcount_t *ptr)
++{
++  *ptr = svwhilele_c16_s64 (7, 5, 2);
++}
++
++void
++test4 (svcount_t *ptr)
++{
++  *ptr = svwhilele_c16_u64 (900, 100, 2);
++}
++
++void
++test5 (svcount_t *ptr)
++{
++  *ptr = svwhilele_c32_s64 (-10, -50, 4);
++}
++
++void
++test6 (svcount_t *ptr)
++{
++  *ptr = svwhilele_c32_u64 (1, 0, 4);
++}
++
++void
++test7 (svcount_t *ptr)
++{
++  *ptr = svwhilele_c64_s64 (0, -5, 4);
++}
++
++void
++test8 (svcount_t *ptr)
++{
++  *ptr = svwhilele_c64_u64 (8, 0, 4);
++}
++
++/* { dg-final { scan-assembler-times {\tpfalse\tp[0-9]+\.b\n} 8 } } */
+diff --git a/gcc/testsuite/gcc.target/aarch64/sve2/acle/general/whilelt_1.c b/gcc/testsuite/gcc.target/aarch64/sve2/acle/general/whilelt_1.c
+new file mode 100644
+index 000000000000..ea70d7272b1c
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/sve2/acle/general/whilelt_1.c
+@@ -0,0 +1,61 @@
++/* { dg-do compile { target { ! aarch64_asm_sve2p1_ok } } } */
++/* { dg-do assemble { target { aarch64_asm_sve2p1_ok } } } */
++/* { dg-options "-O2" } */
++
++#include <arm_sve.h>
++
++#pragma GCC target "+sve2p1"
++
++/* { dg-final { scan-assembler-not {\twhilele\t} } } */
++/* { dg-final { scan-assembler-not {\twhilelt\t} } } */
++/* { dg-final { scan-assembler-not {\tptrue\t} } } */
++
++void
++test1 (svcount_t *ptr)
++{
++  *ptr = svwhilelt_c8_s64 (0, -57, 2);
++}
++
++void
++test2 (svcount_t *ptr)
++{
++  *ptr = svwhilelt_c8_u64 (50, 0, 2);
++}
++
++void
++test3 (svcount_t *ptr)
++{
++  *ptr = svwhilelt_c16_s64 (0, 0, 2);
++}
++
++void
++test4 (svcount_t *ptr)
++{
++  *ptr = svwhilelt_c16_u64 (0, 0, 2);
++}
++
++void
++test5 (svcount_t *ptr)
++{
++  *ptr = svwhilelt_c32_s64 (-10, -50, 4);
++}
++
++void
++test6 (svcount_t *ptr)
++{
++  *ptr = svwhilelt_c32_u64 (0, 0, 4);
++}
++
++void
++test7 (svcount_t *ptr)
++{
++  *ptr = svwhilelt_c64_s64 (0, 0, 4);
++}
++
++void
++test8 (svcount_t *ptr)
++{
++  *ptr = svwhilelt_c64_u64 (0, 0, 4);
++}
++
++/* { dg-final { scan-assembler-times {\tpfalse\tp[0-9]+\.b\n} 8 } } */

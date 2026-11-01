@@ -1,0 +1,52 @@
+From 1b8df100b9ba660d48b5dbb6f292387e0cc456db Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Sat, 17 Oct 2026 10:37:29 +0200
+Subject: [PATCH 374/385] testsuite: Fix up literals{1,2}.C tests [PR127945]
+
+David Malcolm's new dg-lint found a bug in these tests, they were incorrectly
+using { target c++23 } as second dg-error argument (which is the comment argument).
+The errors are emitted at all C++ standard levels, so there should be no
+target specified for it at all; there is a second error emitted only for some
+C++ versions on the same line, but that is handled by second dg-error on the
+line below it with .-1 .  As { target c++23 } has been treated as a comment
+on those directives, it has been checking for it unconditionally already before
+this change.
+
+2026-10-17  Jakub Jelinek  <jakub@redhat.com>
+
+	PR testsuite/127945
+	* g++.dg/cpp26/literals1.C: Drop bogus { target c++23 } from dg-error.
+	* g++.dg/cpp26/literals2.C: Likewise.
+
+(cherry picked from commit 113f18c2309d064465254c83bf1b5fcbbad7c87a)
+---
+ gcc/testsuite/g++.dg/cpp26/literals1.C | 2 +-
+ gcc/testsuite/g++.dg/cpp26/literals2.C | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/testsuite/g++.dg/cpp26/literals1.C b/gcc/testsuite/g++.dg/cpp26/literals1.C
+index d51f2f8373f8..409f9811498f 100644
+--- a/gcc/testsuite/g++.dg/cpp26/literals1.C
++++ b/gcc/testsuite/g++.dg/cpp26/literals1.C
+@@ -19,7 +19,7 @@ char16_t j = u'abcd';					// { dg-error "multi-character literal cannot have an
+ char16_t k = u'\x61\x62\x63\x64';			// { dg-error "multi-character literal cannot have an encoding prefix" }
+ char16_t l = u'á';
+ char16_t m = u'😁';					// { dg-error "character not encodable in a single code unit" }
+-char16_t n = u'\N{FACE WITH TEARS OF JOY}';		// { dg-error "character not encodable in a single code unit" { target c++23 } }
++char16_t n = u'\N{FACE WITH TEARS OF JOY}';		// { dg-error "character not encodable in a single code unit" }
+ 							// { dg-error "named universal character escapes are only valid in" "" { target c++20_down } .-1 }
+ char16_t o = u'\U0001F602';				// { dg-error "character not encodable in a single code unit" }
+ char32_t p = U'abcd';					// { dg-error "multi-character literal cannot have an encoding prefix" }
+diff --git a/gcc/testsuite/g++.dg/cpp26/literals2.C b/gcc/testsuite/g++.dg/cpp26/literals2.C
+index e0e61e45c2bf..53c104a3c706 100644
+--- a/gcc/testsuite/g++.dg/cpp26/literals2.C
++++ b/gcc/testsuite/g++.dg/cpp26/literals2.C
+@@ -21,7 +21,7 @@ char16_t j = u'abcd';					// { dg-error "multi-character literal cannot have an
+ char16_t k = u'\x61\x62\x63\x64';			// { dg-error "multi-character literal cannot have an encoding prefix" }
+ char16_t l = u'á';
+ char16_t m = u'😁';					// { dg-error "character not encodable in a single code unit" }
+-char16_t n = u'\N{FACE WITH TEARS OF JOY}';		// { dg-error "character not encodable in a single code unit" { target c++23 } }
++char16_t n = u'\N{FACE WITH TEARS OF JOY}';		// { dg-error "character not encodable in a single code unit" }
+ 							// { dg-error "named universal character escapes are only valid in" "" { target c++20_down } .-1 }
+ char16_t o = u'\U0001F602';				// { dg-error "character not encodable in a single code unit" }
+ char32_t p = U'abcd';					// { dg-error "multi-character literal cannot have an encoding prefix" }

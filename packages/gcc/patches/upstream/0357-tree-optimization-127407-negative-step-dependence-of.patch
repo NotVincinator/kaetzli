@@ -1,0 +1,73 @@
+From c97c50e1eb4b37d6720492089ebb631ecb8ad4b9 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Thu, 17 Sep 2026 11:24:41 +0200
+Subject: [PATCH 357/385] tree-optimization/127407 - negative step dependence
+ of grouped stores
+
+The following adds a missed check for preserving scalar oder of
+stores to the negative distance case in the vectorizers dependence
+analysis.
+
+	PR tree-optimization/127407
+	* tree-vect-data-refs.cc (vect_analyze_data_ref_dependence):
+	Also call vect_preserves_scalar_order_p for negative dependence
+	distance.
+
+	* gcc.dg/vect/vect-pr127407.c: New testcase.
+
+(cherry picked from commit b0fcf6cab6b44d916992f17297d7c248d64469dc)
+---
+ gcc/testsuite/gcc.dg/vect/vect-pr127407.c | 29 +++++++++++++++++++++++
+ gcc/tree-vect-data-refs.cc                |  3 +++
+ 2 files changed, 32 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.dg/vect/vect-pr127407.c
+
+diff --git a/gcc/testsuite/gcc.dg/vect/vect-pr127407.c b/gcc/testsuite/gcc.dg/vect/vect-pr127407.c
+new file mode 100644
+index 000000000000..704a631be8b4
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/vect/vect-pr127407.c
+@@ -0,0 +1,29 @@
++#include "tree-vect.h"
++
++__attribute__ ((noipa)) void
++f (int *px, int n)
++{
++  int i;
++  for (i = 0; i < n; i++, px += 2)
++    {
++      px[0] = i;
++      px[-2] = i + 100;
++      px[1] = 7;
++    }
++}
++
++int a[256];
++
++int
++main (void)
++{
++  check_vect ();
++
++  f (a + 2, 64);
++
++  for (int k = 1; k < 64; k++)
++    if (a[2 * k] != k + 100)
++      __builtin_abort ();
++
++  return 0;
++}
+diff --git a/gcc/tree-vect-data-refs.cc b/gcc/tree-vect-data-refs.cc
+index 9f74ed5ef0f9..bff24ddb931b 100644
+--- a/gcc/tree-vect-data-refs.cc
++++ b/gcc/tree-vect-data-refs.cc
+@@ -595,6 +595,9 @@ vect_analyze_data_ref_dependence (struct data_dependence_relation *ddr,
+ 					       "between data-refs %T and %T\n",
+ 					       DR_REF (dra), DR_REF (drb));
+ 	    }
++	  if (!vect_preserves_scalar_order_p (dr_info_a, dr_info_b))
++	    return opt_result::failure_at (stmtinfo_a->stmt,
++					   "dependence in interleaving.\n");
+ 	  /* Record a negative dependence distance to later limit the
+ 	     amount of stmt copying / unrolling we can perform.
+ 	     Only need to handle read-after-write dependence.  */

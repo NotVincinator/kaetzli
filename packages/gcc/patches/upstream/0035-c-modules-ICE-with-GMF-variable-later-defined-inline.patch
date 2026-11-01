@@ -1,0 +1,58 @@
+From 61f16b5960e4a53d7ac5881f4db74ccfb7cb6df7 Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Thu, 13 Aug 2026 18:07:25 -0400
+Subject: [PATCH 035/385] c++/modules: ICE with GMF variable later defined
+ inline [PR126783]
+
+Here transfer_defining_module (added in r16-5213) assumes that if
+a redeclaration has DECL_LANG_SPECIFIC allocated, then so must the
+original declaration, but this isn't true for q below.  Instead we
+should call retrofit_lang_decl to allocate DECL_LANG_SPECIFIC as
+needed; other parts of duplicate_decls do the same.
+
+	PR c++/126783
+
+gcc/cp/ChangeLog:
+
+	* module.cc (transfer_defining_module): Call retrofit_lang_decl
+	instead of assuming the old declaration already has
+	DECL_LANG_SPECIFIC allocated.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/modules/gmf-6.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit a03b3ab4b0a6a446fe9a1d7e6e82967a8dd3edcf)
+---
+ gcc/cp/module.cc                     | 2 +-
+ gcc/testsuite/g++.dg/modules/gmf-6.C | 7 +++++++
+ 2 files changed, 8 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/modules/gmf-6.C
+
+diff --git a/gcc/cp/module.cc b/gcc/cp/module.cc
+index 83d3929415cb..b7c1eae2df61 100644
+--- a/gcc/cp/module.cc
++++ b/gcc/cp/module.cc
+@@ -22399,7 +22399,7 @@ transfer_defining_module (tree olddecl, tree newdecl)
+ 
+   if (DECL_LANG_SPECIFIC (new_inner))
+     {
+-      gcc_checking_assert (DECL_LANG_SPECIFIC (old_inner));
++      retrofit_lang_decl (old_inner);
+       if (DECL_MODULE_PURVIEW_P (new_inner))
+ 	DECL_MODULE_PURVIEW_P (old_inner) = true;
+       if (!DECL_MODULE_IMPORT_P (new_inner))
+diff --git a/gcc/testsuite/g++.dg/modules/gmf-6.C b/gcc/testsuite/g++.dg/modules/gmf-6.C
+new file mode 100644
+index 000000000000..201650917a32
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/modules/gmf-6.C
+@@ -0,0 +1,7 @@
++// PR c++/126783
++// { dg-additional-options "-fmodules -Wno-global-module" }
++// { dg-module-cmi M }
++module;
++extern int const q;
++inline constexpr int q = 1;
++export module M;

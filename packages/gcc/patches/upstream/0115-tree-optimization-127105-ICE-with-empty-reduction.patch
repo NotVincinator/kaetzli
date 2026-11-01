@@ -1,0 +1,67 @@
+From 7866d2f8e06ed73dbca75f01d409a2c32028bb09 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Fri, 28 Aug 2026 14:54:01 +0200
+Subject: [PATCH 115/385] tree-optimization/127105 - ICE with empty reduction
+
+When we try to analyze a reduction chain we ICE when we access
+the single stmt we want to use after verifying that single stmt
+exists, but we do the access before.  Oops.
+
+	PR tree-optimization/127105
+	* tree-vect-slp.cc (vect_analyze_slp_reduc_chain): Access
+	scalar_stmts[0] only after we determined it exists.
+
+	* gcc.dg/vect/vect-pr127105.c: New testcase.
+
+(cherry picked from commit 5fa2866f2674d274034de150f669aee611c2d9fe)
+---
+ gcc/testsuite/gcc.dg/vect/vect-pr127105.c | 12 ++++++++++++
+ gcc/tree-vect-slp.cc                      |  7 +++----
+ 2 files changed, 15 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/vect/vect-pr127105.c
+
+diff --git a/gcc/testsuite/gcc.dg/vect/vect-pr127105.c b/gcc/testsuite/gcc.dg/vect/vect-pr127105.c
+new file mode 100644
+index 000000000000..1a4c9d9e5ce9
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/vect/vect-pr127105.c
+@@ -0,0 +1,12 @@
++/* { dg-do compile } */
++/* { dg-additional-options "-O3 -fno-tree-pre" } */
++
++int a;
++char c_0;
++void main() {
++  int f;
++  for (int d = 0; d < 3; d++) {
++    f = a ? c_0 : 0;
++    c_0 = f;
++  }
++}
+diff --git a/gcc/tree-vect-slp.cc b/gcc/tree-vect-slp.cc
+index 94b6aad94008..cc26bb739a3b 100644
+--- a/gcc/tree-vect-slp.cc
++++ b/gcc/tree-vect-slp.cc
+@@ -4266,9 +4266,6 @@ vect_analyze_slp_reduc_chain (loop_vec_info vinfo,
+   if (fail)
+     return false;
+ 
+-  /* Remember a stmt with the actual reduction operation.  */
+-  stmt_vec_info reduc_scalar_stmt = scalar_stmts[0];
+-
+   /* When the SSA def chain through reduc-idx does not form a natural
+      reduction chain try to linearize an associative operation manually.  */
+   if (scalar_stmts.length () == 1
+@@ -4276,9 +4273,11 @@ vect_analyze_slp_reduc_chain (loop_vec_info vinfo,
+       && associative_tree_code ((tree_code)code)
+       /* We may not associate if a fold-left reduction is required.  */
+       && !needs_fold_left_reduction_p (TREE_TYPE (gimple_get_lhs
+-						    (reduc_scalar_stmt->stmt)),
++						    (scalar_stmts[0]->stmt)),
+ 				       code))
+     {
++      /* Remember a stmt with the actual reduction operation.  */
++      stmt_vec_info reduc_scalar_stmt = scalar_stmts[0];
+       auto_vec<chain_op_t> chain;
+       auto_vec<std::pair<tree_code, gimple *> > worklist;
+       gimple *op_stmt = NULL, *other_op_stmt = NULL;

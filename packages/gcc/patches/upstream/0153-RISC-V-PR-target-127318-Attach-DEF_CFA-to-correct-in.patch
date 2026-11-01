@@ -1,0 +1,49 @@
+From b76a3d07556ae7fbed58aa709b1ba2062ef51fd1 Mon Sep 17 00:00:00 2001
+From: Jeff Law <jeffrey.law@oss.qualcomm.com>
+Date: Sun, 13 Sep 2026 08:49:47 -0600
+Subject: [PATCH 153/385] [RISC-V][PR target/127318] Attach DEF_CFA to correct
+ insn
+
+As is noted in the PR, the REG_CFA_DEF_DFA note is wrong for the testcase,
+while I get meaningfully different CFA note locations than the author, it is
+clear that the note is getting attached to the wrong insn.
+
+The CFA_DEF_CFA note should get attached to the insn that copies from the stack
+pointer into the temporary.  The RISC-V port tried to do that, but appears to
+have just gotten the logic wrong.  The net is the CFA_DEF_CFA note got attached
+to the insn before the stack pointer copy.  Worse yet the insn with the note
+could move around relative to the stack pointer for scheduling purposes.
+
+The fix is trivial.  We just need to attach the note to the sp->temp copy.
+Given this doesn't affect code generation, but is a correctness issue, I will
+go ahead and backport it immediately rather than waiting for the usual simmer
+on the trunk.
+
+Bootstrapped and regression tested on the K3 and c920.  Also tested for the
+riscv32-elf and riscv64-elf platforms.
+
+	PR target/127318
+gcc/
+	* config/riscv/riscv.cc (riscv_v_adjust_scalable_frame): Attach
+	REG_CFA_DEF_CFA note to the copy from the stack pointer.
+
+(cherry picked from commit e3457d211e2720dd0f8070fe7600be4b026ed1ef)
+---
+ gcc/config/riscv/riscv.cc | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/gcc/config/riscv/riscv.cc b/gcc/config/riscv/riscv.cc
+index 7ca36b5803a8..041cd80c80a3 100644
+--- a/gcc/config/riscv/riscv.cc
++++ b/gcc/config/riscv/riscv.cc
+@@ -9577,9 +9577,8 @@ riscv_v_adjust_scalable_frame (rtx target, poly_int64 offset, bool epilogue)
+ 	     very wrong) we tie the old and new stack pointer together.
+ 	     The tie will expand to nothing but the optimizers will not touch
+ 	     the instruction.  */
+-	  insn = get_last_insn ();
+ 	  rtx stack_ptr_copy = gen_rtx_REG (Pmode, RISCV_STACK_CLASH_VECTOR_CFA_REGNUM);
+-	  emit_move_insn (stack_ptr_copy, stack_pointer_rtx);
++	  insn = emit_move_insn (stack_ptr_copy, stack_pointer_rtx);
+ 	  riscv_emit_stack_tie (stack_ptr_copy);
+ 
+ 	  /* We want the CFA independent of the stack pointer for the

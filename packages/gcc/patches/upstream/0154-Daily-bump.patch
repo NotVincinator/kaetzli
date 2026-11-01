@@ -1,0 +1,88 @@
+From 3be2518f7aa28e262bee04240170b8cc97fdaaa1 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Mon, 14 Sep 2026 00:19:57 +0000
+Subject: [PATCH 154/385] Daily bump.
+
+---
+ gcc/ChangeLog           | 20 ++++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/c-family/ChangeLog  |  9 +++++++++
+ gcc/testsuite/ChangeLog | 16 ++++++++++++++++
+ 4 files changed, 46 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 90540870d538..e6b6cd691ff7 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,23 @@
++2026-09-13  Jeff Law  <jeffrey.law@oss.qualcomm.com>
++
++	Backported from master:
++	2026-09-13  Jeff Law  <jeffrey.law@oss.qualcomm.com>
++
++	PR target/127318
++	* config/riscv/riscv.cc (riscv_v_adjust_scalable_frame): Attach
++	REG_CFA_DEF_CFA note to the copy from the stack pointer.
++
++2026-09-13  Xi Ruoyao  <xry111@xry111.site>
++
++	Backported from master:
++	2026-09-13  Xi Ruoyao  <xry111@xry111.site>
++
++	PR target/127153
++	* config/loongarch/loongarch.md (both_non_zero): Defer the split
++	post reload and add constraint to ensure operands[0] and
++	operands[2] are in different hard registers.
++	(both_non_zero_subreg): Likewise.
++
+ 2026-09-12  Zhongyao Chen  <chenzhongyao.hit@gmail.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 15c8f6800f3f..1c5002a42eae 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260913
++20260914
+diff --git a/gcc/c-family/ChangeLog b/gcc/c-family/ChangeLog
+index ae0c4030f720..84acfcdd82e1 100644
+--- a/gcc/c-family/ChangeLog
++++ b/gcc/c-family/ChangeLog
+@@ -1,3 +1,12 @@
++2026-09-13  Zhou Qiankang  <wszqkzqk@qq.com>
++
++	Backported from master:
++	2026-06-08  Zhou Qiankang  <wszqkzqk@qq.com>
++
++	PR c++/125642
++	* c-cppbuiltin.cc (c_cpp_builtins): Don't define __FRACT_FBIT__
++	in C++.
++
+ 2026-08-07  Release Manager
+ 
+ 	* GCC 16.2.0 released.
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index c54735a13636..346eefb4abe5 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,19 @@
++2026-09-13  Zhou Qiankang  <wszqkzqk@qq.com>
++
++	Backported from master:
++	2026-06-08  Zhou Qiankang  <wszqkzqk@qq.com>
++
++	PR c++/125642
++	* g++.dg/pr125642.C: New test.
++
++2026-09-13  Xi Ruoyao  <xry111@xry111.site>
++
++	Backported from master:
++	2026-09-13  Xi Ruoyao  <xry111@xry111.site>
++
++	PR target/127153
++	* c-c++-common/pr127153.c: New test.
++
+ 2026-09-12  Zhongyao Chen  <chenzhongyao.hit@gmail.com>
+ 
+ 	Backported from master:

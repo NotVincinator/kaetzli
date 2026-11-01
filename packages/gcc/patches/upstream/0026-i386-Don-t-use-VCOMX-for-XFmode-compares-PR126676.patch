@@ -1,0 +1,70 @@
+From ff20c357b3f62d4ffa76a74ce21fc49b640d61e6 Mon Sep 17 00:00:00 2001
+From: "Hu, Lin1" <lin1.hu@intel.com>
+Date: Fri, 7 Aug 2026 16:07:45 +0800
+Subject: [PATCH 026/385] i386: Don't use VCOMX for XFmode compares [PR126676]
+
+gcc/ChangeLog:
+
+	PR target/126676
+	* config/i386/i386-expand.cc (ix86_expand_fp_compare): Only use
+	UNSPEC_OPTCOMX for the modes VCOMX exists for.
+
+gcc/testsuite/ChangeLog:
+
+	PR target/126676
+	* gcc.target/i386/pr126676.c: New test.
+
+(cherry picked from commit 121691a8f8b29fd0cc8bf538b5a24424607a59f6)
+---
+ gcc/config/i386/i386-expand.cc           | 15 ++++++++-------
+ gcc/testsuite/gcc.target/i386/pr126676.c |  7 +++++++
+ 2 files changed, 15 insertions(+), 7 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr126676.c
+
+diff --git a/gcc/config/i386/i386-expand.cc b/gcc/config/i386/i386-expand.cc
+index be6aed2bd214..3c2b2dc6e7ec 100644
+--- a/gcc/config/i386/i386-expand.cc
++++ b/gcc/config/i386/i386-expand.cc
+@@ -2921,6 +2921,7 @@ ix86_expand_fp_compare (enum rtx_code code, rtx op0, rtx op1)
+   rtx tmp, scratch;
+ 
+   code = ix86_prepare_fp_compare_args (code, &op0, &op1);
++  machine_mode op_mode = GET_MODE (op0);
+ 
+   tmp = gen_rtx_COMPARE (CCFPmode, op0, op1);
+   if (unordered_compare)
+@@ -2931,14 +2932,14 @@ ix86_expand_fp_compare (enum rtx_code code, rtx op0, rtx op1)
+     {
+     case IX86_FPCMP_COMI:
+       tmp = gen_rtx_COMPARE (CCFPmode, op0, op1);
++      /* VCOMX/VUCOMX only have DF/SF/HF mode instructions.  */
++      if (TARGET_AVX10_2
++	  && (code == EQ || code == NE)
++	  && (op_mode == HFmode || op_mode == SFmode || op_mode == DFmode))
++	tmp = gen_rtx_UNSPEC (CCFPmode, gen_rtvec (1, tmp), UNSPEC_OPTCOMX);
+       /* We only have vcomisbf16, No vcomubf16 nor vcomxbf16 */
+-      if (GET_MODE (op0) != E_BFmode)
+-	{
+-	  if (TARGET_AVX10_2 && (code == EQ || code == NE))
+-	    tmp = gen_rtx_UNSPEC (CCFPmode, gen_rtvec (1, tmp), UNSPEC_OPTCOMX);
+-	  if (unordered_compare)
+-	    tmp = gen_rtx_UNSPEC (CCFPmode, gen_rtvec (1, tmp), UNSPEC_NOTRAP);
+-	}
++      if (op_mode != BFmode && unordered_compare)
++	tmp = gen_rtx_UNSPEC (CCFPmode, gen_rtvec (1, tmp), UNSPEC_NOTRAP);
+       cmp_mode = CCFPmode;
+       emit_insn (gen_rtx_SET (gen_rtx_REG (CCFPmode, FLAGS_REG), tmp));
+       break;
+diff --git a/gcc/testsuite/gcc.target/i386/pr126676.c b/gcc/testsuite/gcc.target/i386/pr126676.c
+new file mode 100644
+index 000000000000..219a6133790c
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr126676.c
+@@ -0,0 +1,7 @@
++/* { dg-do compile { target { ! ia32 } } } */
++/* { dg-options "-O2 -march=x86-64 -mavx10.2 -mapxf" } */
++/* { dg-final { scan-assembler-times "fucomip" 2 } } */
++/* { dg-final { scan-assembler-not "comx" } } */
++
++int f1 (long double a, long double b, int x) { return x > 0 && a == b; }
++int f2 (long double a, long double b, int x) { return x > 0 && a != b; }

@@ -1,0 +1,68 @@
+From 5e7fa6dbae546cdc07857be19cf3aa2375e9edad Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Tue, 18 Aug 2026 20:15:45 +0200
+Subject: [PATCH 055/385] c++: Fix ICE during explanation of failed
+ __has_unique_object_representation [PR126867]
+
+The following testcase ICEs since r16-5520 added explain
+arguments to type_has_unique_obj_representations and
+record_has_unique_obj_representations.  Most of the location_t
+arguments in that change look correct, either DECL_SOURCE_LOCATION
+of some FIELD_DECL or in type_has_unique_obj_representations use
+loc, which is initialized to
+  location_t loc = input_location;
+  if (tree m = TYPE_MAIN_DECL (t))
+    loc = DECL_SOURCE_LOCATION (m);
+But in record_has_unique_obj_representations we don't have
+a variable like that and t at that point is the RECORD_TYPE
+or UNION_TYPE, so using DECL_SOURCE_LOCATION on it will surely ICE
+in a checking compiler.
+location_of call does the above dances, so it seems easiest to
+call it rather than duplicate it by hand.
+
+2026-08-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/126867
+	* tree.cc (record_has_unique_obj_representations): Use
+	location_of (const_cast <tree> (t)) rather than
+	DECL_SOURCE_LOCATION (t).
+
+	* g++.dg/cpp1z/has-unique-obj-representations6.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 318e6a4640420d5cc213df779bf751485fa56063)
+---
+ gcc/cp/tree.cc                                         |  2 +-
+ .../g++.dg/cpp1z/has-unique-obj-representations6.C     | 10 ++++++++++
+ 2 files changed, 11 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp1z/has-unique-obj-representations6.C
+
+diff --git a/gcc/cp/tree.cc b/gcc/cp/tree.cc
+index f2ecc2df0d77..084dfd70f6bd 100644
+--- a/gcc/cp/tree.cc
++++ b/gcc/cp/tree.cc
+@@ -5247,7 +5247,7 @@ record_has_unique_obj_representations (const_tree t, const_tree sz,
+ 	    inform (DECL_SOURCE_LOCATION (last_named_field),
+ 		    "padding occurs after %qD", last_named_field);
+ 	  else
+-	    inform (DECL_SOURCE_LOCATION (t),
++	    inform (location_of (const_cast <tree> (t)),
+ 		    "%qT has padding and no data fields", t);
+ 	}
+       return false;
+diff --git a/gcc/testsuite/g++.dg/cpp1z/has-unique-obj-representations6.C b/gcc/testsuite/g++.dg/cpp1z/has-unique-obj-representations6.C
+new file mode 100644
+index 000000000000..431b55ade522
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp1z/has-unique-obj-representations6.C
+@@ -0,0 +1,10 @@
++// PR c++/126867
++// { dg-do compile { target c++17 } }
++
++template <class T>
++constexpr bool U = __has_unique_object_representations (T);
++
++struct S {};		// { dg-message "'S' does not have unique object representations, because" }
++			// { dg-message "'S' has padding and no data fields" "" { target *-*-* } .-1 }
++
++static_assert (U <S>);	// { dg-error "static assertion failed" }

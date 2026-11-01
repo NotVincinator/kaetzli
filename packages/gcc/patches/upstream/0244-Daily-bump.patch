@@ -1,0 +1,57 @@
+From 05031a95502d22af03a1cfb373dcdebbd3d9c031 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Wed, 7 Oct 2026 00:20:58 +0000
+Subject: [PATCH 244/385] Daily bump.
+
+---
+ gcc/DATESTAMP           |  2 +-
+ gcc/cp/ChangeLog        | 15 +++++++++++++++
+ gcc/testsuite/ChangeLog |  8 ++++++++
+ 3 files changed, 24 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 3b3ae2dafce4..65b980db14cc 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261006
++20261007
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index 2b7d3e2854c6..a9c40bd171bb 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,18 @@
++2026-10-06  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2026-10-06  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/127707
++	* name-lookup.cc (finish_nonmember_using_decl): New bool
++	parameter.  Set USING_DECL_TYPENAME_P if it's true.
++	* name-lookup.h (finish_nonmember_using_decl): Adjust
++	declaration.
++	* parser.cc (finish_using_decl): Pass typename_p to
++	finish_nonmember_using_decl.
++	* pt.cc (tsubst_stmt) <case DECL_EXPR>: Pass
++	USING_DECL_TYPENAME_P to finish_nonmember_using_decl.
++
+ 2026-10-03  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index f4ca2a1f2b83..ba535a7726b1 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2026-10-06  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2026-10-06  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/127707
++	* g++.dg/reflect/ns12.C: New test.
++
+ 2026-10-05  Julio Sotoriva De Bastiani  <Julio.SotorivaDeBastiani@arm.com>
+ 
+ 	PR target/126096

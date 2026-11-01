@@ -1,0 +1,86 @@
+From d2abcdc5727d0d4e31d6d9d5809aed25818d16a8 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Thu, 6 Aug 2026 11:01:15 +0200
+Subject: [PATCH 010/385] libcpp: Fix up ICE with __VA_OPT__ [PR125048]
+
+The following testcase ICEs, because we call linemap_enter_macro
+and remember what it returned and then in a loop sometimes call
+vaopt_state::update (src) which can call expand_arg which under the
+hood can reallocate the pfile->line_table->info_macro.maps array.
+As linemap_enter_macro returns a pointer into that array, if the
+array is reallocated, we then dereference the freed memory.
+
+The following patch fixes it by remembering the offset into the
+pfile->line_table->info_macro.maps array and when we could have called
+expand_arg, updates the map variable so that it is correct even after
+possible reallocation.
+
+2026-04-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR preprocessor/125048
+	* macro.cc (replace_args): Remember the position of map
+	in the pfile->line_table->info_macro.maps array and if vostate
+	is DROP, recompute map pointer as expand_arg call could have
+	reallocated the pfile->line_table->info_macro.maps array.
+
+	* c-c++-common/cpp/va-opt-11.c: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 7b87f41690d46b869c21d0d0537b766698da3827)
+---
+ gcc/testsuite/c-c++-common/cpp/va-opt-11.c | 13 +++++++++++++
+ libcpp/macro.cc                            |  7 +++++++
+ 2 files changed, 20 insertions(+)
+ create mode 100644 gcc/testsuite/c-c++-common/cpp/va-opt-11.c
+
+diff --git a/gcc/testsuite/c-c++-common/cpp/va-opt-11.c b/gcc/testsuite/c-c++-common/cpp/va-opt-11.c
+new file mode 100644
+index 000000000000..68cf55817eda
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/cpp/va-opt-11.c
+@@ -0,0 +1,13 @@
++/* PR preprocessor/125048 */
++/* { dg-do preprocess } */
++/* { dg-options "-std=c23" { target c } } */
++/* { dg-options "-std=c++20" { target c++ } } */
++
++#define A(...)B(B(B(B(__VA_ARGS__##__VA_OPT__()))))
++#define B(...)C(C(C(C(__VA_ARGS__##__VA_OPT__()))))
++#define C(...)D(D(D(D(__VA_ARGS__##__VA_OPT__()))))
++#define D(...)E(E(E(E(__VA_ARGS__##__VA_OPT__()))))
++#define E(...)__VA_ARGS__
++#define F
++A(F)
++/* { dg-final { scan-file va-opt-11.i "D\\\(D\\\(D\\\(C\\\(C\\\(C\\\(B\\\(B\\\(B\\\(\\\)\\\)\\\)\\\)\\\)\\\)\\\)\\\)\\\)" } } */
+diff --git a/libcpp/macro.cc b/libcpp/macro.cc
+index c29a34302b63..15260a21b585 100644
+--- a/libcpp/macro.cc
++++ b/libcpp/macro.cc
+@@ -1995,6 +1995,7 @@ replace_args (cpp_reader *pfile, cpp_hashnode *node, cpp_macro *macro,
+   location_t *virt_locs = NULL;
+   unsigned int exp_count;
+   const line_map_macro *map = NULL;
++  size_t map_idx = 0;
+   int track_macro_exp;
+ 
+   /* First, fully macro-expand arguments, calculating the number of
+@@ -2105,6 +2106,7 @@ replace_args (cpp_reader *pfile, cpp_hashnode *node, cpp_macro *macro,
+       map = linemap_enter_macro (pfile->line_table, node,
+ 				 expansion_point_loc,
+ 				 num_macro_tokens);
++      map_idx = map - pfile->line_table->info_macro.maps;
+     }
+   i = 0;
+   vaopt_state vaopt_tracker (pfile, macro->variadic, &args[macro->paramc - 1]);
+@@ -2226,6 +2228,11 @@ replace_args (cpp_reader *pfile, cpp_hashnode *node, cpp_macro *macro,
+ 					 NULL, 0);
+ 		}
+ 	    }
++	  else if (vostate == vaopt_state::DROP && map)
++	    /* For the DROP case vaopt_tracker.update (src) can call
++	       expand_arg and that can reallocate the maps, so need to
++	       update the map pointer.  */
++	    map = pfile->line_table->info_macro.maps + map_idx;
+ 	  continue;
+ 	}
+ 

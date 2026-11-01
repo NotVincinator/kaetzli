@@ -1,0 +1,130 @@
+From a88df55edc15ebfa61cc348c604205ce508d6473 Mon Sep 17 00:00:00 2001
+From: Robin Dapp <robin.dapp@oss.qualcomm.com>
+Date: Wed, 9 Sep 2026 09:12:07 +0200
+Subject: [PATCH 147/385] lower-subreg: Avoid unsplittable modes. [PR127256]
+
+This is split off of r17-3907-gec58d736cd572b.  The patch mainly avoids
+splitting subregs whose outer mode can be split but the inner cannot
+like in
+  (subreg:TI (reg:VNx4SI 665) 0).
+Also, it filters out unsplittable modes and doesn't assert that an
+outermode in simplify_subreg_concatn is interesting.  It suffices that
+its size is constant so we can build subregs.
+
+	PR middle-end/127256
+
+gcc/ChangeLog:
+
+	* lower-subreg.cc (interesting_mode_p): Don't consider
+	unsplittable modes as interesting.
+	(simple_move_operand): Don't split subregs whose outer mode
+	can be split but the inner mode cannot.
+	(simplify_subreg_concatn): Don't insist the outer mode is
+	interesting but rather check that its size is constant.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.target/aarch64/pr127256.C: New test.
+---
+ gcc/lower-subreg.cc                         | 29 +++++++++++++++++----
+ gcc/testsuite/g++.target/aarch64/pr127256.C | 22 ++++++++++++++++
+ 2 files changed, 46 insertions(+), 5 deletions(-)
+ create mode 100644 gcc/testsuite/g++.target/aarch64/pr127256.C
+
+diff --git a/gcc/lower-subreg.cc b/gcc/lower-subreg.cc
+index 5dee6a0b6460..5a74d8429399 100644
+--- a/gcc/lower-subreg.cc
++++ b/gcc/lower-subreg.cc
+@@ -30,6 +30,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "memmodel.h"
+ #include "tm_p.h"
+ #include "expmed.h"
++#include "regs.h"
+ #include "insn-config.h"
+ #include "emit-rtl.h"
+ #include "recog.h"
+@@ -113,6 +114,9 @@ interesting_mode_p (machine_mode mode, unsigned int *bytes,
+ {
+   if (!GET_MODE_SIZE (mode).is_constant (bytes))
+     return false;
++  if (maybe_lt ((unsigned) UNITS_PER_WORD,
++		(poly_uint64) REGMODE_NATURAL_SIZE (mode)))
++    return false;
+   *words = CEIL (*bytes, UNITS_PER_WORD);
+   return true;
+ }
+@@ -302,7 +306,20 @@ static bool
+ simple_move_operand (rtx x)
+ {
+   if (GET_CODE (x) == SUBREG)
+-    x = SUBREG_REG (x);
++    {
++      /* Exclude subregs whose outer mode can be split into multiple words
++	 but whose inner mode cannot.  Attempting to split such a subreg
++	 would mean trying to split the unsplittable inner register.
++
++	 If instead the subreg occupies a single word, we can keep it as-is,
++	 regardless of what the SUBREG_REG is.  If the outer mode cannot be
++	 split then the subreg makes things no worse than they already are.  */
++      unsigned int factor, size;
++      if (interesting_mode_p (GET_MODE (x), &size, &factor) && factor > 1
++	  && !interesting_mode_p (GET_MODE (SUBREG_REG (x)), &size, &factor))
++	return false;
++      x = SUBREG_REG (x);
++    }
+ 
+   if (!OBJECT_P (x))
+     return false;
+@@ -649,18 +666,20 @@ decompose_register (unsigned int regno)
+ static rtx
+ simplify_subreg_concatn (machine_mode outermode, rtx op, poly_uint64 orig_byte)
+ {
+-  unsigned int outer_size, outer_words, inner_size, inner_words;
++  unsigned int outer_size, inner_size, inner_words;
+   machine_mode innermode, partmode;
+   rtx part;
+   unsigned int final_offset;
+   unsigned int byte;
+ 
+   innermode = GET_MODE (op);
+-  if (!interesting_mode_p (outermode, &outer_size, &outer_words)
+-      || !interesting_mode_p (innermode, &inner_size, &inner_words))
++  if (!interesting_mode_p (innermode, &inner_size, &inner_words))
+     gcc_unreachable ();
+ 
+-  /* Must be constant if interesting_mode_p passes.  */
++  if (!GET_MODE_SIZE (outermode).is_constant (&outer_size))
++    return NULL_RTX;
++
++  /* Must be constant if outer_size is.  */
+   byte = orig_byte.to_constant ();
+   gcc_assert (GET_CODE (op) == CONCATN);
+   gcc_assert (byte % outer_size == 0);
+diff --git a/gcc/testsuite/g++.target/aarch64/pr127256.C b/gcc/testsuite/g++.target/aarch64/pr127256.C
+new file mode 100644
+index 000000000000..2520af1e2f72
+--- /dev/null
++++ b/gcc/testsuite/g++.target/aarch64/pr127256.C
+@@ -0,0 +1,22 @@
++/* { dg-do compile } */
++/* { dg-additional-options "-O2" } */
++
++#include <arm_sve.h>
++#pragma GCC target "+sve"
++
++float tt[4];
++float t2[4];
++void ComputeCoefficients() {
++    float block[4];
++    {
++        svbool_t t = svwhilelt_b32_u32({}, 4);
++        svfloat32_t v = svld1_f32(t, tt);
++        svst1_f32(t, block, v);
++    }
++    __builtin_memcpy(tt, block, sizeof(block));
++    {
++        svbool_t t = svwhilelt_b32_u32({}, 1);
++        svfloat32_t v = svld1_f32(t, tt);
++        svst1_f32(t, t2, v);
++    }
++}

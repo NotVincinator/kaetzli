@@ -1,0 +1,216 @@
+From 1f32d57ce4ecabe3fdd5a98d726ecacb20349d11 Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Wed, 19 Aug 2026 15:10:00 +0200
+Subject: [PATCH 062/385] Ada: Fix infinite loop on reduction expression with
+ -gnatVa
+
+This is a regression present on the mainline and 16 branch, coming from an
+invalid tree sharing in the new implementation of the (complex) analysis of
+reduction expressions.
+
+gcc/ada/
+	PR ada/126907
+	* sem_attr.adb (Resolve_Attribute) <Attribute_Reduce>: Do not call
+	Relocate_Node on nodes of the original unanalyzed tree.
+
+gcc/testsuite/
+	* gnat.dg/reduce7.adb: New test.
+---
+ gcc/ada/sem_attr.adb              | 44 +++++++++++-----------
+ gcc/testsuite/gnat.dg/reduce7.adb | 61 +++++++++++++++++++++++++++++++
+ 2 files changed, 82 insertions(+), 23 deletions(-)
+ create mode 100644 gcc/testsuite/gnat.dg/reduce7.adb
+
+diff --git a/gcc/ada/sem_attr.adb b/gcc/ada/sem_attr.adb
+index 730f2ac161ae..e912293f039a 100644
+--- a/gcc/ada/sem_attr.adb
++++ b/gcc/ada/sem_attr.adb
+@@ -13007,7 +13007,7 @@ package body Sem_Attr is
+                   Copy_Reducer_N : constant Node_Id :=
+                                      Copy_Separate_Tree (Reducer_N);
+ 
+-                  Copy_Aggr_Expr : Node_Id;
++                  Expr           : Node_Id;
+                   Loop_Var       : Entity_Id;
+                   Reducer_Call   : Node_Id;
+ 
+@@ -13058,7 +13058,6 @@ package body Sem_Attr is
+                      Init_Var : constant Entity_Id :=
+                                   Make_Temporary (Loc, 'B');
+ 
+-                     Aggr_Expr  : Node_Id;
+                      Dummy_Loop : Node_Id;
+                      Init_Nam   : Node_Id;
+                      Iter_Spec  : Node_Id;
+@@ -13079,39 +13078,40 @@ package body Sem_Attr is
+ 
+                      if Nkind (P) = N_Aggregate then
+                         declare
+-                           Stream, Stream_It : Node_Id;
++                           Assoc, Spec : Node_Id;
++
+                         begin
+-                           Stream := First (Component_Associations (P));
+-                           Stream_It := Iterator_Specification (Stream);
+-                           Aggr_Expr := Expression (Stream);
++                           Assoc := First (Component_Associations (P));
++                           Spec := Iterator_Specification (Assoc);
++                           Expr := Copy_Separate_Tree (Expression (Assoc));
+ 
+-                           --  Case [for I of It => Aggr_Expr]
++                           --  Case [for I of It => Expr]
+ 
+-                           if Nkind (Stream) = N_Iterated_Component_Association
+-                             and then Present (Stream_It)
+-                             and then Of_Present (Stream_It)
++                           if Nkind (Assoc) = N_Iterated_Component_Association
++                             and then Present (Spec)
++                             and then Of_Present (Spec)
+                            then
+                               Iter_Spec :=
+                                 Make_Iteration_Scheme (Loc,
+                                   Iterator_Specification =>
+-                                    Relocate_Node (Stream_It));
++                                    Copy_Separate_Tree (Spec));
+                               Loop_Var :=
+                                 Defining_Identifier
+                                   (Iterator_Specification (Iter_Spec));
+ 
+-                           --  Case [for I in Range => Aggr_Expr]
++                           --  Case [for I in Range => Expr]
+ 
+                            else
++                              Assoc := Copy_Separate_Tree (Assoc);
+                               Iter_Spec :=
+                                 Make_Iteration_Scheme (Loc,
+                                   Loop_Parameter_Specification =>
+                                     Make_Loop_Parameter_Specification  (Loc,
+                                       Defining_Identifier =>
+-                                        Defining_Identifier
+-                                          (Copy_Separate_Tree (Stream)),
++                                        Defining_Identifier (Assoc),
+                                       Discrete_Subtype_Definition =>
+-                                        Relocate_Node (First (Discrete_Choices
+-                                                               (Stream)))));
++                                        Relocate_Node
++                                          (First (Discrete_Choices (Assoc)))));
+                               Loop_Var :=
+                                 Defining_Identifier
+                                   (Loop_Parameter_Specification (Iter_Spec));
+@@ -13122,7 +13122,7 @@ package body Sem_Attr is
+ 
+                      else
+                         Loop_Var := Make_Temporary (Loc, 'I');
+-                        Aggr_Expr := Make_Identifier (Loc, Chars (Loop_Var));
++                        Expr := Make_Identifier (Loc, Chars (Loop_Var));
+                         Iter_Spec := Make_Iteration_Scheme (Loc,
+                           Iterator_Specification =>
+                             Make_Iterator_Specification (Loc,
+@@ -13146,22 +13146,20 @@ package body Sem_Attr is
+                      pragma Assert (Present (Etype (Loop_Var)));
+                      pragma Assert (Etype (Loop_Var) /= Any_Type);
+ 
+-                     Copy_Aggr_Expr := Copy_Separate_Tree (Aggr_Expr);
+-
+                      case Reducer_Call_Statement_Kind is
+                         when E_Procedure =>
+                            Reducer_Call :=
+                              Make_Procedure_Call_Statement (Sloc (Reducer_N),
+                                Name => Copy_Reducer_N,
+                                Parameter_Associations =>
+-                                 New_List (Init_Nam, Copy_Aggr_Expr));
++                                 New_List (Init_Nam, Expr));
+ 
+                         when E_Function | E_Operator =>
+                            Reducer_Call :=
+                              Make_Function_Call (Sloc (Reducer_N),
+                                Name => Copy_Reducer_N,
+                                Parameter_Associations =>
+-                                 New_List (Init_Nam, Copy_Aggr_Expr));
++                                 New_List (Init_Nam, Expr));
+                            Set_Etype (Reducer_Call, Accum_Typ);
+ 
+                         when others =>
+@@ -13201,13 +13199,13 @@ package body Sem_Attr is
+ 
+                   elsif not Is_Overloaded (Reducer_Call) then
+                      pragma Assert (Present (Entity (Copy_Reducer_N)));
+-                     pragma Assert (Present (Etype (Copy_Aggr_Expr)));
++                     pragma Assert (Present (Etype (Expr)));
+ 
+                      --  Set the correct reducer entity and then return the
+                      --  value subtype.
+ 
+                      Set_Entity (Reducer_N, Entity (Copy_Reducer_N));
+-                     return Etype (Copy_Aggr_Expr);
++                     return Etype (Expr);
+                   end if;
+ 
+                   return Empty;
+diff --git a/gcc/testsuite/gnat.dg/reduce7.adb b/gcc/testsuite/gnat.dg/reduce7.adb
+new file mode 100644
+index 000000000000..7ea23ce0900b
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/reduce7.adb
+@@ -0,0 +1,61 @@
++-- { dg-do run }
++-- { dg-options "-gnat2022 -gnatVa" }
++
++with Ada.Text_IO;
++
++procedure Reduce7 is
++
++   procedure Section_4_2_1_Paragraph_15 is
++      package Roman is
++         type Roman_Digit is ('I', 'V', 'X', 'L', 'C', 'D', 'M');
++         for Roman_Digit use ('I' => 1, 'V' => 5, 'X' => 10, 'L' => 50, 'C' => 100, 'D' => 500, 'M' => 1000);
++
++         subtype Roman_Character is Wide_Wide_Character with
++           Static_Predicate => Roman_Character in 'I' | 'V' | 'X' | 'L' | 'C' | 'D' | 'M';
++
++         Max_Roman_Number : constant := 3_999;  -- MMMCMXCIX
++
++         type Roman_Number is range 1 .. Max_Roman_Number
++           with String_Literal => To_Roman_Number;
++
++         function To_Roman_Number (S : Wide_Wide_String) return Roman_Number
++           with Pre => S'Length > 0 and then
++           (for all Char of S => Char in Roman_Character);
++
++         function To_Roman_Number (S : Wide_Wide_String) return Roman_Number is
++           (declare
++            R : constant array (Integer range <>) of Roman_Number :=
++            (for D in S'Range => Roman_Digit'Enum_Rep
++             (Roman_Digit'Wide_Wide_Value (''' & S (D) & '''))); -- See 3.5.2 and 13.4
++            begin
++              [for I in R'Range =>
++                (if I < R'Last and then R (I) < R (I + 1) then -1 else 1) * R (I)]'
++                  Reduce("+", 0));
++      end Roman;
++
++   use type Roman.Roman_Number;
++   X : Roman.Roman_Number := "III" * "IV" * "XII"; -- 144 (that is, CXLIV)
++   Y : Roman.Roman_Number := 10;
++   begin
++      Ada.Text_IO.Put_Line ("III * IV * XII is" & X'Image);
++   end Section_4_2_1_Paragraph_15;
++
++   procedure Section_4_5_10_Paragraph_36 is
++      use Ada.Text_IO;
++      type Real is digits 8;
++      -- Example of a reduction expression used to compute the value of Pi:
++
++      --  See 3.5.7.
++      function Pi (Number_Of_Steps : Natural := 10_000) return Real is
++        (1.0 / Real (Number_Of_Steps) *
++          [for I in 1 .. Number_Of_Steps =>
++            (4.0 / (1.0 + ((Real (I) - 0.5) * (1.0 / Real (Number_Of_Steps)))**2))]'
++              Reduce("+", 0.0));
++   begin
++      Ada.Text_IO.Put_Line ("Pi =" & Pi (100)'Image);
++   end Section_4_5_10_Paragraph_36;
++
++begin
++   Section_4_2_1_Paragraph_15;
++   Section_4_5_10_Paragraph_36;
++end;

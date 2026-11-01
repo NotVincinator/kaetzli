@@ -1,0 +1,316 @@
+From 4fb564f729db138c5f5a9b2551651281e8095be1 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Tomasz=20Kami=C5=84ski?= <tkaminsk@redhat.com>
+Date: Tue, 7 Jul 2026 10:27:33 +0200
+Subject: [PATCH 343/385] libstdc++: Assert that produced
+ layout_stride::mapping is unique.
+
+This patch add an assertions checking if the combination of strides and
+extents passed to layout_stride::mapping is unique. The implementation
+follows resolutions of LWG4603, "layout_stride` should accept zero strides
+for empty `extents`" and LWG4606, "Bullet (4.3) preconditions are too strict
+to implement submdspan."
+
+Firstly, we observe that if new mapping N is produced by adding dimension
+(with at least two elements) to some unique mapping M, for N to remain unique,
+the stride on the newly added dimension needs to be greater than to maximum
+index produced by M, i.e:
+  sum_[0,M::rank()) M.stride(i) * (M.extents().extent(i) - 1)
+As M.required_span_size() is 1 + above sum, equivalently stride needs to be
+greater than or equal to it.
+
+This patch, uses above to find permutation of dimension index (__perm),
+corresponding to order in which dimension are appended (for extent greater
+than one, this is equivalent to lowest to highest value of strides).
+Starting from zero-dimensional mapping (__cur_size == 1), in each iteration
+we compare the next __stride against required_span_size (__cur_span), and
+if check passes, we update it's value. The above also guarantees that are
+__stride values are greater than zero.
+
+As dimension of extent one (with one element), can be used only with index
+value of 0, they stride do not contribute to index value, and can be
+selected arbitrary (including having value zero). We handle above by moving
+indices corresponding to such dimensions to front of __perm.
+
+As mentioned above, stride value zero are acceptable also for dimension
+with extent equal to one (in addition to empty mappings). This is done
+separately for mappings of rank one, two, three and larger. In the last
+case, a separate loop is only required in non-debug mode.
+
+As for the two dimension mappings, the above sum reduces to stride *
+(extent - 1), we continue validating them in non-debug mode. We handle
+degenerate mappings (at least one extent is one) first, reusing
+__stride_nonzero to check other dimension.
+
+libstdc++-v3/ChangeLog:
+
+	* include/std/mdspan (layout_stride::mapping::_M_check_unique):
+	Define.
+	(layout_stride::mapping(const extents_type&, span<....>)):
+	Add __glibcxx_assert on _M_check_unique.
+	* testsuite/23_containers/mdspan/layouts/stride_neg.cc:
+	Test for the new added assertions.
+	* testsuite/23_containers/mdspan/layouts/stride_debug_neg.cc:
+	New test covering cases detected only in debug mode.
+
+Reviewed-by: Jonathan Wakely <jwakely@redhat.com>
+	(cherry picked from commits 1a4d8dc0d2dc045bbb93654ae66fb80276dc6690)
+	(0b3c5e87f6c5a93076227883fa2f882a4e879e63)
+---
+ libstdc++-v3/include/std/mdspan               | 96 ++++++++++++++++++-
+ .../mdspan/layouts/stride_debug_neg.cc        | 42 ++++++++
+ .../mdspan/layouts/stride_neg.cc              | 63 +++++++++++-
+ 3 files changed, 195 insertions(+), 6 deletions(-)
+ create mode 100644 libstdc++-v3/testsuite/23_containers/mdspan/layouts/stride_debug_neg.cc
+
+diff --git a/libstdc++-v3/include/std/mdspan b/libstdc++-v3/include/std/mdspan
+index b47b4de67b2b..79dbf0308d29 100644
+--- a/libstdc++-v3/include/std/mdspan
++++ b/libstdc++-v3/include/std/mdspan
+@@ -1899,6 +1899,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	  for (size_t __i = 0; __i < extents_type::rank(); ++__i)
+ 	    _M_strides[__i] =
+ 	      __mdspan::__index_type_cast<index_type>(as_const(__strides[__i]));
++
++	  if constexpr (extents_type::rank() > 0)
++	    __glibcxx_assert(_M_check_unique());
+ 	}
+ 
+       template<typename _OIndexType>
+@@ -2033,6 +2036,97 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	}
+ 
+     private:
++      using _Strides = typename __array_traits<index_type,
++					       extents_type::rank()>::_Type;
++
++      constexpr bool
++      _M_check_unique() const
++      {
++	constexpr size_t __rank = extents_type::rank();
++	// _GLIBCXX_RESOLVE_LIB_DEFECTS
++	// 4603. `layout_stride` should accept zero strides for empty `extents`
++	// 4606. Bullet (4.3) preconditions are too strict to implement submdspan
++
++	if (__mdspan::__empty(_M_extents))
++	  return true;
++
++	auto __stride_nonzero = [&](size_t __idx)
++	{ return (_M_strides[__idx] > 0) || (_M_extents.extent(__idx) == 1); };
++
++	if constexpr (__rank == 1)
++	  return __stride_nonzero(0);
++	else if constexpr (__rank == 2)
++	  {
++	    if (_M_extents.extent(0) == 1)
++	      return __stride_nonzero(1);
++	    if (_M_extents.extent(1) == 1)
++	      return __stride_nonzero(0);
++	    if (!_M_strides[0] || !_M_strides[1])
++	      return false;
++	    return (_M_strides[1] > _M_strides[0] * (_M_extents.extent(0) - 1))
++		|| (_M_strides[0] > _M_strides[1] * (_M_extents.extent(1) - 1));
++	  }
++	else
++	  {
++	    // This is necessary, but not sufficient condition for uniqueness.
++	    // It requires computation in range of call of operator(), so check
++	    // if first, also in non-debug mode.
++	    if (required_span_size() < __mdspan::__size(_M_extents))
++	      return false;
++
++	    // Checking for a valid permutation of strides is O(rank^2) so
++	    // so enabled only in debug mode.
++#ifdef _GLIBCXX_DEBUG
++	    size_t __perm[__rank];
++	    for (size_t __i = 0; __i < __rank; ++__i)
++	      __perm[__i] = __i;
++
++	    auto __getstride = [&](size_t __idx) { return _M_strides[__idx]; };
++	    auto __getextent = [&](size_t __idx) { return _M_extents.extent(__idx); };
++	    auto __popmin = [&](size_t __from, auto __getter)
++	    {
++	      size_t __min = __perm[__rank - 1];
++	      for (size_t __i = __rank - 1; __i > __from; --__i)
++		{
++		  const size_t __cur = __perm[__i - 1];
++		  if (__getter(__cur) < __getter(__min))
++		    {
++		      __perm[__i] = __min;
++		      __min = __cur;
++		    }
++		  else
++		    __perm[__i] = __cur;
++		}
++	      __perm[__from] = __min;
++	      return __getter(__min);
++	    };
++
++	    // We use eager insertion-sort based algorithm to permute the __perm.
++	    size_t __idx = 0;
++
++	    // Stride values are not relevant for dimension with single element
++	    while (__popmin(__idx, __getextent) == 1)
++	      if (++__idx == __rank)
++		return true;
++
++	    size_t __prev_span = 1;
++	    for (; __idx < __rank; ++__idx)
++	      {
++		const size_t __stride = __popmin(__idx, __getstride);
++		if (__stride < __prev_span)
++		  return false;
++		__prev_span += __stride * (__getextent(__perm[__idx]) - 1);
++	      }
++#else
++	    // Otherwise check obvious cases where stride is zero.
++	    for (size_t __idx = 0; __idx < __rank; ++__idx)
++	      if (!__stride_nonzero(__idx))
++		return false;
++#endif
++	    return true;
++	  }
++      }
++
+ #if __glibcxx_submdspan
+       template<typename... _Slices>
+ 	requires (extents_type::rank() == sizeof...(_Slices))
+@@ -2053,8 +2147,6 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	}
+ #endif
+ 
+-      using _Strides = typename __array_traits<index_type,
+-					       extents_type::rank()>::_Type;
+       [[no_unique_address]] extents_type _M_extents;
+       [[no_unique_address]] _Strides _M_strides;
+     };
+diff --git a/libstdc++-v3/testsuite/23_containers/mdspan/layouts/stride_debug_neg.cc b/libstdc++-v3/testsuite/23_containers/mdspan/layouts/stride_debug_neg.cc
+new file mode 100644
+index 000000000000..bc5f41489d74
+--- /dev/null
++++ b/libstdc++-v3/testsuite/23_containers/mdspan/layouts/stride_debug_neg.cc
+@@ -0,0 +1,42 @@
++// { dg-do compile { target c++23 } }
++#include <mdspan>
++#include <cstdint>
++
++using std::array;
++template<size_t Rank>
++ using mapping = std::layout_stride::mapping<std::dextents<size_t, Rank>>;
++
++// Only some permutations are valid, invalid permutations detected only in debug mode.
++
++// Unique if stride 4 corresponds to extent 3
++constexpr auto m28 = mapping<2>(array{3, 4}, array{4, 10}); // { dg-bogus "expansion of" }
++constexpr auto m29 = mapping<2>(array{3, 4}, array{10, 4}); // { dg-error "expansion of" "" { target debug_mode } }
++constexpr auto m30 = mapping<2>(array{4, 3}, array{10, 4}); // { dg-bogus "expansion of" }
++constexpr auto m31 = mapping<2>(array{4, 3}, array{4, 10}); // { dg-error "expansion of" "" { target debug_mode } }
++
++// Unique if stride 11 corresponds to extent 3, 2 * (5-1) = 8 < 11, and 11 * (3-1) + 8 = 30 < 35
++constexpr auto m32 = mapping<3>(array{3, 4, 5}, array{11, 2, 35}); // { dg-bogus "expansion of" }
++constexpr auto m33 = mapping<3>(array{3, 4, 5}, array{11, 35, 2}); // { dg-bogus "expansion of" }
++constexpr auto m34 = mapping<3>(array{3, 4, 5}, array{2, 11, 35}); // { dg-error "expansion of" "" { target debug_mode } }
++constexpr auto m35 = mapping<3>(array{3, 4, 5}, array{35, 2, 11}); // { dg-error "expansion of" "" { target debug_mode } }
++constexpr auto m36 = mapping<3>(array{5, 4, 3}, array{2, 35, 11}); // { dg-bogus "expansion of" }
++constexpr auto m37 = mapping<3>(array{5, 4, 3}, array{2, 11, 35}); // { dg-error "expansion of" "" { target debug_mode } }
++constexpr auto m38 = mapping<3>(array{5, 3, 4}, array{35, 11, 2}); // { dg-bogus "expansion of" }
++constexpr auto m39 = mapping<3>(array{3, 5, 4}, array{35, 2, 11}); // { dg-error "expansion of" "" { target debug_mode } }
++
++// Unique for stride -> extent mapping: 3 * (5-1) = 12 < 16, 15 * (4-1) + 12 = 57 < 65, 65 * (3-1) + 57 = 187 < 200
++constexpr auto m40 = mapping<4>(array{3, 4, 5, 6}, array{65, 16, 3, 200}); // { dg-bogus "expansion of" }
++constexpr auto m41 = mapping<4>(array{3, 4, 5, 6}, array{3, 16, 65, 200}); // { dg-error "expansion of" "" { target debug_mode } }
++constexpr auto m42 = mapping<4>(array{3, 4, 5, 6}, array{200, 65, 3, 16}); // { dg-error "expansion of" "" { target debug_mode } }
++constexpr auto m43 = mapping<4>(array{5, 3, 6, 4}, array{3, 65, 200, 16}); // { dg-bogus "expansion of" }
++constexpr auto m44 = mapping<4>(array{5, 3, 6, 4}, array{3, 16, 200, 65}); // { dg-error "expansion of" "" { target debug_mode } }
++
++// Examples based on one from LWG 4606
++constexpr auto m45 = mapping<2>(array{2, 3}, array{5, 2}); // { dg-bogus "expansion of" }
++constexpr auto m46 = mapping<3>(array{2, 3, 5}, array{5, 2, 10}); // { dg-bogus "expansion of" }
++constexpr auto m47 = mapping<3>(array{2, 3, 1}, array{5, 2, 99}); // { dg-bogus "expansion of" }
++constexpr auto m48 = mapping<4>(array{2, 3, 5, 4}, array{5, 2, 10, 50}); // { dg-bogus "expansion of" }
++constexpr auto m49 = mapping<4>(array{2, 1, 3, 5}, array{5, 99, 2, 10}); // { dg-bogus "expansion of" }
++
++// { dg-prune-output "non-constant condition for static assertion" }
++// { dg-prune-output "__glibcxx_assert_fail()" }
+diff --git a/libstdc++-v3/testsuite/23_containers/mdspan/layouts/stride_neg.cc b/libstdc++-v3/testsuite/23_containers/mdspan/layouts/stride_neg.cc
+index 153560bc82ff..5a818042b5ab 100644
+--- a/libstdc++-v3/testsuite/23_containers/mdspan/layouts/stride_neg.cc
++++ b/libstdc++-v3/testsuite/23_containers/mdspan/layouts/stride_neg.cc
+@@ -1,7 +1,5 @@
+ // { dg-do compile { target c++23 } }
+ #include <mdspan>
+-
+-#include "../layout_traits.h"
+ #include <cstdint>
+ 
+ constexpr size_t dyn = std::dynamic_extent;
+@@ -21,11 +19,68 @@ constexpr bool
+ test_stride_negative()
+ {
+   auto exts = std::extents<std::size_t, dyn, dyn>(1, 3);
+-  auto m = std::layout_stride::mapping(exts, std::array{1, -4}); // { dg-error "expansion of" } 
++  auto m = std::layout_stride::mapping(exts, std::array{1, -4}); // { dg-error "expansion of" }
+   (void) m;
+   return true;
+ }
+-static_assert(test_stride_negative()); // { dg-error "expansion of" } 
++static_assert(test_stride_negative()); // { dg-error "expansion of" }
++
++using std::array;
++template<size_t Rank>
++ using mapping = std::layout_stride::mapping<std::dextents<size_t, Rank>>;
++
++constexpr auto m0 = mapping<0>(array<int, 0>{}, array<int, 0>{}); // { dg-bogus "expansion of" }
++
++// Zero strides allowed for empty mappings
++constexpr auto m00 = mapping<1>(array{0}, array{0}); // { dg-bogus "expansion of" }
++constexpr auto m01 = mapping<2>(array{0, 2}, array{3, 0}); // { dg-bogus "expansion of" }
++constexpr auto m02 = mapping<2>(array{0, 2}, array{0, 0}); // { dg-bogus "expansion of" }
++constexpr auto m03 = mapping<3>(array{0, 2, 3}, array{3, 0, 0}); // { dg-bogus "expansion of" }
++constexpr auto m04 = mapping<3>(array{0, 2, 3}, array{3, 3, 0}); // { dg-bogus "expansion of" }
++constexpr auto m05 = mapping<4>(array{0, 2, 3, 4}, array{5, 3, 0, 2}); // { dg-bogus "expansion of" }
++
++// On dimensions with stride equal to 1
++constexpr auto m0a = mapping<1>(array{1}, array{0}); // { dg-bogus "expansion of" }
++constexpr auto m0b = mapping<2>(array{2, 1}, array{3, 0}); // { dg-bogus "expansion of" }
++constexpr auto m0c = mapping<2>(array{1, 1}, array{0, 0}); // { dg-bogus "expansion of" }
++constexpr auto m0d = mapping<3>(array{2, 1, 1}, array{3, 0, 0}); // { dg-bogus "expansion of" }
++constexpr auto m0e = mapping<3>(array{2, 2, 1}, array{6, 3, 0}); // { dg-bogus "expansion of" }
++constexpr auto m0f = mapping<4>(array{2, 2, 1, 2}, array{8, 4, 0, 2}); // { dg-bogus "expansion of" }
++
++// Otherwise leads to non-unique mappings.
++constexpr auto m06 = mapping<1>(array{2}, array{0}); // { dg-error "expansion of" }
++constexpr auto m07 = mapping<2>(array{2, 3}, array{3, 0}); // { dg-error "expansion of" }
++constexpr auto m08 = mapping<3>(array{2, 3, 4}, array{3, 3, 0}); // { dg-error "expansion of" }
++constexpr auto m09 = mapping<4>(array{2, 3, 4, 5}, array{5, 3, 0, 2}); // { dg-error "expansion of" }
++
++// required_span_size is smaller size of multidimensional index space
++constexpr auto m10 = mapping<2>(array{3, 4}, array{2, 3}); // { dg-error "expansion of" }
++constexpr auto m11 = mapping<2>(array{3, 4}, array{1, 2}); // { dg-error "expansion of" }
++constexpr auto m12 = mapping<3>(array{3, 4, 5}, array{1, 3, 11}); // { dg-error "expansion of" }
++constexpr auto m13 = mapping<3>(array{3, 4, 5}, array{1, 2, 12}); // { dg-error "expansion of" }
++constexpr auto m14 = mapping<4>(array{3, 4, 5, 6}, array{1, 3, 12, 50}); // { dg-error "expansion of" }
++constexpr auto m15 = mapping<4>(array{3, 4, 5, 6}, array{1, 3, 11, 60}); // { dg-error "expansion of" }
++constexpr auto m16 = mapping<4>(array{3, 4, 5, 6}, array{1, 2, 12, 60}); // { dg-error "expansion of" }
++
++// Passes required_span_size check (smaller and bigger stride), detected only in debug mode
++constexpr auto m17 = mapping<3>(array{3, 4, 5}, array{1, 2, 25}); // { dg-error "expansion of" "" { target debug_mode } }
++constexpr auto m18 = mapping<3>(array{3, 4, 5}, array{1, 5, 12}); // { dg-error "expansion of" "" { target debug_mode } }
++constexpr auto m19 = mapping<4>(array{3, 4, 5, 6}, array{1, 2, 12, 100}); // { dg-error "expansion of" "" { target debug_mode } }
++constexpr auto m20 = mapping<4>(array{3, 4, 5, 6}, array{1, 5, 12, 60});  // { dg-error "expansion of" "" { target debug_mode } }
++
++// Any stride values are allowed for extents 1
++constexpr auto m21 = mapping<2>(array{1, 1}, array{88, 99}); // { dg-bogus "expansion of" }
++constexpr auto m2a = mapping<2>(array{5, 1}, array{88, 99}); // { dg-bogus "expansion of" }
++constexpr auto m22 = mapping<3>(array{1, 1, 1}, array{88, 99, 00}); // { dg-bogus "expansion of" }
++constexpr auto m2b = mapping<3>(array{1, 5, 1}, array{88, 99, 77}); // { dg-bogus "expansion of" }
++constexpr auto m23 = mapping<4>(array{1, 1, 1, 1}, array{77, 99, 00, 88}); // { dg-bogus "expansion of" }
++constexpr auto m2c = mapping<4>(array{1, 1, 5, 1}, array{77, 99, 1, 88}); // { dg-bogus "expansion of" }
++constexpr auto m24 = mapping<5>(array{3, 4, 1, 1, 5}, array{3, 10, 3, 3, 45}); // { dg-bogus "expansion of" }
++constexpr auto m25 = mapping<5>(array{3, 4, 1, 1, 5}, array{3, 10, 3, 10, 45}); // { dg-bogus "expansion of" }
++constexpr auto m26 = mapping<5>(array{3, 4, 1, 1, 5}, array{3, 10, 10, 3, 45}); // { dg-bogus "expansion of" }
++constexpr auto m27 = mapping<5>(array{3, 4, 1, 1, 5}, array{3, 10, 10, 10, 45}); // { dg-bogus "expansion of" }
++constexpr auto m2d = mapping<5>(array{3, 4, 1, 1, 5}, array{3, 10, 00, 99, 45}); // { dg-bogus "expansion of" }
++constexpr auto m2e = mapping<5>(array{1, 1, 1, 1, 1}, array{00, 77, 88, 99, 00}); // { dg-bogus "expansion of" }
+ 
+ // { dg-prune-output "non-constant condition for static assertion" }
+ // { dg-prune-output "__glibcxx_assert_fail()" }

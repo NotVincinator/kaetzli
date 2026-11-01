@@ -1,0 +1,96 @@
+From e557f4fb58705ac6e48b8874bdac6161ea32c2ab Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Mon, 3 Aug 2026 13:02:01 -0400
+Subject: [PATCH 074/385] c++/reflection: ^^ rejects pack-index-specifier
+ [PR126546]
+
+[expr.reflect] says that a reflection of a pack-index-expressions
+is ill-formed.  But that applies to the ^^id-expression production,
+not ^^type-id, in which a pack-index-specifier (for types) can be
+used.  So it's wrong for get_reflection to check PACK_INDEX_P, it
+should only reject PACK_INDEX_EXPR.
+
+I don't think that currently we can get there with a PACK_INDEX_EXPR
+though: for a pack-index-expression Xs...[0] cp_parser_reflection_name
+will consume Xs and then immediately call get_reflection which gives
+an error.  But leaving the PACK_INDEX_EXPR check in doesn't seem like
+a bad idea.
+
+	PR c++/126546
+
+gcc/cp/ChangeLog:
+
+	* reflect.cc (get_reflection): Check PACK_INDEX_EXPR instead of
+	PACK_INDEX_P.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/reflect/pack-index1.C: Accept a reflection of a
+	pack-index-specifier.  Reject a reflection of a
+	pack-index-expression.
+	* g++.dg/reflect/pack-index2.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 78b03e2296722df3b69f28677cbeed03c1642dbf)
+---
+ gcc/cp/reflect.cc                          | 2 +-
+ gcc/testsuite/g++.dg/reflect/pack-index1.C | 9 ++++++++-
+ gcc/testsuite/g++.dg/reflect/pack-index2.C | 8 ++++++++
+ 3 files changed, 17 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/reflect/pack-index2.C
+
+diff --git a/gcc/cp/reflect.cc b/gcc/cp/reflect.cc
+index e9b0ab77eca3..952551e9f95c 100644
+--- a/gcc/cp/reflect.cc
++++ b/gcc/cp/reflect.cc
+@@ -141,7 +141,7 @@ get_reflection (location_t loc, tree t, reflect_kind kind/*=REFLECT_UNDEF*/)
+ 
+   /* Constant template parameters and pack-index-expressions cannot
+      appear as operands of the reflection operator.  */
+-  if (PACK_INDEX_P (t))
++  if (TREE_CODE (t) == PACK_INDEX_EXPR)
+     {
+       error_at (loc, "%<^^%> cannot be applied to a pack index");
+       return error_mark_node;
+diff --git a/gcc/testsuite/g++.dg/reflect/pack-index1.C b/gcc/testsuite/g++.dg/reflect/pack-index1.C
+index f68705b12991..c2b27a8c133d 100644
+--- a/gcc/testsuite/g++.dg/reflect/pack-index1.C
++++ b/gcc/testsuite/g++.dg/reflect/pack-index1.C
+@@ -14,10 +14,16 @@ f ()
+ {
+   constexpr auto r1 = ^^Ts...[0]::sx;
+   constexpr auto r2 = ^^typename Ts...[0]::type;
++  constexpr auto e = ^^Ts...[0];
++}
+ 
++template<int... Ns>
++void
++g ()
++{
+   // NTTPs and pack-index-expressions cannot appear as operands
+   // of the reflection operator.
+-  constexpr auto e = ^^Ts...[0]; // { dg-error "cannot be applied" }
++  constexpr auto e = ^^Ns...[0];  // { dg-error "cannot be applied" }
+ }
+ 
+ 
+@@ -25,4 +31,5 @@ void
+ g ()
+ {
+   f<S>();
++  g<1, 2, 3>();
+ }
+diff --git a/gcc/testsuite/g++.dg/reflect/pack-index2.C b/gcc/testsuite/g++.dg/reflect/pack-index2.C
+new file mode 100644
+index 000000000000..113629510f11
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/reflect/pack-index2.C
+@@ -0,0 +1,8 @@
++// PR c++/126546
++// { dg-do compile { target c++26 } }
++// { dg-additional-options "-freflection" }
++
++template <class... Ts>
++consteval auto first() { return ^^Ts...[0]; }
++
++static_assert(first<int, double>() == ^^int);

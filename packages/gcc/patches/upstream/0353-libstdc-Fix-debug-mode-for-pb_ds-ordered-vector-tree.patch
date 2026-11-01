@@ -1,0 +1,257 @@
+From 804e4f5c3aac4ad676bfd2cba52db6fcbea410b5 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Thu, 1 Oct 2026 12:32:41 +0100
+Subject: [PATCH 353/385] libstdc++: Fix debug mode for pb_ds ordered-vector
+ trees [PR127675]
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+As noted in the bugzilla PR, there are debug mode assertions in the
+ov_tree_map and ov_tree_set code which fail occasionally (but not
+consistently because the tests use the current time as a random seed).
+
+This change first allows the time-based random seed to be overridden
+using the same GLIBCXX_SEED_TEST_RNG environment variable already
+checked elsewhere in the testsuite. This allows failures to be triggered
+reliably.
+
+The bug in erase_if is an exception-safety bug where most state is
+rolled back cleanly if an exception occurs, but some modifications to
+the debug_base::m_keys list are not rolled back. This leaves the
+container in an inconsistent state where the values in m_keys do not
+match the contents of the container. This triggers debug assertions on
+the next operation when the container checks its invariants.
+
+The bug in erase(It) is much simpler and easier to trigger: the function
+calls alloc.allocate(m_size - 1) unconditionally, even if m_size == 1.
+It is unspecified what allocators return for zero-sized allocations, so
+this can return a non-null pointer.  That is then inconsistent with the
+debug assertions which require m_a_values == nullptr to be true when
+m_size == 0. The solution here is to simply avoid allocating anything
+when m_size == 1.
+
+There's a similar latent bug in the 4-param overload of
+copy_from_ordered_range, which would call allocate(0) if called with two
+empty ranges. Although its only caller today already checks for empty
+ranges, it would be more robust to make copy_from_ordered_range safe for
+this case. That avoids a potential future bug where the debug assertions
+fail again because copy_from_ordered_range allocates a non-null pointer
+for m_size == 0. The change made in this commit is to return early if
+len == 0, which is exactly what the 2-param overload of
+copy_from_ordered_range already does.
+
+Finally, the split and join members of the debug_base are refactored to
+use std::list::splice instead of inserting and erasing elements from the
+two lists. This means they perform no allocations and no copies, so
+cannot throw exceptions (unless the comparison function passed to split
+throws).  Although this doesn't fix any known bugs, it makes the callers
+of those functions more robust and makes it easier to ensure those
+callers are exception-safe.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/127675
+	* include/ext/pb_ds/detail/debug_map_base.hpp (split, join): Use
+	std::list::splice to move elements without reallocating.
+	* include/ext/pb_ds/detail/ov_tree_map_/constructors_destructor_fn_imps.hpp
+	(copy_from_ordered_range(It, It, It, It)): Do not allocate new
+	storage for an empty container.
+	* include/ext/pb_ds/detail/ov_tree_map_/erase_fn_imps.hpp
+	(erase_if): Do not modify this->debug_base::m_keys until all
+	allocations and other potentially-throwing operations have
+	completed successfully.
+	(erase_imp): Do not allocate new storage for an empty container.
+	* testsuite/ext/pb_ds/regression/127675.cc: New test.
+	* testsuite/util/testsuite_rng.h (get_time_determined_seed): Use
+	getenv("GLIBCXX_SEED_TEST_RNG") to allow the seed to be fixed.
+
+Reviewed-by: Tomasz Kamiński <tkaminsk@redhat.com>
+(cherry picked from commit c1a660d44be3dc140b7ff24611e8ff7a4557d761)
+---
+ .../ext/pb_ds/detail/debug_map_base.hpp       | 19 +++----
+ .../constructors_destructor_fn_imps.hpp       |  2 +
+ .../detail/ov_tree_map_/erase_fn_imps.hpp     | 13 +++--
+ .../testsuite/ext/pb_ds/regression/127675.cc  | 53 +++++++++++++++++++
+ libstdc++-v3/testsuite/util/testsuite_rng.h   |  7 ++-
+ 5 files changed, 77 insertions(+), 17 deletions(-)
+ create mode 100644 libstdc++-v3/testsuite/ext/pb_ds/regression/127675.cc
+
+diff --git a/libstdc++-v3/include/ext/pb_ds/detail/debug_map_base.hpp b/libstdc++-v3/include/ext/pb_ds/detail/debug_map_base.hpp
+index 67bdc3c942f0..8083f1617316 100644
+--- a/libstdc++-v3/include/ext/pb_ds/detail/debug_map_base.hpp
++++ b/libstdc++-v3/include/ext/pb_ds/detail/debug_map_base.hpp
+@@ -312,10 +312,7 @@ namespace __gnu_pbds
+       iterator it = m_keys.begin();
+       while (it != m_keys.end())
+ 	if (cmp_fn(r_key, *it))
+-	  {
+-	    other.insert_new(*it);
+-	    it = m_keys.erase(it);
+-	  }
++	  other.m_keys.splice(other.m_keys.end(), m_keys, it++);
+ 	else
+ 	  ++it;
+     }
+@@ -325,16 +322,12 @@ namespace __gnu_pbds
+     PB_DS_CLASS_C_DEC::
+     join(PB_DS_CLASS_C_DEC& other, bool with_cleanup)
+     {
+-      iterator it = other.m_keys.begin();
+-      while (it != other.m_keys.end())
+-	{
++      if (with_cleanup)
++	m_keys.splice(m_keys.end(), other.m_keys);
++      else
++	for (iterator it = other.m_keys.begin(), e = other.m_keys.end();
++	     it != e; ++it)
+ 	  insert_new(*it);
+-	  if (with_cleanup)
+-	    it = other.m_keys.erase(it);
+-	  else
+-	    ++it;
+-	}
+-      _GLIBCXX_DEBUG_ASSERT(!with_cleanup || other.m_keys.empty());
+     }
+ 
+ #undef PB_DS_CLASS_T_DEC
+diff --git a/libstdc++-v3/include/ext/pb_ds/detail/ov_tree_map_/constructors_destructor_fn_imps.hpp b/libstdc++-v3/include/ext/pb_ds/detail/ov_tree_map_/constructors_destructor_fn_imps.hpp
+index 713d25640487..dffc2f275ee4 100644
+--- a/libstdc++-v3/include/ext/pb_ds/detail/ov_tree_map_/constructors_destructor_fn_imps.hpp
++++ b/libstdc++-v3/include/ext/pb_ds/detail/ov_tree_map_/constructors_destructor_fn_imps.hpp
+@@ -162,6 +162,8 @@ copy_from_ordered_range(It first_it, It last_it, It other_first_it,
+   clear();
+   const size_type len = std::distance(first_it, last_it)
+     			 + std::distance(other_first_it, other_last_it);
++  if (len == 0)
++    return;
+ 
+   value_vector a_values = s_value_alloc.allocate(len);
+ 
+diff --git a/libstdc++-v3/include/ext/pb_ds/detail/ov_tree_map_/erase_fn_imps.hpp b/libstdc++-v3/include/ext/pb_ds/detail/ov_tree_map_/erase_fn_imps.hpp
+index 62a1f3de8c2a..930d4a3199e3 100644
+--- a/libstdc++-v3/include/ext/pb_ds/detail/ov_tree_map_/erase_fn_imps.hpp
++++ b/libstdc++-v3/include/ext/pb_ds/detail/ov_tree_map_/erase_fn_imps.hpp
+@@ -93,7 +93,11 @@ erase_if(Pred pred)
+   value_vector a_new_values = s_value_alloc.allocate(new_size);
+   iterator target_it = a_new_values;
+   cond_dtor<size_type> cd(a_new_values, target_it, new_size);
+-  _GLIBCXX_DEBUG_ONLY(debug_base::clear());
++  _GLIBCXX_DEBUG_ONLY(
++  struct dbase : debug_base {
++    using debug_base::swap;
++    using debug_base::insert_new;
++  } d);
+   for (iterator source_it = begin(); source_it != m_end_it; ++source_it)
+     {
+       if (!pred(*source_it))
+@@ -101,12 +105,13 @@ erase_if(Pred pred)
+ 	  new (const_cast<void*>(static_cast<const void*>(target_it)))
+ 	    value_type(*source_it);
+ 
+-	  _GLIBCXX_DEBUG_ONLY(debug_base::insert_new(PB_DS_V2F(*source_it)));
++	  _GLIBCXX_DEBUG_ONLY(d.insert_new(PB_DS_V2F(*source_it)));
+ 	  ++target_it;
+ 	}
+     }
+ 
+   reallocate_metadata((node_update*)this, new_size);
++  _GLIBCXX_DEBUG_ONLY(d.swap(*this));
+   cd.set_no_action();
+ 
+   {
+@@ -138,7 +143,9 @@ erase_imp(It it)
+ #endif
+ 
+   _GLIBCXX_DEBUG_ASSERT(m_size > 0);
+-  value_vector a_values = s_value_alloc.allocate(m_size - 1);
++  value_vector a_values = 0;
++  if (m_size > 1)
++    a_values = s_value_alloc.allocate(m_size - 1);
+   iterator source_it = begin();
+   iterator source_end_it = end();
+   iterator target_it = a_values;
+diff --git a/libstdc++-v3/testsuite/ext/pb_ds/regression/127675.cc b/libstdc++-v3/testsuite/ext/pb_ds/regression/127675.cc
+new file mode 100644
+index 000000000000..594abf4e937b
+--- /dev/null
++++ b/libstdc++-v3/testsuite/ext/pb_ds/regression/127675.cc
+@@ -0,0 +1,53 @@
++// { dg-options "-D_GLIBCXX_DEBUG" }
++// { dg-do run }
++
++#include <ext/pb_ds/assoc_container.hpp>
++#include <ext/throw_allocator.h>
++
++static bool is_odd(int i) { return i & 1; }
++
++template<class T, class U, class, class>
++struct Node_update
++{
++  typedef int metadata_type;
++  void operator()(U, T) const { }
++};
++
++static void
++test_erase_if_exception_safety()
++{
++  using namespace __gnu_pbds;
++  typedef __gnu_cxx::throw_allocator_limit<int> Alloc;
++  typedef tree<int, null_type, std::less<int>, ov_tree_tag, Node_update, Alloc> Set;
++
++  for (int i = 0; i < 100; ++i)
++  {
++    Set s;
++    s.insert(0);
++    s.insert(1);
++    s.insert(2);
++    Alloc::limit_adjustor ladj(i);
++    try
++    {
++      s.erase_if(is_odd); // throwing allocator triggered debug assertion
++    }
++    catch (const __gnu_cxx::forced_error&)
++    {
++    }
++  }
++}
++
++static void
++test_erase_last_element()
++{
++  using namespace __gnu_pbds;
++  tree<int, int, std::less<int>, ov_tree_tag> m;
++  m[1] = 1;
++  m.erase(m.begin()); // erasing last element triggered debug assertion
++}
++
++int main()
++{
++  test_erase_if_exception_safety();
++  test_erase_last_element();
++}
+diff --git a/libstdc++-v3/testsuite/util/testsuite_rng.h b/libstdc++-v3/testsuite/util/testsuite_rng.h
+index 69c0ea8cd5a9..261874be991d 100644
+--- a/libstdc++-v3/testsuite/util/testsuite_rng.h
++++ b/libstdc++-v3/testsuite/util/testsuite_rng.h
+@@ -38,6 +38,7 @@
+ 
+ #include <ctime>
+ #include <climits>
++#include <cstdlib>
+ #include <debug/debug.h>
+ #include <tr1/random>
+ 
+@@ -61,7 +62,11 @@ namespace __gnu_pbds
+ 
+       static unsigned int
+       get_time_determined_seed()
+-      { return(static_cast<unsigned int>(std::time(0))); }
++      {
++	if (const char* v = std::getenv("GLIBCXX_SEED_TEST_RNG"))
++	  return std::strtoul(v, 0, 10);
++	return(static_cast<unsigned int>(std::time(0)));
++      }
+ 
+       unsigned long
+       get_unsigned_long(unsigned long min = 0,

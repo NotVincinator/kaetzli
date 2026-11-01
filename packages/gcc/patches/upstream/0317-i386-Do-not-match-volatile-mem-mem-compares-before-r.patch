@@ -1,0 +1,198 @@
+From cce25db4b9117ef02dcd9b48116185b223c1b5a0 Mon Sep 17 00:00:00 2001
+From: Uros Bizjak <ubizjak@gmail.com>
+Date: Mon, 19 Oct 2026 08:54:30 +0200
+Subject: [PATCH 317/385] i386: Do not match volatile mem/mem compares before
+ reload [PR127851]
+
+The combine pass can merge two volatile loads into a single compare
+insn of the form (compare (mem/v x) (mem/v y)).  The compare patterns
+accept mem/mem operands before reload, but the constraints allow only
+one memory operand, so the register allocator has to load one of them
+into a register.  The order of the volatile accesses within a single
+insn is unspecified and is picked by RA, so the sequence point between
+the two reads can be lost:
+
+  extern volatile int x, y;
+  int f (void) { int a = x; int b = y; return a < b; }
+
+was compiled to load y before x.  This can reorder READ_ONCE accesses
+in the Linux kernel.
+
+The expanders never generate a compare with a volatile memory operand
+paired with another memory operand; volatile operands are always
+loaded into a register first.  Only combine forms such insns, so
+reject them in the insn condition of @ccmp<mode>, *cmp<mode>_1 and
+*cmp<mode>_minus_1 when both operands are volatile memory references.
+Only the relative order of volatile accesses is significant, so
+mem/mem compares with at most one volatile operand are still valid
+and are not affected.
+
+	PR target/127851
+
+gcc/ChangeLog:
+
+	* config/i386/i386.md (@ccmp<mode>, *cmp<mode>_1)
+	(*cmp<mode>_minus_1): Reject operands that are both volatile
+	memory references.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/i386/volatile-fuse-order-1.c: New test.
+	* gcc.target/i386/volatile-fuse-order-2.c: Likewise.
+	* gcc.target/i386/volatile-fuse-order-3.c: Likewise.
+
+Co-authored-by: Vineet Gupta <vineet.gupta@linux.dev>
+(cherry picked from commit dc57b45e7a79f6c1bfeada05096822f821a36905)
+---
+ gcc/config/i386/i386.md                       | 12 +++++--
+ .../gcc.target/i386/volatile-fuse-order-1.c   | 25 +++++++++++++++
+ .../gcc.target/i386/volatile-fuse-order-2.c   | 32 +++++++++++++++++++
+ .../gcc.target/i386/volatile-fuse-order-3.c   | 31 ++++++++++++++++++
+ 4 files changed, 97 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/i386/volatile-fuse-order-1.c
+ create mode 100644 gcc/testsuite/gcc.target/i386/volatile-fuse-order-2.c
+ create mode 100644 gcc/testsuite/gcc.target/i386/volatile-fuse-order-3.c
+
+diff --git a/gcc/config/i386/i386.md b/gcc/config/i386/i386.md
+index fe40cd25b7d7..8da13e866944 100644
+--- a/gcc/config/i386/i386.md
++++ b/gcc/config/i386/i386.md
+@@ -1540,7 +1540,9 @@
+ 	(unspec:CC
+ 	  [(match_operand:SI 4 "const_0_to_15_operand")]
+ 	  UNSPEC_APX_DFV)))]
+- "TARGET_APX_CCMP"
++ "TARGET_APX_CCMP
++  && !(MEM_P (operands[2]) && MEM_P (operands[3])
++       && MEM_VOLATILE_P (operands[2]) && MEM_VOLATILE_P (operands[3]))"
+  "@
+   ctest%C1{<imodesuffix>}\t%G4 %2, %2
+   ccmp%C1{<imodesuffix>}\t%G4 {%3, %2|%2, %3}
+@@ -1590,7 +1592,9 @@
+   [(set (reg FLAGS_REG)
+ 	(compare (match_operand:SWI 0 "nonimmediate_operand" "<r>m,<r>")
+ 		 (match_operand:SWI 1 "<general_operand>" "<r><i>,<r><m>")))]
+-  "ix86_match_ccmode (insn, CCmode)"
++  "ix86_match_ccmode (insn, CCmode)
++   && !(MEM_P (operands[0]) && MEM_P (operands[1])
++	&& MEM_VOLATILE_P (operands[0]) && MEM_VOLATILE_P (operands[1]))"
+   "cmp{<imodesuffix>}\t{%1, %0|%0, %1}"
+   [(set_attr "type" "icmp")
+    (set_attr "mode" "<MODE>")])
+@@ -1601,7 +1605,9 @@
+ 	  (minus:SWI (match_operand:SWI 0 "nonimmediate_operand" "<r>m,<r>")
+ 		     (match_operand:SWI 1 "<general_operand>" "<r><i>,<r><m>"))
+ 	  (const_int 0)))]
+-  "ix86_match_ccmode (insn, CCGOCmode)"
++  "ix86_match_ccmode (insn, CCGOCmode)
++   && !(MEM_P (operands[0]) && MEM_P (operands[1])
++	&& MEM_VOLATILE_P (operands[0]) && MEM_VOLATILE_P (operands[1]))"
+   "cmp{<imodesuffix>}\t{%1, %0|%0, %1}"
+   [(set_attr "type" "icmp")
+    (set_attr "mode" "<MODE>")])
+diff --git a/gcc/testsuite/gcc.target/i386/volatile-fuse-order-1.c b/gcc/testsuite/gcc.target/i386/volatile-fuse-order-1.c
+new file mode 100644
+index 000000000000..70bacee284f8
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/volatile-fuse-order-1.c
+@@ -0,0 +1,25 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -fomit-frame-pointer -fno-pic -masm=att" } */
++/* { dg-final { check-function-bodies "**" "" "" { target { ! *-*-darwin* } } } } */
++
++/* The two volatile reads are in separate full expressions, so x must be
++   read before y.  Combine must not put both reads into one compare insn,
++   which gives them no order.  */
++
++/*
++**f:
++**...
++**	movl	x(|\(%rip\)), %eax
++**	cmpl	y(|\(%rip\)), %eax
++**...
++*/
++
++extern volatile int x, y;
++
++int
++f (void)
++{
++  int a = x;
++  int b = y;
++  return a < b;
++}
+diff --git a/gcc/testsuite/gcc.target/i386/volatile-fuse-order-2.c b/gcc/testsuite/gcc.target/i386/volatile-fuse-order-2.c
+new file mode 100644
+index 000000000000..8ea0bdaf3f46
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/volatile-fuse-order-2.c
+@@ -0,0 +1,32 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -fomit-frame-pointer -masm=att" } */
++/* { dg-final { check-function-bodies "ia32" "*ia32" "" { target { ia32 && { ! *-*-darwin* } } } } } */
++/* { dg-final { check-function-bodies "x64" "*x64" "" { target { { ! ia32 } && { ! *-*-darwin* } } } } } */
++
++/* Both reads of *P are in separate full expressions: the first read must
++   be the one loaded into a register before the compare, which performs
++   the second read.  */
++
++/*
++ia32f:
++ia32...
++ia32	movl	\(%eax\), %edx
++ia32	cmpl	\(%eax\), %edx
++ia32...
++*ia32
++
++x64f:
++x64...
++x64	movl	\(%(r|e)di\), %eax
++x64	cmpl	\(%(r|e)di\), %eax
++x64...
++*x64
++*/
++
++int
++f (volatile int *p)
++{
++  int a = *p;
++  int b = *p;
++  return a < b;
++}
+diff --git a/gcc/testsuite/gcc.target/i386/volatile-fuse-order-3.c b/gcc/testsuite/gcc.target/i386/volatile-fuse-order-3.c
+new file mode 100644
+index 000000000000..5fe024338874
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/volatile-fuse-order-3.c
+@@ -0,0 +1,31 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -fomit-frame-pointer -fno-pic -masm=att" } */
++/* { dg-final { check-function-bodies "**" "" "" { target { ! *-*-darwin* } } } } */
++
++/* As volatile-fuse-order-1.c, but only the sign of the difference is
++   used, so the two reads would end up as the operands of a MINUS inside
++   the compare, (compare (minus (mem x) (mem y)) (const_int 0)), rather
++   than directly as the compare's operands.  x must still be read first.  */
++
++/*
++**f:
++**...
++**	movl	x(|\(%rip\)), %eax
++**	cmpl	y(|\(%rip\)), %eax
++**...
++*/
++
++extern volatile int x, y;
++void g1 (void);
++void g2 (void);
++
++void
++f (void)
++{
++  int a = x;
++  int b = y;
++  if ((int) ((unsigned) a - (unsigned) b) < 0)
++    g1 ();
++  else
++    g2 ();
++}

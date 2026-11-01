@@ -1,0 +1,46 @@
+From dbb20c388157df875a8aa4005dd958c34fd76746 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Tue, 29 Sep 2026 15:17:25 +0100
+Subject: [PATCH 221/385] libstdc++: Fix failing performance test
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This test no longer builds because (file >> line) is ill-formed in
+C++20, since r11-2581-g17abcc77341584 which implemented LWG 2499.
+
+There's no reason to use a dynamically-allocated array when the length
+is a small constant. We can just use an array on the stack.
+
+libstdc++-v3/ChangeLog:
+
+	* testsuite/performance/27_io/ifstream_extract_chars.cc: Use
+	stack array instead of dynamic allocation.
+
+Reviewed-by: Tomasz Kamiński <tkaminsk@redhat.com>
+(cherry picked from commit 4e596c9800ec9441409275f79326805a4fde8358)
+---
+ .../testsuite/performance/27_io/ifstream_extract_chars.cc      | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/libstdc++-v3/testsuite/performance/27_io/ifstream_extract_chars.cc b/libstdc++-v3/testsuite/performance/27_io/ifstream_extract_chars.cc
+index e3c754063279..89c84215108e 100644
+--- a/libstdc++-v3/testsuite/performance/27_io/ifstream_extract_chars.cc
++++ b/libstdc++-v3/testsuite/performance/27_io/ifstream_extract_chars.cc
+@@ -34,7 +34,7 @@ int main()
+   const unsigned lines = 200000;
+   const unsigned line_length = 200;
+ 
+-  char* line = new char[line_length + 2];
++  char line[line_length + 2];
+ 
+   // Construct data.
+   {
+@@ -76,7 +76,6 @@ int main()
+     clear_counters(time, resource);
+   }
+ 
+-  delete[] line;
+   unlink(filename);
+   return 0;
+ }

@@ -1,0 +1,138 @@
+From 239247823ca6171c919b2fcb8aa3aae93f9913d7 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Wed, 29 Jul 2026 19:04:37 +0100
+Subject: [PATCH 230/385] libstdc++: Make chrono::parse accept out-of-range
+ values that aren't needed [PR126364]
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+When parsing a time with %R or %T we should ignore out of range hours
+and minutes if the type being parsed doesn't need them, e.g. when
+parsing a chrono::year_month_day from "2026-07-29 99:99:99" we do not
+set failbit, and should continue parsing after the invalid hours and
+minutes.
+
+Because we were short circuiting as soon as we saw "99" (in either
+field) we didn't parse to the end of the %R or %T field, and then could
+set failbit if there were any subsequent characters or flags to parse.
+
+The fix is to only short-circuit when setting failbit, and continue
+parsing otherwise.
+
+With this change, we no longer hit the 'break' when __read_unsigned(2)
+returns -1 (e.g. because the input was non-numeric) unless we're
+parsing a type that needs the %R or %T value. But that's OK, because
+__read_unsigned sets failbit when it returns -1 and so the next
+__read_chr or __read_unsigned will fail without extracting more
+characters, and we'll break there instead. So there's no change in
+observable behaviour for non-numeric inputs, only for out-of-range
+numeric inputs.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/126364
+	* include/bits/chrono_io.h (_Parser::operator()) <R>: Only break
+	early when setting failbit.
+	* testsuite/std/time/parse/126364.cc: New test.
+
+Reviewed-by: Tomasz Kamiński <tkaminsk@redhat.com>
+(cherry picked from commit 5a457c7ba71bebfa1c07a4d4bba8a13b03bba2f4)
+---
+ libstdc++-v3/include/bits/chrono_io.h         | 16 +++---
+ .../testsuite/std/time/parse/126364.cc        | 51 +++++++++++++++++++
+ 2 files changed, 59 insertions(+), 8 deletions(-)
+ create mode 100644 libstdc++-v3/testsuite/std/time/parse/126364.cc
+
+diff --git a/libstdc++-v3/include/bits/chrono_io.h b/libstdc++-v3/include/bits/chrono_io.h
+index 6e51a57d4de2..a018f40ef603 100644
+--- a/libstdc++-v3/include/bits/chrono_io.h
++++ b/libstdc++-v3/include/bits/chrono_io.h
+@@ -4925,22 +4925,22 @@ namespace __detail
+ 		    {
+ 		      auto __val = __read_unsigned(2);
+ 		      if (__val == -1 || __val > 23) [[unlikely]]
+-			{
+-			  if ((_M_need & _ChronoParts::_TimeOfDay) != 0)
++			if ((_M_need & _ChronoParts::_TimeOfDay) != 0)
++			  {
+ 			    __err |= ios_base::failbit;
+-			  break;
+-			}
++			    break;
++			  }
+ 		      if (!__read_chr(':')) [[unlikely]]
+ 			break;
+ 		      __h = hours(__val);
+ 
+ 		      __val = __read_unsigned(2);
+ 		      if (__val == -1 || __val > 60) [[unlikely]]
+-			{
+-			  if ((_M_need & _ChronoParts::_TimeOfDay) != 0)
++			if ((_M_need & _ChronoParts::_TimeOfDay) != 0)
++			  {
+ 			    __err |= ios_base::failbit;
+-			  break;
+-			}
++			    break;
++			  }
+ 		      __min = minutes(__val);
+ 
+ 		      if (__c == 'R')
+diff --git a/libstdc++-v3/testsuite/std/time/parse/126364.cc b/libstdc++-v3/testsuite/std/time/parse/126364.cc
+new file mode 100644
+index 000000000000..43739e46c414
+--- /dev/null
++++ b/libstdc++-v3/testsuite/std/time/parse/126364.cc
+@@ -0,0 +1,51 @@
++// { dg-do run { target c++20 } }
++
++// Bug 126364 - chrono::from_stream %T and %R short circuit on out of range
++// values even when it doesn't fail the parse
++
++#include <chrono>
++#include <sstream>
++#include <testsuite_hooks.h>
++
++using namespace std::chrono;
++
++static bool check(const char* input, char const* fmt)
++{
++    std::istringstream is(input);
++    year_month_day ymd{};
++    return from_stream(is, fmt, ymd).good() && ymd.ok();
++}
++
++void
++test_pr126364()
++{
++  // Accept out of range numbers for unused hours, minutes, and seconds.
++  VERIFY( check("2026-07-31T25:36:57Z", "%FT%TZ") );  // hour 25 only
++  VERIFY( check("2026-07-31T20:99:57Z", "%FT%TZ") );  // minute 99 only
++  VERIFY( check("2026-07-31T20:36:99Z", "%FT%TZ") );  // second 99 only
++  VERIFY( check("2026-07-31T25:36:57Z", "%FT%T") );   // hour 25 only, no Z
++  VERIFY( check("2026-07-31T20:99:57Z", "%FT%T") );   // minute 99 only, no Z
++  VERIFY( check("2026-07-31T20:36:99Z", "%FT%T") );   // second 99 only, no Z
++  VERIFY( check("2026-07-31 25", "%F %H") );          // %H out of range alone
++  VERIFY( check("2026-07-31 99", "%F %M") );          // %M out of range alone
++}
++
++void
++test_invalid()
++{
++  // Do not accept non-numeric input for unused hours, minutes, and seconds.
++  VERIFY( ! check("2026-07-31 xx", "%F %H") );
++  VERIFY( ! check("2026-07-31 xx", "%F %M") );
++  VERIFY( ! check("2026-07-31 xx", "%F %S") );
++  VERIFY( ! check("2026-07-31 xx:20", "%F %R") );
++  VERIFY( ! check("2026-07-31 10:xx", "%F %R") );
++  VERIFY( ! check("2026-07-31 xx:20:30", "%F %T") );
++  VERIFY( ! check("2026-07-31 10:xx:30", "%F %T") );
++  VERIFY( ! check("2026-07-31 10:20:xx", "%F %T") );
++}
++
++int main()
++{
++  test_pr126364();
++  test_invalid();
++}

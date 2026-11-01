@@ -1,0 +1,162 @@
+From 5e127189db82fc344bbb4a78af9f0a16d8e8023e Mon Sep 17 00:00:00 2001
+From: Jerry DeLisle <jvdelisle@gcc.gnu.org>
+Date: Sat, 9 May 2026 11:49:21 -0700
+Subject: [PATCH 207/385] fortran: Add -fcoarray=shared option to auto-link
+ -lcaf_shmem
+
+The new -fcoarray=shared option provides a convenient shorthand for
+the common invocation -fcoarray=lib -lcaf_shmem.  The driver transforms
+-fcoarray=shared into -fcoarray=lib for the frontend and automatically
+appends -lcaf_shmem to the link command.  Existing uses of -fcoarray=lib
+are unaffected.
+
+Assisted by: Claude Sonnet 4.6
+
+gcc/:
+
+	* flag-types.h (gfc_fcoarray): Add GFC_FCOARRAY_SHARED.
+
+gcc/fortran/:
+
+	* lang.opt (fcoarray=): Add shared enum value; update help text.
+	* gfortranspec.cc (CAF_SHMEM_LIBRARY): New macro.
+	(lang_specific_driver): Detect -fcoarray=shared in first pass and
+	set need_caf_shmem flag.  In second pass, transform -fcoarray=shared
+	to -fcoarray=lib for cc1.  Append -lcaf_shmem when need_caf_shmem
+	is set and linking is active.
+
+gcc/testsuite/:
+
+	* gfortran.dg/coarray_51.f90: New test.
+
+(cherry picked from commit be1da01067c898a3e3979bfb1edd05f115ab2e3e)
+---
+ gcc/flag-types.h                         |  3 ++-
+ gcc/fortran/gfortranspec.cc              | 25 ++++++++++++++++++++++++
+ gcc/fortran/lang.opt                     |  5 ++++-
+ gcc/testsuite/gfortran.dg/coarray_51.f90 | 15 ++++++++++++++
+ 4 files changed, 46 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/coarray_51.f90
+
+diff --git a/gcc/flag-types.h b/gcc/flag-types.h
+index 77dc1f658fbd..3d182785c824 100644
+--- a/gcc/flag-types.h
++++ b/gcc/flag-types.h
+@@ -456,7 +456,8 @@ enum gfc_fcoarray
+ {
+   GFC_FCOARRAY_NONE = 0,
+   GFC_FCOARRAY_SINGLE,
+-  GFC_FCOARRAY_LIB
++  GFC_FCOARRAY_LIB,
++  GFC_FCOARRAY_SHARED
+ };
+ 
+ 
+diff --git a/gcc/fortran/gfortranspec.cc b/gcc/fortran/gfortranspec.cc
+index d0df0ee61717..13b240013e8a 100644
+--- a/gcc/fortran/gfortranspec.cc
++++ b/gcc/fortran/gfortranspec.cc
+@@ -62,6 +62,10 @@ along with GCC; see the file COPYING3.  If not see
+ #define FORTRAN_LIBRARY "gfortran"
+ #endif
+ 
++#ifndef CAF_SHMEM_LIBRARY
++#define CAF_SHMEM_LIBRARY "caf_shmem"
++#endif
++
+ /* Name of the spec file.  */
+ #define SPEC_FILE "libgfortran.spec"
+ 
+@@ -205,6 +209,9 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
+   /* Whether we need to link statically.  */
+   int static_linking = 0;
+ 
++  /* Whether -fcoarray=shared was given; triggers auto-link of -lcaf_shmem.  */
++  int need_caf_shmem = 0;
++
+   /* The number of input and output files in the incoming arg list.  */
+   int n_infiles = 0;
+   int n_outfiles = 0;
+@@ -272,6 +279,11 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
+ 	  ++n_outfiles;
+ 	  break;
+ 
++	case OPT_fcoarray_:
++	  if (decoded_options[i].value == GFC_FCOARRAY_SHARED)
++	    need_caf_shmem = 1;
++	  break;
++
+ 	case OPT_v:
+ 	  verbose = 1;
+ 	  break;
+@@ -349,6 +361,16 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+ 	      saw_speclang = (strcmp (lang, "none") != 0);
+ 	    }
+ 
++	  /* -fcoarray=shared is a driver-level alias for -fcoarray=lib that
++	     also arranges for -lcaf_shmem to be linked automatically.  Pass
++	     -fcoarray=lib to cc1 so the frontend uses the library code path.  */
++	  if (decoded_options[i].opt_index == OPT_fcoarray_
++	      && decoded_options[i].value == GFC_FCOARRAY_SHARED)
++	    {
++	      append_option (OPT_fcoarray_, "lib", GFC_FCOARRAY_LIB);
++	      continue;
++	    }
++
+ 	  append_arg (&decoded_options[i]);
+ 
+ 	  continue;
+@@ -404,6 +426,9 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+ 	default:
+ 	  break;
+ 	}
++
++      if (need_caf_shmem)
++	append_option (OPT_l, CAF_SHMEM_LIBRARY, 1);
+     }
+ 
+ #ifdef ENABLE_SHARED_LIBGCC
+diff --git a/gcc/fortran/lang.opt b/gcc/fortran/lang.opt
+index 754e5c9115b3..cbd13aa20190 100644
+--- a/gcc/fortran/lang.opt
++++ b/gcc/fortran/lang.opt
+@@ -833,7 +833,7 @@ Experimental unsigned numbers.
+ 
+ fcoarray=
+ Fortran RejectNegative Joined Enum(gfc_fcoarray) Var(flag_coarray) Init(GFC_FCOARRAY_NONE)
+--fcoarray=<none|single|lib>	Specify which coarray parallelization should be used.
++-fcoarray=<none|single|lib|shared>	Specify which coarray parallelization should be used.
+ 
+ Enum
+ Name(gfc_fcoarray) Type(enum gfc_fcoarray) UnknownError(Unrecognized option: %qs)
+@@ -847,6 +847,9 @@ Enum(gfc_fcoarray) String(single) Value(GFC_FCOARRAY_SINGLE)
+ EnumValue
+ Enum(gfc_fcoarray) String(lib) Value(GFC_FCOARRAY_LIB)
+ 
++EnumValue
++Enum(gfc_fcoarray) String(shared) Value(GFC_FCOARRAY_SHARED)
++
+ fcheck=
+ Fortran RejectNegative JoinedOrMissing
+ -fcheck=[...]	Specify which runtime checks are to be performed.
+diff --git a/gcc/testsuite/gfortran.dg/coarray_51.f90 b/gcc/testsuite/gfortran.dg/coarray_51.f90
+new file mode 100644
+index 000000000000..da8a270c2629
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/coarray_51.f90
+@@ -0,0 +1,15 @@
++! { dg-do link }
++! { dg-options "-fcoarray=shared -fdump-tree-original" }
++!
++! Test that -fcoarray=shared is accepted and generates the same
++! library-based CAF calls as -fcoarray=lib.
++
++program test
++  implicit none
++  integer :: x[*]
++  x = this_image ()
++  sync all
++end program test
++
++! { dg-final { scan-tree-dump-times "_gfortran_caf_init \\(&argc, &argv\\);" 1 "original" } }
++! { dg-final { scan-tree-dump-times "_gfortran_caf_sync_all \\(" 1 "original" } }

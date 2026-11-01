@@ -1,0 +1,95 @@
+From 789c8859e18a1aec7ae8bdb5b2487aeec414dc4a Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 11 Aug 2026 00:20:57 +0000
+Subject: [PATCH 025/385] Daily bump.
+
+---
+ gcc/ChangeLog           | 14 ++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/cp/ChangeLog        | 10 ++++++++++
+ gcc/po/ChangeLog        |  6 ++++++
+ gcc/testsuite/ChangeLog | 13 +++++++++++++
+ 5 files changed, 44 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 4a6a61d90e0a..7df087ca5f26 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,17 @@
++2026-08-10  H.J. Lu  <hjl.tools@gmail.com>
++
++	Backported from master:
++	2026-08-04  H.J. Lu  <hjl.tools@gmail.com>
++
++	PR target/126320
++	PR target/126450
++	PR target/126529
++	* config/i386/i386.cc (ix86_spill_register_argument_p): Removed.
++	(ix86_argument_passed_on_stack_p): Remove the second argument.
++	Return true if the argument's DECL_INCOMING_RTL is a memory
++	operand.
++	(ix86_update_stack_alignment): Updated.
++
+ 2026-08-07  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 6c93e5aba5cf..be531dce9220 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260810
++20260811
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index 27dc1111f091..f7e675f26d12 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,13 @@
++2026-08-10  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
++
++	Backported from master:
++	2026-07-31  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
++
++	PR c++/124806
++	* module.cc (elf_out::began): New data member.
++	(elf_out::begin): Set it after successful initialization.
++	(elf_out::end): Do not finalize output that never began.
++
+ 2026-08-07  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/po/ChangeLog b/gcc/po/ChangeLog
+index 9d30122ad9e2..957d05a07f1e 100644
+--- a/gcc/po/ChangeLog
++++ b/gcc/po/ChangeLog
+@@ -1,3 +1,9 @@
++2026-08-10  Joseph Myers  <josmyers@redhat.com>
++
++	* be.po, da.po, de.po, el.po, es.po, fi.po, fr.po, hr.po, id.po,
++	ja.po, ka.po, nl.po, ru.po, sr.po, sv.po, tr.po, uk.po, vi.po,
++	zh_CN.po, zh_TW.po: Update.
++
+ 2026-08-07  Release Manager
+ 
+ 	* GCC 16.2.0 released.
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index fe8ea028d1db..42fbdbe6e80e 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,16 @@
++2026-08-10  H.J. Lu  <hjl.tools@gmail.com>
++
++	Backported from master:
++	2026-08-04  H.J. Lu  <hjl.tools@gmail.com>
++
++	PR target/126320
++	PR target/126450
++	PR target/126529
++	* gcc.target/i386/pr126529-1.c: New test.
++	* gcc.target/i386/pr126529-2.c: Likewise.
++	* gcc.target/i386/pr126529-3.c: Likewise.
++	* gcc.target/i386/pr126529-4.c: Likewise.
++
+ 2026-08-08  Paul Thomas  <pault@gcc.gnu.org>
+ 
+ 	Backported from master:

@@ -1,0 +1,141 @@
+From 8c04a7768f77c534a98d24c8eb109e9a1d8f04ed Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Sun, 18 Oct 2026 23:09:16 +0200
+Subject: [PATCH 344/385] fortran: Fix CHARACTER(c_char),VALUE dummy of BIND(C)
+ interface [PR127881]
+
+For a procedure declared with a BIND(C) interface, a scalar character dummy
+with the VALUE attribute shall always be passed by value.  Only a single
+character shall be passed.
+
+	PR fortran/127881
+
+gcc/fortran/ChangeLog:
+
+	* trans-expr.cc (conv_scalar_char_value): Fix passing of the case of
+	non-constant strings: always pass first first character by value.
+
+gcc/testsuite/ChangeLog:
+
+	* gfortran.dg/bind_c_char_value.f90: New test.
+	* gfortran.dg/bind_c_char_value_aux.c: New test.
+
+(cherry picked from commit 96b3143c09001538084fb3159385f2a4fff9afc7)
+---
+ gcc/fortran/trans-expr.cc                     | 25 ++------
+ .../gfortran.dg/bind_c_char_value.f90         | 57 +++++++++++++++++++
+ .../gfortran.dg/bind_c_char_value_aux.c       |  4 ++
+ 3 files changed, 67 insertions(+), 19 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/bind_c_char_value.f90
+ create mode 100644 gcc/testsuite/gfortran.dg/bind_c_char_value_aux.c
+
+diff --git a/gcc/fortran/trans-expr.cc b/gcc/fortran/trans-expr.cc
+index bd1ea109d772..2091c1331298 100644
+--- a/gcc/fortran/trans-expr.cc
++++ b/gcc/fortran/trans-expr.cc
+@@ -4576,26 +4576,13 @@ conv_scalar_char_value (gfc_symbol *sym, gfc_se *se, gfc_expr **expr)
+ 					(*expr)->value.character.string[0]);
+       gfc_replace_expr (*expr, tmp);
+     }
+-  else if (se != NULL && (*expr)->expr_type == EXPR_VARIABLE)
++  else if (se != NULL)
+     {
+-      if ((*expr)->ref == NULL)
+-	{
+-	  se->expr = gfc_string_to_single_character
+-	    (integer_one_node,
+-	      gfc_build_addr_expr (gfc_get_pchar_type ((*expr)->ts.kind),
+-				  gfc_get_symbol_decl
+-				  ((*expr)->symtree->n.sym)),
+-	      (*expr)->ts.kind);
+-	}
+-      else
+-	{
+-	  gfc_conv_variable (se, *expr);
+-	  se->expr = gfc_string_to_single_character
+-	    (integer_one_node,
+-	      gfc_build_addr_expr (gfc_get_pchar_type ((*expr)->ts.kind),
+-				  se->expr),
+-	      (*expr)->ts.kind);
+-	}
++      gfc_conv_expr (se, *expr);
++      gfc_conv_string_parameter (se);
++      se->expr = gfc_string_to_single_character (integer_one_node,
++						 se->expr, (*expr)->ts.kind);
++      se->string_length = integer_one_node;
+     }
+ }
+ 
+diff --git a/gcc/testsuite/gfortran.dg/bind_c_char_value.f90 b/gcc/testsuite/gfortran.dg/bind_c_char_value.f90
+new file mode 100644
+index 000000000000..994668e15e03
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/bind_c_char_value.f90
+@@ -0,0 +1,57 @@
++! { dg-do run }
++! { dg-additional-sources bind_c_char_value_aux.c }
++!
++! PR fortran/127881 - CHARACTER(c_char),VALUE dummy of BIND(C) interface
++!
++! Contributed by Christopher Albert <albert@tugraz.at>
++
++module m
++  use, intrinsic :: iso_c_binding, only: c_char, c_int
++  implicit none
++  interface
++     function echo_char(a) bind(C, name="echo_char") result(r)
++       import :: c_char, c_int
++       character(kind=c_char), value, intent(in) :: a
++       integer(c_int) :: r
++     end function echo_char
++  end interface
++contains
++  integer function via_dummy(c)
++    character(kind=c_char), intent(in) :: c
++    character(kind=c_char,len=2) :: cc
++    integer :: res, tmp, n = 2
++    via_dummy = echo_char(c)
++    res = via_dummy
++    ! test non-variable argument a and len(a) /= 1
++    tmp = echo_char ((c))
++    if (tmp /= res) error stop 11
++    cc = c // c
++    tmp = echo_char (cc)
++    if (tmp /= res) error stop 12
++    tmp = echo_char ((cc))
++    if (tmp /= res) error stop 13
++    tmp = echo_char (c // c)
++    if (tmp /= res) error stop 14
++    tmp = echo_char(repeat (c,n))
++    if (tmp /= res) error stop 15
++  end function via_dummy
++end module m
++
++program pr
++  use m
++  implicit none
++  integer :: i, nbad_local, nbad_dummy, nbad_achar
++  character(kind=c_char) :: c
++  nbad_local = 0; nbad_dummy = 0; nbad_achar = 0
++  do i = 0, 127
++     c = achar(i)
++     if (echo_char(c) /= i) nbad_local = nbad_local + 1
++     if (via_dummy(c) /= i) nbad_dummy = nbad_dummy + 1
++     if (echo_char(achar(i)) /= i) nbad_achar = nbad_achar + 1
++  end do
++  if (nbad_local + nbad_dummy + nbad_achar /= 0) then
++     print '(3(a,i0))', 'local variable: ', nbad_local, &
++          '  dummy argument: ', nbad_dummy, '  achar(): ', nbad_achar
++     stop 1
++  end if
++end program pr
+diff --git a/gcc/testsuite/gfortran.dg/bind_c_char_value_aux.c b/gcc/testsuite/gfortran.dg/bind_c_char_value_aux.c
+new file mode 100644
+index 000000000000..87bdc032ef8a
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/bind_c_char_value_aux.c
+@@ -0,0 +1,4 @@
++/* Used by bind_c_char_value.f90.  */
++/* PR fortran/127881.  */
++
++int echo_char (char a) { return (unsigned char) a; }

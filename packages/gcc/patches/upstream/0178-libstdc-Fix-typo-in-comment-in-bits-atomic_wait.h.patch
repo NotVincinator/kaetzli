@@ -1,0 +1,28 @@
+From 95bfcca9d250d1a72d7be7de96ee8350f37539e2 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Wed, 16 Sep 2026 11:35:02 +0100
+Subject: [PATCH 178/385] libstdc++: Fix typo in comment in
+ <bits/atomic_wait.h>
+
+libstdc++-v3/ChangeLog:
+
+	* include/bits/atomic_wait.h: Fix typo in comment.
+
+(cherry picked from commit fffdaf05ca485db7c2aceed4f9defd66a107c71b)
+---
+ libstdc++-v3/include/bits/atomic_wait.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/libstdc++-v3/include/bits/atomic_wait.h b/libstdc++-v3/include/bits/atomic_wait.h
+index 5224e69817de..22fda6d1b2d3 100644
+--- a/libstdc++-v3/include/bits/atomic_wait.h
++++ b/libstdc++-v3/include/bits/atomic_wait.h
+@@ -102,7 +102,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 	  && ((sizeof(_Tp) == 4 && alignof(_Tp) >= 4)
+ 		|| (sizeof(_Tp) == 8 && alignof(_Tp) >= 8));
+ #else
+-// define _GLIBCX_HAVE_PLATFORM_WAIT and implement __platform_wait()
++// define _GLIBCXX_HAVE_PLATFORM_WAIT and implement __platform_wait()
+ // and __platform_notify() if there is a more efficient primitive supported
+ // by the platform (e.g. __ulock_wait()/__ulock_wake()) which is better than
+ // a mutex/condvar based wait.

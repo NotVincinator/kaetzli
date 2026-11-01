@@ -1,0 +1,30 @@
+From ab3b92da31d4c7af1004715381b90c76f347843f Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Wed, 16 Sep 2026 11:32:08 +0100
+Subject: [PATCH 177/385] libstdc++: Fix typo in preprocessor condition for
+ cstdio=pure [PR127430]
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/127430
+	* config/io/basic_file_stdio.cc (__basic_file::fd) Fix typo in
+	preprocessor condition.
+
+(cherry picked from commit c227d573fc26f4dc9c08eff3f5591fc75cdebb82)
+---
+ libstdc++-v3/config/io/basic_file_stdio.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/libstdc++-v3/config/io/basic_file_stdio.cc b/libstdc++-v3/config/io/basic_file_stdio.cc
+index 669215e81f47..49389ff5c905 100644
+--- a/libstdc++-v3/config/io/basic_file_stdio.cc
++++ b/libstdc++-v3/config/io/basic_file_stdio.cc
+@@ -303,7 +303,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+   __basic_file<char>::is_open() const throw ()
+   { return _M_cfile != 0; }
+ 
+-#ifndef _GLIBCCXX_USE_STDIO_PURE
++#ifndef _GLIBCXX_USE_STDIO_PURE
+   int
+   __basic_file<char>::fd() throw ()
+   { return fileno(_M_cfile); }

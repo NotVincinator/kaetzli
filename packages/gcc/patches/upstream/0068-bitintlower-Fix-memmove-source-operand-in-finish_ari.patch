@@ -1,0 +1,57 @@
+From 80a778c167632cb21a4614e893bb68812f135b70 Mon Sep 17 00:00:00 2001
+From: Manjunath Matti <mmatti@linux.ibm.com>
+Date: Thu, 20 Aug 2026 08:51:55 +0200
+Subject: [PATCH 068/385] bitintlower: Fix memmove source operand in
+ finish_arith_overflow [PR126939]
+
+finish_arith_overflow builds a memmove call to shift the result of a
+double-width multiplication down inside the destination object, on
+big-endian targets where the computed value occupies more limbs than
+the destination.
+
+The destination argument correctly takes the address of OBJ, but SRC is
+a MEM_REF, that is a value of array type, and it is passed directly as
+memmove's second argument, which is a pointer.  Wrap it in
+build_fold_addr_expr so that the address is passed instead.  Since
+build_fold_addr_expr of a MEM_REF folds back to the pointer, no
+dereference is materialised.
+
+The affected code is guarded by bitint_big_endian, and is only reached
+for widths whose value needs more limbs than the destination object,
+that is huge _BitInt operands of __builtin_{add,sub,mul}_overflow, so
+it needs a big-endian target with _BitInt support to be exercised at
+all.  It is being hit now that _BitInt is being enabled for powerpc
+(PR117584).
+
+Existing coverage is sufficient: on powerpc64 big-endian this fixes
+gcc.dg/torture/bitint-93.c and bitint-94.c at -O0 and -O2, and
+gcc.dg/torture/bitint-32.c through bitint-37.c at -O0.  No new test is
+added.
+
+2026-08-20  Manjunath Matti  <mmatti@linux.ibm.com>
+
+	PR middle-end/126939
+	* gimple-lower-bitint.cc (bitint_large_huge::finish_arith_overflow):
+	Take the address of the memmove source operand.
+
+(cherry picked from commit 471ee3f3c98f9afffd61443b995c67f76e0e4b99)
+---
+ gcc/gimple-lower-bitint.cc | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/gimple-lower-bitint.cc b/gcc/gimple-lower-bitint.cc
+index 40f2ce149c2d..e6716acb7ed0 100644
+--- a/gcc/gimple-lower-bitint.cc
++++ b/gcc/gimple-lower-bitint.cc
+@@ -4593,8 +4593,9 @@ bitint_large_huge::finish_arith_overflow (tree var, tree obj, tree type,
+ 			     build_fold_addr_expr (unshare_expr (obj)), off);
+ 	  g = gimple_build_call (fn, 3,
+ 				 build_fold_addr_expr (unshare_expr (obj)),
+-				 src, build_int_cst (size_type_node,
+-						     obj_nelts * m_limb_size));
++				 build_fold_addr_expr (src),
++				 build_int_cst (size_type_node,
++						obj_nelts * m_limb_size));
+ 	  insert_before (g);
+ 	}
+       if (orig_obj == NULL_TREE && obj)

@@ -1,0 +1,49 @@
+From 0b0209ca1aff9f7cd28150b5714cb6dd7514b313 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Tue, 4 Aug 2026 21:42:49 +0200
+Subject: [PATCH 009/385] testsuite: Fix up gcc.dg/pr126464.c test [PR126464]
+
+On Tue, Aug 04, 2026 at 02:13:19PM +0200, Torbjorn SVENSSON wrote:
+> This causes regression on most (all?) arm-none-eabi targets.
+> /build/gcc_src/gcc/testsuite/gcc.dg/pr126464.c:56:3: warning: floating constant exceeds range of 'long double' [-Woverflow]
+
+This patch guards it with preprocessor tests whether such floating point
+constants are representable.
+
+2026-08-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/126464
+	* gcc.dg/pr126464.c: Guard uses of 1e300 with
+	__DBL_MAX_10_EXP__ >= 301 and uses of 1e4000L with
+	__LDBL_MAX_10_EXP__ >= 4001.
+
+Reviewed-by: Andrea Pinski <andrew.pinski@oss.qualcomm.com>
+(cherry picked from commit b5b0203b8c3b7cee4e65a09e4443f948dee434b4)
+---
+ gcc/testsuite/gcc.dg/pr126464.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/gcc/testsuite/gcc.dg/pr126464.c b/gcc/testsuite/gcc.dg/pr126464.c
+index b6eb1320dec5..620b9b42f62c 100644
+--- a/gcc/testsuite/gcc.dg/pr126464.c
++++ b/gcc/testsuite/gcc.dg/pr126464.c
+@@ -47,15 +47,19 @@ qux (long double x)
+ int
+ main ()
+ {
++#if __DBL_MAX_10_EXP__ >= 301
+   if (!__builtin_isinf ((double) 1e300)
+       && __builtin_isinf ((float) 1e300)
+       && (foo (-1e300) != -5e299
+ 	  || baz (1e300) != 5e299))
+     __builtin_abort ();
++#endif
+ 
++#if __LDBL_MAX_10_EXP__ >= 4001
+   if (!__builtin_isinf ((long double) 1e4000L)
+       && __builtin_isinf ((double) 1e4000L)
+       && (bar (1e4000L) != 5e3999L
+ 	  || qux (-1e4000L) != -5e3999L))
+     __builtin_abort ();
++#endif
+ }

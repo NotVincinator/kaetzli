@@ -1,0 +1,139 @@
+From a69daf9558da37831e4fe8d4524cca33a78c659b Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Mon, 14 Sep 2026 13:29:21 +0200
+Subject: [PATCH 261/385] optabs: Fix up fallback expansions of some atomic
+ builtins [PR127336]
+
+If the val operand due to TER is a MEM (or contains a MEM) which can alias
+with mem (the memory atomically updated), we have various wrong-code
+problems in the fallback expansions.
+The first one can be seen on the testcase and is solved by the second/third
+hunks, if the backend has an instruction to atomically update in the mode
+and return the previous rather than the updated value, we perform non-atomic
+update of that value with val again after the atomic insn.  If val is or
+overlaps with mem, we then incorrectly use an updated value rather than
+the original value (of course, the code is weird because it non-atomically
+reads first what is then atomically updated, so if some other thread
+modifies it, what will be the result is pretty random).  This patch changes
+-       movl    v(%rip), %eax
++       movl    v(%rip), %edx
++       movl    %edx, %eax
+        lock xaddl      %eax, v(%rip)
+-       addl    v(%rip), %eax
++       addl    %edx, %eax
+        cmpl    $18, %eax
+        jne     .L3
+        xorl    %eax, %eax
+        ret
+on x86_64 by forcing the val into pseudo in that case.  Another problem
+(the last 2 hunks in optabs.cc) is if there is no named pattern for it
+and we fallback to compare and exchange loop.  E.g. if similar testcase
+uses unsigned long long instead of unsigned on x86_64 -m32 -march=x86-64.
+Not included in testsuite because it actually "works" on uncontended
+variable, the bug is that val is read from memory twice, once before
+the loop and once inside of the loop before the cmpxchg8b instruction.
+So it is actually correct unless cmpxchg8b fails the first time.
+And the first hunk is to do the same thing on various other places that
+use cmpxchg fallback loop.
+
+2026-09-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/127336
+	* optabs.cc (maybe_emit_compare_and_swap_exchange_loop,
+	expand_atomic_fetch_op_no_fallback, expand_atomic_fetch_op): Force
+	val into a pseduo if it updates to mem could change its value
+	and when using val after the atomic op or inside of a loop.
+
+	* gcc.dg/pr127336.c: New test.
+
+Reviewed-by: Richard Biener <rguenth@suse.de>
+(cherry picked from commit be20f2a5b7887853833308617292d271be91414b)
+---
+ gcc/optabs.cc                   | 22 ++++++++++++++++++++++
+ gcc/testsuite/gcc.dg/pr127336.c | 12 ++++++++++++
+ 2 files changed, 34 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.dg/pr127336.c
+
+diff --git a/gcc/optabs.cc b/gcc/optabs.cc
+index 111b9be99139..4a277d31519a 100644
+--- a/gcc/optabs.cc
++++ b/gcc/optabs.cc
+@@ -7181,10 +7181,17 @@ maybe_emit_compare_and_swap_exchange_loop (rtx target, rtx mem, rtx val)
+ 
+   if (can_compare_and_swap_p (mode, true))
+     {
++      rtx_insn *start = get_last_insn ();
++      /* Force val into a register if it could change value when the
++	 atomic insn updates mem.  */
++      if (reg_overlap_mentioned_p (mem, val))
++	val = force_reg (mode, val);
+       if (!target || !register_operand (target, mode))
+ 	target = gen_reg_rtx (mode);
+       if (expand_compare_and_swap_loop (mem, target, val, NULL_RTX))
+ 	return target;
++      else
++	delete_insns_since (start);
+     }
+ 
+   return NULL_RTX;
+@@ -7979,6 +7986,12 @@ expand_atomic_fetch_op_no_fallback (rtx target, rtx mem, rtx val,
+      try that operation.  */
+   if (after || unused_result || optab.reverse_code != UNKNOWN)
+     {
++      rtx_insn *start = get_last_insn ();
++      /* Force val into a register if it could change value when the
++	 atomic insn updates mem.  */
++      if (!unused_result && reg_overlap_mentioned_p (mem, val))
++	val = force_reg (mode, val);
++
+       /* Try the __atomic version, then the older __sync version.  */
+       result = maybe_emit_op (&optab, target, mem, val, true, model, !after);
+       if (!result)
+@@ -8005,6 +8018,8 @@ expand_atomic_fetch_op_no_fallback (rtx target, rtx mem, rtx val,
+ 					  true, OPTAB_LIB_WIDEN);
+ 	  return result;
+ 	}
++      else
++	delete_insns_since (start);
+     }
+ 
+   /* No direct opcode can be generated.  */
+@@ -8104,6 +8119,11 @@ expand_atomic_fetch_op (rtx target, rtx mem, rtx val, enum rtx_code code,
+     {
+       rtx_insn *insn;
+       rtx t0 = gen_reg_rtx (mode), t1;
++      rtx_insn *start = get_last_insn ();
++      /* Force val into a register if it could change value when the
++	 atomic insn updates mem.  */
++      if (reg_overlap_mentioned_p (mem, val))
++	val = force_reg (mode, val);
+ 
+       start_sequence ();
+ 
+@@ -8137,6 +8157,8 @@ expand_atomic_fetch_op (rtx target, rtx mem, rtx val, enum rtx_code code,
+ 
+       if (t1 != NULL && expand_compare_and_swap_loop (mem, t0, t1, insn))
+         return target;
++      else
++	delete_insns_since (start);
+     }
+ 
+   return NULL_RTX;
+diff --git a/gcc/testsuite/gcc.dg/pr127336.c b/gcc/testsuite/gcc.dg/pr127336.c
+new file mode 100644
+index 000000000000..0ad87bc9eb83
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr127336.c
+@@ -0,0 +1,12 @@
++/* PR middle-end/127336 */
++/* { dg-do run { target sync_int_long } } */
++/* { dg-options "-O2" } */
++
++unsigned v = 9;
++
++int
++main ()
++{
++  if (__atomic_add_fetch (&v, v, __ATOMIC_RELAXED) != 18)
++    __builtin_abort ();
++}

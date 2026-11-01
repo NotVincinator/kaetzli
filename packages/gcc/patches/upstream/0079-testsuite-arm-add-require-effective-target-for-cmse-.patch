@@ -1,0 +1,72 @@
+From e0983afb0e3ad3620d4d4daa47e49bf3ccf08284 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Torbj=C3=B6rn=20SVENSSON?= <torbjorn.svensson@foss.st.com>
+Date: Fri, 7 Aug 2026 18:03:32 +0200
+Subject: [PATCH 079/385] testsuite: arm: add require effective target for cmse
+ tests
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+In order for the tests to pass, -mcpu=unset is needed to avoid conflict
+between -march and any previous -mcpu argument.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/arm/cmse/cmse-18.c: Use effective-target
+	arm_arch_v8m_main.
+	* gcc.target/arm/cmse/cmse-19.c: Use effective-target
+	arm_arch_v8_1m_mve.
+	* lib/target-supports.exp: Define effective-target
+	arm_arch_v8m_main.
+
+Signed-off-by: Torbjörn SVENSSON <torbjorn.svensson@foss.st.com>
+(cherry picked from commit f51ab50afb9542d93879e0afcda8e3dbb2f3cd31)
+---
+ gcc/testsuite/gcc.target/arm/cmse/cmse-18.c | 4 +++-
+ gcc/testsuite/gcc.target/arm/cmse/cmse-19.c | 8 +++++---
+ gcc/testsuite/lib/target-supports.exp       | 1 +
+ 3 files changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/gcc/testsuite/gcc.target/arm/cmse/cmse-18.c b/gcc/testsuite/gcc.target/arm/cmse/cmse-18.c
+index eb8a358481df..bf9dcec207f0 100644
+--- a/gcc/testsuite/gcc.target/arm/cmse/cmse-18.c
++++ b/gcc/testsuite/gcc.target/arm/cmse/cmse-18.c
+@@ -1,6 +1,8 @@
+ /* { dg-do compile } */
++/* { dg-require-effective-target arm_arch_v8m_main_ok } */
+ /* Make sure FPCXT is not enabled.  */
+-/* { dg-options "-mcmse -fdump-rtl-final -march=armv8-m.main+fp" } */
++/* { dg-options "-mcmse -fdump-rtl-final" } */
++/* { dg-add-options arm_arch_v8m_main } */
+ 
+ typedef void (*f)(int) __attribute__((cmse_nonsecure_call));
+ 
+diff --git a/gcc/testsuite/gcc.target/arm/cmse/cmse-19.c b/gcc/testsuite/gcc.target/arm/cmse/cmse-19.c
+index ae075c371f6e..51919617f957 100644
+--- a/gcc/testsuite/gcc.target/arm/cmse/cmse-19.c
++++ b/gcc/testsuite/gcc.target/arm/cmse/cmse-19.c
+@@ -1,7 +1,9 @@
+ /* { dg-do compile } */
+-/* This is a duplicate of cmse-18.c, targetting arm_v8_1m_mve, to make sure
+-   FPCXT is enabled.  */
+-/* { dg-options "-mcmse -fdump-rtl-final -march=armv8.1-m.main+mve" } */
++/* { dg-require-effective-target arm_arch_v8_1m_main_mve_ok } */
++/* This is a duplicate of cmse-18.c, targetting arm_v8_1m_main_mve, to make
++   sure FPCXT is enabled.  */
++/* { dg-options "-mcmse -fdump-rtl-final" } */
++/* { dg-add-options arm_arch_v8_1m_main_mve } */
+ 
+ typedef void (*f)(int) __attribute__((cmse_nonsecure_call));
+ 
+diff --git a/gcc/testsuite/lib/target-supports.exp b/gcc/testsuite/lib/target-supports.exp
+index 72ad67bc996b..440e65019632 100644
+--- a/gcc/testsuite/lib/target-supports.exp
++++ b/gcc/testsuite/lib/target-supports.exp
+@@ -6305,6 +6305,7 @@ foreach { armfunc armflag armdefs } {
+ 		__ARM_ARCH_8M_BASE__
+ 	v8m_main "-march=armv8-m.main+fp -mthumb" __ARM_ARCH_8M_MAIN__
+ 	v8_1m_main "-march=armv8.1-m.main+fp -mthumb" __ARM_ARCH_8M_MAIN__
++	v8_1m_main_mve "-march=armv8.1-m.main+mve -mthumb" __ARM_ARCH_8M_MAIN__
+ 	v8_1m_main_pacbti "-march=armv8.1-m.main+pacbti+fp -mthumb"
+ 		"__ARM_ARCH_8M_MAIN__ && __ARM_FEATURE_BTI && __ARM_FEATURE_PAUTH"
+ 	v8_1m_main_fp_hard "-march=armv8.1-m.main+pacbti+fp -mthumb -mfpu=auto -mfloat-abi=hard" "__ARM_ARCH_8M_MAIN__ && (__ARM_FP & 2)"

@@ -1,0 +1,116 @@
+From 4e3274800752936bb5cdcafe836b7cd700f8ad6d Mon Sep 17 00:00:00 2001
+From: Robin Dapp <robin.dapp@oss.qualcomm.com>
+Date: Tue, 4 Aug 2026 11:37:33 +0200
+Subject: [PATCH 027/385] RISC-V: Fix single-step expansion [PR126550].
+
+In expand_const_vector_single_step_npatterns, we use a second vector
+builder that is derived from the main one, in order to create a
+different alternating pattern for constant synthesis.  We later use the
+second builder's number of patterns for creating an intermediate
+operation.  The second builder can have a different number of patterns
+than the first one, however, for example when its "global" pattern is
+simpler.
+
+This patch uses npatterns from the original builder.
+
+	PR target/126550
+
+gcc/ChangeLog:
+
+	* config/riscv/riscv-v.cc (expand_const_vector_single_step_npatterns):
+	User global builder's npatterns.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/rvv/autovec/pr126550-2.c: New test.
+	* gcc.target/riscv/rvv/autovec/pr126550.c: New test.
+
+(cherry picked from commit 7cdbbbdecb09e518e28c5116b05e0018b9460b95)
+---
+ gcc/config/riscv/riscv-v.cc                   |  2 +-
+ .../gcc.target/riscv/rvv/autovec/pr126550-2.c | 14 +++++++
+ .../gcc.target/riscv/rvv/autovec/pr126550.c   | 41 +++++++++++++++++++
+ 3 files changed, 56 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/rvv/autovec/pr126550-2.c
+ create mode 100644 gcc/testsuite/gcc.target/riscv/rvv/autovec/pr126550.c
+
+diff --git a/gcc/config/riscv/riscv-v.cc b/gcc/config/riscv/riscv-v.cc
+index b2d9b15bedaf..df927dc7b8b0 100644
+--- a/gcc/config/riscv/riscv-v.cc
++++ b/gcc/config/riscv/riscv-v.cc
+@@ -1570,7 +1570,7 @@ expand_const_vector_single_step_npatterns (rtx target, rvv_builder *builder)
+ 	  rtx tmp2 = gen_reg_rtx (builder->mode ());
+ 	  rtx step
+ 	    = simplify_binary_operation (MINUS, builder->inner_mode (),
+-					 builder->elt (v.npatterns()),
++					 builder->elt (builder->npatterns ()),
+ 					 builder->elt (0));
+ 	  expand_vec_series (tmp2, const0_rtx, step, tmp1);
+ 
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/pr126550-2.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/pr126550-2.c
+new file mode 100644
+index 000000000000..d04231f6e090
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/pr126550-2.c
+@@ -0,0 +1,14 @@
++/* { dg-do compile } */
++/* { dg-options "-O3 -march=rv64gcv_zvl256b -mabi=lp64d" } */
++
++#include <stdint.h>
++typedef uint16_t v16 __attribute__((vector_size(32)));
++
++v16
++foo (v16 x)
++{
++  return __builtin_shufflevector (x, x, 0, 1, 0, 1, 2, 3, 2, 3, 4, 5, 4, 5, 6,
++				  7, 6, 7);
++}
++
++/* { dg-final { scan-assembler-not "vmv.v.i\\sv\[0-9\]+,0" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/pr126550.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/pr126550.c
+new file mode 100644
+index 000000000000..41b04d1c596d
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/pr126550.c
+@@ -0,0 +1,41 @@
++/* { dg-do run } */
++/* { dg-require-effective-target rvv_zvl256b_ok } */
++/* { dg-additional-options "-O3 -march=rv64gcv_zvl256b -mabi=lp64d -fno-vect-cost-model -std=gnu99" } */
++
++#include <stdint.h>
++
++struct Pair { uint16_t first, second; };
++struct S { uint16_t a[2], b[2]; uint32_t r; };
++
++__attribute__((noipa))
++void load(struct S *dst, const struct Pair *src, unsigned long n)
++{
++  for (unsigned long k = 0; k < n; k++) {
++    dst[k].a[0] = src[k].first;
++    dst[k].a[1] = src[k].second;
++    dst[k].b[0] = src[k].first;
++    dst[k].b[1] = src[k].second;
++  }
++}
++
++#define N 40
++static struct Pair src[N];
++static struct S    out[N];
++
++int main(void)
++{
++  for (unsigned i = 0; i < N; i++) {
++    src[i].first = (uint16_t)(i * 2u + 1);
++    src[i].second = (uint16_t)(i * 3u + 2);
++  }
++  load(out, src, N);
++
++  for (unsigned i = 0; i < N; i++) {
++    uint16_t f = src[i].first, s = src[i].second;
++    if (out[i].a[0] != f || out[i].a[1] != s ||
++      out[i].b[0] != f || out[i].b[1] != s) {
++        __builtin_abort ();
++    }
++  }
++  return 0;
++}

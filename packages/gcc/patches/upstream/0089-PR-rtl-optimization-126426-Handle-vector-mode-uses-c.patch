@@ -1,0 +1,169 @@
+From 6e81c9629eed29aa26cac6d0dddee3cf73f7cb91 Mon Sep 17 00:00:00 2001
+From: Jeff Law <jeffrey.law@oss.qualcomm.com>
+Date: Thu, 13 Aug 2026 18:34:48 -0600
+Subject: [PATCH 089/385] [PR rtl-optimization/126426] Handle vector mode uses
+ conservatively in ext-dce
+
+So ext-dce isn't terribly vector aware, it mostly tries to stay out of the way
+and stay conservatively correct when vector modes are encountered.
+
+When that code was added in 2023/2024 it goofed a very important case that has
+now reared its ugly head.
+
+Consider a use of V2HI.  What bits are live as a result of such a use?  Right
+now we record 0xffff as the bits potentially live.  But that's badly wrong.  We
+have 2 HI objects, so there's actually 32 bits of live data, so 0xffffffff.
+
+With the bits live being incorrect we can incorrectly remove an extension
+because we think the bits are never read.  That's precisely what happens in
+this PR.
+
+Not much motivation was given for using GET_MODE_INNER rather than GET_MODE
+other than it works better for vector/complex.  I should have caught this when
+it was introduced.
+
+For a destination, GET_MODE_INNER is safe.  The worst case is we'll fail to
+mark bits as dead which in turn will inhibit optimization.  For a source
+operand it's a completely different story.  By failing to mark some bits as
+live we can (as this pr showed) erroneously remove an extension.
+
+While reviewing all the uses of GET_MODE_INNER, I've become convinced the
+vector handling in carry_backpropagate is broken.  If it's going to support
+vector, it needs to do what it's doing now with the GET_MODE_INNER stuff which
+gives us liveness of an element, then broadcast the liveness state across all
+the elements of the vector.  It seems like it should be possible to support
+this case, but having not seen anything even close to it in practice, I'm
+punting it for now and returning a conservatively correct state when presented
+with vector modes in carry_backpropagate.
+
+This has been bootstrapped and regression tested on riscv64, x86_64, aarch64,
+alpha, hppa and others.  It's also been tested without regressions on the
+various *-elf targets.  Pushing to the trunk.
+
+	PR rtl-optimization/126426
+
+gcc/
+	* ext-dce.cc (carry_backpropagate): Return a conservatively
+	correct mask when presented with vector modes.
+	(ext_dce_process_uses): Don't use GET_MODE_INNER, we need to
+	know the full extent of the bits for vector and complex modes.
+
+gcc/testsuite
+	* gcc.target/riscv/pr126426.c: New test.
+
+(cherry picked from commit 090baea02d768ff884d1b326d6bf7d57cfcc1231)
+---
+ gcc/ext-dce.cc                            | 28 ++++++++++++---
+ gcc/testsuite/gcc.target/riscv/pr126426.c | 43 +++++++++++++++++++++++
+ 2 files changed, 67 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/pr126426.c
+
+diff --git a/gcc/ext-dce.cc b/gcc/ext-dce.cc
+index 5cc15dd9b44f..a008ec910f35 100644
+--- a/gcc/ext-dce.cc
++++ b/gcc/ext-dce.cc
+@@ -571,7 +571,23 @@ carry_backpropagate (unsigned HOST_WIDE_INT mask, enum rtx_code code, rtx x)
+   if (mask == 0)
+     return 0;
+ 
+-  enum machine_mode mode = GET_MODE_INNER (GET_MODE (x));
++  /* Consider a vector operation, the bits live are the element bits live
++     broadcasted across the vector.  So there can be holes (consider a
++     logical shift).
++
++     Vector modes aren't likely to represent cases we can optimize with
++     any regularity.  It seems sensible to just punt that case in a
++     conservatively correct way.
++
++     The conservatively corect choice here would be to return the mode
++     mask for the outer mode.  We're already doing that for modes larger
++     than HOST_BITS_PER_WIDE_INT, so it should be safe for larger vectors
++     as well as something like V2HI.  */
++  if (VECTOR_MODE_P (GET_MODE (x)) || COMPLEX_MODE_P (GET_MODE (x)))
++    return GET_MODE_MASK (GET_MODE (x));
++    
++
++  enum machine_mode mode = GET_MODE (x);
+   unsigned HOST_WIDE_INT mmask = GET_MODE_MASK (mode);
+ 
+   /* While we don't try to optimize operations on types larger
+@@ -645,6 +661,11 @@ carry_backpropagate (unsigned HOST_WIDE_INT mask, enum rtx_code code, rtx x)
+ 	  || !GET_MODE_BITSIZE (GET_MODE (XEXP (x, 0))).is_constant ())
+ 	return -1;
+ 
++      /* See note about vector modes near the start of this function.  */
++      if (VECTOR_MODE_P (GET_MODE (XEXP (x, 0)))
++	  || COMPLEX_MODE_P (GET_MODE (XEXP (x, 0))))
++	return GET_MODE_MASK (GET_MODE (XEXP (x, 0)));
++
+       /* We want the mode of the inner object.  We need to ensure its
+ 	 sign bit is on in MASK.  */
+       mode = GET_MODE_INNER (GET_MODE (XEXP (x, 0)));
+@@ -780,7 +801,7 @@ ext_dce_process_uses (rtx_insn *insn, rtx obj,
+ 		{
+ 		  rtx inner = XEXP (src, 0);
+ 		  unsigned HOST_WIDE_INT src_mask
+-		    = GET_MODE_MASK (GET_MODE_INNER (GET_MODE (inner)));
++		    = GET_MODE_MASK (GET_MODE (inner));
+ 
+ 		  /* DST_MASK could be zero if we had something in the SET
+ 		     that we couldn't handle.  */
+@@ -937,8 +958,7 @@ ext_dce_process_uses (rtx_insn *insn, rtx obj,
+ 			 propagate destination liveness through, then just
+ 			 set the mask to the mode's mask.  */
+ 		      if (!safe_for_live_propagation (code))
+-			tmp_mask
+-			  = GET_MODE_MASK (GET_MODE_INNER (GET_MODE (y)));
++			tmp_mask = GET_MODE_MASK (GET_MODE (y));
+ 
+ 		      if (tmp_mask & 0xff)
+ 			bitmap_set_bit (livenow, rn);
+diff --git a/gcc/testsuite/gcc.target/riscv/pr126426.c b/gcc/testsuite/gcc.target/riscv/pr126426.c
+new file mode 100644
+index 000000000000..19c4aaae36fc
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/pr126426.c
+@@ -0,0 +1,43 @@
++/* { dg-do run } */
++/* { dg-additional-options "--std=gnu99 -march=rv64gcb" { target rv64 } } */
++/* { dg-additional-options "--std=gnu99 -march=rv32gcb" { target rv32 } } */
++
++typedef union {
++  short mv[2];
++  unsigned mv32;
++} MotionVector;
++enum { kProjectionMvClamp, kMaxFrameDistance };
++short kProjectionMvDivisionLookup[] = {0, 6};
++int SpecGetMvProjectionKernel(int mv, int numerator, int denominator) {
++  int value = mv * numerator * kProjectionMvDivisionLookup[denominator];
++  if (value >= 0)
++    value += 3;
++  value >>= 4;
++  if (value > 4)
++    value = 1;
++  return value;
++}
++void SpecGetMvProjectionNoClamp(MotionVector mv, int numerator, int denominator,
++                                MotionVector *projection_mv) {
++  for (int i = 0; i < 2; ++i)
++    projection_mv->mv[i] =
++        SpecGetMvProjectionKernel(mv.mv[i], numerator, denominator);
++}
++int main() {
++  short mvs[5][2] = {{0}};
++  for (int j = 0; j < 5; ++j) {
++    short *mv_value = mvs[j];
++    for (int numerator = -kMaxFrameDistance; numerator; ++numerator)
++      for (int denominator = 0; denominator <= kMaxFrameDistance;
++           ++denominator) {
++        MotionVector mv, spec_projection_mv;
++        mv.mv[0] = mv.mv[1] = mv_value[1];
++        SpecGetMvProjectionNoClamp(mv, numerator, denominator,
++                                   &spec_projection_mv);
++        if (spec_projection_mv.mv32) {
++           __builtin_abort ();
++	}
++      }
++  }
++  __builtin_exit (0);
++}

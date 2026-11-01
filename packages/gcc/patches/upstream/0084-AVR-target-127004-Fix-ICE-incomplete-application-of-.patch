@@ -1,0 +1,127 @@
+From b2c3bc6920553e39648353fd21aac90e03e40853 Mon Sep 17 00:00:00 2001
+From: Georg-Johann Lay <avr@gjlay.de>
+Date: Sun, 23 Aug 2026 20:52:57 +0200
+Subject: [PATCH 084/385] AVR: target/127004 - Fix ICE "incomplete application
+ of insn"
+
+This ICE occurs when RTL pass avr-fuse-move finds an optimization,
+and then finds a difference between the outcomes of the new insn
+sequence and the old one.
+
+In this specific case, optimize_data_t::ignore_mask didn't account
+for all the regs clobbered by the old sequence, so that the pass
+logic concluded there was a bug in the optimization and ICEd.
+
+The old insn is a SImode multiplication with a known result,
+which clobbers quite some regs because it is implemented as a
+transparent libgcc call.  The optimization replaces that
+multiplication with a constant.
+
+The ICE only occurs with -mpr118012 which tries to hack around
+PR118012 by calling the libgcc multiplications by hand instead
+of relying on the libcall machinery.
+
+The fix traverses the old pattern and gathers all scratch regs
+in ignore_mask.  The patch passes without new regressions.
+It fixes the ICE which occurred for targets that don't have MUL.
+
+	PR target/127004
+gcc/
+	* config/avr/avr-passes.cc (rtl-iter.h): Include.
+	(insninfo_t::scratch_mask): New method.
+	(optimize_data_t::try_split_ldi): Use it for ignore_mask.
+	(optimize_data_t::try_split_any): Same.
+	(optimize_data_t::emit_sequence): Dump ignore_mask prior to
+	calling fatal_insn.
+gcc/testsuite/
+	* gcc.target/avr/torture/pr127004.c: New test.
+
+(cherry picked from commit 91291a45490dae956752e55398b6562505692dc5)
+---
+ gcc/config/avr/avr-passes.cc                  | 30 ++++++++++++++++---
+ .../gcc.target/avr/torture/pr127004.c         |  7 +++++
+ 2 files changed, 33 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/avr/torture/pr127004.c
+
+diff --git a/gcc/config/avr/avr-passes.cc b/gcc/config/avr/avr-passes.cc
+index ec21fed4eb83..4e79cfd21d5a 100644
+--- a/gcc/config/avr/avr-passes.cc
++++ b/gcc/config/avr/avr-passes.cc
+@@ -28,6 +28,7 @@
+ #include "backend.h"
+ #include "target.h"
+ #include "rtl.h"
++#include "rtl-iter.h"
+ #include "tree.h"
+ #include "diagnostic-core.h"
+ #include "cfghooks.h"
+@@ -1053,6 +1054,28 @@ struct insninfo_t
+     else
+       gcc_unreachable ();
+   }
++
++  gprmask_t scratch_mask () const
++  {
++    gprmask_t mask = m_scratch
++      ? regmask (m_scratch, 1)
++      : 0;
++
++    if (m_insn)
++      {
++	subrtx_iterator::array_type array;
++	FOR_EACH_SUBRTX (iter, array, PATTERN (m_insn), NONCONST)
++	  {
++	    rtx scratch_reg;
++	    if (GET_CODE (*iter) == CLOBBER
++		&& REG_P (scratch_reg = XEXP (*iter, 0))
++		&& END_REGNO (scratch_reg) <= REG_32)
++	      mask |= regmask (scratch_reg);
++	  }
++      }
++
++    return mask;
++  }
+ }; // insninfo_t
+ 
+ 
+@@ -1186,6 +1209,7 @@ optimize_data_t::emit_sequence (basic_block bb, rtx_insn *insns)
+ 	  avr_dump ("INCOMPLETE APPLICATION:\n");
+ 	  m2.dump ("regs old route=%s\n\n");
+ 	  n2.dump ("regs new route=%s\n\n");
++	  avr_dump ("ignore_mask = %08x\n\n", (unsigned) ignore_mask);
+ 	  avr_dump ("The new insns are:\n%L", insns);
+ 
+ 	  fatal_insn ("incomplete application of insn", insns);
+@@ -2714,8 +2738,7 @@ optimize_data_t::try_split_ldi (bbinfo_t *bbi)
+ 
+       n_new_insns = bbinfo_t::fpd->solution.emit_insns (curr.ii, curr.regs);
+ 
+-      if (curr.ii.m_scratch)
+-	ignore_mask = regmask (curr.ii.m_scratch, 1);
++      ignore_mask = curr.ii.scratch_mask ();
+     }
+ 
+   return found;
+@@ -3056,8 +3079,7 @@ optimize_data_t::try_split_any (bbinfo_t *)
+ 	return fail ("too expensive");
+     }
+ 
+-  if (ii.m_scratch)
+-    ignore_mask = regmask (ii.m_scratch, 1);
++  ignore_mask = ii.scratch_mask ();
+ 
+   return true;
+ }
+diff --git a/gcc/testsuite/gcc.target/avr/torture/pr127004.c b/gcc/testsuite/gcc.target/avr/torture/pr127004.c
+new file mode 100644
+index 000000000000..225923a2a805
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/avr/torture/pr127004.c
+@@ -0,0 +1,7 @@
++/* { dg-do compile } */
++/* { dg-additional-options "-std=c99" } */
++
++unsigned f (unsigned x)
++{
++  return (unsigned) (((unsigned long long) x * 0xAAAAAAAB) >> 32) >> 1;
++}

@@ -1,0 +1,80 @@
+From 9da5b256666b88aec0db5dfdd5a46508b50f0ee2 Mon Sep 17 00:00:00 2001
+From: Yongqiang Tian <yqtian668@gmail.com>
+Date: Fri, 2 Oct 2026 22:33:13 +0200
+Subject: [PATCH 273/385] tree-optimization: Skip debug stmts before assigning
+ UIDs [PR127687]
+
+GIMPLE_DEBUG statements currently consume UIDs and are then treated as
+non-assignments, which flushes pending VEC_PERM simplify sequences.  This
+makes sequence blending depend on whether debug information is present.
+
+Skip debug statements before assigning UIDs and processing ordinary
+statements.
+
+Assisted-by: OpenAI Codex 5.6 Sol, co-reviewed by Claude and Yongqiang Tian.
+
+	PR tree-optimization/127687
+
+gcc/ChangeLog:
+
+	* tree-ssa-forwprop.cc (pass_forwprop::execute): Skip debug
+	statements before assigning UIDs.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.dg/pr127687.c: New test.
+
+Signed-off-by: Yongqiang Tian <yqtian668@gmail.com>
+(cherry picked from commit 791386dc22c978e374863d459c378c64cb6d8f26)
+---
+ gcc/testsuite/gcc.dg/pr127687.c | 23 +++++++++++++++++++++++
+ gcc/tree-ssa-forwprop.cc        |  6 ++++++
+ 2 files changed, 29 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.dg/pr127687.c
+
+diff --git a/gcc/testsuite/gcc.dg/pr127687.c b/gcc/testsuite/gcc.dg/pr127687.c
+new file mode 100644
+index 000000000000..bac77b8e944c
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr127687.c
+@@ -0,0 +1,23 @@
++/* PR tree-optimization/127687 */
++/* { dg-do compile } */
++/* { dg-options "-O2 -fcompare-debug -fdump-tree-forwprop1-details" } */
++/* { dg-additional-options "-msse2" { target i?86-*-* x86_64-*-* } } */
++
++typedef int V __attribute__((vector_size (4 * sizeof (int))));
++
++[[gnu::noipa]] void
++foo (V *x, V *y)
++{
++  V a = *x;
++  V b = *y;
++  V c = __builtin_shufflevector (a, a, 0, 2, 0, 2);
++  V d = __builtin_shufflevector (a, a, 1, 3, 1, 3);
++  V e = __builtin_shufflevector (b, b, 0, 2, 0, 2);
++  V f = __builtin_shufflevector (b, b, 1, 3, 1, 3);
++  V g = __builtin_shufflevector (c + d, c - d, 0, 4, 1, 5);
++  V h = __builtin_shufflevector (e + f, e - f, 0, 4, 1, 5);
++  *x = g;
++  *y = h;
++}
++
++/* { dg-final { scan-tree-dump "Vec perm simplify sequences have been blended" "forwprop1" { target { aarch64*-*-* i?86-*-* x86_64-*-* } } } } */
+diff --git a/gcc/tree-ssa-forwprop.cc b/gcc/tree-ssa-forwprop.cc
+index 3971ff024479..97b35e926af4 100644
+--- a/gcc/tree-ssa-forwprop.cc
++++ b/gcc/tree-ssa-forwprop.cc
+@@ -5408,6 +5408,12 @@ pass_forwprop::execute (function *fun)
+ 	  tree lhs, rhs;
+ 	  enum tree_code code;
+ 
++	  if (is_gimple_debug (stmt))
++	    {
++	      gsi_next (&gsi);
++	      continue;
++	    }
++
+ 	  gimple_set_uid (stmt, uid++);
+ 
+ 	  if (!is_gimple_assign (stmt))

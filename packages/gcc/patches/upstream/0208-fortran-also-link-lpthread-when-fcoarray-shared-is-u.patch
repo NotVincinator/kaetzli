@@ -1,0 +1,39 @@
+From 90f250aa6dc1d671581f3149e3d5a5491b5d68fb Mon Sep 17 00:00:00 2001
+From: Jerry DeLisle <jvdelisle@gcc.gnu.org>
+Date: Wed, 27 May 2026 09:24:26 -0700
+Subject: [PATCH 208/385] fortran: also link -lpthread when -fcoarray=shared is
+ used [PR125324]
+
+When the driver auto-links -lcaf_shmem for -fcoarray=shared it must also
+link -lpthread because the shmem CAF runtime uses POSIX threads internally.
+
+Assisted by: Claude Sonnet 4.6
+
+	PR fortran/125324
+
+gcc/fortran/ChangeLog:
+
+	* gfortranspec.cc (lang_specific_driver): Also append -lpthread
+	when need_caf_shmem is set.
+
+(cherry picked from commit ee7d0c7b4102b8ef0bcaa725c75e141248b774cb)
+---
+ gcc/fortran/gfortranspec.cc | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/fortran/gfortranspec.cc b/gcc/fortran/gfortranspec.cc
+index 13b240013e8a..a98c538889eb 100644
+--- a/gcc/fortran/gfortranspec.cc
++++ b/gcc/fortran/gfortranspec.cc
+@@ -428,7 +428,10 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+ 	}
+ 
+       if (need_caf_shmem)
+-	append_option (OPT_l, CAF_SHMEM_LIBRARY, 1);
++	{
++	  append_option (OPT_l, CAF_SHMEM_LIBRARY, 1);
++	  append_option (OPT_l, "pthread", 1);
++	}
+     }
+ 
+ #ifdef ENABLE_SHARED_LIBGCC

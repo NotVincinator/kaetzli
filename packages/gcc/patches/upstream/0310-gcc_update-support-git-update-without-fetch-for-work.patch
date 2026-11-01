@@ -1,0 +1,123 @@
+From 00057d8221906736c8825559a27a2837e1c1cd31 Mon Sep 17 00:00:00 2001
+From: Richard Earnshaw <rearnsha@arm.com>
+Date: Fri, 16 Oct 2026 16:04:10 +0100
+Subject: [PATCH 310/385] gcc_update: support git update without fetch for
+ worktrees
+
+Git has a very useful facility that allows multiple checkouts to share
+a single git tree by setting up worktrees.  When using this workflow,
+updates to multiple checkouts only needs the repository to be synced
+from upstream once, then git rebase can be used for other worktrees.
+However, using git rebase directly doesn't update files such as
+LAST_UPDATED or gcc/REVISION - to get these updated requires using
+gcc_update and for git that only uses git pull, forcing multiple
+upstream sync attempts.
+
+This patch addes a new option --no-fetch which, when using git,
+suppresses the fetch step and uses git rebase, but then performs the
+same post update steps as a normal fetch - specifically the touch and
+update of the revision files.  The idea is that a user can now update
+multiple worktrees as follows:
+
+cd <gcc-main>; contrib/gcc_update
+cd <gcc-worktree1>; contrib/gcc_update --no-fetch
+cd <gcc-worktree2>; contrib/gcc_update --no-fetch
+etc.
+
+The --no-fetch option is simply ignored when not using git.  I don't know
+if HG has something equivalent, but svn certainly doesn't.
+
+contrib/ChangeLog:
+
+	* gcc_update: Add a new option, --no-fetch.  If specified, run
+	git rebase rather than git pull.
+
+(cherry picked from commit c7fe1f6ff065b3bc1d224b2cdaa3657f3f2f35aa)
+---
+ contrib/gcc_update | 41 +++++++++++++++++++++++++++++++++--------
+ 1 file changed, 33 insertions(+), 8 deletions(-)
+
+diff --git a/contrib/gcc_update b/contrib/gcc_update
+index 417e0483b3f3..7aada35db31f 100755
+--- a/contrib/gcc_update
++++ b/contrib/gcc_update
+@@ -21,13 +21,20 @@
+ # If the first parameter reads --patch, the second parameter is considered
+ # a patch file.
+ #
+-# If the first parameter is --touch, no svn operation will be performed,
+-# only generated files that appear to be out of date in the local tree
+-# will be touched.
++# If the first parameter is --touch, no update will be performed, only
++# generated files that appear to be out of date in the local tree will
++# be touched.
+ #
+ # If the first parameter is --list, a list of the generated files and
+ # their dependencies will be printed; --help prints this message.
+ #
++# If the first parameter is --no-fetch, then suppress the git fetch
++# step and rebase only on the current working tree from the local
++# repository.  This can be used to update multiple worktrees that
++# share a common git tree that was previously synced.  Any additional
++# arguments are interpreted as arguments to git rebase.  Ignored when
++# not using git.
++#
+ # If the first parameter is --silent, this script prints nothing other
+ # than error messages; the second parameter is then interpreted as above.
+ #
+@@ -37,6 +44,7 @@
+ # contrib/gcc_update --patch some-patch
+ # contrib/gcc_update --touch
+ # contrib/gcc_update --list
++# contrib/gcc_update --no-fetch
+ 
+ 
+ # Default options used when updating (none).
+@@ -53,6 +61,9 @@ export LANG LC_ALL
+ # Arrange for the value of $0 to be available for functions
+ self=$0
+ 
++# (Git only), suppress fetching the repository from upstream.
++unset nofetch
++
+ # This function prints its arguments to standard output unless
+ # "silent" is set.
+ unset silent
+@@ -300,6 +311,11 @@ case "$1" in
+     exit $?
+     ;;
+ 
++--no-fetch)
++    nofetch=t
++    shift
++    ;;
++
+ --help)
+     sed -e '1,2d' -e '/^UPDATE_OPTIONS=/{i\
+ \
+@@ -345,11 +361,20 @@ case $vcs_type in
+             exit 1
+ 	fi
+ 
+-	$GCC_GIT pull ${silent+-q} --rebase ${1+"$@"}
+-	if [ $? -ne 0 ]; then
+-            (touch_files_reexec)
+-            echo "git pull of full tree failed." >&2
+-            exit 1
++	if [ -n "${nofetch}" ]; then
++	    $GCC_GIT rebase --fork-point ${silent+-q} ${1+"$@"}
++	    if [ $? -ne 0 ]; then
++		(touch_files_reexec)
++		echo "git rebase of full tree failed." >&2
++		exit 1
++	    fi
++	else
++	    $GCC_GIT pull ${silent+-q} --rebase ${1+"$@"}
++	    if [ $? -ne 0 ]; then
++		(touch_files_reexec)
++		echo "git pull of full tree failed." >&2
++		exit 1
++	    fi
+ 	fi
+ 
+ 	# Open-coded version of "git gcc-descr" from contrib/gcc-git-customization.sh

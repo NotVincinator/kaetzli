@@ -1,0 +1,52 @@
+From c2ab0eb5be80a4d88683666ec3af9129636ca0d4 Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Sat, 31 Oct 2026 17:14:04 +0100
+Subject: [PATCH 383/385] Ada: Fix compiler hang on structural generic
+ instantiation
+
+This happens when the first reference to the structural instance is made
+within an expression function, because the implicit instantiation is not
+performed in an appropriate state by the semantic analyzer.
+
+gcc/ada/
+	* sem_ch12.adb (Analyze_Structural_Associations): Even in the local
+	case, make sure that the implicit instantiation is performed in an
+	appropriate state by the semantic analyzer.
+---
+ gcc/ada/sem_ch12.adb | 22 +++++++++++++++++++++-
+ 1 file changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ada/sem_ch12.adb b/gcc/ada/sem_ch12.adb
+index 2ed907981531..39e53c5d0a37 100644
+--- a/gcc/ada/sem_ch12.adb
++++ b/gcc/ada/sem_ch12.adb
+@@ -6520,8 +6520,28 @@ package body Sem_Ch12 is
+                   Inside_A_Generic := S_Inside_A_Generic;
+                end;
+ 
++            --  If the scope is local, the instantiation must be fully analyzed
++            --  as well as expanded if the context is not a generic unit.
++
+             else
+-               Add_Local_Declaration (R, N, Scop => Scop);
++               declare
++                  S_Expander_Active : constant Boolean := Expander_Active;
++                  S_Full_Analysis   : constant Boolean := Full_Analysis;
++                  S_In_Spec_Expr    : constant Boolean := In_Spec_Expression;
++
++               begin
++                  Expander_Active :=
++                    Operating_Mode = Opt.Generate_Code
++                      and then not Inside_A_Generic;
++                  Full_Analysis := True;
++                  In_Spec_Expression := False;
++
++                  Add_Local_Declaration (R, N, Scop => Scop);
++
++                  Expander_Active := S_Expander_Active;
++                  Full_Analysis := S_Full_Analysis;
++                  In_Spec_Expression := S_In_Spec_Expr;
++               end;
+             end if;
+ 
+             Ent := Defining_Entity_Of_Instance (R);

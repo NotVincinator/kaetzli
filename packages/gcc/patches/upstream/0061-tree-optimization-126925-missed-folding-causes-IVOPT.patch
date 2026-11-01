@@ -1,0 +1,73 @@
+From 5ec88821a111a20fe10faba574298f553d000b48 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Tue, 18 Aug 2026 09:49:12 +0200
+Subject: [PATCH 061/385] tree-optimization/126925 - missed folding causes
+ IVOPTs crash
+
+When we fail to simplify an IV candidate step to zero SCEV might
+still have simplified the before/after candidate to an IV with
+zero step.  Avoid crashing in such situation.
+
+	PR tree-optimization/126925
+	* tree-ssa-loop-ivopts.cc (create_new_iv): Avoid crashing
+	if the use IV is invariant.
+
+	* gcc.dg/torture/pr126925.c: New testcase.
+
+(cherry picked from commit 8ff8114e4448307f27e38fbdb98028283ab64f1c)
+---
+ gcc/testsuite/gcc.dg/torture/pr126925.c | 21 +++++++++++++++++++++
+ gcc/tree-ssa-loop-ivopts.cc             | 11 ++++++++---
+ 2 files changed, 29 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/pr126925.c
+
+diff --git a/gcc/testsuite/gcc.dg/torture/pr126925.c b/gcc/testsuite/gcc.dg/torture/pr126925.c
+new file mode 100644
+index 000000000000..06e601d64985
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/pr126925.c
+@@ -0,0 +1,21 @@
++/* { dg-do compile } */
++
++int a;
++long b;
++int c(long d) {
++  for (;;)
++    if (d)
++      return b;
++}
++void e(int d) {
++  unsigned long f = 6;
++  int g;
++  while (c(f)) {
++    g = 0;
++    for (; g < 2; g++) {
++      a = 0;
++      short h = d;
++      f = d + f - (h + f + (a + 4 + f));
++    }
++  }
++}
+diff --git a/gcc/tree-ssa-loop-ivopts.cc b/gcc/tree-ssa-loop-ivopts.cc
+index 6ecf5bef7b4f..5cdc20b83ed9 100644
+--- a/gcc/tree-ssa-loop-ivopts.cc
++++ b/gcc/tree-ssa-loop-ivopts.cc
+@@ -7243,10 +7243,15 @@ create_new_iv (struct ivopts_data *data, struct iv_cand *cand)
+       name_info (data, cand->var_before)->preserve_biv = true;
+       name_info (data, cand->var_after)->preserve_biv = true;
+ 
+-      /* Rewrite the increment so that it uses var_before directly.  */
++      /* Rewrite the increment so that it uses var_before directly.  Missed
++	 optimization can result in a use IV with zero step, avoid
++	 crashing in that case.  */
+       use = find_interesting_uses_op (data, cand->var_after);
+-      group = data->vgroups[use->group_id];
+-      group->selected = cand;
++      if (use)
++	{
++	  group = data->vgroups[use->group_id];
++	  group->selected = cand;
++	}
+       return;
+     }
+ 

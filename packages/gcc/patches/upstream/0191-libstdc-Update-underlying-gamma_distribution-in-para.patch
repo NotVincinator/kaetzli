@@ -1,0 +1,216 @@
+From ffe6c9af6a9435c94b570831c999cffa7c53ca21 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Tomasz=20Kami=C5=84ski?= <tkaminsk@redhat.com>
+Date: Wed, 16 Sep 2026 10:10:00 +0200
+Subject: [PATCH 191/385] libstdc++: Update underlying gamma_distribution in
+ param() [PR123409]
+
+This updates the underlying gamma distribution in the param function by
+invoking the param function on the corresponding member:
+ * _M_gd for negative_binomial_distribution, student_t_distribution;
+ * _M_gd_x, _M_gd_y for fisher_f_distribution.
+
+The distribution_param.cc test, validates that for all distributions,
+constructing from or setting params results in equal distribution that
+produces same values. The test uses -ffloat-store for -m32, following
+chi_squared_distribution test for PR83833 - that is removed, as all
+cases are covered in new test.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/123409
+	* include/bits/random.h (negative_binomial_distribution::param)
+	(fisher_f_distribution::param, student_t_distribution::param):
+	Updated underlying gamma distributions, by calling param.
+	(chi_squared_distribution::param): Use type alias and parenthesis
+	for consistency.
+	* testsuite/26_numerics/random/distribution_param.cc: New test.
+	* testsuite/26_numerics/random/chi_squared_distribution/83833.cc:
+	Removed, covered by above.
+
+Reviewed-by: Jonathan Wakely <jwakely@redhat.com>
+(cherry picked from commit c638dae26f3134951e11aafe696787f83121571c)
+---
+ libstdc++-v3/include/bits/random.h            | 32 ++++++++--
+ .../random/chi_squared_distribution/83833.cc  | 41 -------------
+ .../26_numerics/random/distribution_param.cc  | 60 +++++++++++++++++++
+ 3 files changed, 86 insertions(+), 47 deletions(-)
+ delete mode 100644 libstdc++-v3/testsuite/26_numerics/random/chi_squared_distribution/83833.cc
+ create mode 100644 libstdc++-v3/testsuite/26_numerics/random/distribution_param.cc
+
+diff --git a/libstdc++-v3/include/bits/random.h b/libstdc++-v3/include/bits/random.h
+index 3fda69c4399a..f6a827a05c38 100644
+--- a/libstdc++-v3/include/bits/random.h
++++ b/libstdc++-v3/include/bits/random.h
+@@ -3500,9 +3500,10 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
+       param(const param_type& __param)
+       {
+ 	_M_param = __param;
+-	typedef typename std::gamma_distribution<result_type>::param_type
+-	  param_type;
+-	_M_gd.param(param_type{__param.n() / 2});
++
++	using param_type
++	  = typename std::gamma_distribution<result_type>::param_type;
++	_M_gd.param(param_type(__param.n() / 2));
+       }
+ 
+       /**
+@@ -3956,7 +3957,14 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
+        */
+       void
+       param(const param_type& __param)
+-      { _M_param = __param; }
++     {
++	_M_param = __param;
++
++	using param_type
++	  = typename std::gamma_distribution<result_type>::param_type;
++	_M_gd_x.param(param_type(__param.m() / 2));
++	_M_gd_y.param(param_type(__param.n() / 2));
++      }
+ 
+       /**
+        * @brief Returns the greatest lower bound value of the distribution.
+@@ -4185,7 +4193,13 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
+        */
+       void
+       param(const param_type& __param)
+-      { _M_param = __param; }
++      {
++	_M_param = __param;
++
++	using param_type
++	  = typename std::gamma_distribution<result_type>::param_type;
++	_M_gd.param(param_type(__param.n() / 2, 2));
++      }
+ 
+       /**
+        * @brief Returns the greatest lower bound value of the distribution.
+@@ -5116,7 +5130,13 @@ _GLIBCXX_END_INLINE_ABI_NAMESPACE(_V2)
+        */
+       void
+       param(const param_type& __param)
+-      { _M_param = __param; }
++      {
++	_M_param = __param;
++
++	using param_type
++	  = typename std::gamma_distribution<double>::param_type;
++	_M_gd.param(param_type(__param.k(), (1.0 - __param.p()) / __param.p()));
++      }
+ 
+       /**
+        * @brief Returns the greatest lower bound value of the distribution.
+diff --git a/libstdc++-v3/testsuite/26_numerics/random/chi_squared_distribution/83833.cc b/libstdc++-v3/testsuite/26_numerics/random/chi_squared_distribution/83833.cc
+deleted file mode 100644
+index 4008f7db89c9..000000000000
+--- a/libstdc++-v3/testsuite/26_numerics/random/chi_squared_distribution/83833.cc
++++ /dev/null
+@@ -1,41 +0,0 @@
+-// Copyright (C) 2018-2026 Free Software Foundation, Inc.
+-//
+-// This file is part of the GNU ISO C++ Library.  This library is free
+-// software; you can redistribute it and/or modify it under the
+-// terms of the GNU General Public License as published by the
+-// Free Software Foundation; either version 3, or (at your option)
+-// any later version.
+-
+-// This library is distributed in the hope that it will be useful,
+-// but WITHOUT ANY WARRANTY; without even the implied warranty of
+-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-// GNU General Public License for more details.
+-
+-// You should have received a copy of the GNU General Public License along
+-// with this library; see the file COPYING3.  If not see
+-// <http://www.gnu.org/licenses/>.
+-
+-// { dg-do run { target c++11 } }
+-// { dg-additional-options "-ffloat-store" { target { m68*-*-* || ia32 } } }
+-// { dg-require-cstdint "" }
+-
+-#include <random>
+-#include <testsuite_hooks.h>
+-
+-void
+-test01()
+-{
+-  std::default_random_engine r1, r2;
+-  using chi = std::chi_squared_distribution<double>;
+-  chi::param_type p(5);
+-  chi d1(p);
+-  chi d2;
+-  d2.param(p);
+-  VERIFY( d1(r1) == d2(r2) ); // PR libstdc++/83833
+-}
+-
+-int
+-main()
+-{
+-  test01();
+-}
+diff --git a/libstdc++-v3/testsuite/26_numerics/random/distribution_param.cc b/libstdc++-v3/testsuite/26_numerics/random/distribution_param.cc
+new file mode 100644
+index 000000000000..d6c067662336
+--- /dev/null
++++ b/libstdc++-v3/testsuite/26_numerics/random/distribution_param.cc
+@@ -0,0 +1,60 @@
++// { dg-do run { target c++11 } }
++// { dg-additional-options "-ffloat-store" { target { m68*-*-* || ia32 } } }
++// { dg-require-cstdint "" }
++
++#include <random>
++#include <testsuite_hooks.h>
++
++template<typename Distribution>
++void
++validate(Distribution&& source)
++{
++  const auto& params = source.param();
++
++  Distribution constr(params);
++  VERIFY( constr == source );
++
++  Distribution setter;
++  setter.param(params);
++  VERIFY( setter == source );
++
++  std::mt19937_64 e1(0x19650809ull), e2 = e1, e3 = e1;
++  for (int i = 0; i < 10; ++i)
++  {
++    const auto expected = source(e1);
++    VERIFY( constr(e2) == expected );
++    VERIFY( setter(e3) == expected );
++  }
++}
++
++int main()
++{
++  // PR83833, PR123409
++  validate(std::uniform_int_distribution<>(13, 22));
++  validate(std::uniform_real_distribution<>(1.0, 9.0));
++
++  validate(std::bernoulli_distribution(0.478));
++  validate(std::binomial_distribution<>(7, 0.334));
++  validate(std::negative_binomial_distribution<>(726, 0.65));
++  validate(std::geometric_distribution<>(0.545));
++
++  validate(std::poisson_distribution<>(6));
++  validate(std::exponential_distribution<>(3));
++  validate(std::gamma_distribution<>(1.1, 2.2));
++  validate(std::weibull_distribution<>(1.7, 3.0));
++  validate(std::extreme_value_distribution<>(-1.628, 1.628));
++
++  validate(std::normal_distribution<>(5.0, 2.0));
++  validate(std::lognormal_distribution<>(1.67, 0.25));
++  validate(std::chi_squared_distribution<>(5));
++  validate(std::cauchy_distribution<>(-3, 0.25));
++  validate(std::fisher_f_distribution<>(26.0, 7.0));
++  validate(std::student_t_distribution<>(65.0));
++
++  const auto wf = [](double x) { return 1 + x; };
++  validate(std::discrete_distribution<>(4, 1.2, 4.5, wf));
++  validate(std::piecewise_constant_distribution<>(5, 0.5, 9, wf));
++  validate(std::piecewise_linear_distribution<>(3, 1.2, 3.4, wf));
++
++  return 0;
++}

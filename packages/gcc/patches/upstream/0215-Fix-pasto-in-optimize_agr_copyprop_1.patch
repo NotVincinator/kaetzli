@@ -1,0 +1,44 @@
+From 91bfbe9389b0783eaabaea682b10cd85b4dd2002 Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Tue, 29 Sep 2026 20:46:24 +0200
+Subject: [PATCH 215/385] Fix pasto in optimize_agr_copyprop_1
+
+The STMT parameter of optimize_agr_copyprop_1 in tree-ssa-forwprop.cc is
+only used for the dump file:
+
+  if (dump_file && (dump_flags & TDF_DETAILS))
+    {
+      fprintf (dump_file, "Simplified\n  ");
+      print_gimple_stmt (dump_file, use_stmt, 0, dump_flags);
+      fprintf (dump_file, "after previous\n  ");
+      print_gimple_stmt (dump_file, stmt, 0, dump_flags);
+    }
+
+so it makes no sense to use the index of its BB to purge EH edges:
+
+  if (maybe_clean_or_replace_eh_stmt (orig_stmt, use_stmt))
+    bitmap_set_bit (to_purge, gimple_bb (stmt)->index);
+
+Instead the index of the BB of USE_STMT needs to be used, as in the attached
+patch.  This fixes the failure of 4 ACATS tests with a modified compiler.
+
+gcc/
+	* tree-ssa-forwprop.cc (optimize_agr_copyprop_1): Use the index of
+	the basic block of USE_STMT instead of STMT to purge EH edges.
+---
+ gcc/tree-ssa-forwprop.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/tree-ssa-forwprop.cc b/gcc/tree-ssa-forwprop.cc
+index ce8bd0e0599d..3971ff024479 100644
+--- a/gcc/tree-ssa-forwprop.cc
++++ b/gcc/tree-ssa-forwprop.cc
+@@ -1687,7 +1687,7 @@ optimize_agr_copyprop_1 (gimple *stmt, gimple *use_stmt,
+       print_gimple_stmt (dump_file, use_stmt, 0, dump_flags);
+     }
+   if (maybe_clean_or_replace_eh_stmt (orig_stmt, use_stmt))
+-    bitmap_set_bit (to_purge, gimple_bb (stmt)->index);
++    bitmap_set_bit (to_purge, gimple_bb (use_stmt)->index);
+   statistics_counter_event (cfun, "copy prop for aggregate", 1);
+ }
+ 

@@ -1,0 +1,126 @@
+From 84373afc873953747427d8d1f7f82ca818e62ada Mon Sep 17 00:00:00 2001
+From: Christophe Lyon <christophe.lyon@arm.com>
+Date: Fri, 2 Oct 2026 07:44:06 +0000
+Subject: [PATCH 322/385] [testsuite, arm]: Rework arm_fp16_ok effective target
+ [PR126082]
+
+arm_fp16_ok accepts a few -mfpu= overrides (*fp16*, vfpvN where N>=4,
+*fp-armv8*), but exits early with -mfpu=auto even though the related
+-march could include a valid FP option.
+
+In addition, it is no longer necessary to check for such flags, since
+modern DejaGnu gives them lower priority compared to the
+dg-add-options directives from individual testcases.
+
+Rework arm_fp16_ok to make it similar to arm_neon_ok and friends,
+iterating over several sets of flags until a working combination is
+found.  Keep -mfpu=vfpv4 as in the original version.
+
+Tested on:
+-marm/-march=armv7-a/-mfloat-abi=soft
+-marm/-march=armv7-a/-mfpu=vfpv3-d16/-mfloat-abi=softfp
+-mthumb/-march=armv6s-m/-mtune=cortex-m0/-mfloat-abi=soft
+-mthumb/-march=armv7-m/-mtune=cortex-m3/-mfloat-abi=softfp
+-mthumb/-march=armv7e-m+fp/-mtune=cortex-m4/-mfloat-abi=hard
+-mthumb/-march=armv7e-m+fp.dp/-mtune=cortex-m7/-mfloat-abi=hard
+-mthumb/-march=armv8-m.base/-mtune=cortex-m23/-mfloat-abi=soft
+-mthumb/-march=armv8-m.main+dsp+fp/-mtune=cortex-m33/-mfloat-abi=hard
+-mthumb/-march=armv8.1-m.main+mve.fp+fp.dp/-mtune=cortex-m55/-mfloat-abi=hard
+-mthumb/-march=armv7-a/-mfpu=vfpv3-d16/-mfloat-abi=softfp
+-mthumb/-march=armv8-a+simd/-mfloat-abi=hard
+
+The tests
+gcc.target/arm/fp16-compile-vcvt.c
+gcc.target/arm/fp16-rounding-alt-1.c
+gcc.target/arm/vect-half-floats.c
+now PASS on
+
+* -marm/-march=armv7-a/-mfloat-abi=soft (was rejected because of
+  -mfloat-abi=soft)
+* -mthumb/-march=armv7-a/-mfpu=vfpv3-d16/-mfloat-abi=softfp (was
+  rejected because of -mfpu=vfpv3-d16)
+
+gcc.target/arm/vect-half-floats.c is UNSUPPORTED on
+-mthumb/-march=armv8.1-m.main+mve.fp+fp.dp/-mtune=cortex-m55/-mfloat-abi=hard
+thanks to the previous patch.
+
+gcc/testsuite/ChangeLog:
+
+	PR testsuite/126082
+	* lib/target-supports.exp
+	(check_effective_target_arm_fp16_ok_nocache): Iterate to find
+	suitable flags.
+
+(cherry picked from commit 2936bd1c97134bd50e887f2e1d6fe306e514d70a)
+---
+ gcc/testsuite/lib/target-supports.exp | 55 +++++++++++----------------
+ 1 file changed, 23 insertions(+), 32 deletions(-)
+
+diff --git a/gcc/testsuite/lib/target-supports.exp b/gcc/testsuite/lib/target-supports.exp
+index 440e65019632..1ef817fabfa5 100644
+--- a/gcc/testsuite/lib/target-supports.exp
++++ b/gcc/testsuite/lib/target-supports.exp
+@@ -6177,40 +6177,31 @@ proc add_options_for_arm_fp16_alternative { flags } {
+ # ARM only.
+ 
+ proc check_effective_target_arm_fp16_ok_nocache { } {
+-    global et_arm_fp16_flags
+-    set et_arm_fp16_flags ""
+-    if { ! [check_effective_target_arm32] } {
+-	return 0;
+-    }
+-    if [check-flags \
+-	    [list "" { *-*-* } { "-mfpu=*" } \
+-		 { "-mfpu=*fp16*" "-mfpu=*fpv[4-9]*" \
+-		       "-mfpu=*fpv[1-9][0-9]*" "-mfpu=*fp-armv8*" } ]] {
+-	# Multilib flags would override -mfpu.
+-	return 0
+-    }
+-    if [check-flags [list "" { *-*-* } { "-mfloat-abi=soft" } { "" } ]] {
+-	# Must generate floating-point instructions.
++    if { ![istarget arm*-*-*] } {
+ 	return 0
+     }
+-    if [check_effective_target_arm_hf_eabi] {
+-	# Use existing float-abi and force an fpu which supports fp16
+-	set et_arm_fp16_flags "-mfpu=vfpv4"
+-	return 1;
+-    }
+-    if [check-flags [list "" { *-*-* } { "-mfpu=*" } { "" } ]] {
+-	# The existing -mfpu value is OK; use it, but add softfp.
+-	set et_arm_fp16_flags "-mfloat-abi=softfp"
+-	return 1;
+-    }
+-    # Add -mfpu for a VFP fp16 variant since there is no preprocessor
+-    # macro to check for this support.
+-    set flags "-mfpu=vfpv4 -mfloat-abi=softfp"
+-    if { [check_no_compiler_messages_nocache arm_fp16_ok assembly {
+-	int dummy;
+-    } "$flags"] } {
+-	set et_arm_fp16_flags "$flags"
+-	return 1
++    global et_arm_fp16_flags
++    set et_arm_fp16_flags ""
++    foreach flags {
++	""
++	"-mfloat-abi=softfp"
++	"-mfpu=auto"
++	"-mfloat-abi=softfp -mfpu=auto"
++	"-mfpu=vfpv4"
++	"-mfloat-abi=softfp -mfpu=vfpv4"
++    } {
++	if { [check_no_compiler_messages_nocache arm_fp16_ok assembly {
++	    #ifndef __ARM_FP
++	    #error __ARM_FP not defined
++	    #endif
++	    #if ((__ARM_FP & 2) == 0)
++	    #error __ARM_FP indicates that half-precision floating point is not supported
++	    #endif
++	    int dummy;
++	} "$flags"] } {
++	    set et_arm_fp16_flags "$flags"
++	    return 1
++	}
+     }
+ 
+     return 0

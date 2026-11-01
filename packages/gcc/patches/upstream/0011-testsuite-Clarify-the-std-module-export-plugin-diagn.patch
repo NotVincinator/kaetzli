@@ -1,0 +1,47 @@
+From 742ca4610d51e156c287daebc8e293f155725c0b Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Thu, 6 Aug 2026 11:03:43 +0200
+Subject: [PATCH 011/385] testsuite: Clarify the std module export plugin
+ diagnostics [PR125200]
+
+The following patch attempts to clarify the diagnostics, so that one e.g.
+doesn't look for import std::whatever; in the headers or something similar.
+
+2026-08-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libstdc++/125200
+	* g++.dg/plugin/std_module_exports_plugin.cc (plugin_dump_decl): Use
+	%< and %>.  Clarify the error message and add a note.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 19a304d3680a1aeeb8ca412a6fe108a3f3b9d305)
+---
+ .../g++.dg/plugin/std_module_exports_plugin.cc         | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/testsuite/g++.dg/plugin/std_module_exports_plugin.cc b/gcc/testsuite/g++.dg/plugin/std_module_exports_plugin.cc
+index e81eb6d3fb6c..21a765041f6e 100644
+--- a/gcc/testsuite/g++.dg/plugin/std_module_exports_plugin.cc
++++ b/gcc/testsuite/g++.dg/plugin/std_module_exports_plugin.cc
+@@ -106,13 +106,19 @@ plugin_dump_decl (tree decl, char *scope, hash_set<tree> **exported_usings)
+ 	if (((int) whitelist[i].enabled_in & (int) this_std) != 0)
+ 	  {
+ 	    inform (DECL_SOURCE_LOCATION (decl),
+-		    "missing using %s%D; whitelisted", scope, name);
++		    "missing %<using %s%D;%> whitelisted", scope, name);
+ 	    return;
+ 	  }
+ 	break;
+       }
+ 
+-  error_at (DECL_SOURCE_LOCATION (decl), "missing using %s%D;", scope, name);
++  auto_diagnostic_group d;
++  error_at (DECL_SOURCE_LOCATION (decl),
++	    "missing %<using %s%D;%> in libstdc++-v3/src/c++23/std*.cc.in",
++	    scope, name);
++  inform (DECL_SOURCE_LOCATION (decl),
++	  "%<%s%D%> found in std namespace but not exported from std module",
++	  scope, name);
+ }
+ 
+ void

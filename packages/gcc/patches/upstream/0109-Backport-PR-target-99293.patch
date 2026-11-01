@@ -1,0 +1,109 @@
+From 997aaa14a9500bfdbe28ec114f953f62e9c1c89e Mon Sep 17 00:00:00 2001
+From: Michael Meissner <meissner@linux.ibm.com>
+Date: Thu, 27 Aug 2026 12:25:47 -0400
+Subject: [PATCH 109/385] Backport PR target/99293
+
+We had optimizations for splat of a vector extract for the other vector
+types, but we missed having one for V2DI and V2DF.  This patch adds a
+combiner insn to do this optimization.
+
+In looking at the source, we had similar optimizations for V4SI and V4SF
+extract and splats, but we missed doing V2DI/V2DF.
+
+Without the patch for the code:
+
+	vector long long splat_dup_l_0 (vector long long v)
+	{
+	  return __builtin_vec_splats (__builtin_vec_extract (v, 0));
+	}
+
+the compiler generates (on a little endian power9):
+
+	splat_dup_l_0:
+		mfvsrld 9,34
+	        mtvsrdd 34,9,9
+		blr
+
+Now it generates:
+
+	splat_dup_l_0:
+		xxpermdi 34,34,34,3
+	        blr
+
+This change was backported from the changes checked into the master
+branch on 2026-08-03.
+
+2026-08-27  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/99293
+	* config/rs6000/vsx.md (vsx_splat_extract_<mode>): New insn.
+
+gcc/testsuite/
+
+	PR target/99293
+	* gcc.target/powerpc/pr99293.c: New test.
+---
+ gcc/config/rs6000/vsx.md                   | 18 ++++++++++++++++++
+ gcc/testsuite/gcc.target/powerpc/pr99293.c | 22 ++++++++++++++++++++++
+ 2 files changed, 40 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr99293.c
+
+diff --git a/gcc/config/rs6000/vsx.md b/gcc/config/rs6000/vsx.md
+index 319435359bdd..5fd8cb6eb299 100644
+--- a/gcc/config/rs6000/vsx.md
++++ b/gcc/config/rs6000/vsx.md
+@@ -4829,6 +4829,24 @@
+   "lxvdsx %x0,%y1"
+   [(set_attr "type" "vecload")])
+ 
++;; Optimize SPLAT of an extract from a V2DF/V2DI vector with a constant element
++(define_insn "*vsx_splat_extract_<mode>"
++  [(set (match_operand:VSX_D 0 "vsx_register_operand" "=wa")
++	(vec_duplicate:VSX_D
++	 (vec_select:<VEC_base>
++	  (match_operand:VSX_D 1 "vsx_register_operand" "wa")
++	  (parallel [(match_operand 2 "const_0_to_1_operand" "n")]))))]
++  "VECTOR_MEM_VSX_P (<MODE>mode)"
++{
++  int which_word = INTVAL (operands[2]);
++  if (!BYTES_BIG_ENDIAN)
++    which_word = 1 - which_word;
++
++  operands[3] = GEN_INT (which_word ? 3 : 0);
++  return "xxpermdi %x0,%x1,%x1,%3";
++}
++  [(set_attr "type" "vecperm")])
++
+ ;; V4SI splat support
+ (define_insn "vsx_splat_v4si"
+   [(set (match_operand:V4SI 0 "vsx_register_operand" "=wa,wa")
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr99293.c b/gcc/testsuite/gcc.target/powerpc/pr99293.c
+new file mode 100644
+index 000000000000..20adc1f27f65
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr99293.c
+@@ -0,0 +1,22 @@
++/* { dg-do compile { target powerpc*-*-* } } */
++/* { dg-require-effective-target powerpc_vsx_ok } */
++/* { dg-options "-O2 -mvsx" } */
++
++/* Test for PR 99263, which wants to do:
++	__builtin_vec_splats (__builtin_vec_extract (v, n))
++
++   where v is a V2DF or V2DI vector and n is either 0 or 1.  Previously the
++   compiler would do a direct move to the GPR registers to select the item and a
++   direct move from the GPR registers to do the splat.  */
++
++vector long long splat_dup_l_0 (vector long long v)
++{
++  return __builtin_vec_splats (__builtin_vec_extract (v, 0));
++}
++
++vector long long splat_dup_l_1 (vector long long v)
++{
++  return __builtin_vec_splats (__builtin_vec_extract (v, 1));
++}
++
++/* { dg-final { scan-assembler-times "xxpermdi" 2 } } */

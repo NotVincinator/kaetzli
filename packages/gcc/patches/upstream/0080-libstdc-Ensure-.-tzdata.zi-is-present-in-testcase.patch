@@ -1,0 +1,48 @@
+From 623e14a2298c4c2f0a4d33b4db5d9e0e10b6aca9 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Fri, 21 Aug 2026 14:26:39 +0100
+Subject: [PATCH 080/385] libstdc++: Ensure ./tzdata.zi is present in testcase
+
+When libstdc++ is configured without an embedded copy of the tzdata.zi
+file (e.g. when using --with-libstdcxx-zoneinfo) this testcase can fail.
+It aborts after chrono::reload_tzdb() throws an exception due to being
+unable to load tzdata.zi from the __gnu_cxx::zoneinfo_dir_override()
+path used in the test.
+
+The test passes using the default configuration because the embedded
+tzdata.zi is used, and it passes if another test has already run and
+created ./tzdata.zi in the test's current working directory.
+
+The solution is to create a dummy ./tzdata.zi file, which only needs to
+contain a version line because we only care that chrono::reload_tzdb()
+finishes, not that it loads valid data.
+
+No other tests are affected, because they either write out a tzdata.zi
+file, or call chrono::get_tzdb() (which has a fallback to a UTC-only
+database). Only calling chrono::reload_tzdb() without a file present is
+a problem, as in this test.
+
+libstdc++-v3/ChangeLog:
+
+	* testsuite/std/time/clock/utc/leap_second_info-2.cc: Create
+	empty ./tzdata.zi file.
+
+(cherry picked from commit 77c73311944d2234ecafa052f9e2b4a625b59eb6)
+---
+ .../testsuite/std/time/clock/utc/leap_second_info-2.cc         | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/libstdc++-v3/testsuite/std/time/clock/utc/leap_second_info-2.cc b/libstdc++-v3/testsuite/std/time/clock/utc/leap_second_info-2.cc
+index 090a28291c85..1cfd5edf93c2 100644
+--- a/libstdc++-v3/testsuite/std/time/clock/utc/leap_second_info-2.cc
++++ b/libstdc++-v3/testsuite/std/time/clock/utc/leap_second_info-2.cc
+@@ -103,6 +103,9 @@ Leap	2120	Dec	30	23:59:59	-	S
+ 
+ int main()
+ {
++  // chrono::reload_tzdb() requires ./tzdata.zi to be present.
++  std::ofstream("tzdata.zi") << "# version empty\n";
++
+   test_known_leaps();
+   test_future_leaps();
+ }

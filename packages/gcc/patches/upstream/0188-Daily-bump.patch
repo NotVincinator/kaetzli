@@ -1,0 +1,126 @@
+From 0b1bd1e984db5e9f9ad94f38014e02e528116a79 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sat, 19 Sep 2026 00:21:13 +0000
+Subject: [PATCH 188/385] Daily bump.
+
+---
+ gcc/ChangeLog           | 19 ++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog |  8 ++++++
+ libstdc++-v3/ChangeLog  | 56 +++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 84 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index c1ce493ae5e5..870da0703554 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,22 @@
++2026-09-18  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
++
++	Backported from master:
++	2026-09-01  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
++
++	* config/aarch64/aarch64-builtins.cc (enum aarch64_builtins): Add
++	AARCH64_BUILTIN_YIELD, AARCH64_BUILTIN_WFE, AARCH64_BUILTIN_WFI,
++	AARCH64_BUILTIN_SEV and AARCH64_BUILTIN_SEVL.
++	(aarch64_init_syshintop_builtins): New function.
++	(handle_arm_acle_h): Call aarch64_init_syshintop_builtins.
++	(aarch64_general_expand_builtin): Expand the system hint builtins.
++	* config/aarch64/aarch64.md (unspecv): Add UNSPECV_YIELD, UNSPECV_WFE,
++	UNSPECV_WFI, UNSPECV_SEV and UNSPECV_SEVL.
++	(aarch64_yield): New insn pattern.
++	(aarch64_wfe): Likewise.
++	(aarch64_wfi): Likewise.
++	(aarch64_sev): Likewise.
++	(aarch64_sevl): Likewise.
++
+ 2026-09-16  Richard Biener  <rguenther@suse.de>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 215e40c73af3..35f33f31d1bf 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260918
++20260919
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index b6e4309fef86..7875b397b7ba 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2026-09-18  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
++
++	Backported from master:
++	2026-09-01  Srinath Parvathaneni  <srinath.parvathaneni@arm.com>
++
++	* gcc.target/aarch64/acle/hint-1.c: New test.
++	* gcc.target/aarch64/acle/hint-2.c: Likewise.
++
+ 2026-09-16  Richard Biener  <rguenther@suse.de>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index 6e6701a0a867..33a2d0b2249b 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,59 @@
++2026-09-18  Jonathan Wakely  <jwakely@redhat.com>
++
++	* testsuite/20_util/specialized_algorithms/pstl/uninitialized_copy_move.cc:
++	Replace references to namespace __pstl with std.
++	* testsuite/25_algorithms/pstl/alg_merge/inplace_merge.cc:
++	Likewise.
++	* testsuite/25_algorithms/pstl/alg_modifying_operations/copy_if.cc:
++	Likewise.
++	* testsuite/25_algorithms/pstl/alg_modifying_operations/copy_move.cc:
++	Likewise.
++	* testsuite/25_algorithms/pstl/alg_modifying_operations/is_partitioned.cc:
++	Likewise.
++	* testsuite/25_algorithms/pstl/alg_modifying_operations/partition.cc:
++	Likewise.
++	* testsuite/25_algorithms/pstl/alg_modifying_operations/partition_copy.cc:
++	Likewise.
++	* testsuite/25_algorithms/pstl/alg_modifying_operations/remove.cc:
++	Likewise.
++	* testsuite/25_algorithms/pstl/alg_modifying_operations/rotate.cc:
++	Likewise.
++	* testsuite/25_algorithms/pstl/alg_modifying_operations/rotate_copy.cc:
++	Likewise.
++	* testsuite/25_algorithms/pstl/alg_modifying_operations/unique.cc:
++	Likewise.
++	* testsuite/25_algorithms/pstl/alg_modifying_operations/unique_copy_equal.cc:
++	Likewise.
++	* testsuite/util/pstl/test_utils.h: Likewise.
++
++2026-09-18  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-09-17  Jonathan Wakely  <jwakely@redhat.com>
++
++	* testsuite/lib/libstdc++.exp (v3_check_preprocessor_condition):
++	Use argument as filename for preprocessing.
++
++2026-09-18  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-09-17  Jonathan Wakely  <jwakely@redhat.com>
++
++	* testsuite/lib/libstdc++.exp (check_v3_target_cpp_feature_test):
++	Use $v3_max_std variable instead of hardcoding the latest -std
++	option.
++
++2026-09-18  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-08-18  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/126786
++	* src/c++23/Makefile.am (empty.cc): New target.
++	(std.lo, std.o, std.compat.lo, std.compat.o): Use empty.cc as
++	fallback instead of overwriting original sources.
++	* src/c++23/Makefile.in: Regenerate.
++
+ 2026-09-16  Jonathan Wakely  <jwakely@redhat.com>
+ 
+ 	Backported from master:

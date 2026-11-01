@@ -1,0 +1,122 @@
+From b567707db43a9990e4319c0c38f4b0c752d45ac7 Mon Sep 17 00:00:00 2001
+From: liuhongt <hongtao.liu@intel.com>
+Date: Thu, 15 Oct 2026 00:29:50 -0700
+Subject: [PATCH 347/385] i386: Avoid emulated broadcasts of vector constants
+ [PR127897]
+
+Only broadcast floating-point constants when a broadcast instruction
+is available (AVX, or AVX2 for 16-bit elements), avoiding sequences such
+as movss + shufps.  For integer constants, guard broadcasting
+with TARGET_PREFER_BCST_FROM_INTEGER.
+
+	PR target/127897
+
+gcc/ChangeLog:
+
+	* config/i386/i386-expand.cc (ix86_expand_vector_move): Only
+	broadcast floating-point constants when a broadcast instruction
+	is available.  Guard integer broadcasts with
+	TARGET_PREFER_BCST_FROM_INTEGER.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/i386/pr127897-1.c: New test.
+	* gcc.target/i386/pr127897-2.c: Likewise.
+	* gcc.target/i386/pr127897-3.c: Likewise.
+
+(cherry picked from commit b2f4da30289466ed982464203d5e552f83421fe8)
+---
+ gcc/config/i386/i386-expand.cc             |  9 ++++++++-
+ gcc/testsuite/gcc.target/i386/pr127897-1.c | 20 ++++++++++++++++++++
+ gcc/testsuite/gcc.target/i386/pr127897-2.c | 14 ++++++++++++++
+ gcc/testsuite/gcc.target/i386/pr127897-3.c | 13 +++++++++++++
+ 4 files changed, 55 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr127897-1.c
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr127897-2.c
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr127897-3.c
+
+diff --git a/gcc/config/i386/i386-expand.cc b/gcc/config/i386/i386-expand.cc
+index f4968af6c72d..a4439c57eb3f 100644
+--- a/gcc/config/i386/i386-expand.cc
++++ b/gcc/config/i386/i386-expand.cc
+@@ -703,7 +703,14 @@ ix86_expand_vector_move (machine_mode mode, rtx operands[])
+ 	  && CONSTANT_POOL_ADDRESS_P (XEXP (op1, 0))))
+     {
+       rtx first = ix86_broadcast_from_constant (mode, op1);
+-      if (first != nullptr)
++      /* Only broadcast floating-point constants when a broadcast instruction
++	 is available (AVX, or AVX2 for 16-bit elements), avoiding sequences
++	 such as movss + shufps.  For integer constants, guard broadcasting
++	 with TARGET_PREFER_BCST_FROM_INTEGER.  */
++      if (first != nullptr
++	  && (FLOAT_MODE_P (mode)
++	      ? (GET_MODE_UNIT_SIZE (mode) < 4 ? TARGET_AVX2 : TARGET_AVX)
++	      : TARGET_PREFER_BCST_FROM_INTEGER))
+ 	{
+ 	  /* Broadcast to XMM/YMM/ZMM register from an integer
+ 	     constant or scalar mem.  */
+diff --git a/gcc/testsuite/gcc.target/i386/pr127897-1.c b/gcc/testsuite/gcc.target/i386/pr127897-1.c
+new file mode 100644
+index 000000000000..f765fe2d5c65
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr127897-1.c
+@@ -0,0 +1,20 @@
++/* PR target/127897 */
++/* { dg-do compile } */
++/* { dg-options "-O2 -msse4.1 -mno-avx" } */
++/* { dg-final { scan-assembler-not "shufps" } } */
++/* { dg-final { scan-assembler-not "movss" } } */
++/* { dg-final { scan-assembler-not "movddup" } } */
++
++#include <immintrin.h>
++
++__m128
++f (__m128 x)
++{
++  return _mm_add_ps (_mm_mul_ps (x, _mm_set1_ps (1.5f)), _mm_set1_ps (0.25f));
++}
++
++__m128d
++g (__m128d x)
++{
++  return _mm_mul_pd (x, _mm_set1_pd (1.5));
++}
+diff --git a/gcc/testsuite/gcc.target/i386/pr127897-2.c b/gcc/testsuite/gcc.target/i386/pr127897-2.c
+new file mode 100644
+index 000000000000..663f164ee433
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr127897-2.c
+@@ -0,0 +1,14 @@
++/* PR target/127897 */
++/* { dg-do compile } */
++/* { dg-options "-O2 -msse4.1 -mno-avx -mtune-ctrl=^prefer_bcst_from_integer" } */
++/* { dg-final { scan-assembler-not "pshufd" } } */
++/* { dg-final { scan-assembler-not "movd\[ \\t\]" } } */
++
++#include <immintrin.h>
++
++__m128i
++f (__m128i x)
++{
++  return _mm_add_epi32 (_mm_mullo_epi32 (x, _mm_set1_epi32 (12345)),
++			_mm_set1_epi32 (678));
++}
+diff --git a/gcc/testsuite/gcc.target/i386/pr127897-3.c b/gcc/testsuite/gcc.target/i386/pr127897-3.c
+new file mode 100644
+index 000000000000..1f3c0bd02741
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr127897-3.c
+@@ -0,0 +1,13 @@
++/* PR target/127897 */
++/* { dg-do compile } */
++/* { dg-options "-O2 -mavx2 -mno-avx512f" } */
++/* { dg-final { scan-assembler-times "vbroadcastss" 2 } } */
++
++#include <immintrin.h>
++
++__m128
++f (__m128 x)
++{
++  return _mm_add_ps (_mm_mul_ps (x, _mm_set1_ps (1.5f)), _mm_set1_ps (0.25f));
++}
++

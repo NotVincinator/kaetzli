@@ -1,0 +1,210 @@
+From 111aa7e0b9ce55571ea0c38264800d64e3952f53 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Tue, 20 Oct 2026 12:06:59 +0200
+Subject: [PATCH 378/385] isel: Fix up optimize_atomic_bit_test_and [PR127965]
+
+If __atomic_fetch_{or,and}_* has its lhs used only in a cast,
+optimize_atomic_bit_test_and accepts it in some cases with
+      else if (TYPE_PRECISION (TREE_TYPE (use_lhs))
+               <= TYPE_PRECISION (TREE_TYPE (use_rhs)))
+condition where use_lhs is the lhs of the cast and use_rhs
+is the rhs1 of that.  This is used with there is ~ operation
+followed by NOP_EXPR to BOOLEAN_TYPE (in that case narrowing
+conversion is ok and we just verify the atomic operation ors in
+or performs and not of the least significant bit, or if there
+is masking and we verify corresponding mask (again, narrowing
+cast is ok).
+r13-3760 added another case, < 0 or >= 0 comparisons as a pattern
+to test the most significant bit.  Initially I thought narrowing
+conversion would need to be avoided for that case, but it is just
+fine, all we need to do is use the correct and mask for that,
+use most significant bit of the narrower type (i.e. TREE_TYPE (use_lhs)
+instead of TREE_TYPE (use_rhs).  Even that doesn't fix everything,
+another problem was that it was computing the most significant bit
+from TYPE_SIZE_UNIT multiplied by BITS_PER_UNIT.  That works for
+type_has_mode_precision_p types, but not for others, e.g. _BitInt.
+< 0 compares the most significant bit of its precision.
+Furthermore, just in case, I've added a test for !TYPE_UNSIGNED,
+in simplified code < 0 or >= 0 on unsigned would be likely optimized
+away, but maybe we get unsimplified stmt.
+The other changes are fixes for typos in the surrounding comments
+and some formatting nits.
+
+2026-10-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/127965
+	* gimple-isel.cc (optimize_atomic_bit_test_and): For the
+	< 0 and >= 0 cases, punt if TREE_TYPE (use_lhs) is unsigned.
+	Compute ibit from TYPE_PRECISION of TREE_TYPE (use_lhs)
+	rather than TYPE_SIZE_UNIT of TREE_TYPE (use_rhs).  Fix comment
+	pastos and other nits.  Formatting fix.
+	(gimple_isel_builtin_call): Formatting fix.
+
+	* gcc.dg/pr127965-1.c: New test.
+	* gcc.dg/pr127965-2.c: New test.
+	* gcc.target/i386/pr127965-1.c: New test.
+	* gcc.target/i386/pr127965-2.c: New test.
+
+Reviewed-by: Richard Biener <rguenth@suse.de>
+(cherry picked from commit 56fcf06ffbdf39d3a6a20298d9c0a3a80fc95f70)
+---
+ gcc/gimple-isel.cc                         | 16 ++++++++--------
+ gcc/testsuite/gcc.dg/pr127965-1.c          | 12 ++++++++++++
+ gcc/testsuite/gcc.dg/pr127965-2.c          | 12 ++++++++++++
+ gcc/testsuite/gcc.target/i386/pr127965-1.c | 16 ++++++++++++++++
+ gcc/testsuite/gcc.target/i386/pr127965-2.c | 16 ++++++++++++++++
+ 5 files changed, 64 insertions(+), 8 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/pr127965-1.c
+ create mode 100644 gcc/testsuite/gcc.dg/pr127965-2.c
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr127965-1.c
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr127965-2.c
+
+diff --git a/gcc/gimple-isel.cc b/gcc/gimple-isel.cc
+index 6f987c49121a..3b8be2395f79 100644
+--- a/gcc/gimple-isel.cc
++++ b/gcc/gimple-isel.cc
+@@ -664,7 +664,7 @@ optimize_atomic_bit_test_and (gimple_stmt_iterator *gsip,
+ 		     _7 = ~_2;
+ 		     _5 = (_Bool) _7;
+ 		     to
+-		     _1 = __atomic_fetch_or_4 (ptr_6, ~1, _3);
++		     _1 = __atomic_fetch_or_4 (ptr_6, 1, _3);
+ 		     _8 = _1 & 1;
+ 		     _5 = _8 == 0;
+ 		     and convert
+@@ -673,7 +673,7 @@ optimize_atomic_bit_test_and (gimple_stmt_iterator *gsip,
+ 		     _7 = ~_2;
+ 		     _5 = (_Bool) _7;
+ 		     to
+-		     _1 = __atomic_fetch_and_4 (ptr_6, 1, _3);
++		     _1 = __atomic_fetch_and_4 (ptr_6, ~1, _3);
+ 		     _8 = _1 & 1;
+ 		     _5 = _8 == 0;
+ 		   */
+@@ -707,6 +707,8 @@ optimize_atomic_bit_test_and (gimple_stmt_iterator *gsip,
+ 		    }
+ 		  if (rhs_code != GE_EXPR && rhs_code != LT_EXPR)
+ 		    return false;
++		  if (TYPE_UNSIGNED (TREE_TYPE (use_lhs)))
++		    return false;
+ 		  if (use_lhs != cmp_rhs1)
+ 		    return false;
+ 		  if (!integer_zerop (cmp_rhs2))
+@@ -714,9 +716,7 @@ optimize_atomic_bit_test_and (gimple_stmt_iterator *gsip,
+ 
+ 		  tree and_mask;
+ 
+-		  unsigned HOST_WIDE_INT bytes
+-		    = tree_to_uhwi (TYPE_SIZE_UNIT (TREE_TYPE (use_rhs)));
+-		  ibit = bytes * BITS_PER_UNIT - 1;
++		  ibit = TYPE_PRECISION (TREE_TYPE (use_lhs)) - 1;
+ 		  unsigned HOST_WIDE_INT highest
+ 		    = HOST_WIDE_INT_1U << ibit;
+ 
+@@ -775,7 +775,7 @@ optimize_atomic_bit_test_and (gimple_stmt_iterator *gsip,
+ 		       */
+ 		    }
+ 		  var = make_ssa_name (TREE_TYPE (use_rhs));
+-		  gimple* use_stmt_removal = use_stmt;
++		  gimple *use_stmt_removal = use_stmt;
+ 		  g = gimple_build_assign (var, BIT_AND_EXPR, use_rhs,
+ 					   and_mask);
+ 		  gsi = gsi_for_stmt (use_nop_stmt);
+@@ -837,7 +837,7 @@ optimize_atomic_bit_test_and (gimple_stmt_iterator *gsip,
+ 		 _12 = _3 & mask_7;
+ 		 _5 = (int) _12;
+ 
+-		 and Convert
++		 and convert
+ 		 _1 = __atomic_fetch_and_4 (ptr_6, ~mask, _3);
+ 		 _2 = (short int) _1;
+ 		 _5 = _2 & mask;
+@@ -1286,7 +1286,7 @@ gimple_isel_builtin_call (gcall *call, gimple_stmt_iterator *gsi)
+     return;
+ 
+   tree callee = gimple_call_fndecl (call);
+-  
++
+   switch (DECL_FUNCTION_CODE (callee))
+     {
+ #define CASE_ATOMIC(NAME) 			\
+diff --git a/gcc/testsuite/gcc.dg/pr127965-1.c b/gcc/testsuite/gcc.dg/pr127965-1.c
+new file mode 100644
+index 000000000000..de898247ec7a
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr127965-1.c
+@@ -0,0 +1,12 @@
++/* PR tree-optimization/127965 */
++/* { dg-do run } */
++/* { dg-options "-O2" } */
++
++int
++main ()
++{
++  int x = (unsigned char) (-__SCHAR_MAX__ - 1);
++  int v = __atomic_fetch_or (&x, -__INT_MAX__ - 1, __ATOMIC_SEQ_CST);
++  if ((signed char) v >= 0)
++    __builtin_abort ();
++}
+diff --git a/gcc/testsuite/gcc.dg/pr127965-2.c b/gcc/testsuite/gcc.dg/pr127965-2.c
+new file mode 100644
+index 000000000000..7bb9f1f90e62
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr127965-2.c
+@@ -0,0 +1,12 @@
++/* PR tree-optimization/127965 */
++/* { dg-do run { target bitint } } */
++/* { dg-options "-O2" } */
++
++int
++main ()
++{
++  int x = 0x20;
++  int v = __atomic_fetch_or (&x, (unsigned char) (-__SCHAR_MAX__ - 1), __ATOMIC_SEQ_CST);
++  if ((_BitInt (6)) v >= 0)
++    __builtin_abort ();
++}
+diff --git a/gcc/testsuite/gcc.target/i386/pr127965-1.c b/gcc/testsuite/gcc.target/i386/pr127965-1.c
+new file mode 100644
+index 000000000000..94a8f46d5481
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr127965-1.c
+@@ -0,0 +1,16 @@
++/* PR tree-optimization/127965 */
++/* { dg-do compile } */
++/* { dg-options "-O2 -masm=att" } */
++
++int x = (unsigned char) (-__SCHAR_MAX__ - 1);
++
++void
++foo ()
++{
++  int v = __atomic_fetch_or (&x, (unsigned char) (-__SCHAR_MAX__ - 1), __ATOMIC_SEQ_CST);
++  if ((signed char) v >= 0)
++    __builtin_abort ();
++}
++
++/* { dg-final { scan-assembler "lock;?\[ \t\]*btsl" } } */
++/* { dg-final { scan-assembler-not "cmpxchg" } } */
+diff --git a/gcc/testsuite/gcc.target/i386/pr127965-2.c b/gcc/testsuite/gcc.target/i386/pr127965-2.c
+new file mode 100644
+index 000000000000..2e99d3a16371
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr127965-2.c
+@@ -0,0 +1,16 @@
++/* PR tree-optimization/127965 */
++/* { dg-do compile { target bitint } } */
++/* { dg-options "-O2 -masm=att" } */
++
++int x = 0x20;
++
++void
++foo ()
++{
++  int v = __atomic_fetch_or (&x, 0x20, __ATOMIC_SEQ_CST);
++  if ((_BitInt (6)) v >= 0)
++    __builtin_abort ();
++}
++
++/* { dg-final { scan-assembler "lock;?\[ \t\]*btsl" } } */
++/* { dg-final { scan-assembler-not "cmpxchg" } } */

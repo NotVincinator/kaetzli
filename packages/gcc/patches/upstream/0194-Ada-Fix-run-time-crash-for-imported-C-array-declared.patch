@@ -1,0 +1,141 @@
+From 38ba2d9b7faf02ed3ffab9be5fd458b1b94d3cb2 Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Tue, 22 Sep 2026 10:26:33 +0200
+Subject: [PATCH 194/385] Ada: Fix run-time crash for imported C array declared
+ without size
+
+This is a regression introduced by a couple of recent unrelated changes,
+which shows that adding an implicit indirection for large objects that
+are declared at the library level may be problematic, especially when
+they are intended to be part of an interface, e.g. to a foreign language.
+
+Therefore, this changes the compiler to stop adding the indirection for
+large objects subject to an aspect/pragma Export or Import.  As a result,
+the compiler or the linker will issue error messages for them.
+
+gcc/ada/
+	* gcc-interface/decl.cc (allocatable_size_p): Add INTERFACE_P
+	parameter and return true for any fixed size when it is true.
+	(gnat_to_gnu_entity): Add EXPORTED_P local variable and use it
+	throughout.
+	<E_Variable>: Adjust calls to allocatable_size_p by passing true
+	for INTERFACE_P if the object is exported or imported.  Remove
+	unreachable code giving a warning for too large imported objects.
+---
+ gcc/ada/gcc-interface/decl.cc | 50 ++++++++++++++++-------------------
+ 1 file changed, 23 insertions(+), 27 deletions(-)
+
+diff --git a/gcc/ada/gcc-interface/decl.cc b/gcc/ada/gcc-interface/decl.cc
+index f9f87b1362e1..c3378e39575b 100644
+--- a/gcc/ada/gcc-interface/decl.cc
++++ b/gcc/ada/gcc-interface/decl.cc
+@@ -215,7 +215,7 @@ static bool compile_time_known_address_p (Node_Id);
+ static bool flb_cannot_be_superflat (Node_Id);
+ static bool range_cannot_be_superflat (Node_Id);
+ static bool constructor_address_p (tree);
+-static bool allocatable_size_p (tree, bool);
++static bool allocatable_size_p (tree, bool, bool);
+ static bool initial_value_needs_conversion (tree, tree);
+ static tree update_n_elem (tree, tree, tree);
+ static int compare_field_bitpos (const void *, const void *);
+@@ -307,6 +307,7 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
+   const bool artificial_p = is_artificial (gnat_entity);
+   /* True if debug info is requested for this entity.  */
+   const bool debug_info_p = Needs_Debug_Info (gnat_entity);
++  const bool exported_p = Is_Exported (gnat_entity);
+   /* True if this entity is to be considered as imported.  */
+   const bool imported_p
+     = (Is_Imported (gnat_entity) && No (Address_Clause (gnat_entity)));
+@@ -744,7 +745,7 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
+ 	   objects by making them volatile.  */
+ 	bool volatile_flag
+ 	  = (Treat_As_Volatile (gnat_entity)
+-	     || (!const_flag && (Is_Exported (gnat_entity) || imported_p)));
++	     || (!const_flag && (exported_p || imported_p)));
+ 	bool mutable_p = false;
+ 	bool used_by_ref = false;
+ 	tree gnu_ext_name = NULL_TREE;
+@@ -935,7 +936,7 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
+ 		    && kind != E_Out_Parameter
+ 		    && Is_Composite_Type (gnat_type)
+ 		    && !Is_Constr_Array_Subt_With_Bounds (gnat_type)
+-		    && !Is_Exported (gnat_entity)
++		    && !exported_p
+ 		    && !imported_p
+ 		    && No (gnat_renamed_obj)
+ 		    && No (Address_Clause (gnat_entity))))
+@@ -1411,7 +1412,8 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
+ 	if (!allocatable_size_p (TYPE_SIZE_UNIT (gnu_type),
+ 				 global_bindings_p ()
+ 				 || !definition
+-				 || static_flag)
++				 || static_flag,
++				 exported_p || imported_p)
+ 	    || (gnu_size
+ 		&& !allocatable_size_p (convert (sizetype,
+ 						 size_binop
+@@ -1419,29 +1421,20 @@ gnat_to_gnu_entity (Entity_Id gnat_entity, tree gnu_expr, bool definition)
+ 						  bitsize_unit_node)),
+ 					global_bindings_p ()
+ 					|| !definition
+-					|| static_flag)))
++					|| static_flag,
++					exported_p || imported_p)))
+ 	  {
+ 	    /* Give a warning if the size is constant.  */
+ 	    if ((TREE_CODE (TYPE_SIZE_UNIT (gnu_type)) == INTEGER_CST
+ 		 || (gnu_size && TREE_CODE (gnu_size) == INTEGER_CST))
+-		&& definition)
++		&& definition
++		&& (global_bindings_p () || static_flag))
+ 	      {
+-		if (imported_p)
+-		  {
+-		    post_error
+-		      ("??too large object cannot be imported directly",
+-		       gnat_entity);
+-		    post_error ("\\??indirect import will be used instead",
++		post_error
++		  ("??too large object cannot be allocated statically",
++		   gnat_entity);
++		post_error ("\\??dynamic allocation will be used instead",
+ 				gnat_entity);
+-		  }
+-		else if (global_bindings_p () || static_flag)
+-		  {
+-		    post_error
+-		      ("??too large object cannot be allocated statically",
+-		       gnat_entity);
+-		    post_error ("\\??dynamic allocation will be used instead",
+-				gnat_entity);
+-		  }
+ 	      }
+ 
+ 	    if (volatile_flag && !TYPE_VOLATILE (gnu_type))
+@@ -7100,17 +7093,20 @@ constructor_address_p (tree gnu_expr)
+ 
+ /* Return true if the size in units represented by GNU_SIZE can be handled by
+    an allocation.  If STATIC_P is true, consider only what can be done with a
+-   static allocation.  */
++   static allocation.  If INTERFACE_P is true, the allocation is intended to
++   be part of an explicit interface to other units, possibly foreign.  */
+ 
+ static bool
+-allocatable_size_p (tree gnu_size, bool static_p)
++allocatable_size_p (tree gnu_size, bool static_p, bool interface_p)
+ {
+   /* We can allocate a fixed size if it is a valid for the middle-end but, for
+      a static allocation, we do not allocate more than 2 GB because this would
+-     very likely be unintended and problematic for usual code models.  */
+-  if (TREE_CODE (gnu_size) == INTEGER_CST)
+-    return valid_constant_size_p (gnu_size)
+-	   && (!static_p || tree_to_uhwi (gnu_size) <= INT_MAX);
++     very likely be unintended and problematic for usual code models.  But we
++     do not try to fiddle with allocations that are part of an interface.  */
++   if (TREE_CODE (gnu_size) == INTEGER_CST)
++    return (interface_p
++	    || (valid_constant_size_p (gnu_size)
++		&& (!static_p || tree_to_uhwi (gnu_size) <= INT_MAX)));
+ 
+   /* We can allocate a variable size if this isn't a static allocation.  */
+   else

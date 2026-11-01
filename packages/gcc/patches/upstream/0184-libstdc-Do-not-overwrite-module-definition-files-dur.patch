@@ -1,0 +1,147 @@
+From 35566ac03c5f25f3f876a1ccbc93bef3f9757ad5 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Mon, 17 Aug 2026 19:04:34 +0100
+Subject: [PATCH 184/385] libstdc++: Do not overwrite module definition files
+ during build [PR126786]
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+As described in the bug report, when compilation of std.cc or
+std.compat.cc fails we overwrite the source file with an empty file, and
+then compile that (so that bootstrap doesn't fail). Then when the module
+definition files are installed, we install the empty file.
+
+We should install the original source, not an empty file. We can create
+an empty file and compile it, but leave the original source untouched so
+that it can still be installed.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/126786
+	* src/c++23/Makefile.am (empty.cc): New target.
+	(std.lo, std.o, std.compat.lo, std.compat.o): Use empty.cc as
+	fallback instead of overwriting original sources.
+	* src/c++23/Makefile.in: Regenerate.
+
+Reviewed-by: Tomasz Kamiński <tkaminsk@redhat.com>
+(cherry picked from commit e87a450f3ead2d6278a54e93409ff67853de93ef)
+---
+ libstdc++-v3/src/c++23/Makefile.am | 24 ++++++++++++------------
+ libstdc++-v3/src/c++23/Makefile.in | 24 ++++++++++++------------
+ 2 files changed, 24 insertions(+), 24 deletions(-)
+
+diff --git a/libstdc++-v3/src/c++23/Makefile.am b/libstdc++-v3/src/c++23/Makefile.am
+index 92691c502a94..e09c4bd54da2 100644
+--- a/libstdc++-v3/src/c++23/Makefile.am
++++ b/libstdc++-v3/src/c++23/Makefile.am
+@@ -54,6 +54,10 @@ std.cc: std.cc.in std-clib.cc.in
+ std.compat.cc: std.compat.cc.in std-clib.cc.in
+ 	cat $^ > $@
+ 
++# Empty file used in case std.cc or std.compat.cc fails to compile.
++empty.cc:
++	echo > $@
++
+ # Also put the interface units in the build-includes bits directory.
+ stamp-modules-bits: $(includebits_DATA)
+ 	@-mkdir -p $(top_builddir)/include/bits
+@@ -100,33 +104,29 @@ MODULES_FLAGS = -isystem ${glibcxx_srcdir}/include/backward -fmodules \
+ 	-Wno-unknown-pragmas
+ 
+ # These go into libmodulesconvenience.la and are linked into libstdc++
+-std.lo: std.cc
++std.lo: std.cc empty.cc
+ 	if ! $(LTCXXCOMPILE) $(MODULES_FLAGS) -c $< ; then \
+ 	  echo "Cannot compile std module" >&2; \
+ 	  echo "Module initialization function will be missing" >&2; \
+-	  echo > $<.tmp && mv $<.tmp $< && \
+-	  $(LTCXXCOMPILE) $(MODULES_FLAGS) -c $< ; \
++	  $(LTCXXCOMPILE) $(MODULES_FLAGS) -c empty.cc -o $@; \
+ 	fi
+-std.o: std.cc
++std.o: std.cc empty.cc
+ 	if ! $(CXXCOMPILE) $(MODULES_FLAGS) -c $< ; then \
+ 	  echo "Cannot compile std module" >&2; \
+ 	  echo "Module initialization function will be missing" >&2; \
+-	  echo > $<.tmp && mv $<.tmp $< && \
+-	  $(CXXCOMPILE) $(MODULES_FLAGS) -c $< ; \
++	  $(CXXCOMPILE) $(MODULES_FLAGS) -c empty.cc -o $@; \
+ 	fi
+-std.compat.lo: std.compat.cc std.lo
++std.compat.lo: std.compat.cc std.lo empty.cc
+ 	if ! $(LTCXXCOMPILE) $(MODULES_FLAGS) -c $< ; then \
+ 	  echo "Cannot compile std.compat module" >&2; \
+ 	  echo "Module initialization function will be missing" >&2; \
+-	  echo > $<.tmp && mv $<.tmp $< && \
+-	  $(LTCXXCOMPILE) $(MODULES_FLAGS) -c $< ; \
++	  $(LTCXXCOMPILE) $(MODULES_FLAGS) -c empty.cc -o $@; \
+ 	fi
+-std.compat.o: std.compat.cc std.o
++std.compat.o: std.compat.cc std.o empty.cc
+ 	if ! $(CXXCOMPILE) $(MODULES_FLAGS) -c $< ; then \
+ 	  echo "Cannot compile std.compat module" >&2; \
+ 	  echo "Module initialization function will be missing" >&2; \
+-	  echo > $<.tmp && mv $<.tmp $< && \
+-	  $(CXXCOMPILE) $(MODULES_FLAGS) -c $< ; \
++	  $(CXXCOMPILE) $(MODULES_FLAGS) -c empty.cc -o $@; \
+ 	fi
+ 
+ # AM_CXXFLAGS needs to be in each subdirectory so that it can be
+diff --git a/libstdc++-v3/src/c++23/Makefile.in b/libstdc++-v3/src/c++23/Makefile.in
+index 0ce93f812d25..f3ea90ce2478 100644
+--- a/libstdc++-v3/src/c++23/Makefile.in
++++ b/libstdc++-v3/src/c++23/Makefile.in
+@@ -862,6 +862,10 @@ std.cc: std.cc.in std-clib.cc.in
+ std.compat.cc: std.compat.cc.in std-clib.cc.in
+ 	cat $^ > $@
+ 
++# Empty file used in case std.cc or std.compat.cc fails to compile.
++empty.cc:
++	echo > $@
++
+ # Also put the interface units in the build-includes bits directory.
+ stamp-modules-bits: $(includebits_DATA)
+ 	@-mkdir -p $(top_builddir)/include/bits
+@@ -884,33 +888,29 @@ print.o: print.cc
+ 	$(CXXCOMPILE) -std=gnu++26 -c $<
+ 
+ # These go into libmodulesconvenience.la and are linked into libstdc++
+-std.lo: std.cc
++std.lo: std.cc empty.cc
+ 	if ! $(LTCXXCOMPILE) $(MODULES_FLAGS) -c $< ; then \
+ 	  echo "Cannot compile std module" >&2; \
+ 	  echo "Module initialization function will be missing" >&2; \
+-	  echo > $<.tmp && mv $<.tmp $< && \
+-	  $(LTCXXCOMPILE) $(MODULES_FLAGS) -c $< ; \
++	  $(LTCXXCOMPILE) $(MODULES_FLAGS) -c empty.cc -o $@; \
+ 	fi
+-std.o: std.cc
++std.o: std.cc empty.cc
+ 	if ! $(CXXCOMPILE) $(MODULES_FLAGS) -c $< ; then \
+ 	  echo "Cannot compile std module" >&2; \
+ 	  echo "Module initialization function will be missing" >&2; \
+-	  echo > $<.tmp && mv $<.tmp $< && \
+-	  $(CXXCOMPILE) $(MODULES_FLAGS) -c $< ; \
++	  $(CXXCOMPILE) $(MODULES_FLAGS) -c empty.cc -o $@; \
+ 	fi
+-std.compat.lo: std.compat.cc std.lo
++std.compat.lo: std.compat.cc std.lo empty.cc
+ 	if ! $(LTCXXCOMPILE) $(MODULES_FLAGS) -c $< ; then \
+ 	  echo "Cannot compile std.compat module" >&2; \
+ 	  echo "Module initialization function will be missing" >&2; \
+-	  echo > $<.tmp && mv $<.tmp $< && \
+-	  $(LTCXXCOMPILE) $(MODULES_FLAGS) -c $< ; \
++	  $(LTCXXCOMPILE) $(MODULES_FLAGS) -c empty.cc -o $@; \
+ 	fi
+-std.compat.o: std.compat.cc std.o
++std.compat.o: std.compat.cc std.o empty.cc
+ 	if ! $(CXXCOMPILE) $(MODULES_FLAGS) -c $< ; then \
+ 	  echo "Cannot compile std.compat module" >&2; \
+ 	  echo "Module initialization function will be missing" >&2; \
+-	  echo > $<.tmp && mv $<.tmp $< && \
+-	  $(CXXCOMPILE) $(MODULES_FLAGS) -c $< ; \
++	  $(CXXCOMPILE) $(MODULES_FLAGS) -c empty.cc -o $@; \
+ 	fi
+ 
+ # Tell versions [3.59,3.63) of GNU make to not export all variables.

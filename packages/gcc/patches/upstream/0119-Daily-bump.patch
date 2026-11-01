@@ -1,0 +1,59 @@
+From 40d7338eba0b826acf781a0b77f2d2cd85967247 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sun, 30 Aug 2026 00:21:16 +0000
+Subject: [PATCH 119/385] Daily bump.
+
+---
+ gcc/ChangeLog           |  9 +++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 16 ++++++++++++++++
+ 3 files changed, 26 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 08c8284e3db5..511ee66141e3 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,12 @@
++2026-08-29  Georg-Johann Lay  <avr@gjlay.de>
++
++	Backported from master:
++	2026-08-29  Georg-Johann Lay  <avr@gjlay.de>
++
++	PR middle-end/127098
++	* config/avr/avr.md (MPUSH): Add TImode to mode iterator.
++	* config/avr/avr.h (PUSH_ROUNDING): Adjust comment.
++
+ 2026-08-28  Richard Biener  <rguenther@suse.de>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 6bdb0652ae95..cb2d581fd4b4 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260829
++20260830
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 352bddce34b4..ec1944773204 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,19 @@
++2026-08-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-08-29  Jakub Jelinek  <jakub@redhat.com>
++
++	* gfortran.dg/guality/arg1.f90: Put a breakpoint on volatile
++	variable increment instead of on the write statement.
++
++2026-08-29  Georg-Johann Lay  <avr@gjlay.de>
++
++	Backported from master:
++	2026-08-29  Georg-Johann Lay  <avr@gjlay.de>
++
++	PR middle-end/127098
++	* gcc.target/avr/torture/pr127098.c: New test.
++
+ 2026-08-28  Richard Biener  <rguenther@suse.de>
+ 
+ 	Backported from master:

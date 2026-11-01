@@ -1,0 +1,54 @@
+From bf226617ad929123e7e34adbd131ecacfc4ea1ff Mon Sep 17 00:00:00 2001
+From: Michael Meissner <meissner@linux.ibm.com>
+Date: Thu, 27 Aug 2026 12:08:03 -0400
+Subject: [PATCH 106/385] Update my entry in MAINTAINERS.
+
+This change updates my information.
+
+2026-08-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* MAINTAINERS: Update Michael Meissner's information.
+	Backported from master from 2026-08-07.1
+---
+ MAINTAINERS | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index d7e5a163e0f3..85cb92753ab6 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -36,7 +36,7 @@ Richard Earnshaw                                <richard.earnshaw@arm.com>
+ Jakub Jelinek                                   <jakub@redhat.com>
+ Richard Kenner                                  <kenner@nyu.edu>
+ Jeff Law                                        <jeffrey.law@oss.qualcomm.com>
+-Michael Meissner                                <gnu@the-meissners.org>
++Michael Meissner                                <meissner@gcc.gnu.org>
+ Jason Merrill                                   <jason@redhat.com>
+ David S. Miller                                 <davem@redhat.com>
+ Joseph Myers                                    <josmyers@redhat.com>
+@@ -116,7 +116,7 @@ riscv port              Jim Wilson              <jim.wilson.gcc@gmail.com>
+ rs6000/powerpc port     David Edelsohn          <dje.gcc@gmail.com>
+ rs6000/powerpc port     Segher Boessenkool      <segher@kernel.crashing.org>
+ rs6000/powerpc port     Kewen Lin               <linkw@gcc.gnu.org>
+-rs6000 vector extns     Aldy Hernandez          <aldy@quesejoda.com>
++rs6000/powerpc port     Michael Meissner        <meissner@gcc.gnu.org>
+ rx port                 Nick Clifton            <nickc@redhat.com>
+ s390 port               Ulrich Weigand          <uweigand@de.ibm.com>
+ s390 port               Andreas Krebbel         <krebbel@linux.ibm.com>
+@@ -201,7 +201,6 @@ libphobos               Iain Buclaw             <ibuclaw@gdcproject.org>
+ line map                Dodji Seketeli          <dodji@redhat.com>
+ soft-fp                 Joseph Myers            <josmyers@redhat.com>
+ scheduler (+ haifa)     Jim Wilson              <wilson@tuliptree.org>
+-scheduler (+ haifa)     Michael Meissner        <gnu@the-meissners.org>
+ scheduler (+ haifa)     Jeff Law                <jeffreyalaw@gmail.com>
+ scheduler (+ haifa)     Vladimir Makarov        <vmakarov@redhat.com>
+ modulo-scheduler        Roman Zhuykov           <zhroma@ispras.ru>
+@@ -686,7 +685,7 @@ Bryce McKinlay                  bryce           <mckinlay@redhat.com>
+ Karl Meakin                     -               <karl.meakin@arm.com>
+ Adam Megacz                     -               <adam@xwt.org>
+ Bingfeng Mei                    meibf           <bmei@broadcom.com>
+-Michael Meissner                meissner        <gnu@the-meissners.org>
++Michael Meissner                meissner        <meissner@gcc.gnu.org>
+ Josef Melcr                     jmelcr          <josef.melcr@suse.com>
+ Jason Merrill                   jason           <jason@redhat.com>
+ Jim Meyering                    -               <jim@meyering.net>

@@ -1,0 +1,97 @@
+From 9ade000c36f761b1968e78501ebf2c40fad4054b Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Wed, 7 Oct 2026 21:34:28 +0200
+Subject: [PATCH 247/385] Ada: Fix bogus warning on use clause for package
+
+This occurs when an overloaded subprogram of the package is locally renamed,
+because this renaming is not recorded as a reference to the package.
+
+gcc/ada/
+	PR ada/126448
+	* sem_ch8.adb (Analyze_Subprogram_Renaming): Pass Nam instead of
+	Name (N) in the calls to Find_Renamed_Entity.  Remove if_statement
+	whose condition is always false.
+	(Find_Renamed_Entity): In the overloaded case and if the overload
+	resolution has succeeded, call Mark_Use_Clauses on the entity.
+
+gcc/testsuite/
+	* gnat.dg/renaming20.adb: New test.
+---
+ gcc/ada/sem_ch8.adb                  | 16 ++++++----------
+ gcc/testsuite/gnat.dg/renaming20.adb | 17 +++++++++++++++++
+ 2 files changed, 23 insertions(+), 10 deletions(-)
+ create mode 100644 gcc/testsuite/gnat.dg/renaming20.adb
+
+diff --git a/gcc/ada/sem_ch8.adb b/gcc/ada/sem_ch8.adb
+index e1e20f50ca93..d9422665bd7a 100644
+--- a/gcc/ada/sem_ch8.adb
++++ b/gcc/ada/sem_ch8.adb
+@@ -3355,7 +3355,7 @@ package body Sem_Ch8 is
+                --  Box present
+ 
+                if Box_Present (Inst_Node) then
+-                  Old_S := Find_Renamed_Entity (N, Name (N), New_S, Is_Actual);
++                  Old_S := Find_Renamed_Entity (N, Nam, New_S, Is_Actual);
+ 
+                --  If there is an immediately visible homonym of the operator
+                --  and the declaration has a default, this is worth a warning
+@@ -3719,7 +3719,7 @@ package body Sem_Ch8 is
+       Ada_Version_Explicit := Ada_Version;
+ 
+       if No (Old_S) then
+-         Old_S := Find_Renamed_Entity (N, Name (N), New_S, Is_Actual);
++         Old_S := Find_Renamed_Entity (N, Nam, New_S, Is_Actual);
+ 
+          --  The visible operation may be an inherited abstract operation that
+          --  was overridden in the private part, in which case a call will
+@@ -3735,14 +3735,6 @@ package body Sem_Ch8 is
+          then
+             Old_S := Alias (Old_S);
+          end if;
+-
+-         --  When the renamed subprogram is overloaded and used as an actual
+-         --  of a generic, its entity is set to the first available homonym.
+-         --  We must first disambiguate the name, then set the proper entity.
+-
+-         if Is_Actual and then Is_Overloaded (Nam) then
+-            Set_Entity (Nam, Old_S);
+-         end if;
+       end if;
+ 
+       --  Most common case: subprogram renames subprogram. No body is generated
+@@ -8148,8 +8140,12 @@ package body Sem_Ch8 is
+ 
+          Set_Entity (Nam, Old_S);
+ 
++         --  If overload resolution has succeeded, reset the flag and mark
++         --  relevant use clauses like Find_{Direct,Expanded}_Name above.
++
+          if Old_S /= Any_Id then
+             Set_Is_Overloaded (Nam, False);
++            Mark_Use_Clauses (Old_S);
+          end if;
+ 
+       --  Non-overloaded case
+diff --git a/gcc/testsuite/gnat.dg/renaming20.adb b/gcc/testsuite/gnat.dg/renaming20.adb
+new file mode 100644
+index 000000000000..493ad27f93f7
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/renaming20.adb
+@@ -0,0 +1,17 @@
++-- { dg-do compile }
++-- { dg-options "-gnatwu" }
++
++with Ada.Strings.Fixed;
++with Ada.Text_IO;
++
++procedure Renaming20 is
++
++  use Ada.Strings;
++  use Fixed;
++
++  function T (Item : String; Side : Trim_End) return String
++    renames Trim;
++
++begin
++  Ada.Text_IO.Put_Line (T (" Hello ", Left));
++end;

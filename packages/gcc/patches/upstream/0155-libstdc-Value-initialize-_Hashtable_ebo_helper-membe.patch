@@ -1,0 +1,189 @@
+From ced804111c255bbe7f7f97de06ae37bd5f7dea56 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Tomasz=20Kami=C5=84ski?= <tkaminsk@redhat.com>
+Date: Thu, 10 Sep 2026 11:20:45 +0200
+Subject: [PATCH 155/385] libstdc++: Value-initialize _Hashtable_ebo_helper
+ members [PR126949]
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The no_unique_address _Hashtable_ebo_helper members (that replaced base
+classes in r15-6273-g689d4abc0b836a), are initialized with {}. Since the
+_Hashtable_ebo_helper are aggregates, aggregate initialization is performed.
+In particular such initialization is ill-formed, if any aggregate member
+has explicit default constructor, as they cannot be initialized from {}.
+This introduced an regression, where hasher, equality, and allocators with
+explicit default constructor were no longer supported.
+
+This patch addresses above by properly value-initializing such members,
+using = Type() syntax, which in turn value-initializes all aggregate
+members, and calls explicit default constructors.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/126949
+	* include/bits/hashtable_policy.h (_Hash_code_base::_M_hash)
+	(_Hashtable_base::_M_equal, _Hashtable_alloc::_M_alloc):
+	Value initialized members in NSDMI.
+	* testsuite/23_containers/unordered_map/cons/default.cc: Check
+	default construction with an hash, equality and allocator with
+	explicit constructor.
+	* testsuite/23_containers/unordered_set/cons/default.cc: Likewise.
+
+Reviewed-by: Jonathan Wakely <jwakely@redhat.com>
+Co-authored-by: Marco Falke <falke.marco@gmail.com>
+Signed-off-by: Tomasz Kamiński <tkaminsk@redhat.com>
+(cherry picked from commit e36fef054c03112a4cd20a6ff0a3b3533c41f2b5)
+---
+ libstdc++-v3/include/bits/hashtable_policy.h  |  9 ++--
+ .../unordered_map/cons/default.cc             | 49 +++++++++++++++++++
+ .../unordered_set/cons/default.cc             | 48 ++++++++++++++++++
+ 3 files changed, 103 insertions(+), 3 deletions(-)
+
+diff --git a/libstdc++-v3/include/bits/hashtable_policy.h b/libstdc++-v3/include/bits/hashtable_policy.h
+index 6e4b365d5925..84ebbf65bcb8 100644
+--- a/libstdc++-v3/include/bits/hashtable_policy.h
++++ b/libstdc++-v3/include/bits/hashtable_policy.h
+@@ -1074,7 +1074,8 @@ namespace __detail
+       { return _M_hash._M_obj; }
+ 
+     protected:
+-      [[__no_unique_address__]] _Hashtable_ebo_helper<_Hash> _M_hash{};
++      [[__no_unique_address__]]
++      _Hashtable_ebo_helper<_Hash> _M_hash = _Hashtable_ebo_helper<_Hash>();
+ 
+       using __hash_code = size_t;
+ 
+@@ -1411,7 +1412,8 @@ namespace __detail
+       using __hash_code = typename __hash_code_base::__hash_code;
+ 
+     protected:
+-      [[__no_unique_address__]] _Hashtable_ebo_helper<_Equal> _M_equal{};
++      [[__no_unique_address__]]
++      _Hashtable_ebo_helper<_Equal> _M_equal = _Hashtable_ebo_helper<_Equal>();
+ 
+       _Hashtable_base() = default;
+ 
+@@ -1491,7 +1493,8 @@ namespace __detail
+     struct _Hashtable_alloc
+     {
+     private:
+-      [[__no_unique_address__]] _Hashtable_ebo_helper<_NodeAlloc> _M_alloc{};
++      [[__no_unique_address__]]
++      _Hashtable_ebo_helper<_NodeAlloc> _M_alloc = _Hashtable_ebo_helper<_NodeAlloc>();
+ 
+       template<typename>
+ 	struct __get_value_type;
+diff --git a/libstdc++-v3/testsuite/23_containers/unordered_map/cons/default.cc b/libstdc++-v3/testsuite/23_containers/unordered_map/cons/default.cc
+index 7a785e980b1f..2a65253c240c 100644
+--- a/libstdc++-v3/testsuite/23_containers/unordered_map/cons/default.cc
++++ b/libstdc++-v3/testsuite/23_containers/unordered_map/cons/default.cc
+@@ -49,3 +49,52 @@ Map4 m4{m};
+ Map4 m5{m, a};
+ Map4 m6{std::move(m)};
+ Map4 m7{std::move(m6), a};
++
++// PR libstdc++/126949
++struct ExplicitHash
++{
++  explicit ExplicitHash(bool = false) { }
++
++  std::size_t operator()(int value) const
++  { return value; }
++};
++
++struct ExplicitEqual
++{
++  explicit ExplicitEqual(bool = false) { }
++
++  bool operator()(int lhs, int rhs) const
++  { return lhs == rhs; }
++};
++
++template<typename T>
++  struct ExplicitAlloc
++  {
++    using value_type = T;
++
++    explicit ExplicitAlloc(bool = false) noexcept { }
++
++    template<typename U>
++      ExplicitAlloc(const ExplicitAlloc<U>&) { }
++
++    T *allocate(std::size_t n)
++    { return std::allocator<T>().allocate(n); }
++
++    void deallocate(T *p, std::size_t n)
++    { std::allocator<T>().deallocate(p, n); }
++
++    bool operator==(const ExplicitAlloc&) const { return true; }
++    bool operator!=(const ExplicitAlloc&) const { return false; }
++  };
++
++void
++test_hash()
++{
++  std::unordered_map<int, int, ExplicitHash> map1;
++  std::unordered_map<int, int, std::hash<int>, ExplicitEqual> map2;
++  std::unordered_map<int, int, std::hash<int>, std::equal_to<int>,
++			       ExplicitAlloc<std::pair<const int, int>>> map3;
++  std::unordered_map<int, int, ExplicitHash, ExplicitEqual,
++			       ExplicitAlloc<std::pair<const int, int>>> map4;
++
++}
+diff --git a/libstdc++-v3/testsuite/23_containers/unordered_set/cons/default.cc b/libstdc++-v3/testsuite/23_containers/unordered_set/cons/default.cc
+index fb87c96ce9d4..ae12afca797a 100644
+--- a/libstdc++-v3/testsuite/23_containers/unordered_set/cons/default.cc
++++ b/libstdc++-v3/testsuite/23_containers/unordered_set/cons/default.cc
+@@ -48,3 +48,51 @@ Set4 s4{s};
+ Set4 s5{s, a};
+ Set4 s6{std::move(s)};
+ Set4 s7{std::move(s6), a};
++
++// PR libstdc++/126949
++struct ExplicitHash
++{
++  explicit ExplicitHash(bool = false) { }
++
++  std::size_t operator()(int value) const
++  { return value; }
++};
++
++struct ExplicitEqual
++{
++  explicit ExplicitEqual(bool = false) { }
++
++  bool operator()(int lhs, int rhs) const
++  { return lhs == rhs; }
++};
++
++template<typename T>
++  struct ExplicitAlloc
++  {
++    using value_type = T;
++
++    explicit ExplicitAlloc(bool = false) noexcept { }
++
++    template<typename U>
++      ExplicitAlloc(const ExplicitAlloc<U>&) { }
++
++    T *allocate(std::size_t n)
++    { return std::allocator<T>().allocate(n); }
++
++    void deallocate(T *p, std::size_t n)
++    { std::allocator<T>().deallocate(p, n); }
++
++    bool operator==(const ExplicitAlloc&) const { return true; }
++    bool operator!=(const ExplicitAlloc&) const { return false; }
++  };
++
++void
++test_explicit_hash()
++{
++  std::unordered_set<int, ExplicitHash> set1;
++  std::unordered_set<int, std::hash<int>, ExplicitEqual> set2;
++  std::unordered_set<int, std::hash<int>, std::equal_to<int>,
++			  ExplicitAlloc<int>> set3;
++  std::unordered_set<int, ExplicitHash, ExplicitEqual,
++			  ExplicitAlloc<int>> set4;
++}

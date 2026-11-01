@@ -1,0 +1,84 @@
+From 49685699c863a3eb81573995bac9c770c5cbe952 Mon Sep 17 00:00:00 2001
+From: Uros Bizjak <ubizjak@gmail.com>
+Date: Mon, 21 Sep 2026 10:09:59 +0200
+Subject: [PATCH 196/385] i386: Fix enabled attribute for V2QI negate/plusminus
+ insns [PR127461]
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+'enabled' attribute has to be a pass-invariant static property per the
+RTL docs, and optimize_function_for_size_p (cfun)'s cgraph frequency/count
+term isn't — the same instability PR114232 already fixed for the insn
+condition, just missed here in enabled.
+
+	PR target/127461
+
+gcc/ChangeLog:
+
+	* config/i386/mmx.md (negv2qi2): Use optimize_size instead of
+	optimize_function_for_size_p (cfun) in the enabled attribute.
+	(<plusminus:insn>v2qi3): Ditto.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/i386/pr127461.c: New test.
+
+(cherry picked from commit 0947d974136292205743bc9bdaca5eb1ea0d6d67)
+---
+ gcc/config/i386/mmx.md                   |  4 ++--
+ gcc/testsuite/gcc.target/i386/pr127461.c | 23 +++++++++++++++++++++++
+ 2 files changed, 25 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr127461.c
+
+diff --git a/gcc/config/i386/mmx.md b/gcc/config/i386/mmx.md
+index 8c50480b76bc..da1c66e8c0b8 100644
+--- a/gcc/config/i386/mmx.md
++++ b/gcc/config/i386/mmx.md
+@@ -3170,7 +3170,7 @@
+    (set (attr "enabled")
+ 	(cond [(and (eq_attr "alternative" "0")
+ 		    (and (match_test "TARGET_PARTIAL_REG_STALL")
+-			 (not (match_test "optimize_function_for_size_p (cfun)"))))
++			 (not (match_test "optimize_size"))))
+ 		(symbol_ref "false")
+ 	      ]
+ 	      (const_string "*")))])
+@@ -3277,7 +3277,7 @@
+    (set (attr "enabled")
+ 	(cond [(and (eq_attr "alternative" "0")
+ 		    (and (match_test "TARGET_PARTIAL_REG_STALL")
+-			 (not (match_test "optimize_function_for_size_p (cfun)"))))
++			 (not (match_test "optimize_size"))))
+ 		(symbol_ref "false")
+ 	      ]
+ 	      (const_string "*")))])
+diff --git a/gcc/testsuite/gcc.target/i386/pr127461.c b/gcc/testsuite/gcc.target/i386/pr127461.c
+new file mode 100644
+index 000000000000..a0af16c3fb54
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr127461.c
+@@ -0,0 +1,23 @@
++/* PR target/127461 */
++/* { dg-do compile { target ia32 } } */
++/* { dg-options "-Og -msse2 -mtune=pentiumpro" } */
++
++typedef __attribute__((__vector_size__(2))) char U;
++typedef __attribute__((__vector_size__(2))) _Float16 V;
++typedef __attribute__((__vector_size__(32))) int W;
++
++V a, b;
++extern inline __attribute__((__cold__)) void foo(int, int, double, char ) {
++  (union {W w;}){};
++  U u = (U)b + (U)a;
++  ((union {
++    U a;
++    char b[];
++  })u)
++      .b;
++}
++void main() {
++  foo((int){}, (int){}, (int){}, 0);
++  for (;;)
++    ;
++}

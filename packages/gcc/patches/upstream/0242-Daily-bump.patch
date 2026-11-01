@@ -1,0 +1,72 @@
+From df440459ea78ba00bb525e00ca2277d215f7d1cf Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 6 Oct 2026 00:21:02 +0000
+Subject: [PATCH 242/385] Daily bump.
+
+---
+ gcc/ChangeLog           | 16 ++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog |  6 ++++++
+ libstdc++-v3/ChangeLog  |  7 +++++++
+ 4 files changed, 30 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index b821cb64a1af..27c4e116c86f 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,19 @@
++2026-10-05  Julio Sotoriva De Bastiani  <Julio.SotorivaDeBastiani@arm.com>
++
++	PR target/126096
++	* config/aarch64/aarch64-sve-builtins.cc
++	(gimple_folder::fold_to_pfalse): Handle svcount_t.
++	* config/aarch64/aarch64-sve-builtins-base.cc
++	(svpfalse_impl::fold): Handle svcount_t.
++	(svwhilelx_impl::fold_type): Punt for non-pfalse svcount_t.
++
++2026-10-05  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-10-05  Jonathan Wakely  <jwakely@redhat.com>
++
++	* doc/extend.texi (Attribute Syntax): Remove stray period.
++
+ 2026-10-02  Tamar Christina  <tamar.christina@arm.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 91c1b11a268e..3b3ae2dafce4 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261005
++20261006
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 000ed157c380..f4ca2a1f2b83 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,9 @@
++2026-10-05  Julio Sotoriva De Bastiani  <Julio.SotorivaDeBastiani@arm.com>
++
++	PR target/126096
++	* gcc.target/aarch64/sve2/acle/general/whilele_1.c: New test.
++	* gcc.target/aarch64/sve2/acle/general/whilelt_1.c: New test.
++
+ 2026-10-04  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index 4a74f171c79a..94e3f93228eb 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,10 @@
++2026-10-05  Anlai Lu  <agicy@qq.com>
++	    Tomasz Kamiński  <tkaminsk@redhat.com>
++
++	* testsuite/27_io/basic_ostream/print/buffered.cc: New test.
++	* testsuite/std/format/functions/format_to_ostreambuf.cc:
++	New test.
++
+ 2026-10-02  Jonathan Wakely  <jwakely@redhat.com>
+ 
+ 	Backported from master:

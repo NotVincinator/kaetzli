@@ -1,0 +1,35 @@
+From 050283994adb5d75af26bb018547bbca223531a4 Mon Sep 17 00:00:00 2001
+From: Christophe Lyon <christophe.lyon@arm.com>
+Date: Wed, 7 Oct 2026 13:12:43 +0000
+Subject: [PATCH 321/385] [testsuite, arm]: Force -mthumb in nomve_fp_1.c
+
+If one forces -marm in RUNTESTFLAGS, we end up compiling this test with
+
+-marm [...] -mfpu=auto -march=armv8.1-m.main+mve [...]
+leading to a failure error: target CPU does not support ARM mode
+
+Add -mthumb to dg-options to avoid this problem.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/arm/mve/general-c/nomve_fp_1.c: Add -mthumb to
+	dg-options.
+
+(cherry picked from commit e333e598d46c15630fe7939811bd971974cdaab7)
+---
+ gcc/testsuite/gcc.target/arm/mve/general-c/nomve_fp_1.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/testsuite/gcc.target/arm/mve/general-c/nomve_fp_1.c b/gcc/testsuite/gcc.target/arm/mve/general-c/nomve_fp_1.c
+index c9d279ead685..1a18b3d20380 100644
+--- a/gcc/testsuite/gcc.target/arm/mve/general-c/nomve_fp_1.c
++++ b/gcc/testsuite/gcc.target/arm/mve/general-c/nomve_fp_1.c
+@@ -4,7 +4,7 @@
+ /* Do not use dg-add-options arm_v8_1m_mve, because this might expand to "",
+    which could imply mve+fp depending on the user settings. We want to make
+    sure the '+fp' extension is not enabled.  */
+-/* { dg-options "-mfpu=auto -march=armv8.1-m.main+mve" } */
++/* { dg-options "-mfpu=auto -march=armv8.1-m.main+mve -mthumb" } */
+ /* { dg-add-options arm_fp } */
+ 
+ #include <arm_mve.h>

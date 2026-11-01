@@ -1,0 +1,106 @@
+From d135ff4f42672b11b5bfdc2a5a447f3919b3d331 Mon Sep 17 00:00:00 2001
+From: liuhongt <hongtao.liu@intel.com>
+Date: Mon, 14 Sep 2026 23:51:26 -0700
+Subject: [PATCH 284/385] match.pd: Check cond_expr_convert_p operand precision
+ [PR127382]
+
+cond_expr_convert_p compared the selected operands only by TYPE_SIZE.
+For integral operands this could build a COND_EXPR whose arms have
+different precision, e.g. unsigned _BitInt(17) vs unsigned int, which
+ICEs in range analysis.
+
+Require the integral arms to be nop-convertible to each other instead,
+which still allows them to differ in sign.
+
+	PR tree-optimization/127382
+
+gcc/ChangeLog:
+
+	* match.pd (cond_expr_convert_p): Use tree_nop_conversion_p
+	instead of INTEGRAL_TYPE_P to check the integral selected
+	operands.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.dg/bitint-146.c: New test.
+	* gcc.target/i386/pr127382.c: Likewise.
+
+(cherry picked from commit 164e45f035160df9e3eac7decb8202ba098e2f3c)
+---
+ gcc/match.pd                             |  2 +-
+ gcc/testsuite/gcc.dg/bitint-146.c        | 20 +++++++++++++++++++
+ gcc/testsuite/gcc.target/i386/pr127382.c | 25 ++++++++++++++++++++++++
+ 3 files changed, 46 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.dg/bitint-146.c
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr127382.c
+
+diff --git a/gcc/match.pd b/gcc/match.pd
+index e9132e857168..c23df0086080 100644
+--- a/gcc/match.pd
++++ b/gcc/match.pd
+@@ -11994,7 +11994,7 @@ and,
+   (if ((INTEGRAL_TYPE_P (type)
+        || (!flag_trapping_math && SCALAR_FLOAT_TYPE_P (type)))
+        && ((INTEGRAL_TYPE_P (TREE_TYPE (@2))
+-	    && INTEGRAL_TYPE_P (TREE_TYPE (@3)))
++	    && tree_nop_conversion_p (TREE_TYPE (@2), TREE_TYPE (@3)))
+ 	   || (SCALAR_FLOAT_TYPE_P (TREE_TYPE (@2))
+ 	       && types_match (TREE_TYPE (@2), TREE_TYPE (@3))))
+        && !operand_equal_p (TYPE_SIZE (type), TYPE_SIZE (TREE_TYPE (@0)))
+diff --git a/gcc/testsuite/gcc.dg/bitint-146.c b/gcc/testsuite/gcc.dg/bitint-146.c
+new file mode 100644
+index 000000000000..c461974d3239
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/bitint-146.c
+@@ -0,0 +1,20 @@
++/* PR tree-optimization/127382 */
++/* { dg-do compile { target bitint } } */
++/* { dg-options "-O2" } */
++
++#if __BITINT_MAXWIDTH__ >= 65
++_BitInt(7) m0[8];
++unsigned _BitInt(17) g1;
++_BitInt(7) p0;
++
++void
++foo (int s0)
++{
++  p0 = g1;
++  for (unsigned i = 0; i < 7; i++)
++    {
++      _BitInt(65) tt = -(_BitInt(65)) (s0 ? i : g1);
++      m0[i & 7] = tt / 10;
++    }
++}
++#endif
+diff --git a/gcc/testsuite/gcc.target/i386/pr127382.c b/gcc/testsuite/gcc.target/i386/pr127382.c
+new file mode 100644
+index 000000000000..edf2ebf688f8
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr127382.c
+@@ -0,0 +1,25 @@
++/* PR tree-optimization/127382 */
++/* { dg-do compile { target bitint } } */
++/* { dg-options "-march=x86-64-v4 -O3 -fdump-tree-vect-details" } */
++
++/* A bit-precise type whose precision fills its container is as good as the
++   plain integer type of the same width, so cond_expr_convert_p has to keep
++   matching it, no mask packing.  */
++
++/* { dg-final { scan-tree-dump "vect_recog_cond_expr_convert_pattern" "vect" { target { ! ia32 } } } } */
++/* { dg-final { scan-assembler-not "kshift" { target { ! ia32 } } } } */
++/* { dg-final { scan-assembler-not "kunpck" { target { ! ia32 } } } } */
++
++#if __BITINT_MAXWIDTH__ >= 32
++_BitInt(32) a[256];
++int b[256];
++short d[256];
++float c[256];
++
++void
++foo (void)
++{
++  for (int i = 0; i < 256; i++)
++    d[i] = c[i] < 1.0f ? (short) a[i] : (short) b[i];
++}
++#endif

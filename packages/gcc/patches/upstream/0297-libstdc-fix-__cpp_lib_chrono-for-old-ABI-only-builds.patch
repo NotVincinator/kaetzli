@@ -1,0 +1,550 @@
+From 185294cfd210ee33948fc2999c3602bacc26cd46 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Hugo=20Beauz=C3=A9e-Luyssen?= <hugo.beauzee@datadoghq.com>
+Date: Tue, 13 Oct 2026 10:14:12 +0000
+Subject: [PATCH 297/385] libstdc++: fix __cpp_lib_chrono for old-ABI-only
+ builds
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The C++20 chrono time zone API is declared when
+_GLIBCXX_USE_CXX11_ABI || !_GLIBCXX_USE_DUAL_ABI, but
+__cpp_lib_chrono only gets its C++20 value when
+_GLIBCXX_USE_CXX11_ABI is set.  Old-ABI-only builds therefore get
+the full API but report the C++17 value.
+
+Widen the condition for the 201907 value to match, and make the
+headers check __cpp_lib_chrono instead of repeating the ABI
+condition.
+
+Assisted-by: Claude (claude-sonnet-5)
+
+libstdc++-v3/ChangeLog:
+
+	* include/bits/chrono_io.h: Check __glibcxx_chrono for C++20
+	tzdb features instead of the ABI macros.
+	* include/bits/version.def (chrono): Use extra_cond instead of
+	cxx11abi to also define 201907 for old-ABI-only builds.
+	* include/bits/version.h: Regenerate.
+	* include/std/chrono: Check __cpp_lib_chrono instead of the
+	ABI macros.
+	* testsuite/lib/libstdc++.exp (check_effective_target_tzdb):
+	Replace cxx11_abi check with hosted check and check
+	__cpp_lib_chrono in preprocessor condition.
+	* testsuite/libstdc++-prettyprinters/chrono.cc: Use
+	__cpp_lib_chrono for preprocessor condition and use tzdb for
+	effective target.  Remove dg-additional-options.
+	* testsuite/std/time/format/data_not_present_neg.cc: Use
+	__cpp_lib_chrono for preprocessor conditions and use tzdb for
+	effective target.
+	* testsuite/std/time/format/empty_spec.cc: Use __cpp_lib_chrono
+	for preprocessor conditions.
+	* testsuite/std/time/format/nonlocking.cc: Likewise.
+	* testsuite/std/time/format/pr117214.cc: Likewise.
+	* testsuite/std/time/format/pr119517.cc: Likewise.
+	* testsuite/std/time/format/whitespace.cc: Likewise.
+	* testsuite/std/time/hash.cc: Likewise.
+	* testsuite/std/time/syn_c++20.cc: Fix typo in macro name and
+	expect new value for !_GLIBCXX_USE_DUAL_ABI.
+	* testsuite/std/time/tzdb/1.cc: Require tzdb effective target
+	instead of cxx11_abi.
+	* testsuite/std/time/tzdb_list/requirements.cc: Likewise.
+	* testsuite/std/time/zoned_time/deduction.cc: Likewise.
+	* testsuite/std/time/zoned_time/io.cc: Likewise.
+	* testsuite/std/time/zoned_time/req_neg.cc: Likewise.
+	* testsuite/std/time/zoned_time/requirements.cc: Likewise.
+	* testsuite/std/time/zoned_traits.cc: Likewise.
+
+Signed-off-by: Hugo Beauzée-Luyssen <hugo.beauzee@datadoghq.com>
+Co-authored-by: Jonathan Wakely <jwakely@redhat.com>
+(cherry picked from commit 38523a24316d35ad1b58c162ec422f099fcd77c2)
+---
+ libstdc++-v3/include/bits/chrono_io.h         |  8 ++--
+ libstdc++-v3/include/bits/version.def         |  4 +-
+ libstdc++-v3/include/bits/version.h           |  4 +-
+ libstdc++-v3/include/std/chrono               | 12 +++---
+ libstdc++-v3/testsuite/lib/libstdc++.exp      |  4 +-
+ .../libstdc++-prettyprinters/chrono.cc        |  5 +--
+ .../std/time/format/data_not_present_neg.cc   | 40 +++++++++----------
+ .../testsuite/std/time/format/empty_spec.cc   |  8 ++--
+ .../testsuite/std/time/format/nonlocking.cc   |  4 +-
+ .../testsuite/std/time/format/pr117214.cc     |  4 +-
+ .../testsuite/std/time/format/pr119517.cc     |  2 +-
+ .../testsuite/std/time/format/whitespace.cc   |  2 +-
+ libstdc++-v3/testsuite/std/time/hash.cc       |  6 +--
+ libstdc++-v3/testsuite/std/time/syn_c++20.cc  |  2 +-
+ libstdc++-v3/testsuite/std/time/tzdb/1.cc     |  2 +-
+ .../std/time/tzdb_list/requirements.cc        |  2 +-
+ .../std/time/zoned_time/deduction.cc          |  2 +-
+ .../testsuite/std/time/zoned_time/io.cc       |  2 +-
+ .../testsuite/std/time/zoned_time/req_neg.cc  |  2 +-
+ .../std/time/zoned_time/requirements.cc       |  2 +-
+ .../testsuite/std/time/zoned_traits.cc        |  2 +-
+ 21 files changed, 60 insertions(+), 59 deletions(-)
+
+diff --git a/libstdc++-v3/include/bits/chrono_io.h b/libstdc++-v3/include/bits/chrono_io.h
+index a018f40ef603..88dbbd1d3569 100644
+--- a/libstdc++-v3/include/bits/chrono_io.h
++++ b/libstdc++-v3/include/bits/chrono_io.h
+@@ -2080,7 +2080,7 @@ namespace __format
+ 	}
+     };
+ 
+-#if _GLIBCXX_USE_CXX11_ABI || ! _GLIBCXX_USE_DUAL_ABI
++#if __glibcxx_chrono >= 201803L // C++ >= 20
+   template<typename _CharT>
+     struct __formatter_chrono_info
+     {
+@@ -3001,7 +3001,7 @@ namespace __format
+       = enable_nonlocking_formatter_optimization<_Duration>;
+ #endif
+ 
+-#if _GLIBCXX_USE_CXX11_ABI || ! _GLIBCXX_USE_DUAL_ABI
++#if __glibcxx_chrono >= 201803L // C++ >= 20
+   template<__format::__char _CharT>
+     struct formatter<chrono::sys_info, _CharT>
+     {
+@@ -3392,7 +3392,7 @@ namespace __format
+       = enable_nonlocking_formatter_optimization<_Duration>;
+ #endif
+ 
+-#if _GLIBCXX_USE_CXX11_ABI || ! _GLIBCXX_USE_DUAL_ABI
++#if __glibcxx_chrono >= 201803L // C++ >= 20
+   template<typename _Duration, typename _TimeZonePtr, __format::__char _CharT>
+     struct formatter<chrono::zoned_time<_Duration, _TimeZonePtr>, _CharT>
+     : formatter<chrono::__detail::__local_time_fmt_for<_Duration>, _CharT>
+@@ -3997,7 +3997,7 @@ namespace __detail
+       return __os << format(__os.getloc(), _GLIBCXX_WIDEN("{:L%T}"), __hms);
+     }
+ 
+-#if _GLIBCXX_USE_CXX11_ABI || ! _GLIBCXX_USE_DUAL_ABI
++#if __glibcxx_chrono >= 201803L // C++ >= 20
+   /// Writes a sys_info object to an ostream in an unspecified format.
+   template<typename _CharT, typename _Traits>
+     basic_ostream<_CharT, _Traits>&
+diff --git a/libstdc++-v3/include/bits/version.def b/libstdc++-v3/include/bits/version.def
+index 44099eccd036..e72a2fe1b51d 100644
+--- a/libstdc++-v3/include/bits/version.def
++++ b/libstdc++-v3/include/bits/version.def
+@@ -613,13 +613,13 @@ ftms = {
+     v = 202306;
+     cxxmin = 26;
+     hosted = yes;
+-    cxx11abi = yes;
++    extra_cond = "_GLIBCXX_USE_CXX11_ABI || !_GLIBCXX_USE_DUAL_ABI";
+   };
+   values = {
+     v = 201907;
+     cxxmin = 20;
+     hosted = yes;
+-    cxx11abi = yes; // std::chrono::tzdb requires cxx11 std::string
++    extra_cond = "_GLIBCXX_USE_CXX11_ABI || !_GLIBCXX_USE_DUAL_ABI";
+   };
+   values = {
+     v = 201611;
+diff --git a/libstdc++-v3/include/bits/version.h b/libstdc++-v3/include/bits/version.h
+index 68f9a5d0b570..93b35fad5a07 100644
+--- a/libstdc++-v3/include/bits/version.h
++++ b/libstdc++-v3/include/bits/version.h
+@@ -681,12 +681,12 @@
+ #undef __glibcxx_want_boyer_moore_searcher
+ 
+ #if !defined(__cpp_lib_chrono)
+-# if (__cplusplus >  202302L) && _GLIBCXX_USE_CXX11_ABI && _GLIBCXX_HOSTED
++# if (__cplusplus >  202302L) && _GLIBCXX_HOSTED && (_GLIBCXX_USE_CXX11_ABI || !_GLIBCXX_USE_DUAL_ABI)
+ #  define __glibcxx_chrono 202306L
+ #  if defined(__glibcxx_want_all) || defined(__glibcxx_want_chrono)
+ #   define __cpp_lib_chrono 202306L
+ #  endif
+-# elif (__cplusplus >= 202002L) && _GLIBCXX_USE_CXX11_ABI && _GLIBCXX_HOSTED
++# elif (__cplusplus >= 202002L) && _GLIBCXX_HOSTED && (_GLIBCXX_USE_CXX11_ABI || !_GLIBCXX_USE_DUAL_ABI)
+ #  define __glibcxx_chrono 201907L
+ #  if defined(__glibcxx_want_all) || defined(__glibcxx_want_chrono)
+ #   define __cpp_lib_chrono 201907L
+diff --git a/libstdc++-v3/include/std/chrono b/libstdc++-v3/include/std/chrono
+index 35d023ddaf57..3e70949f64db 100644
+--- a/libstdc++-v3/include/std/chrono
++++ b/libstdc++-v3/include/std/chrono
+@@ -57,7 +57,7 @@
+ # include <bits/stl_algo.h>     // upper_bound
+ # include <bits/range_access.h> // begin/end for arrays
+ #endif
+-#if __cpp_lib_chrono >= 201803L // C++20 && HOSTED && USE_CXX11_ABI
++#if __cpp_lib_chrono >= 201803L // C++20 && HOSTED
+ # include <sstream>
+ # include <string>
+ # include <vector>
+@@ -2544,7 +2544,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+     }
+ 
+ #if _GLIBCXX_HOSTED
+-#if _GLIBCXX_USE_CXX11_ABI || ! _GLIBCXX_USE_DUAL_ABI
++#if __cpp_lib_chrono >= 201803L
+     // C++20 [time.zones] Time zones
+ 
+     struct tzdb;
+@@ -3219,7 +3219,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+     }
+ 
+     using zoned_seconds = zoned_time<seconds>;
+-#endif // _GLIBCXX_USE_CXX11_ABI || ! _GLIBCXX_USE_DUAL_ABI
++#endif // __cpp_lib_chrono >= 201803L
+ 
+ namespace __detail
+ {
+@@ -3274,7 +3274,7 @@ namespace __detail
+ 
+       if (__ss > __expires)
+ 	{
+-#if _GLIBCXX_USE_CXX11_ABI || ! _GLIBCXX_USE_DUAL_ABI // use chrono::tzdb
++#if __cpp_lib_chrono >= 201803L // use chrono::tzdb
+ 	  // Call into the library because it might have knowledge of new
+ 	  // leap seconds loaded at runtime from the tzdata files.
+ 
+@@ -3601,7 +3601,7 @@ namespace __detail
+     };
+ 
+ #if _GLIBCXX_HOSTED
+-#if _GLIBCXX_USE_CXX11_ABI || ! _GLIBCXX_USE_DUAL_ABI
++#if __cpp_lib_chrono >= 201803L
+   // zoned_time
+   template<typename _Duration, typename _TimeZonePtr>
+     requires __is_hash_enabled_for<
+@@ -3658,7 +3658,7 @@ namespace __detail
+ 		 __val.value().count());
+       }
+     };
+-#endif // _GLIBCXX_USE_CXX11_ABI || ! _GLIBCXX_USE_DUAL_ABI
++#endif // __cpp_lib_chrono >= 201803L
+ #endif // _GLIBCXX_HOSTED
+ #endif // __glibcxx_chrono_cxx20 >= 202306
+ 
+diff --git a/libstdc++-v3/testsuite/lib/libstdc++.exp b/libstdc++-v3/testsuite/lib/libstdc++.exp
+index 661731d7bf75..768ed3d8712b 100644
+--- a/libstdc++-v3/testsuite/lib/libstdc++.exp
++++ b/libstdc++-v3/testsuite/lib/libstdc++.exp
+@@ -1630,9 +1630,11 @@ proc check_effective_target_hosted { } {
+ 
+ # Return 1 if std::chrono::tzdb is supported.
+ proc check_effective_target_tzdb { } {
+-    if {![check_effective_target_cxx11_abi]} {
++    # Check the feature test macro (which depends on hosted and ABI macros).
++    if {![check_v3_target_cpp_feature_test "__cpp_lib_chrono >= 201803L"]} {
+ 	return 0
+     }
++    # Also require that we have tzdata available on-disk or in-memory.
+     return [check_v3_target_prop_cached et_tzdb {
+ 	set cond "defined _GLIBCXX_ZONEINFO_DIR || _GLIBCXX_STATIC_TZDATA"
+ 	return [v3_check_preprocessor_condition tzdb $cond]
+diff --git a/libstdc++-v3/testsuite/libstdc++-prettyprinters/chrono.cc b/libstdc++-v3/testsuite/libstdc++-prettyprinters/chrono.cc
+index c10198df06eb..a668d9699277 100644
+--- a/libstdc++-v3/testsuite/libstdc++-prettyprinters/chrono.cc
++++ b/libstdc++-v3/testsuite/libstdc++-prettyprinters/chrono.cc
+@@ -1,6 +1,5 @@
+ // { dg-options "-g -O0 -std=gnu++20" }
+ // { dg-do run { target c++20 } }
+-// { dg-additional-options "-DTEST_ZONED_TIME" { target tzdb } }
+ 
+ // Copyright The GNU Toolchain Authors.
+ //
+@@ -39,9 +38,9 @@ main()
+   utc_time utc(467664h);
+   // { dg-final { note-test utc {std::chrono::utc_time = { 467664h }} } }
+ 
+-#if _GLIBCXX_USE_CXX11_ABI && defined TEST_ZONED_TIME
++#if __cpp_lib_chrono >= 201803L
+   zoned_time<milliseconds> zt("Europe/London", half_past_epoch);
+-  // { dg-final { note-test zt {std::chrono::zoned_time = { "Europe/London" 1800000ms [1970-01-01 00:30:00] }} { target cxx11_abi } } }
++  // { dg-final { note-test zt {std::chrono::zoned_time = { "Europe/London" 1800000ms [1970-01-01 00:30:00] }} { target tzdb } } }
+ #endif
+ 
+   [[maybe_unused]] day ninth(9);
+diff --git a/libstdc++-v3/testsuite/std/time/format/data_not_present_neg.cc b/libstdc++-v3/testsuite/std/time/format/data_not_present_neg.cc
+index cb8f916f2166..3ed98192cfdf 100644
+--- a/libstdc++-v3/testsuite/std/time/format/data_not_present_neg.cc
++++ b/libstdc++-v3/testsuite/std/time/format/data_not_present_neg.cc
+@@ -119,9 +119,9 @@ auto tai = std::format("{:%Q}", tai_clock::now()); // { dg-error "call to conste
+ auto file = std::format("{:%Q}", file_clock::now()); // { dg-error "call to consteval function" }
+ 
+ const auto ltc = local_seconds(10s);
+-#if _GLIBCXX_USE_CXX11_ABI
++#if __cpp_lib_chrono >= 201803L
+ const auto zt = zoned_time<seconds>("Europe/Sofia", local_seconds(10s));
+-auto zt1 = std::format("{:%Q}", zt); // { dg-error "call to consteval function" "" { target cxx11_abi } }
++auto zt1 = std::format("{:%Q}", zt); // { dg-error "call to consteval function" "" { target tzdb } }
+ #endif
+ auto lf1 = std::format("{:%Q}", local_time_format(ltc)); // { dg-error "call to consteval function" }
+ 
+@@ -141,24 +141,24 @@ auto hms5 = std::format("{:%F}", HMS(1255s)); // { dg-error "call to consteval f
+ auto hms6 = std::format("{:%Q}", HMS(1255s)); // { dg-error "call to consteval function" }
+ auto hms7 = std::format("{:%Z}", HMS(1255s)); // { dg-error "call to consteval function" }
+ 
+-#if _GLIBCXX_USE_CXX11_ABI
+-auto li1 = std::format("{:%d}", local_info()); // { dg-error "call to consteval function" "" { target cxx11_abi } }
+-auto li2 = std::format("{:%w}", local_info()); // { dg-error "call to consteval function" "" { target cxx11_abi } }
+-auto li3 = std::format("{:%m}", local_info()); // { dg-error "call to consteval function" "" { target cxx11_abi } }
+-auto li4 = std::format("{:%y}", local_info()); // { dg-error "call to consteval function" "" { target cxx11_abi } }
+-auto li5 = std::format("{:%F}", local_info()); // { dg-error "call to consteval function" "" { target cxx11_abi } }
+-auto li6 = std::format("{:%T}", local_info()); // { dg-error "call to consteval function" "" { target cxx11_abi } }
+-auto li7 = std::format("{:%Q}", local_info()); // { dg-error "call to consteval function" "" { target cxx11_abi } }
+-auto li8 = std::format("{:%Z}", local_info()); // { dg-error "call to consteval function" "" { target cxx11_abi } }
+-
+-auto si1 = std::format("{:%d}", sys_info()); // { dg-error "call to consteval function" "" { target cxx11_abi } }
+-auto si2 = std::format("{:%w}", sys_info()); // { dg-error "call to consteval function" "" { target cxx11_abi } }
+-auto si3 = std::format("{:%m}", sys_info()); // { dg-error "call to consteval function" "" { target cxx11_abi } }
+-auto si4 = std::format("{:%y}", sys_info()); // { dg-error "call to consteval function" "" { target cxx11_abi } }
+-auto si5 = std::format("{:%F}", sys_info()); // { dg-error "call to consteval function" "" { target cxx11_abi } }
+-auto si6 = std::format("{:%T}", sys_info()); // { dg-error "call to consteval function" "" { target cxx11_abi } }
+-auto si7 = std::format("{:%Q}", sys_info()); // { dg-error "call to consteval function" "" { target cxx11_abi } }
+-auto si8 = std::format("{:%Z}", sys_info()); // { dg-error "call to consteval function" "" { target cxx11_abi } }
++#if __cpp_lib_chrono >= 201803L
++auto li1 = std::format("{:%d}", local_info()); // { dg-error "call to consteval function" "" { target tzdb } }
++auto li2 = std::format("{:%w}", local_info()); // { dg-error "call to consteval function" "" { target tzdb } }
++auto li3 = std::format("{:%m}", local_info()); // { dg-error "call to consteval function" "" { target tzdb } }
++auto li4 = std::format("{:%y}", local_info()); // { dg-error "call to consteval function" "" { target tzdb } }
++auto li5 = std::format("{:%F}", local_info()); // { dg-error "call to consteval function" "" { target tzdb } }
++auto li6 = std::format("{:%T}", local_info()); // { dg-error "call to consteval function" "" { target tzdb } }
++auto li7 = std::format("{:%Q}", local_info()); // { dg-error "call to consteval function" "" { target tzdb } }
++auto li8 = std::format("{:%Z}", local_info()); // { dg-error "call to consteval function" "" { target tzdb } }
++
++auto si1 = std::format("{:%d}", sys_info()); // { dg-error "call to consteval function" "" { target tzdb } }
++auto si2 = std::format("{:%w}", sys_info()); // { dg-error "call to consteval function" "" { target tzdb } }
++auto si3 = std::format("{:%m}", sys_info()); // { dg-error "call to consteval function" "" { target tzdb } }
++auto si4 = std::format("{:%y}", sys_info()); // { dg-error "call to consteval function" "" { target tzdb } }
++auto si5 = std::format("{:%F}", sys_info()); // { dg-error "call to consteval function" "" { target tzdb } }
++auto si6 = std::format("{:%T}", sys_info()); // { dg-error "call to consteval function" "" { target tzdb } }
++auto si7 = std::format("{:%Q}", sys_info()); // { dg-error "call to consteval function" "" { target tzdb } }
++auto si8 = std::format("{:%Z}", sys_info()); // { dg-error "call to consteval function" "" { target tzdb } }
+ #endif
+ 
+ // { dg-error "call to non-'constexpr' function" "" { target *-*-* } 0 }
+diff --git a/libstdc++-v3/testsuite/std/time/format/empty_spec.cc b/libstdc++-v3/testsuite/std/time/format/empty_spec.cc
+index b84f84a3069f..0d51a46f3e50 100644
+--- a/libstdc++-v3/testsuite/std/time/format/empty_spec.cc
++++ b/libstdc++-v3/testsuite/std/time/format/empty_spec.cc
+@@ -629,7 +629,7 @@ test_leap_second()
+ 	  WIDEN("2012-06-30 23:59:60") );
+ }
+ 
+-#if _GLIBCXX_USE_CXX11_ABI || !_GLIBCXX_USE_DUAL_ABI
++#if __cpp_lib_chrono >= 201803L
+ template<typename Dur, typename Dur2>
+ auto
+ make_zoned(const sys_time<Dur2>& st, const time_zone* tz)
+@@ -709,14 +709,14 @@ test_time_points()
+   test_time_point<CharT, gps_clock, false>();
+   test_time_point<CharT, file_clock, false>();
+   test_leap_second<CharT>();
+-#if _GLIBCXX_USE_CXX11_ABI || !_GLIBCXX_USE_DUAL_ABI
++#if __cpp_lib_chrono >= 201803L
+   test_zoned_time<CharT>();
+ #endif
+   test_local_time_format<CharT>();
+ 
+ }
+ 
+-#if _GLIBCXX_USE_CXX11_ABI || !_GLIBCXX_USE_DUAL_ABI
++#if __cpp_lib_chrono >= 201803L
+ template<typename CharT>
+ void
+ test_sys_info()
+@@ -826,7 +826,7 @@ test_all()
+   test_durations<CharT>();
+   test_calendar<CharT>();
+   test_time_points<CharT>();
+-#if _GLIBCXX_USE_CXX11_ABI || !_GLIBCXX_USE_DUAL_ABI
++#if __cpp_lib_chrono >= 201803L
+   test_infos<CharT>();
+ #endif
+ }
+diff --git a/libstdc++-v3/testsuite/std/time/format/nonlocking.cc b/libstdc++-v3/testsuite/std/time/format/nonlocking.cc
+index f1b57b5a3485..661bb26b7e02 100644
+--- a/libstdc++-v3/testsuite/std/time/format/nonlocking.cc
++++ b/libstdc++-v3/testsuite/std/time/format/nonlocking.cc
+@@ -35,7 +35,7 @@ static_assert(std::enable_nonlocking_formatter_optimization<
+ static_assert(std::enable_nonlocking_formatter_optimization<
+ 		std::chrono::year_month_weekday_last>);
+ 
+-#if _GLIBCXX_USE_CXX11_ABI || !_GLIBCXX_USE_DUAL_ABI
++#if __cpp_lib_chrono >= 201803L
+ static_assert(std::enable_nonlocking_formatter_optimization<
+ 		std::chrono::local_info>);
+ static_assert(std::enable_nonlocking_formatter_optimization<
+@@ -132,7 +132,7 @@ static_assert(std::enable_nonlocking_formatter_optimization<
+ static_assert(std::enable_nonlocking_formatter_optimization<
+ 		local_time_fmt<NonBufferedDuration>>);
+ 
+-#if _GLIBCXX_USE_CXX11_ABI || !_GLIBCXX_USE_DUAL_ABI
++#if __cpp_lib_chrono >= 201803L
+ static_assert(std::enable_nonlocking_formatter_optimization<
+ 		std::chrono::zoned_time<std::chrono::seconds>>);
+ static_assert(!std::enable_nonlocking_formatter_optimization<
+diff --git a/libstdc++-v3/testsuite/std/time/format/pr117214.cc b/libstdc++-v3/testsuite/std/time/format/pr117214.cc
+index 79109c391518..9deeca3dc191 100644
+--- a/libstdc++-v3/testsuite/std/time/format/pr117214.cc
++++ b/libstdc++-v3/testsuite/std/time/format/pr117214.cc
+@@ -82,7 +82,7 @@ void maybe_set_tz()
+ void
+ test_c_zoned()
+ {
+-#if _GLIBCXX_USE_CXX11_ABI
++#if __cpp_lib_chrono >= 201803L
+   maybe_set_tz();
+ 
+   using namespace std::chrono;
+@@ -118,7 +118,7 @@ test_c_local()
+   VERIFY( s.find("GMT") == s.npos );
+   VERIFY( s.find("UTC") == s.npos );
+ 
+-#if _GLIBCXX_USE_CXX11_ABI
++#if __cpp_lib_chrono >= 201803L
+   zoned_time z(system_clock::now());
+   VERIFY( s.find(z.get_info().abbrev) == s.npos );
+ #endif
+diff --git a/libstdc++-v3/testsuite/std/time/format/pr119517.cc b/libstdc++-v3/testsuite/std/time/format/pr119517.cc
+index 37bff86b13ab..a9920f236de5 100644
+--- a/libstdc++-v3/testsuite/std/time/format/pr119517.cc
++++ b/libstdc++-v3/testsuite/std/time/format/pr119517.cc
+@@ -35,7 +35,7 @@ static_assert( !std::formattable<std::chrono::tai_seconds, int> );
+ static_assert( !std::formattable<std::chrono::gps_seconds, int> );
+ static_assert( !std::formattable<std::chrono::local_seconds, int> );
+ static_assert( !std::formattable<std::chrono::file_time<std::chrono::seconds>, int> );
+-#if _GLIBCXX_USE_CXX11_ABI || ! _GLIBCXX_USE_DUAL_ABI
++#if __cpp_lib_chrono >= 201803L
+ static_assert( !std::formattable<std::chrono::zoned_seconds, int> );
+ 
+ static_assert( !std::formattable<std::chrono::sys_info, int> );
+diff --git a/libstdc++-v3/testsuite/std/time/format/whitespace.cc b/libstdc++-v3/testsuite/std/time/format/whitespace.cc
+index debda08995cf..9637886aae5b 100644
+--- a/libstdc++-v3/testsuite/std/time/format/whitespace.cc
++++ b/libstdc++-v3/testsuite/std/time/format/whitespace.cc
+@@ -40,7 +40,7 @@ test_all()
+   test<CharT>(2020y/January/8);
+   test<CharT>(local_days(2020y/January/8));
+   test<CharT>(sys_days(2020y/January/8) + 13h + 10min + 5s);
+-#if _GLIBCXX_USE_CXX11_ABI || ! _GLIBCXX_USE_DUAL_ABI
++#if __cpp_lib_chrono >= 201803L
+   test<CharT>(sys_info());
+   test<CharT>(local_info());
+ #endif
+diff --git a/libstdc++-v3/testsuite/std/time/hash.cc b/libstdc++-v3/testsuite/std/time/hash.cc
+index ed9139bb8108..0a8ac4a98720 100644
+--- a/libstdc++-v3/testsuite/std/time/hash.cc
++++ b/libstdc++-v3/testsuite/std/time/hash.cc
+@@ -188,7 +188,7 @@ void test01()
+   test_hash(2024y / month(1234u) / Tuesday[last]);
+   test_hash(2024y / August / weekday(1234u)[last]);
+ 
+-#if _GLIBCXX_USE_CXX11_ABI
++#if __cpp_lib_chrono >= 202306L
+   // zoned_time
+   test_hash(zoned_seconds("Europe/Rome", sys_seconds(1234s)));
+   test_hash(zoned_time("Europe/Rome", system_clock::now()));
+@@ -238,7 +238,7 @@ void test03()
+   {
+     test_hash(d);
+     test_hash(sys_time<D>(d));
+-#if _GLIBCXX_USE_CXX11_ABI
++#if __cpp_lib_chrono >= 202306L
+     test_hash(zoned_time<D>(sys_time<D>(d)));
+ #endif
+   };
+@@ -261,7 +261,7 @@ void test04()
+   static_assert(is_hash_poisoned<duration<non_hashable_arithmetic_wrapper<int>>>);
+   static_assert(is_hash_poisoned<duration<non_hashable_arithmetic_wrapper<double>>>);
+ 
+-#if _GLIBCXX_USE_CXX11_ABI
++#if __cpp_lib_chrono >= 202306L
+   static_assert(!is_hash_poisoned<zoned_time<duration<int>>>);
+   static_assert(!is_hash_poisoned<zoned_time<duration<double>>>);
+   static_assert(!is_hash_poisoned<zoned_time<duration<arithmetic_wrapper<int>>>>);
+diff --git a/libstdc++-v3/testsuite/std/time/syn_c++20.cc b/libstdc++-v3/testsuite/std/time/syn_c++20.cc
+index 01d5b265129b..62abbc52ad2f 100644
+--- a/libstdc++-v3/testsuite/std/time/syn_c++20.cc
++++ b/libstdc++-v3/testsuite/std/time/syn_c++20.cc
+@@ -21,7 +21,7 @@
+ #include <chrono>
+ 
+ // std::chrono::tzdb is not defined for the old std::string ABI.
+-#if _GLIBCXX_USE_CXX_ABI
++#if _GLIBCXX_USE_CXX11_ABI || !_GLIBCXX_USE_DUAL_ABI
+ # define EXPECTED_VALUE 201907L
+ #else
+ # define EXPECTED_VALUE 201611L
+diff --git a/libstdc++-v3/testsuite/std/time/tzdb/1.cc b/libstdc++-v3/testsuite/std/time/tzdb/1.cc
+index 7a31c1c20ba7..9a85e286133a 100644
+--- a/libstdc++-v3/testsuite/std/time/tzdb/1.cc
++++ b/libstdc++-v3/testsuite/std/time/tzdb/1.cc
+@@ -1,5 +1,5 @@
+ // { dg-do run { target c++20 } }
+-// { dg-require-effective-target cxx11_abi }
++// { dg-require-effective-target tzdb }
+ 
+ #include <chrono>
+ #include <testsuite_hooks.h>
+diff --git a/libstdc++-v3/testsuite/std/time/tzdb_list/requirements.cc b/libstdc++-v3/testsuite/std/time/tzdb_list/requirements.cc
+index b26704f41469..67b40cfc9ad0 100644
+--- a/libstdc++-v3/testsuite/std/time/tzdb_list/requirements.cc
++++ b/libstdc++-v3/testsuite/std/time/tzdb_list/requirements.cc
+@@ -1,5 +1,5 @@
+ // { dg-do compile { target c++20 } }
+-// { dg-require-effective-target cxx11_abi }
++// { dg-require-effective-target tzdb }
+ 
+ #include <chrono>
+ 
+diff --git a/libstdc++-v3/testsuite/std/time/zoned_time/deduction.cc b/libstdc++-v3/testsuite/std/time/zoned_time/deduction.cc
+index 05bc275f5929..ca08f79bbe7d 100644
+--- a/libstdc++-v3/testsuite/std/time/zoned_time/deduction.cc
++++ b/libstdc++-v3/testsuite/std/time/zoned_time/deduction.cc
+@@ -1,5 +1,5 @@
+ // { dg-do compile { target c++20 } }
+-// { dg-require-effective-target cxx11_abi }
++// { dg-require-effective-target tzdb }
+ 
+ #include <chrono>
+ 
+diff --git a/libstdc++-v3/testsuite/std/time/zoned_time/io.cc b/libstdc++-v3/testsuite/std/time/zoned_time/io.cc
+index c113eea6d3fe..6fc80fed577a 100644
+--- a/libstdc++-v3/testsuite/std/time/zoned_time/io.cc
++++ b/libstdc++-v3/testsuite/std/time/zoned_time/io.cc
+@@ -1,5 +1,5 @@
+ // { dg-do run { target c++20 } }
+-// { dg-require-effective-target cxx11_abi }
++// { dg-require-effective-target tzdb }
+ // { dg-timeout-factor 2 }
+ 
+ #include <chrono>
+diff --git a/libstdc++-v3/testsuite/std/time/zoned_time/req_neg.cc b/libstdc++-v3/testsuite/std/time/zoned_time/req_neg.cc
+index 169dc6dae5cf..9950a1f8394d 100644
+--- a/libstdc++-v3/testsuite/std/time/zoned_time/req_neg.cc
++++ b/libstdc++-v3/testsuite/std/time/zoned_time/req_neg.cc
+@@ -1,5 +1,5 @@
+ // { dg-do compile { target c++20 } }
+-// { dg-require-effective-target cxx11_abi }
++// { dg-require-effective-target tzdb }
+ 
+ #include <chrono>
+ 
+diff --git a/libstdc++-v3/testsuite/std/time/zoned_time/requirements.cc b/libstdc++-v3/testsuite/std/time/zoned_time/requirements.cc
+index e7bf05e94749..fd38c7c3844f 100644
+--- a/libstdc++-v3/testsuite/std/time/zoned_time/requirements.cc
++++ b/libstdc++-v3/testsuite/std/time/zoned_time/requirements.cc
+@@ -1,5 +1,5 @@
+ // { dg-do compile { target c++20 } }
+-// { dg-require-effective-target cxx11_abi }
++// { dg-require-effective-target tzdb }
+ 
+ #include <chrono>
+ 
+diff --git a/libstdc++-v3/testsuite/std/time/zoned_traits.cc b/libstdc++-v3/testsuite/std/time/zoned_traits.cc
+index 83cf66351270..b3d77b7adbea 100644
+--- a/libstdc++-v3/testsuite/std/time/zoned_traits.cc
++++ b/libstdc++-v3/testsuite/std/time/zoned_traits.cc
+@@ -1,5 +1,5 @@
+ // { dg-do run { target c++20 } }
+-// { dg-require-effective-target cxx11_abi }
++// { dg-require-effective-target tzdb }
+ 
+ #include <chrono>
+ #include <testsuite_hooks.h>

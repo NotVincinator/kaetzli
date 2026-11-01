@@ -1,0 +1,125 @@
+From 20613cacb4a2d57b69e270de974732c2a8f1856c Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Wed, 2 Sep 2026 10:28:49 +0200
+Subject: [PATCH 165/385] tree-optimization: do not lose reverse storage order
+ when translating a ref
+
+When vn_reference_lookup_3 translates a reference through an aggregate
+copy it may fail to find a common base and instead reduce the lookup to
+the base of the copy's right-hand side plus a constant offset, folding
+all of the original operands away.  A reversed storage order is a
+property of the component and not of its position, so it cannot be
+recovered from that offset: the translated reference ends up in natural
+order and the later "assignment from a constant" case interprets the
+stored bytes with the wrong bit numbering, silently producing a wrong
+value.
+
+Punt in that case, i.e. when no original operand survives and either
+access is in reverse storage order.  When an operand does survive it
+stays outermost and carries the flag, so the storage order of the
+translated reference is unchanged; a reverse flag on an inner operand
+only describes an inner container and does not affect the byte order of
+the scalar access.
+
+reverse_storage_order_for_component_p now takes its argument by const
+reference so that the auto_vec holding the right-hand side operands can
+be passed to it.
+
+Assisted-by: Claude Opus 5 <noreply@anthropic.com>
+
+	PR tree-optimization/126153
+	* tree-ssa-sccvn.cc (reverse_storage_order_for_component_p): Take
+	the operands by const reference.
+	(vn_reference_lookup_3): Punt when translating a reference through
+	an aggregate copy consumes all of its operands and either access
+	has reverse storage order.
+
+	* gcc.dg/torture/sso-fre-1.c: New test.
+
+(cherry picked from commit 5d3f80d7d9baf9207bb037a85ad78f3bcee4e41b)
+---
+ gcc/testsuite/gcc.dg/torture/sso-fre-1.c | 43 ++++++++++++++++++++++++
+ gcc/tree-ssa-sccvn.cc                    | 13 ++++++-
+ 2 files changed, 55 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/sso-fre-1.c
+
+diff --git a/gcc/testsuite/gcc.dg/torture/sso-fre-1.c b/gcc/testsuite/gcc.dg/torture/sso-fre-1.c
+new file mode 100644
+index 000000000000..5366d437310a
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/sso-fre-1.c
+@@ -0,0 +1,43 @@
++/* { dg-do run } */
++/* { dg-require-effective-target le } */
++
++/* Value numbering used to translate a reference through an aggregate copy
++   by folding the components of the reference into a constant offset into
++   the right-hand side of the copy.  A reversed storage order is a property
++   of the component and not of its position, so it was lost in the process
++   and the load of F7 below was resolved to the least significant bits of
++   the byte instead of to its most significant bits.  */
++
++struct __attribute__((scalar_storage_order("big-endian"))) S0
++{
++  char f7 : 3;
++  char f6 : 5;
++};
++
++struct S1 { int a; struct S0 f3; char pad; short s; };
++
++struct S1 g;
++struct S1 *escape;
++
++__attribute__((noipa)) int
++foo (void)
++{
++  struct S1 l;
++  struct S0 *q;
++
++  /* Reversed bit order, so this gives f7 == 1 and f6 == 4.  */
++  *(char *) &g.f3 = 0x24;
++  l = g;
++  /* Keep L addressable so that it is not scalarized away.  */
++  escape = &l;
++  q = (struct S0 *) ((char *) &l + __builtin_offsetof (struct S1, f3));
++  return q->f7;
++}
++
++int
++main (void)
++{
++  if (foo () != 1)
++    __builtin_abort ();
++  return 0;
++}
+diff --git a/gcc/tree-ssa-sccvn.cc b/gcc/tree-ssa-sccvn.cc
+index ca3ce8546236..f0553e54d20c 100644
+--- a/gcc/tree-ssa-sccvn.cc
++++ b/gcc/tree-ssa-sccvn.cc
+@@ -1725,7 +1725,7 @@ contains_storage_order_barrier_p (vec<vn_reference_op_s> ops)
+ /* Return true if OPS represent an access with reverse storage order.  */
+ 
+ static bool
+-reverse_storage_order_for_component_p (vec<vn_reference_op_s> ops)
++reverse_storage_order_for_component_p (const vec<vn_reference_op_s> &ops)
+ {
+   unsigned i = 0;
+   if (ops[i].opcode == REALPART_EXPR || ops[i].opcode == IMAGPART_EXPR)
+@@ -3773,6 +3773,17 @@ vn_reference_lookup_3 (ao_ref *ref, tree vuse, void *data_,
+       tree rhs1 = gimple_assign_rhs1 (def_stmt);
+       copy_reference_ops_from_ref (rhs1, &rhs);
+ 
++      /* When none of the original operands survives the storage order of
++	 the translated reference is the one of the RHS of the copy.  The
++	 operands we folded into a constant offset above may well have
++	 specified a reverse storage order, which is a property of the
++	 component and not of its position, so it is not recoverable from
++	 that offset.  Punt unless both accesses are in natural order.  */
++      if (i < 0
++	  && (reverse_storage_order_for_component_p (vr->operands)
++	      || reverse_storage_order_for_component_p (rhs)))
++	return (void *)-1;
++
+       /* Apply an extra offset to the inner MEM_REF of the RHS.  */
+       bool force_no_tbaa = false;
+       if (maybe_ne (extra_off, 0))

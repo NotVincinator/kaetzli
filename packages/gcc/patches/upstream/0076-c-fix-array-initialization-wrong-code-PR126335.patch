@@ -1,0 +1,139 @@
+From 69f0ab9e2875d064afc52ab5e5e66a8357085905 Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Thu, 30 Jul 2026 15:18:14 -0400
+Subject: [PATCH 076/385] c++: fix array initialization wrong code [PR126335]
+
+This is a wrong-code problem starting with the recent check_initializer
+simplification (r17-1661).  I thought the fix would be to bring some of
+those dropped conditions back, but now I think the change just uncovered
+a latent bug.
+
+Since r17-1661, when initializing 'm' of type 'M[2]' we no longer call
+build_aggr_init_full_exprs in check_initializer; instead, we go on to
+store_init_value -> split_nonconstant_init.  There we arrive with:
+
+{{.a=TARGET_EXPR <D.3136, <<< Unknown tree: aggr_init_expr
+  3
+  operator""_s
+  D.3136 >>>>, .b=TARGET_EXPR <D.3139, <<< Unknown tree: aggr_init_expr
+  3
+  operator""_s
+  D.3139 >>>>}, {.a={.p=&empty.str}, .b={.p=&empty.str}}}
+
+which so far seems OK.  The type is an array so split_nonconstant_init_1
+delegates to build_vec_init and returns true which, as the comment says,
+should mean that "the whole of the value was initialized by the generated
+statements".  This is inaccurate: since try_const and do_static_init are
+both true in build_vec_init, we have split out the constant initializer
+(the {.a={.p=&empty.str}, .b={.p=&empty.str}} part) into DECL_INITIAL:
+
+5374       else if (do_static_init && !vec_safe_is_empty (const_vec))
+5375         DECL_INITIAL (obase) = build_constructor (atype, const_vec);
+
+so we have both dynamic and static initializers.  But since
+split_nonconstant_init_1 returns bool, it's not ready to signal this case
+to split_nonconstant_init, which then does:
+
+ 943       if (split_nonconstant_init_1 (dest, init, true, &flags))
+ 944         init = NULL_TREE;
+
+and then overwrites DECL_INITIAL (dest).  So we've lost a half of the
+initializer and got wrong-code as the result.
+
+This patch fixes it by not throwing away the DECL_INITIAL that
+build_vec_init set for us.  I suppose another approach would be
+to somehow change split_nonconstant_init_1/ARRAY_TYPE to follow
+the element pruning/add_stmt like the rest of the function, but that
+seems more complicated.
+
+	PR c++/126335
+
+gcc/cp/ChangeLog:
+
+	* typeck2.cc (split_nonconstant_init): Assert that DECL_INITIAL
+	is initially null.  Don't clear DECL_INITIAL if build_vec_init
+	set it.  Only clear TREE_READONLY if CODE has side-effects.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/init/array68.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit e3da9acc2462e43e0ce3b9a5d414b988c35595c3)
+---
+ gcc/cp/typeck2.cc                   | 21 ++++++++++++++++++---
+ gcc/testsuite/g++.dg/init/array68.C | 19 +++++++++++++++++++
+ 2 files changed, 37 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/init/array68.C
+
+diff --git a/gcc/cp/typeck2.cc b/gcc/cp/typeck2.cc
+index d29dbfcb65df..155c2ac6b27c 100644
+--- a/gcc/cp/typeck2.cc
++++ b/gcc/cp/typeck2.cc
+@@ -576,7 +576,7 @@ build_disable_temp_cleanup (tree f)
+ /* The recursive part of split_nonconstant_init.  DEST is an lvalue
+    expression to which INIT should be assigned.  INIT is a CONSTRUCTOR.
+    Return true if the whole of the value was initialized by the
+-   generated statements.  */
++   generated statements or modifying DECL_INITIAL.  */
+ 
+ static bool
+ split_nonconstant_init_1 (tree dest, tree init, bool last,
+@@ -845,6 +845,13 @@ split_nonconstant_init (tree dest, tree init)
+       if (TREE_CODE (TREE_TYPE (dest)) != ARRAY_TYPE)
+ 	flags = make_tree_vector ();
+ 
++      /* We are about to call split_nonconstant_init_1 which might
++	 set DECL_INITIAL, so make sure we aren't overwriting an
++	 existing initializer.  Also, if we split out everything,
++	 we clear INIT so won't set DECL_INITIAL below.  Make
++	 sure it's null so that we're not forgetting to clear it.  */
++      gcc_assert (!(VAR_P (dest) && DECL_INITIAL (dest)));
++
+       if (split_nonconstant_init_1 (dest, init, true, &flags))
+ 	init = NULL_TREE;
+ 
+@@ -855,8 +862,16 @@ split_nonconstant_init (tree dest, tree init)
+       code = pop_stmt_list (code);
+       if (VAR_P (dest) && !is_local_temp (dest))
+ 	{
+-	  DECL_INITIAL (dest) = init;
+-	  TREE_READONLY (dest) = 0;
++	  /* If we are initializing an array, split_nonconstant_init_1
++	     might've delegated to build_vec_init in which case it always
++	     returns true so we clear INIT.  But if we're initializing
++	     a static array, build_vec_init can put constant initializers
++	     into DECL_INITIAL.  Clearing it would mean losing some of the
++	     initializers as in c++/126335.  */
++	  if (init)
++	    DECL_INITIAL (dest) = init;
++	  if (TREE_SIDE_EFFECTS (code))
++	    TREE_READONLY (dest) = 0;
+ 	}
+       else if (init)
+ 	{
+diff --git a/gcc/testsuite/g++.dg/init/array68.C b/gcc/testsuite/g++.dg/init/array68.C
+new file mode 100644
+index 000000000000..f9afda7eb53b
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/init/array68.C
+@@ -0,0 +1,19 @@
++// PR c++/126335
++// { dg-do run { target c++20 } }
++
++struct D {};
++struct Lit {
++  constexpr Lit(char const *) {}
++  D str;
++};
++auto empty = Lit("");
++struct S {
++  D * p;
++  constexpr S() { p = &empty.str; }
++  S(Lit) {}
++  ~S() {}
++};
++template<Lit L> S operator ""_s() { return L; }
++struct M { S a, b; };
++static M m[2]{{""_s, ""_s}, {}};
++int main() { return m[1].a.p == nullptr; }

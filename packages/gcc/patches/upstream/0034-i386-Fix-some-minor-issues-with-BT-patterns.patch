@@ -1,0 +1,44 @@
+From d3ee0199d95ecea85c6116a9e10a9728506f419e Mon Sep 17 00:00:00 2001
+From: Uros Bizjak <ubizjak@gmail.com>
+Date: Wed, 12 Aug 2026 21:13:15 +0200
+Subject: [PATCH 034/385] i386: Fix some minor issues with BT patterns
+
+Relax register constraint on operand 1 of *bt<mode> from "q" to "r"
+so it is no longer restricted to the legacy byte-addressable register
+class.  Also remove the unneeded "r,m" constraints on operand 0
+of *bt<SWI48:mode>_mask pre-reload splitter, keeping only the
+nonimmediate_operand predicate.
+
+gcc/ChangeLog:
+
+	* config/i386/i386.md (*bt<mode>): Change operand 1 constraint
+	from "q<S>,<S>" to "r<S>,<S>".
+	(*bt<SWI48:mode>_mask): Remove constraints from operand 0.
+
+(cherry picked from commit f296bb38423fb786f20d213f9f87bf2c7ce14b63)
+---
+ gcc/config/i386/i386.md | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/config/i386/i386.md b/gcc/config/i386/i386.md
+index 8407af948fc4..fe40cd25b7d7 100644
+--- a/gcc/config/i386/i386.md
++++ b/gcc/config/i386/i386.md
+@@ -19548,7 +19548,7 @@
+ 	  (zero_extract:SWI48
+ 	    (match_operand:SWI48 0 "nonimmediate_operand" "r,m")
+ 	    (const_int 1)
+-	    (match_operand:QI 1 "nonmemory_operand" "q<S>,<S>"))))]
++	    (match_operand:QI 1 "nonmemory_operand" "r<S>,<S>"))))]
+   ""
+ {
+   switch (get_attr_mode (insn))
+@@ -19577,7 +19577,7 @@
+         (compare:CCC
+ 	  (const_int 0)
+           (zero_extract:SWI48
+-            (match_operand:SWI48 0 "nonimmediate_operand" "r,m")
++            (match_operand:SWI48 0 "nonimmediate_operand")
+             (const_int 1)
+ 	    (subreg:QI
+ 	      (and:SWI248

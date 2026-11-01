@@ -1,0 +1,178 @@
+From 48dfb2f181e913bc49180cc42d9ba675f29da585 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 20 Aug 2026 00:20:57 +0000
+Subject: [PATCH 065/385] Daily bump.
+
+---
+ gcc/ChangeLog           | 33 ++++++++++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/ada/ChangeLog       | 14 +++++++++++
+ gcc/cp/ChangeLog        | 28 ++++++++++++++++++++++
+ gcc/testsuite/ChangeLog | 51 +++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 127 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 8b743696a889..7f34ab1c7529 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,36 @@
++2026-08-19  Alice Carlotti  <alice.carlotti@arm.com>
++
++	PR target/124629
++	* config/aarch64/driver-aarch64.cc (AARCH64_ARCH):
++	Don't skip first character of #ARCH_IDENT.
++
++2026-08-19  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-08-18  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/126925
++	* tree-ssa-loop-ivopts.cc (create_new_iv): Avoid crashing
++	if the use IV is invariant.
++
++2026-08-19  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-08-05  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/126650
++	* tree-affine.cc (get_inner_reference_aff): Fixup rounding
++	of size.
++
++2026-08-19  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-08-18  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/126926
++	* tree-vect-slp.cc (vectorize_slp_instance_root_stmt): Only
++	replace the RHS of the vector constructing scalar stmt.
++
+ 2026-08-18  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index a8e78f54d93c..7a23bbffaa7d 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260819
++20260820
+diff --git a/gcc/ada/ChangeLog b/gcc/ada/ChangeLog
+index 14631bb5c1c5..0ac652b93da1 100644
+--- a/gcc/ada/ChangeLog
++++ b/gcc/ada/ChangeLog
+@@ -1,3 +1,17 @@
++2026-08-19  Eric Botcazou  <ebotcazou@adacore.com>
++
++	PR ada/126928
++	* sem_ch12.adb (In_Local_Package_Of_Formal_Package): New predicate.
++	(Analyze_Package_Instantiation): Do not register the instantiation
++	of the body if it is present in the local package of a formal one.
++	(Need_Subprogram_Instance_Body): Likewise.
++
++2026-08-19  Eric Botcazou  <ebotcazou@adacore.com>
++
++	PR ada/126907
++	* sem_attr.adb (Resolve_Attribute) <Attribute_Reduce>: Do not call
++	Relocate_Node on nodes of the original unanalyzed tree.
++
+ 2026-08-07  Release Manager
+ 
+ 	* GCC 16.2.0 released.
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index 4e3d483e2c5f..636d65a8bc1a 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,31 @@
++2026-08-19  Patrick Palka  <ppalka@redhat.com>
++
++	Backported from master:
++	2026-08-12  Patrick Palka  <ppalka@redhat.com>
++		    Bernhard M. Wiedemann  <bwiedemann@suse.de>
++
++	PR c++/124811
++	* decl.cc (typename_hasher::hash): Instead of pointer hashing,
++	hash TYPE_HASH of context and use iterative_hash_template_arg
++	to hash fullname.
++
++2026-08-19  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-08-19  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/126918
++	* constexpr.cc (class constexpr_global_ctx): Extend description of
++	caught_exceptions vector.
++	(cxx_eval_cxa_builtin_fn): When catching a pointer-to-member and
++	the current exception is nullptr or pointer-to-member with different
++	type, create a temporary, initialize it from the exception value and
++	return address of it.  Make sure to free these temporaries at
++	__cxa_end_catch time.
++	* call.cc (handler_match_for_exception_type): Allow NULLPTR_TYPE
++	exception type or different pointer-to-member type even for
++	TYPE_PTRMEMFUNC_P types, not just TYPE_PTRDATAMEM_P types.
++
+ 2026-08-18  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 981044dd9367..1e3911aac44d 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,54 @@
++2026-08-19  Alice Carlotti  <alice.carlotti@arm.com>
++
++	PR target/124629
++	* gcc.target/aarch64/cpunative/info_36: New test file.
++	* gcc.target/aarch64/cpunative/native_cpu_36.c: New test.
++
++2026-08-19  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* gnat.dg/specs/generic_inst10.ads: New test.
++	* gnat.dg/specs/generic_inst10_g1.ads: New helper.
++	* gnat.dg/specs/generic_inst10_g2.ads: Likewise.
++	* gnat.dg/specs/generic_inst10_g3.ads: Likewise.
++	* gnat.dg/specs/generic_inst10_pkg.ads: Likewise.
++
++2026-08-19  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* gnat.dg/reduce7.adb: New test.
++
++2026-08-19  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-08-18  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/126925
++	* gcc.dg/torture/pr126925.c: New testcase.
++
++2026-08-19  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-08-05  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/126650
++	* gcc.dg/torture/pr126650.c: New testcase.
++
++2026-08-19  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-08-18  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/126926
++	* gcc.dg/vect/bb-slp-pr126926.c: New testcase.
++
++2026-08-19  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-08-19  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/126918
++	* g++.dg/cpp26/constexpr-eh24.C: New test.
++	* g++.dg/cpp26/constexpr-eh25.C: New test.
++
+ 2026-08-18  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:

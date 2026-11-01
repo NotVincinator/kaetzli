@@ -1,0 +1,61 @@
+From 5bab614c989403b371d9592b6ac80407a25d24a2 Mon Sep 17 00:00:00 2001
+From: Stefan Schulze Frielinghaus <stefansf@gcc.gnu.org>
+Date: Sun, 20 Sep 2026 09:19:50 +0200
+Subject: [PATCH 252/385] expand_mult: Look through vector mode
+
+When expand_mult handles a constant vector multiplier where the scalar
+operand is a CONST_WIDE_INT, then also look through the vector mode
+while determining the shift amount since here we need the scalar mode.
+Note, when we call later on into expand_shift we need the vector mode,
+i.e., only for the shift amount we need the scalar mode.
+
+	PR middle-end/127474
+
+gcc/ChangeLog:
+
+	* expmed.cc (expand_mult): Look through vector mode.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.dg/torture/pr127474.c: New test.
+
+(cherry picked from commit 5dc4ab23e0d01a1fd20c1365bdb2de039d831ff9)
+---
+ gcc/expmed.cc                           |  4 +++-
+ gcc/testsuite/gcc.dg/torture/pr127474.c | 12 ++++++++++++
+ 2 files changed, 15 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/pr127474.c
+
+diff --git a/gcc/expmed.cc b/gcc/expmed.cc
+index 6c761d36c5d6..e93dcb30c929 100644
+--- a/gcc/expmed.cc
++++ b/gcc/expmed.cc
+@@ -3548,7 +3548,9 @@ expand_mult (machine_mode mode, rtx op0, rtx op1, rtx target,
+       else if (CONST_DOUBLE_AS_INT_P (scalar_op1))
+ #endif
+ 	{
+-	  int shift = wi::exact_log2 (rtx_mode_t (scalar_op1, mode));
++	  machine_mode scalar_mode = VECTOR_MODE_P (mode)
++				     ? GET_MODE_INNER (mode) : mode;
++	  int shift = wi::exact_log2 (rtx_mode_t (scalar_op1, scalar_mode));
+ 	  /* Perfect power of 2 (other than 1, which is handled above).  */
+ 	  if (shift > 0)
+ 	    return expand_shift (LSHIFT_EXPR, mode, op0,
+diff --git a/gcc/testsuite/gcc.dg/torture/pr127474.c b/gcc/testsuite/gcc.dg/torture/pr127474.c
+new file mode 100644
+index 000000000000..b0f63fda042b
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/pr127474.c
+@@ -0,0 +1,12 @@
++/* { dg-do compile } */
++/* { dg-require-effective-target int128 } */
++/* { dg-additional-options "-march=z17" { target s390x-*-* } } */
++
++/* Previously we ICE'd in expand_mult when dealing with a CONST_WIDE_INT.  */
++
++typedef __int128 v1ti __attribute__ ((vector_size (16)));
++
++v1ti foo (v1ti x)
++{
++  return x * (v1ti){(__int128)123456789 << 64 | (__int128)123456789};
++}

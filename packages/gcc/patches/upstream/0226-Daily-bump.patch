@@ -1,0 +1,43 @@
+From f4d42a87b2d0e1186a4fa366f61bce3cffbd65b1 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Fri, 2 Oct 2026 00:21:00 +0000
+Subject: [PATCH 226/385] Daily bump.
+
+---
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 18 ++++++++++++++++++
+ 2 files changed, 19 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index b5a6302beac2..8b2dfd12ad46 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261001
++20261002
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 9e3970d4cf3c..3004963825c3 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,21 @@
++2026-10-01  Christophe Lyon  <christophe.lyon@arm.com>
++
++	Backported from master:
++	2026-10-01  Christophe Lyon  <christophe.lyon@arm.com>
++
++	* gcc.target/arm/armv6-unaligned-load-ice.c: Remove dg-skip-if,
++	fix dg-options and dg-add-options.
++	* gcc.target/arm/attr-unaligned-load-ice.c: Remove dg-skip-if and
++	fix dg-options.
++	* gcc.target/arm/attr_arm-err.c: Remove dg-skip-if.
++	* gcc.target/arm/combine-cmp-shift.c: Remove dg-skip-if, useless
++	-mcpu=cortex-a8 and require arm_arch_v7a.
++	* gcc.target/arm/lob2.c: Remove dg-skip-if, and require
++	arm_arch_v8_1m_main.
++	* gcc.target/arm/lob5.c: Likewise.
++	* gcc.target/arm/pr50305.c: Remove dg-skip-if and require
++	arm_arch_v7a_arm.
++
+ 2026-09-30  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+ 
+ 	Backported from master:

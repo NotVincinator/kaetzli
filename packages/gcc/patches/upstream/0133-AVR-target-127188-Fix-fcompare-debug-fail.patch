@@ -1,0 +1,116 @@
+From f91449daed2c83ef4c0d69430216dc6bfddd56bc Mon Sep 17 00:00:00 2001
+From: Georg-Johann Lay <avr@gjlay.de>
+Date: Fri, 4 Sep 2026 13:14:10 +0200
+Subject: [PATCH 133/385] AVR: target/127188 - Fix -fcompare-debug fail
+
+The transformations performed by the avr-2moves pass might depend
+on the presence of debug insns, which is fixed by this patch.
+
+It now uses next_nondebug_insn_bb() to traverses the insns in such a
+way that the seen insns don't depend on the presence of debug insns.
+
+Plus, it ignores debug insns when it traverses the DF_REG_USE_CHAIN
+of the considered register.
+
+The patch passes without new regression.  It fixes
+
+  gcc.dg/pr103837.c (test for excess errors)
+  gcc.dg/pr45865.c (test for excess errors)
+
+which failed with -fcompare-debug.
+
+	PR target/127188
+gcc/
+	* config/avr/avr-passes.cc (avr_pass_2moves) <optimize_2moves_bb>:
+	Use next_nondebug_insn_bb to traverse the insns.
+	<optimize_2moves>: Ignore degug insns when traversing
+	DF_REG_USE_CHAIN.
+gcc/testsuite/
+	* gcc.target/avr/pr127188.c: New test.
+
+(cherry picked from commit 740716f3b13102b93489eec8f3238aa1f356fe0b)
+---
+ gcc/config/avr/avr-passes.cc            | 27 ++++++++++++++-----------
+ gcc/testsuite/gcc.target/avr/pr127188.c | 18 +++++++++++++++++
+ 2 files changed, 33 insertions(+), 12 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/avr/pr127188.c
+
+diff --git a/gcc/config/avr/avr-passes.cc b/gcc/config/avr/avr-passes.cc
+index 4e79cfd21d5a..240563028a34 100644
+--- a/gcc/config/avr/avr-passes.cc
++++ b/gcc/config/avr/avr-passes.cc
+@@ -84,8 +84,7 @@ namespace
+ {
+ 
+ /////////////////////////////////////////////////////////////////////////////
+-// Before we start with the very code, introduce some helpers that are
+-// quite generic, though up to now only avr-fuse-add makes use of them.
++// Before we start with the very code, introduce some generic helpers.
+ 
+ /* Get the next / previous NONDEBUG_INSN_P after INSN in basic block BB.
+    This assumes we are in CFG layout mode so that BLOCK_FOR_INSN()
+@@ -4919,18 +4918,19 @@ bool
+ avr_pass_2moves::optimize_2moves_bb (basic_block bb)
+ {
+   bool changed = false;
+-  rtx_insn *insn1 = nullptr;
+-  rtx_insn *insn2 = nullptr;
+-  rtx_insn *curr;
++  rtx_insn *insn1 = next_nondebug_insn_bb (bb, BB_HEAD (bb));
+ 
+-  FOR_BB_INSNS (bb, curr)
++  while (insn1)
+     {
+-      if (insn1 && INSN_P (insn1)
+-	  && insn2 && INSN_P (insn2))
+-	changed |= optimize_2moves (insn1, insn2);
++      rtx_insn *insn2 = next_nondebug_insn_bb (bb, insn1);
++      if (!insn2)
++	break;
++
++      rtx_insn *next = next_nondebug_insn_bb (bb, insn2);
+ 
+-      insn1 = insn2;
+-      insn2 = curr;
++      bool change = optimize_2moves (insn1, insn2);
++      changed |= change;
++      insn1 = change ? next : insn2;
+     }
+ 
+   return changed;
+@@ -4970,7 +4970,10 @@ avr_pass_2moves::optimize_2moves (rtx_insn *insn1, rtx_insn *insn2)
+       for (; use; use = DF_REF_NEXT_REG (use))
+ 	{
+ 	  rtx_insn *user = DF_REF_INSN (use);
+-	  avr_dump (" %d", INSN_UID (user));
++	  bool debug_p = DEBUG_INSN_P (user);
++	  avr_dump (" %d%s", INSN_UID (user), debug_p ? "=debug_insn" : "");
++	  if (debug_p)
++	    continue;
+ 	  good |= INSN_UID (user) == INSN_UID (insn2);
+ 	  bad |= INSN_UID (user) != INSN_UID (insn2);
+ 	}
+diff --git a/gcc/testsuite/gcc.target/avr/pr127188.c b/gcc/testsuite/gcc.target/avr/pr127188.c
+new file mode 100644
+index 000000000000..f2c5145b4c15
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/avr/pr127188.c
+@@ -0,0 +1,18 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -fcompare-debug" } */
++
++extern int foo (int);
++
++int bar (int a, int b)
++{
++  int q;
++  if (a < 0)
++    q = 0;
++  else
++    q = 1;
++  int c = foo (b);
++  if (q != 0)
++    c = foo (c);
++  int d = foo (c);
++  return d;
++}

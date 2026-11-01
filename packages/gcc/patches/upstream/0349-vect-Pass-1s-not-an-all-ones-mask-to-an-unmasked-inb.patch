@@ -1,0 +1,112 @@
+From 2ab72a5a399b838232e4f1c9de4b6c48d9b86305 Mon Sep 17 00:00:00 2001
+From: Igor Shevlyakov <igor@tachyum.com>
+Date: Fri, 9 Oct 2026 11:08:56 -0600
+Subject: [PATCH 349/385] vect: Pass 1s, not an all-ones mask, to an unmasked
+ inbranch clone [PR127784]
+
+When vectorizable_simd_clone_call uses an inbranch SIMD clone for a call
+site that is not masked, it synthesizes an all-true mask.  For clones
+whose mask argument is a vector of the argument type (mask_mode ==
+VOIDmode) it built an all-ones mask of that type and then converted it
+to the clone's 1/0 encoding with
+
+  VEC_COND_EXPR <mask, { 1, ... }, { 0, ... }>
+
+A VEC_COND_EXPR condition must be a boolean vector, but
+vect_build_all_ones_mask returns one only when the mask type is
+boolean; for a floating-point mask type it is a vector of NaNs, and the
+statement is invalid GIMPLE.  On x86_64 the SSE clone takes its mask as
+vector(2) double; since r17-2654 two calls of an "omp declare simd
+inbranch" function can be SLP-vectorized as one unmasked call of that
+clone, so this ICEs at -O2 -fopenmp-simd.
+
+All lanes are active, so pass the value the VEC_COND_EXPR would select,
+a vector of 1s, directly.
+
+	PR tree-optimization/127784
+
+gcc/ChangeLog:
+
+	* tree-vect-stmts.cc (vectorizable_simd_clone_call): Pass a vector
+	of 1s as an all-true mask for a VOIDmode mask_mode.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.dg/vect/vect-simd-clone-allones-mask.c: New test.
+
+Signed-off-by: Igor Shevlyakov <igor@tachyum.com>
+(cherry picked from commit 035e2f6217cf68e2d702f2323a8ccb6163fb39e2)
+---
+ .../vect/vect-simd-clone-allones-mask.c       | 43 +++++++++++++++++++
+ gcc/tree-vect-stmts.cc                        |  8 ++++
+ 2 files changed, 51 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.dg/vect/vect-simd-clone-allones-mask.c
+
+diff --git a/gcc/testsuite/gcc.dg/vect/vect-simd-clone-allones-mask.c b/gcc/testsuite/gcc.dg/vect/vect-simd-clone-allones-mask.c
+new file mode 100644
+index 000000000000..d74e9246168c
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/vect/vect-simd-clone-allones-mask.c
+@@ -0,0 +1,43 @@
++/* Unmasked call of an inbranch SIMD clone whose mask argument is a
++   floating-point vector.  */
++/* { dg-require-effective-target vect_simd_clones } */
++/* { dg-additional-options "-fopenmp-simd --param vect-partial-vector-usage=0" } */
++/* { dg-additional-options "-mavx512f" { target avx512f_runtime } } */
++
++#include "tree-vect.h"
++
++#define N 64
++
++#pragma omp declare simd inbranch
++__attribute__((noinline)) double
++foo (double x, double y)
++{
++  return x * 10.0 + y;
++}
++
++double r[N], t[N];
++
++__attribute__((noipa)) void
++f (double *rp, double *tp, long n)
++{
++  for (long i = 0; i < n; i++)
++    rp[i] = rp[i] * (foo (tp[0] + 1.0, tp[0] + 2.0)
++		     + foo (tp[0] + 3.0, tp[0] + 4.0));
++}
++
++int
++main ()
++{
++  check_vect ();
++  for (int i = 0; i < N; i++)
++    {
++      r[i] = i;
++      t[i] = 0.5;
++    }
++  f (r, t, N);
++  /* foo (1.5, 2.5) + foo (3.5, 4.5) = 17.5 + 39.5.  */
++  for (int i = 0; i < N; i++)
++    if (r[i] != i * 57.0)
++      __builtin_abort ();
++  return 0;
++}
+diff --git a/gcc/tree-vect-stmts.cc b/gcc/tree-vect-stmts.cc
+index 1f3bdb167cc4..e9b4e8528693 100644
+--- a/gcc/tree-vect-stmts.cc
++++ b/gcc/tree-vect-stmts.cc
+@@ -4930,6 +4930,14 @@ vectorizable_simd_clone_call (vec_info *vinfo, stmt_vec_info stmt_info,
+ 		  mask = vect_get_loop_mask (loop_vinfo, gsi, loop_masks,
+ 					     ncopies * o, mask_vectype, m);
+ 		}
++	      else if (bestn->simdclone->mask_mode == VOIDmode)
++		{
++		  /* All lanes are active: pass what the VEC_COND_EXPR below
++		     would select.  An all-ones floating-point MASK_ARGTYPE
++		     is not a valid condition.  */
++		  vargs.safe_push (build_one_cst (mask_argtype));
++		  continue;
++		}
+ 	      else
+ 		mask = vect_build_all_ones_mask (vinfo, stmt_info,
+ 						 mask_argtype);

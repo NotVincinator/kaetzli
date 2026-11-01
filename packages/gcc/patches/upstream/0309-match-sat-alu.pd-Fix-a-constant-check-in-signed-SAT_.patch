@@ -1,0 +1,145 @@
+From cf366d0dae6aef5db474f0f3897186d82681d3c9 Mon Sep 17 00:00:00 2001
+From: Kyrylo Tkachov <ktkachov@nvidia.com>
+Date: Thu, 15 Oct 2026 20:09:21 +0200
+Subject: [PATCH 309/385] match-sat-alu.pd: Fix a constant check in signed
+ SAT_ADD [PR127357]
+
+The form
+
+  T SUM = (T) ((UT) X + (UT) IMM);
+  ((X ^ SUM) & (X ^ C3)) < 0 ? (-(T) (X < 0) ^ MAX) : SUM
+
+is a signed saturating add only when (X ^ C3) < 0 tests that X has the
+sign of IMM, that is when C3 and IMM have opposite signs.  The source
+form has C3 == ~IMM.  The pattern, added in r15-4994, checks
+(IMM & C3) == 0, which also accepts IMM = 1, C3 = 2:
+
+  int
+  s_sat (int x)
+  {
+    int sum = (int) ((unsigned) x + 1u);
+    if (((x ^ sum) & (x ^ 2)) < 0)
+      return -(int) (x < 0) ^ INT_MAX;
+    return sum;
+  }
+
+  _4 = x_10(D) ^ 2;
+  _5 = _3 & _4;
+  if (_5 < 0)
+  ...
+  # _9 = PHI <_12(3), sum_11(2)>
+
+widening_mul replaces the PHI with _9 = .SAT_ADD (x_10(D), 1), so
+s_sat (INT_MAX) returns INT_MAX instead of INT_MIN.  The vectorizer uses
+the same matcher, which is how the PR127357 testcase fails at -O3.
+s_sat in PR127916 is the same bug.
+
+Compare the sign bits of the two constants instead.  This also accepts
+valid pairs that the old check rejected, such as IMM = 1, C3 = -3.
+
+Bootstrapped and tested as part of the series on
+aarch64-unknown-linux-gnu and x86_64-pc-linux-gnu.
+
+	PR tree-optimization/127357
+	PR tree-optimization/127916
+
+gcc/ChangeLog:
+
+	* match.pd (signed_integer_sat_add): Require opposite signs
+	for the two constants of the single AND IMM form.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.dg/torture/pr127357.c: New test.
+
+Signed-off-by: Kyrylo Tkachov <ktkachov@nvidia.com>
+(cherry picked from commit 1dbe8802bdd361e2274d1c0bec5e75e09ad0bc64)
+---
+ gcc/match.pd                            |  4 +-
+ gcc/testsuite/gcc.dg/torture/pr127357.c | 62 +++++++++++++++++++++++++
+ 2 files changed, 65 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/pr127357.c
+
+diff --git a/gcc/match.pd b/gcc/match.pd
+index 5dd1f9c3ca19..54bbf8b8856b 100644
+--- a/gcc/match.pd
++++ b/gcc/match.pd
+@@ -3633,7 +3633,9 @@ DEFINE_INT_AND_FLOAT_ROUND_FN (RINT)
+ 			(bit_xor:c @0 INTEGER_CST@3)) integer_zerop)
+ 	 (signed_integer_sat_val @0)
+ 	 @2)
+-  (if (wi::bit_and (wi::to_wide (@1), wi::to_wide (@3)) == 0)))
++  /* (X ^ C3) < 0 has to test that X has the sign of IMM, so C3 and IMM
++     need opposite signs.  The source form above has C3 == ~IMM.  */
++  (if (tree_int_cst_sign_bit (@1) != tree_int_cst_sign_bit (@3))))
+ 
+ (match (signed_integer_sat_add @0 @1)
+   /* T SUM = (T)((UT)X + (UT)-1);
+diff --git a/gcc/testsuite/gcc.dg/torture/pr127357.c b/gcc/testsuite/gcc.dg/torture/pr127357.c
+new file mode 100644
+index 000000000000..0505b7b392c1
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/pr127357.c
+@@ -0,0 +1,62 @@
++/* PR tree-optimization/127357 */
++/* PR tree-optimization/127916 */
++/* { dg-do run } */
++
++/* ((X ^ SUM) & (X ^ 2)) < 0 tests X < 0 && SUM >= 0, which is not the
++   overflow test of X + 1.  */
++
++__attribute__((noipa)) int
++s_sat (int x)
++{
++  int sum = (int) ((unsigned) x + 1u);
++  if (((x ^ sum) & (x ^ 2)) < 0)
++    return -(int) (x < 0) ^ __INT_MAX__;
++  return sum;
++}
++
++static signed char
++idiom (signed char x)
++{
++  signed char sum = (signed char) ((unsigned char) x + 1);
++  signed char c = (signed char) ((x ^ sum) & (x ^ 2));
++  signed char satval = (signed char) (-(signed char) (x < 0) ^ 127);
++  return c < 0 ? satval : sum;
++}
++
++#define N 256
++signed char in[N], out[N];
++
++__attribute__((noipa)) void
++loop (void)
++{
++  for (int i = 0; i < N; i++)
++    out[i] = idiom (in[i]);
++}
++
++/* (X ^ -3) < 0 tests X >= 0, so this is a saturating addition.  */
++
++__attribute__((noipa)) int
++sat (int x)
++{
++  int sum = (int) ((unsigned) x + 1u);
++  if (((x ^ sum) & (x ^ -3)) < 0)
++    return -(int) (x < 0) ^ __INT_MAX__;
++  return sum;
++}
++
++int
++main (void)
++{
++  if (s_sat (__INT_MAX__) != -__INT_MAX__ - 1
++      || s_sat (-1) != -__INT_MAX__ - 1 || s_sat (1) != 2)
++    __builtin_abort ();
++  for (int i = 0; i < N; i++)
++    in[i] = i - 128;
++  loop ();
++  for (int i = 0; i < N; i++)
++    if (out[i] != (in[i] == -1 ? -128 : (signed char) (in[i] + 1)))
++      __builtin_abort ();
++  if (sat (__INT_MAX__) != __INT_MAX__ || sat (-1) != 0 || sat (5) != 6)
++    __builtin_abort ();
++  return 0;
++}

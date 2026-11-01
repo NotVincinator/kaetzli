@@ -1,0 +1,108 @@
+From 16664bccc9d7b8f40f32f154493723fe285bdc92 Mon Sep 17 00:00:00 2001
+From: Odysseas Georgoudis <odygrd@hotmail.com>
+Date: Sun, 26 Jul 2026 23:48:20 +0100
+Subject: [PATCH 129/385] c++: Avoid access check for dependent lookup result
+ [PR124983]
+
+strip_using_decl turns a dependent typename USING_DECL into a dependent
+TYPE_DECL.  If member lookup finds that declaration while looking for a
+typo correction, lookup_member can therefore try to perform an access
+check on it.  Access checks for dependent declarations need to wait until
+substitution, and enforce_access asserts this invariant.
+
+Skip the access check whenever the lookup result refers to a member of a
+dependent scope, not just when it remains a USING_DECL.
+
+gcc/cp/ChangeLog:
+
+	PR c++/124983
+	* search.cc (lookup_member): Skip access checks for declarations
+	from dependent scope.
+
+gcc/testsuite/ChangeLog:
+
+	PR c++/124983
+	* g++.dg/template/pr124983.C: New test.
+
+Signed-off-by: Odysseas Georgoudis <odygrd@hotmail.com>
+Co-authored-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 151ded854245c1578706a9da4843f17f55de33d0)
+---
+ gcc/cp/search.cc                         |  7 ++--
+ gcc/testsuite/g++.dg/template/pr124983.C | 49 ++++++++++++++++++++++++
+ 2 files changed, 53 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/template/pr124983.C
+
+diff --git a/gcc/cp/search.cc b/gcc/cp/search.cc
+index e098362fed77..c4c5e0aebecf 100644
+--- a/gcc/cp/search.cc
++++ b/gcc/cp/search.cc
+@@ -1277,9 +1277,10 @@ lookup_member (tree xbasetype, tree name, int protect, bool want_type,
+     {
+       tree decl = is_overloaded_fn (rval) ? get_first_fn (rval) : rval;
+       decl = strip_using_decl (decl);
+-      /* A dependent USING_DECL will be checked after tsubsting.  */
+-      if (TREE_CODE (decl) != USING_DECL
+-	  && !DECL_IOBJ_MEMBER_FUNCTION_P (decl)
++      /* A dependent declaration will be checked after tsubsting.  */
++      if (!dependent_scope_p (DECL_CONTEXT (decl))
++	  && !(DECL_DECLARES_FUNCTION_P (decl)
++	       && DECL_IOBJ_MEMBER_FUNCTION_P (decl))
+ 	  && !perform_or_defer_access_check (basetype_path, decl, decl,
+ 					     complain, afi))
+ 	return error_mark_node;
+diff --git a/gcc/testsuite/g++.dg/template/pr124983.C b/gcc/testsuite/g++.dg/template/pr124983.C
+new file mode 100644
+index 000000000000..72819af48c0e
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/template/pr124983.C
+@@ -0,0 +1,49 @@
++// PR c++/124983
++// { dg-do compile }
++
++template <class T>
++struct A
++{
++  using typename T::Type;
++
++  void f()
++  {
++    this->type(); // { dg-error "no member named 'type'; did you mean 'Type'" }
++  }
++};
++
++template <class T>
++struct B
++{
++  typedef typename T::Type Type;
++  static T Value;
++
++  void f()
++  {
++    this->type(); // { dg-error "no member named 'type'; did you mean 'Type'" }
++    this->value(); // { dg-error "no member named 'value'; did you mean 'Value'" }
++  }
++};
++
++struct X
++{
++  typedef int Type;
++};
++
++template <class T>
++struct C
++{
++private:
++  typedef typename T::Type Type; // { dg-message "declared private" }
++  static T Value; // { dg-message "declared private" }
++};
++
++template <class T>
++void g()
++{
++  typename C<T>::Type t; // { dg-error "private within this context" }
++  (void) C<T>::Value; // { dg-error "private within this context" }
++  (void) t;
++}
++
++template void g<X>(); // { dg-message "required from here" }

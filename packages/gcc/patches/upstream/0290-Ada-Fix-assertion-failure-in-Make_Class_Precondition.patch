@@ -1,0 +1,31 @@
+From 9dac0f686778815dad93e9b6722f20289f603d47 Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Wed, 14 Oct 2026 13:52:19 +0200
+Subject: [PATCH 290/385] Ada: Fix assertion failure in
+ Make_Class_Precondition_Subps
+
+Build_Class_Condition_Subprograms calls Make_Class_Precondition_Subps on
+Is_Primitive_Wrapper subprograms too.
+
+gcc/ada/
+	PR ada/127880
+	* contracts.adb (Make_Class_Precondition_Subps): Accept another
+	kind of wrapper subprograms.
+---
+ gcc/ada/contracts.adb | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ada/contracts.adb b/gcc/ada/contracts.adb
+index bde66171cbc0..198f697c830a 100644
+--- a/gcc/ada/contracts.adb
++++ b/gcc/ada/contracts.adb
+@@ -4233,7 +4233,8 @@ package body Contracts is
+       then
+          pragma Assert
+            (Comes_From_Source (Subp_Id)
+-              or else Is_Dispatch_Table_Wrapper (Subp_Id));
++             or else Is_Dispatch_Table_Wrapper (Subp_Id)
++             or else Is_Primitive_Wrapper (Subp_Id));
+ 
+          if No (Dynamic_Call_Helper (Subp_Id)) then
+ 

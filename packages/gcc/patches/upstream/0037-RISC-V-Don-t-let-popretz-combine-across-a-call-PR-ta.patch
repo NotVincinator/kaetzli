@@ -1,0 +1,148 @@
+From 3cdb74f43678a97b01f1de0cfe9eb218d73460f7 Mon Sep 17 00:00:00 2001
+From: Kito Cheng <kito.cheng@sifive.com>
+Date: Tue, 4 Aug 2026 10:43:37 +0800
+Subject: [PATCH 037/385] RISC-V: Don't let popretz combine across a call [PR
+ target/126454]
+
+The popretz pass scans backwards from cm.popret for the "li a0, 0" that
+feeds the (use a0), but nothing stopped the scan at a call: the argument
+registers of a call live in CALL_INSN_FUNCTION_USAGE, which
+reg_referenced_p does not look at, and the a0 set by a call_value hides
+in a PARALLEL, which the bare SET test did not match.  A "li a0, 0" that
+sets up the first argument of a call was therefore deleted and cm.popret
+became cm.popretz, so the callee got garbage in a0 and the caller
+returned 0 instead of the result of the callee.
+
+Use insn level helpers instead, find_reg_fusage for the uses and
+reg_set_p for the definitions, and ask them about the word_mode a0
+rather than about the a0 of the (use a0), whose mode covers a0 and a1
+for a DImode return value on rv32.
+
+gcc/ChangeLog:
+
+	PR target/126454
+	* config/riscv/riscv-opt-popretz.cc (pass_combine_popretz::execute):
+	Stop the backward scan at any use or definition of a0, including
+	those hidden in CALL_INSN_FUNCTION_USAGE or in a PARALLEL.
+
+gcc/testsuite/ChangeLog:
+
+	PR target/126454
+	* gcc.target/riscv/pr126454.c: New test.
+
+(cherry picked from commit c80ac3cb559f6ea2be6be3d0458c1615ff27c9a0)
+---
+ gcc/config/riscv/riscv-opt-popretz.cc     | 44 +++++++++++++----------
+ gcc/testsuite/gcc.target/riscv/pr126454.c | 36 +++++++++++++++++++
+ 2 files changed, 61 insertions(+), 19 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/pr126454.c
+
+diff --git a/gcc/config/riscv/riscv-opt-popretz.cc b/gcc/config/riscv/riscv-opt-popretz.cc
+index f6f26bced2cc..0fd58fb9eaa1 100644
+--- a/gcc/config/riscv/riscv-opt-popretz.cc
++++ b/gcc/config/riscv/riscv-opt-popretz.cc
+@@ -205,7 +205,7 @@ pass_combine_popretz::execute (function *fn)
+ 
+       rtx_insn *def_a0_insn = NULL;
+       rtx_insn *use_a0_insn = NULL;
+-      rtx a0_reg = NULL;
++      rtx a0_reg = regno_reg_rtx[A0_REGNUM];
+       /* Scan backwards from popret to find the pattern:
+          1. First, find the (use a0) pseudo-instruction
+          2. Continue scanning to find "li a0, 0" (set a0 to const0_rtx)
+@@ -223,29 +223,35 @@ pass_combine_popretz::execute (function *fn)
+ 	      && REG_P (XEXP (def_pat, 0))
+ 	      && REGNO (XEXP (def_pat, 0)) == A0_REGNUM)
+ 	    {
+-	      a0_reg = XEXP (def_pat, 0);
+ 	      use_a0_insn = def_insn;
+ 	      continue;
+ 	    }
+ 
+-	  if (use_a0_insn && reg_referenced_p (a0_reg, def_pat))
++	  if (use_a0_insn)
+ 	    {
+-	      /* a0 is used by other instruction before its use in popret.  */
+-	      use_a0_insn = NULL;
+-	      break;
+-	    }
+-
+-	  if (use_a0_insn
+-	      && GET_CODE (def_pat) == SET
+-	      && REG_P (SET_DEST (def_pat))
+-	      && REGNO (SET_DEST (def_pat)) == A0_REGNUM)
+-	    {
+-	      if (SET_SRC (def_pat) == CONST0_RTX (GET_MODE (SET_SRC (def_pat))))
+-	        def_a0_insn = def_insn;
+-	      /* Stop the search regardless of the value assigned to a0,
+-	         because we only want to match the last (most recent)
+-	         definition of a0 before the (use a0).  */
+-	      break;
++	      if (reg_referenced_p (a0_reg, def_pat)
++		  || (CALL_P (def_insn)
++		      && find_reg_fusage (def_insn, USE, a0_reg)))
++		{
++		  /* a0 is used by other instruction before its use in
++		     popret.  */
++		  use_a0_insn = NULL;
++		  break;
++		}
++
++	      if (reg_set_p (a0_reg, def_insn))
++		{
++		  rtx set = single_set (def_insn);
++		  if (set
++		      && REG_P (SET_DEST (set))
++		      && REGNO (SET_DEST (set)) == A0_REGNUM
++		      && SET_SRC (set) == CONST0_RTX (GET_MODE (SET_SRC (set))))
++		    def_a0_insn = def_insn;
++		  /* Stop the search regardless of the value assigned to a0,
++		     because we only want to match the last (most recent)
++		     definition of a0 before the (use a0).  */
++		  break;
++		}
+ 	    }
+ 	  }
+ 
+diff --git a/gcc/testsuite/gcc.target/riscv/pr126454.c b/gcc/testsuite/gcc.target/riscv/pr126454.c
+new file mode 100644
+index 000000000000..ac30c1756dff
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/pr126454.c
+@@ -0,0 +1,36 @@
++/* { dg-do compile } */
++/* { dg-options " -Os -march=rv32ima_zca_zcmp -mabi=ilp32 -mcmodel=medlow" }*/
++/* { dg-skip-if "" { *-*-* } {"-O0" "-O1" "-O2" "-Og" "-O3" "-Oz" "-flto"} } */
++/* { dg-final { check-function-bodies "**" "" } } */
++
++int callee (int a, int *p);
++
++/*
++**test_arg_setup:
++**	...
++**	li	a0,0
++**	call	callee(?:@plt)?
++**	cm.popret	{ra}, 32
++**	...
++*/
++int
++test_arg_setup (int mode)
++{
++  int local = mode;
++  return callee (0, &local);
++}
++
++/*
++**test_ret_zero:
++**	...
++**	call	callee(?:@plt)?
++**	cm.popretz	{ra}, 32
++**	...
++*/
++int
++test_ret_zero (int mode)
++{
++  int local = mode;
++  callee (0, &local);
++  return 0;
++}

@@ -1,0 +1,63 @@
+From a0969384a83a5d65701934c1bb6e113a4d7e14b4 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Tue, 18 Aug 2026 17:51:14 +0200
+Subject: [PATCH 054/385] c++: Fix up assert in build_vec_init [PR126752]
+
+The following testcase ICEs in an assert added by Marek in
+r15-6308.  A subsequent change r15-6897 made the code added in
+the former commit no longer trigger on anything in the testsuite,
+including the initlist-array{23,24}.C tests added for it.
+Later on I've added an optimization in r16-343 so that cleanups
+clear rval instead of setting iterator to maxindex but missed
+this spot and nothing in the testsuite triggered it.
+
+The following patch adjusts the assert to what the r16-343 change
+does.
+
+2026-08-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/126752
+	* init.cc (build_vec_init): Assert TREE_PURPOSE of the
+	last *cleanup_flags element is rval rather than iterator.
+
+	* g++.dg/cpp0x/initlist-array25.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit e78da8455a1ef5b188085d97a61b4e7dee812c93)
+---
+ gcc/cp/init.cc                                |  2 +-
+ gcc/testsuite/g++.dg/cpp0x/initlist-array25.C | 12 ++++++++++++
+ 2 files changed, 13 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp0x/initlist-array25.C
+
+diff --git a/gcc/cp/init.cc b/gcc/cp/init.cc
+index d0929c35bfcb..044435dbd736 100644
+--- a/gcc/cp/init.cc
++++ b/gcc/cp/init.cc
+@@ -5348,7 +5348,7 @@ build_vec_init (tree base, tree maxindex, tree init,
+ 	      && !vec_safe_is_empty (*cleanup_flags))
+ 	    {
+ 	      auto l = (*cleanup_flags)->last ();
+-	      gcc_assert (TREE_PURPOSE (l) == iterator);
++	      gcc_assert (TREE_PURPOSE (l) == rval);
+ 	      (*cleanup_flags)->pop ();
+ 	    }
+ 	  tree const_init = build_constructor (atype, const_vec);
+diff --git a/gcc/testsuite/g++.dg/cpp0x/initlist-array25.C b/gcc/testsuite/g++.dg/cpp0x/initlist-array25.C
+new file mode 100644
+index 000000000000..e42227e36dcd
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp0x/initlist-array25.C
+@@ -0,0 +1,12 @@
++// PR c++/126752
++// { dg-do compile { target c++11 } }
++
++struct A {
++  struct B { constexpr B () {} };
++  struct C { ~C (); B c; };
++  struct D : private C {};
++  struct E { E (); };
++  struct F { D f {}; };
++  struct G { F g[1] {}; E h; };
++  void foo () { G {}; }
++};

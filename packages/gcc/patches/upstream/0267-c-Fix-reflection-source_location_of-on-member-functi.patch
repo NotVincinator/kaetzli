@@ -1,0 +1,71 @@
+From 7edd52d111a547c57b74bcbe0b310bd35b72b17f Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Mon, 21 Sep 2026 09:16:21 +0200
+Subject: [PATCH 267/385] c++: Fix reflection source_location_of on member
+ function reflections [PR127493]
+
+We don't call maybe_get_first_fn in eval_source_location_of and so don't
+get to the DECL_SOURCE_LOCATION we otherwise could/should.
+
+The following patch fixes it.
+
+2026-09-21  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/127493
+	* reflect.cc (eval_source_location_of): Call maybe_get_first_fn.
+
+	* g++.dg/reflect/source_location_of1.C (struct G, struct H): New
+	types.  Add asserts for source_location_of of member function and
+	member function template.
+	* g++.dg/reflect/source_location_of2.C: Expect implicitEqLine rather
+	than 0 for line of ^^ImplicitEq::operator==.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 4bcbeb8d5d4d23d2e575cd947c59c410d62ca457)
+---
+ gcc/cp/reflect.cc                                  | 2 ++
+ gcc/testsuite/g++.dg/reflect/source_location_of1.C | 4 ++++
+ gcc/testsuite/g++.dg/reflect/source_location_of2.C | 3 +--
+ 3 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/cp/reflect.cc b/gcc/cp/reflect.cc
+index 5c7b86823c22..7391dbd150e7 100644
+--- a/gcc/cp/reflect.cc
++++ b/gcc/cp/reflect.cc
+@@ -2674,6 +2674,8 @@ eval_source_location_of (location_t loc, tree r, reflect_kind kind,
+        for now use location_t of the base parent (i.e. the derived
+        class).  */
+     r = direct_base_derived (r);
++  else
++    r = maybe_get_first_fn (r);
+   if (OVERLOAD_TYPE_P (r) || (TYPE_P (r) && typedef_variant_p (r)))
+     rloc = DECL_SOURCE_LOCATION (TYPE_NAME (r));
+   else if (DECL_P (r) && r != global_namespace)
+diff --git a/gcc/testsuite/g++.dg/reflect/source_location_of1.C b/gcc/testsuite/g++.dg/reflect/source_location_of1.C
+index 8ba34dbbaa7b..6f32d036facd 100644
+--- a/gcc/testsuite/g++.dg/reflect/source_location_of1.C
++++ b/gcc/testsuite/g++.dg/reflect/source_location_of1.C
+@@ -23,6 +23,10 @@ union U {};
+ static_assert (source_location_of (^^U).line () == std::source_location::current ().line () - 1);
+ void foo (int, int) {}
+ static_assert (source_location_of (^^foo).line () == std::source_location::current ().line () - 1);
++struct G { void foo (int, int) {} };
++static_assert (source_location_of (^^G::foo).line () == std::source_location::current ().line () - 1);
++struct H { template <typename T> void foo (T, T) {} };
++static_assert (source_location_of (^^H::foo).line () == std::source_location::current ().line () - 1);
+ namespace N { namespace O {} }
+ static_assert (source_location_of (^^N).line () == std::source_location::current ().line () - 1);
+ static_assert (source_location_of (^^N::O).line () == std::source_location::current ().line () - 2);
+diff --git a/gcc/testsuite/g++.dg/reflect/source_location_of2.C b/gcc/testsuite/g++.dg/reflect/source_location_of2.C
+index 7ea4d9e652ed..dc1716eb91b2 100644
+--- a/gcc/testsuite/g++.dg/reflect/source_location_of2.C
++++ b/gcc/testsuite/g++.dg/reflect/source_location_of2.C
+@@ -38,7 +38,6 @@ struct ImplicitEq
+   auto operator<=> (const ImplicitEq&) const = default;
+ };
+ 
+-// Would expect either class head, or operator<=> line
+-static_assert (source_location_of (^^ImplicitEq::operator==).line () == 0);
++static_assert (source_location_of (^^ImplicitEq::operator==).line () == implicitEqLine);
+ static_assert (source_location_of (select_mem (^^ImplicitEq, is_operator (op_equals_equals))).line () == implicitEqLine);
+ static_assert (source_location_of (select_mem (^^ImplicitEq, is_operator (op_spaceship))).line () == implicitEqLine);

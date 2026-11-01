@@ -1,0 +1,101 @@
+From 74474caecb3f9fced3218133d597c7181f0b5606 Mon Sep 17 00:00:00 2001
+From: Haochen Jiang <haochen.jiang@intel.com>
+Date: Mon, 26 Oct 2026 14:08:09 +0800
+Subject: [PATCH 367/385] i386: Do not emit 256 bit vinsert*64x2/32*4 w/o
+ AVX512VL [PR127459]
+
+avx_vec_concat<mode> wrongly emits 256 bit vinsert instructions when
+there is no AVX512VL after egpr change. Change noavx512f to noavx512vl
+for 256 bit vector to prohibit that.
+
+gcc/ChangeLog:
+
+	PR target/127459
+	* config/i386/sse.md (avx_vec_concat_isa): New.
+	(avx_vec_concat<mode>): Allow 256 bit vinsert*64x2/32*4 when
+	AVX512VL is enabled.
+
+gcc/testsuite/ChangeLog:
+
+	PR target/127459
+	* gcc.target/i386/pr127459-1a.c: New test.
+	* gcc.target/i386/pr127459-1b.c: Ditto.
+---
+ gcc/config/i386/sse.md                      | 10 +++++++++-
+ gcc/testsuite/gcc.target/i386/pr127459-1a.c | 20 ++++++++++++++++++++
+ gcc/testsuite/gcc.target/i386/pr127459-1b.c | 11 +++++++++++
+ 3 files changed, 40 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr127459-1a.c
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr127459-1b.c
+
+diff --git a/gcc/config/i386/sse.md b/gcc/config/i386/sse.md
+index 4d2ad0fea156..6f9000804196 100644
+--- a/gcc/config/i386/sse.md
++++ b/gcc/config/i386/sse.md
+@@ -29881,6 +29881,14 @@
+    (set_attr "prefix" "maybe_evex")
+    (set_attr "mode" "<sseinsnmode>")])
+ 
++(define_mode_attr avx_vec_concat_isa
++  [(V32QI "avx512vl") (V16HI "avx512vl") (V16HF "avx512vl")
++   (V16BF "avx512vl") (V8SI "avx512vl") (V4DI "avx512vl")
++   (V8SF "avx512vl") (V4DF "avx512vl") (V64QI "avx512f")
++   (V32HI "avx512f") (V32HF "avx512f") (V32BF "avx512f")
++   (V16SI "avx512f") (V8DI "avx512f") (V16SF "avx512f")
++   (V8DF "avx512f")])
++
+ (define_insn "avx_vec_concat<mode>"
+   [(set (match_operand:V_256_512 0 "register_operand" "=x,v,x,Yv")
+ 	(vec_concat:V_256_512
+@@ -29984,7 +29992,7 @@
+       gcc_unreachable ();
+     }
+ }
+-  [(set_attr "isa" "noavx512f,avx512f,*,*")
++  [(set_attr "isa" "no<avx_vec_concat_isa>,<avx_vec_concat_isa>,*,*")
+    (set_attr "addr" "gpr16,*,*,*")
+    (set_attr "type" "sselog,sselog,ssemov,ssemov")
+    (set_attr "c86_attr" "insertx,insertx,*,*")
+diff --git a/gcc/testsuite/gcc.target/i386/pr127459-1a.c b/gcc/testsuite/gcc.target/i386/pr127459-1a.c
+new file mode 100644
+index 000000000000..dae7fed6e582
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr127459-1a.c
+@@ -0,0 +1,20 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -mavx512f -mno-avx512vl" } */
++/* { dg-final { scan-assembler "vinserti128" } } */
++/* { dg-final { scan-assembler-not "vinserti32x4" } } */
++
++void sink(int *);
++
++void f(const unsigned *tab, unsigned long long k)
++{
++	int out[8];
++	out[0] = tab[(k >>  0) & 15];
++	out[1] = tab[(k >>  4) & 15];
++	out[2] = tab[(k >>  8) & 15];
++	out[3] = tab[(k >> 12) & 15];
++	out[4] = tab[(k >> 16) & 15];
++	out[5] = tab[(k >> 20) & 15];
++	out[6] = tab[(k >> 24) & 15];
++	out[7] = tab[(k >> 28) & 15];
++	sink(out);
++}
+diff --git a/gcc/testsuite/gcc.target/i386/pr127459-1b.c b/gcc/testsuite/gcc.target/i386/pr127459-1b.c
+new file mode 100644
+index 000000000000..dbb8999de606
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr127459-1b.c
+@@ -0,0 +1,11 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -mavx512dq -mno-avx512vl" } */
++/* { dg-final { scan-assembler "vinserti128" } } */
++/* { dg-final { scan-assembler-not "vinserti64x2" } } */
++
++#include <immintrin.h>
++__m256i
++f4 (long long a, long long b, long long c, long long d)
++{
++  return _mm256_set_epi64x (a, b, c, d);
++}

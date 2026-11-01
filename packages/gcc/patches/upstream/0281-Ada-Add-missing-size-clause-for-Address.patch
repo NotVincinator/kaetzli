@@ -1,0 +1,24 @@
+From 789754ce7c8eb0b8c3d7bb4bc93b7d6d6d5448f4 Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Mon, 12 Oct 2026 09:07:24 +0200
+Subject: [PATCH 281/385] Ada: Add missing size clause for Address
+
+gcc/ada/
+	* libgnat/system-linux-loongarch.ads (Address): Add size clause.
+---
+ gcc/ada/libgnat/system-linux-loongarch.ads | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/gcc/ada/libgnat/system-linux-loongarch.ads b/gcc/ada/libgnat/system-linux-loongarch.ads
+index 67bbdbc4b351..85f14b72c81b 100644
+--- a/gcc/ada/libgnat/system-linux-loongarch.ads
++++ b/gcc/ada/libgnat/system-linux-loongarch.ads
+@@ -106,6 +106,8 @@ package System is
+ private
+ 
+    type Address is mod Memory_Size;
++   for Address'Size use Standard'Address_Size;
++
+    Null_Address : constant Address := 0;
+ 
+    --------------------------------------

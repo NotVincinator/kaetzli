@@ -1,0 +1,171 @@
+From b70dedc141813ecceb0023d7ea3b1b455350c6eb Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Fri, 25 Sep 2026 11:09:37 +0200
+Subject: [PATCH 271/385] internal-fn: Fix up .MUL_OVERFLOW expansion for
+ non-mode precision arguments [PR127517]
+
+Most of expand_mul_overflow just assumes mode precision arguments
+of the same mode and perhaps different signedness and in the end only
+expand_arith_overflow_result_store and expand_ubsan_result_store
+deal with the result mode being smaller than the operand mode or
+having non-mode precision and performing additional testing for those
+cases.  The callers of expand_mul_overflow for the non-ubsan cases
+(and bitint lowering) ensure argument promotions so that both
+expand_mul_overflow operands have the same precision.
+They can have non-mode precision though.
+In r14-3745 when adding _BitInt support I've already dealt with this
+and added
+  /* Unsigned types with smaller than mode precision, even if they have most
+     significant bit set, are still zero-extended.  */
+  if (uns0_p && TYPE_PRECISION (TREE_TYPE (arg0)) < GET_MODE_PRECISION (mode))
+    pos_neg0 = 1;
+  if (uns1_p && TYPE_PRECISION (TREE_TYPE (arg1)) < GET_MODE_PRECISION (mode))
+    pos_neg1 = 1;
+after the 2 get_range_pos_neg calls.  Unfortunately the following testcase
+shows that is not good enough.
+In the testcase, one of the arguments is originally
+0x7fffffffffffffffffffffffffffffffwb in _BitInt(128) type (so its
+signed maximum), but during gimple opts that is optimized into
+unsigned _BitInt(127) 0x7fffffffffffffffffffffffffffffffuwb (unsigned
+127-bit maximum, same value, that is all __builtin_mul_overflow cares
+about, it extends everything virtually to infinite precision).
+Now, get_range_pos_neg (arg1, currently_expanding_gimple_stmt);
+for the unsigned _BitInt(127) maximum is 2, it always treats it as signed
+and says whether the most significant bit is known to be 0 or 1 or unknown,
+2 means it is known to be set.  The above mentioned adjustment adjusts
+it to 1, which is correct, when used in the mode precision (128-bit),
+the most significant bit is actually clear, because uns1_p.
+So, we are then handling a s x u -> s overflow multiplication, and
+when we know the most significant bit of the second operand is 0 (pos_neg1
+is 1), we don't do any adjustments and just fallthrough into the
+s x s -> s overflow multiplication.  So far so good.
+We don't have an optab and do the expansion in half mode (DImode), where
+we then call
+          if (arg1 != error_mark_node)
+            mprec1 = get_min_precision (arg1, sign);
+but arg1 still has 127-bit precision rather than 128-bit and sign is SIGNED,
+so this sets mprec1 to 1 rather than 127 that we need (when looking at the
+127-bit value as signed, it is all sign bit copies, _BitInt(127) -1).
+
+The following patch fixes this by reverting the r14-3745 changes and
+instead just promoting arg0 and arg1 to corresponding type with mode
+precision and their original signedness.  Both get_range_pos_neg
+and get_min_precision can deal with several NOP_EXPRs/CONVERT_EXPRs around
+an SSA_NAME and we already rely on that.
+
+The only thing where we actually need the original arg0/arg1 before
+promotion (for .MUL_OVERFLOW the passed in arg0/arg1 are already often
+after promotion anyway) is in the ubsan case to know what kind of types
+of the arguments to print, so the patch adds orig_arg{0,1} variables
+and passes that, otherwise the patch without that breaks
+ubsan/bitint-{1,2}.c.
+
+2026-09-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/127517
+	* internal-fn.cc (expand_mul_overflow): Revert the 2023-09-06
+	changes.  Instead promote arg0 and/or arg1 to a type with
+	uns{0,1}_p signedness and mode precision if they have non-mode
+	precision.  Pass the original arg0/arg1 and their type to
+	ubsan_build_overflow_builtin, instead of passing the promoted
+	ones.
+
+	* gcc.dg/torture/bitint-109.c: New test.
+
+Reviewed-by: Richard Biener <rguenth@suse.de>
+(cherry picked from commit 240bfe82a1f937a9b0be9877754a3d23567d5ec9)
+---
+ gcc/internal-fn.cc                        | 30 +++++++++++++++--------
+ gcc/testsuite/gcc.dg/torture/bitint-109.c | 18 ++++++++++++++
+ 2 files changed, 38 insertions(+), 10 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/bitint-109.c
+
+diff --git a/gcc/internal-fn.cc b/gcc/internal-fn.cc
+index 25acc63b247b..662d1e75d2f7 100644
+--- a/gcc/internal-fn.cc
++++ b/gcc/internal-fn.cc
+@@ -1750,7 +1750,7 @@ expand_mul_overflow (location_t loc, tree lhs, tree arg0, tree arg1,
+ 		     tree *datap)
+ {
+   rtx res, op0, op1;
+-  tree fn, type;
++  tree fn, type, orig_arg0 = arg0, orig_arg1 = arg1;
+   rtx_code_label *done_label, *do_error;
+   rtx target = NULL_RTX;
+   signop sign;
+@@ -1764,10 +1764,26 @@ expand_mul_overflow (location_t loc, tree lhs, tree arg0, tree arg1,
+   do_error = gen_label_rtx ();
+ 
+   do_pending_stack_adjust ();
++
++  scalar_int_mode mode = SCALAR_INT_TYPE_MODE (TREE_TYPE (arg0));
++  /* If the operand types don't have mode precision, extend them
++     to mode precision.  */
++  if (TYPE_PRECISION (TREE_TYPE (arg0)) < GET_MODE_PRECISION (mode))
++    {
++      tree type = build_nonstandard_integer_type (GET_MODE_PRECISION (mode),
++						  uns0_p);
++      arg0 = fold_convert_loc (loc, type, arg0);
++    }
++  if (TYPE_PRECISION (TREE_TYPE (arg1)) < GET_MODE_PRECISION (mode))
++    {
++      tree type = build_nonstandard_integer_type (GET_MODE_PRECISION (mode),
++						  uns1_p);
++      arg1 = fold_convert_loc (loc, type, arg1);
++    }
++
+   op0 = expand_normal (arg0);
+   op1 = expand_normal (arg1);
+ 
+-  scalar_int_mode mode = SCALAR_INT_TYPE_MODE (TREE_TYPE (arg0));
+   bool uns = unsr_p;
+   if (lhs)
+     {
+@@ -1829,12 +1845,6 @@ expand_mul_overflow (location_t loc, tree lhs, tree arg0, tree arg1,
+ 
+   int pos_neg0 = get_range_pos_neg (arg0, currently_expanding_gimple_stmt);
+   int pos_neg1 = get_range_pos_neg (arg1, currently_expanding_gimple_stmt);
+-  /* Unsigned types with smaller than mode precision, even if they have most
+-     significant bit set, are still zero-extended.  */
+-  if (uns0_p && TYPE_PRECISION (TREE_TYPE (arg0)) < GET_MODE_PRECISION (mode))
+-    pos_neg0 = 1;
+-  if (uns1_p && TYPE_PRECISION (TREE_TYPE (arg1)) < GET_MODE_PRECISION (mode))
+-    pos_neg1 = 1;
+ 
+   /* s1 * u2 -> ur  */
+   if (!uns0_p && uns1_p && unsr_p)
+@@ -2559,8 +2569,8 @@ expand_mul_overflow (location_t loc, tree lhs, tree arg0, tree arg1,
+     {
+       /* Expand the ubsan builtin call.  */
+       push_temp_slots ();
+-      fn = ubsan_build_overflow_builtin (MULT_EXPR, loc, TREE_TYPE (arg0),
+-					 arg0, arg1, datap);
++      fn = ubsan_build_overflow_builtin (MULT_EXPR, loc, TREE_TYPE (orig_arg0),
++					 orig_arg0, orig_arg1, datap);
+       expand_normal (fn);
+       pop_temp_slots ();
+       do_pending_stack_adjust ();
+diff --git a/gcc/testsuite/gcc.dg/torture/bitint-109.c b/gcc/testsuite/gcc.dg/torture/bitint-109.c
+new file mode 100644
+index 000000000000..944e9f4deb67
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/bitint-109.c
+@@ -0,0 +1,18 @@
++/* PR middle-end/127517 */
++/* { dg-do run { target bitint } } */
++
++__attribute__((noipa)) void
++foo (int x)
++{
++#if __BITINT_MAXWIDTH__ >= 128
++  _BitInt(128) t = 0x7fffffffffffffffffffffffffffffffwb;
++  if (!__builtin_mul_overflow_p (t, x, (_BitInt (127)) 0))
++    __builtin_abort ();
++#endif
++}
++
++int
++main ()
++{
++  foo (8);
++}

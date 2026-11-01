@@ -1,0 +1,95 @@
+From fbff798e15cf4d3b5088e690e0b53288918f609a Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Wed, 30 Sep 2026 12:10:52 +0100
+Subject: [PATCH 220/385] libstdc++: Fix header name in pb_ds tutorial docs
+
+In more proof that nobody cares about this code, the docs have been
+giving the wrong names for the headers for many years.
+
+libstdc++-v3/ChangeLog:
+
+	* doc/xml/manual/policy_data_structures.xml: Fix header name in
+	pb_ds examples.
+	* doc/xml/manual/using.xml: Fix names for pb_ds headers.
+	* doc/html/*: Regenerate.
+
+(cherry picked from commit fcd77abe119da6c09c68b4aefbb9f22a66f85946)
+---
+ .../doc/html/manual/policy_data_structures_using.html         | 4 ++--
+ libstdc++-v3/doc/html/manual/using_headers.html               | 2 +-
+ libstdc++-v3/doc/xml/manual/policy_data_structures.xml        | 4 ++--
+ libstdc++-v3/doc/xml/manual/using.xml                         | 4 ++--
+ 4 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/libstdc++-v3/doc/html/manual/policy_data_structures_using.html b/libstdc++-v3/doc/html/manual/policy_data_structures_using.html
+index 10c13bedeacd..0cce54dcf57a 100644
+--- a/libstdc++-v3/doc/html/manual/policy_data_structures_using.html
++++ b/libstdc++-v3/doc/html/manual/policy_data_structures_using.html
+@@ -69,7 +69,7 @@
+ 	  this shows basic operations on a collision-chaining hash-based
+ 	  container:
+ 	</p><pre class="programlisting">
+-	  #include &lt;ext/pb_ds/assoc_container.h&gt;
++	  #include &lt;ext/pb_ds/assoc_container.hpp&gt;
+ 
+ 	  int main()
+ 	  {
+@@ -86,7 +86,7 @@
+ 	  containers, which are very useful for the construction of
+ 	  "multimaps," are also unordered.
+ 	</p><p>This snippet shows a red-black tree based container:</p><pre class="programlisting">
+-	  #include &lt;ext/pb_ds/assoc_container.h&gt;
++	  #include &lt;ext/pb_ds/assoc_container.hpp&gt;
+ 
+ 	  int main()
+ 	  {
+diff --git a/libstdc++-v3/doc/html/manual/using_headers.html b/libstdc++-v3/doc/html/manual/using_headers.html
+index 49a826143441..5aae8fcdf54a 100644
+--- a/libstdc++-v3/doc/html/manual/using_headers.html
++++ b/libstdc++-v3/doc/html/manual/using_headers.html
+@@ -115,7 +115,7 @@ compiler supports scalar decimal floating-point types defined via
+   Also included are files for the C++ ABI interface:
+ </p><div class="table"><a id="table.abi_headers"></a><p class="title"><strong>Table 3.19. C++ ABI Headers</strong></p><div class="table-contents"><table class="table" summary="C++ ABI Headers" border="1"><colgroup><col align="left" class="c1" /><col align="left" class="c2" /></colgroup><tbody><tr><td align="left"><code class="filename">cxxabi.h</code></td><td align="left"><code class="filename">cxxabi_forced.h</code></td></tr></tbody></table></div></div><br class="table-break" /><p>
+   And a large variety of extensions.
+-</p><div class="table"><a id="table.ext_headers"></a><p class="title"><strong>Table 3.20. Extension Headers</strong></p><div class="table-contents"><table class="table" summary="Extension Headers" border="1"><colgroup><col align="left" class="c1" /><col align="left" class="c2" /><col align="left" class="c3" /><col align="left" class="c4" /><col align="left" class="c5" /></colgroup><tbody><tr><td align="left"><code class="filename">ext/algorithm</code></td><td align="left"><code class="filename">ext/atomicity.h</code></td><td align="left"><code class="filename">ext/bitmap_allocator.h</code></td><td align="left"><code class="filename">ext/cast.h</code></td><td class="auto-generated"> </td></tr><tr><td align="left"><code class="filename">ext/codecvt_specializations.h</code></td><td align="left"><code class="filename">ext/concurrence.h</code></td><td align="left"><code class="filename">ext/debug_allocator.h</code></td><td align="left"><code class="filename">ext/enc_filebuf.h</code></td><td align="left"><code class="filename">ext/extptr_allocator.h</code></td></tr><tr><td align="left"><code class="filename">ext/functional</code></td><td align="left"><code class="filename">ext/iterator</code></td><td align="left"><code class="filename">ext/malloc_allocator.h</code></td><td align="left"><code class="filename">ext/memory</code></td><td align="left"><code class="filename">ext/mt_allocator.h</code></td></tr><tr><td align="left"><code class="filename">ext/new_allocator.h</code></td><td align="left"><code class="filename">ext/numeric</code></td><td align="left"><code class="filename">ext/numeric_traits.h</code></td><td align="left"><code class="filename">ext/pb_ds/assoc_container.h</code></td><td align="left"><code class="filename">ext/pb_ds/priority_queue.h</code></td></tr><tr><td align="left"><code class="filename">ext/pod_char_traits.h</code></td><td align="left"><code class="filename">ext/pool_allocator.h</code></td><td align="left"><code class="filename">ext/rb_tree</code></td><td align="left"><code class="filename">ext/rope</code></td><td align="left"><code class="filename">ext/slist</code></td></tr><tr><td align="left"><code class="filename">ext/stdio_filebuf.h</code></td><td align="left"><code class="filename">ext/stdio_sync_filebuf.h</code></td><td align="left"><code class="filename">ext/throw_allocator.h</code></td><td align="left"><code class="filename">ext/typelist.h</code></td><td align="left"><code class="filename">ext/type_traits.h</code></td></tr><tr><td align="left"><code class="filename">ext/vstring.h</code></td><td colspan="4" align="left"> </td></tr></tbody></table></div></div><br class="table-break" /><p></p><div class="table"><a id="table.debug_headers"></a><p class="title"><strong>Table 3.21. Extension Debug Headers</strong></p><div class="table-contents"><table class="table" summary="Extension Debug Headers" border="1"><colgroup><col align="left" class="c1" /><col align="left" class="c2" /><col align="left" class="c3" /><col align="left" class="c4" /><col align="left" class="c5" /></colgroup><tbody><tr><td align="left"><code class="filename">debug/array</code></td><td align="left"><code class="filename">debug/bitset</code></td><td align="left"><code class="filename">debug/deque</code></td><td align="left"><code class="filename">debug/forward_list</code></td><td align="left"><code class="filename">debug/list</code></td></tr><tr><td align="left"><code class="filename">debug/map</code></td><td align="left"><code class="filename">debug/set</code></td><td align="left"><code class="filename">debug/string</code></td><td align="left"><code class="filename">debug/unordered_map</code></td><td align="left"><code class="filename">debug/unordered_set</code></td></tr><tr><td align="left"><code class="filename">debug/vector</code></td><td colspan="4" align="left"> </td></tr></tbody></table></div></div><br class="table-break" /><p></p><div class="table"><a id="table.parallel_headers"></a><p class="title"><strong>Table 3.22. Extension Parallel Headers</strong></p><div class="table-contents"><table class="table" summary="Extension Parallel Headers" border="1"><colgroup><col align="left" class="c1" /><col align="left" class="c2" /></colgroup><tbody><tr><td align="left"><code class="filename">parallel/algorithm</code></td><td align="left"><code class="filename">parallel/numeric</code></td></tr></tbody></table></div></div><br class="table-break" /></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a id="manual.intro.using.headers.mixing"></a>Mixing Headers</h3></div></div></div><p> A few simple rules.
++</p><div class="table"><a id="table.ext_headers"></a><p class="title"><strong>Table 3.20. Extension Headers</strong></p><div class="table-contents"><table class="table" summary="Extension Headers" border="1"><colgroup><col align="left" class="c1" /><col align="left" class="c2" /><col align="left" class="c3" /><col align="left" class="c4" /><col align="left" class="c5" /></colgroup><tbody><tr><td align="left"><code class="filename">ext/algorithm</code></td><td align="left"><code class="filename">ext/atomicity.h</code></td><td align="left"><code class="filename">ext/bitmap_allocator.h</code></td><td align="left"><code class="filename">ext/cast.h</code></td><td class="auto-generated"> </td></tr><tr><td align="left"><code class="filename">ext/codecvt_specializations.h</code></td><td align="left"><code class="filename">ext/concurrence.h</code></td><td align="left"><code class="filename">ext/debug_allocator.h</code></td><td align="left"><code class="filename">ext/enc_filebuf.h</code></td><td align="left"><code class="filename">ext/extptr_allocator.h</code></td></tr><tr><td align="left"><code class="filename">ext/functional</code></td><td align="left"><code class="filename">ext/iterator</code></td><td align="left"><code class="filename">ext/malloc_allocator.h</code></td><td align="left"><code class="filename">ext/memory</code></td><td align="left"><code class="filename">ext/mt_allocator.h</code></td></tr><tr><td align="left"><code class="filename">ext/new_allocator.h</code></td><td align="left"><code class="filename">ext/numeric</code></td><td align="left"><code class="filename">ext/numeric_traits.h</code></td><td align="left"><code class="filename">ext/pb_ds/assoc_container.hpp</code></td><td align="left"><code class="filename">ext/pb_ds/priority_queue.hpp</code></td></tr><tr><td align="left"><code class="filename">ext/pod_char_traits.h</code></td><td align="left"><code class="filename">ext/pool_allocator.h</code></td><td align="left"><code class="filename">ext/rb_tree</code></td><td align="left"><code class="filename">ext/rope</code></td><td align="left"><code class="filename">ext/slist</code></td></tr><tr><td align="left"><code class="filename">ext/stdio_filebuf.h</code></td><td align="left"><code class="filename">ext/stdio_sync_filebuf.h</code></td><td align="left"><code class="filename">ext/throw_allocator.h</code></td><td align="left"><code class="filename">ext/typelist.h</code></td><td align="left"><code class="filename">ext/type_traits.h</code></td></tr><tr><td align="left"><code class="filename">ext/vstring.h</code></td><td colspan="4" align="left"> </td></tr></tbody></table></div></div><br class="table-break" /><p></p><div class="table"><a id="table.debug_headers"></a><p class="title"><strong>Table 3.21. Extension Debug Headers</strong></p><div class="table-contents"><table class="table" summary="Extension Debug Headers" border="1"><colgroup><col align="left" class="c1" /><col align="left" class="c2" /><col align="left" class="c3" /><col align="left" class="c4" /><col align="left" class="c5" /></colgroup><tbody><tr><td align="left"><code class="filename">debug/array</code></td><td align="left"><code class="filename">debug/bitset</code></td><td align="left"><code class="filename">debug/deque</code></td><td align="left"><code class="filename">debug/forward_list</code></td><td align="left"><code class="filename">debug/list</code></td></tr><tr><td align="left"><code class="filename">debug/map</code></td><td align="left"><code class="filename">debug/set</code></td><td align="left"><code class="filename">debug/string</code></td><td align="left"><code class="filename">debug/unordered_map</code></td><td align="left"><code class="filename">debug/unordered_set</code></td></tr><tr><td align="left"><code class="filename">debug/vector</code></td><td colspan="4" align="left"> </td></tr></tbody></table></div></div><br class="table-break" /><p></p><div class="table"><a id="table.parallel_headers"></a><p class="title"><strong>Table 3.22. Extension Parallel Headers</strong></p><div class="table-contents"><table class="table" summary="Extension Parallel Headers" border="1"><colgroup><col align="left" class="c1" /><col align="left" class="c2" /></colgroup><tbody><tr><td align="left"><code class="filename">parallel/algorithm</code></td><td align="left"><code class="filename">parallel/numeric</code></td></tr></tbody></table></div></div><br class="table-break" /></div><div class="section"><div class="titlepage"><div><div><h3 class="title"><a id="manual.intro.using.headers.mixing"></a>Mixing Headers</h3></div></div></div><p> A few simple rules.
+ </p><p>First, mixing different dialects of the standard headers is not
+ possible. It's an all-or-nothing affair. Thus, code like
+ </p><pre class="programlisting">
+diff --git a/libstdc++-v3/doc/xml/manual/policy_data_structures.xml b/libstdc++-v3/doc/xml/manual/policy_data_structures.xml
+index e6e89613769a..b82a458507e7 100644
+--- a/libstdc++-v3/doc/xml/manual/policy_data_structures.xml
++++ b/libstdc++-v3/doc/xml/manual/policy_data_structures.xml
+@@ -1330,7 +1330,7 @@
+ 	  container:
+ 	</para>
+ 	<programlisting>
+-	  #include &lt;ext/pb_ds/assoc_container.h&gt;
++	  #include &lt;ext/pb_ds/assoc_container.hpp&gt;
+ 
+ 	  int main()
+ 	  {
+@@ -1353,7 +1353,7 @@
+ 	<para>This snippet shows a red-black tree based container:</para>
+ 
+ 	<programlisting>
+-	  #include &lt;ext/pb_ds/assoc_container.h&gt;
++	  #include &lt;ext/pb_ds/assoc_container.hpp&gt;
+ 
+ 	  int main()
+ 	  {
+diff --git a/libstdc++-v3/doc/xml/manual/using.xml b/libstdc++-v3/doc/xml/manual/using.xml
+index e2e75e8fe28c..d929f2a04466 100644
+--- a/libstdc++-v3/doc/xml/manual/using.xml
++++ b/libstdc++-v3/doc/xml/manual/using.xml
+@@ -885,8 +885,8 @@ compiler supports scalar decimal floating-point types defined via
+ <entry><filename class="headerfile">ext/new_allocator.h</filename></entry>
+ <entry><filename class="headerfile">ext/numeric</filename></entry>
+ <entry><filename class="headerfile">ext/numeric_traits.h</filename></entry>
+-<entry><filename class="headerfile">ext/pb_ds/assoc_container.h</filename></entry>
+-<entry><filename class="headerfile">ext/pb_ds/priority_queue.h</filename></entry>
++<entry><filename class="headerfile">ext/pb_ds/assoc_container.hpp</filename></entry>
++<entry><filename class="headerfile">ext/pb_ds/priority_queue.hpp</filename></entry>
+ </row>
+ <row>
+ <entry><filename class="headerfile">ext/pod_char_traits.h</filename></entry>

@@ -1,0 +1,51 @@
+From e69549cc0edb5cb2e9e981244932bf4ee102509a Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sun, 13 Sep 2026 00:19:58 +0000
+Subject: [PATCH 150/385] Daily bump.
+
+---
+ gcc/ChangeLog           | 9 +++++++++
+ gcc/DATESTAMP           | 2 +-
+ gcc/testsuite/ChangeLog | 8 ++++++++
+ 3 files changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index fb017649d5b4..90540870d538 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,12 @@
++2026-09-12  Zhongyao Chen  <chenzhongyao.hit@gmail.com>
++
++	Backported from master:
++	2026-09-08  Zhongyao Chen  <chenzhongyao.hit@gmail.com>
++
++	PR target/126932
++	* config/riscv/autovec.md: Rewrite vector FMA patterns.
++	* config/riscv/autovec-opt.md: Likewise and add new patterns.
++
+ 2026-09-11  Robin Dapp  <robin.dapp@oss.qualcomm.com>
+ 
+ 	PR middle-end/127256
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 4987d1122047..15c8f6800f3f 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260912
++20260913
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index cf508bdc66de..c54735a13636 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2026-09-12  Zhongyao Chen  <chenzhongyao.hit@gmail.com>
++
++	Backported from master:
++	2026-09-08  Zhongyao Chen  <chenzhongyao.hit@gmail.com>
++
++	PR target/126932
++	* gcc.target/riscv/rvv/autovec/ternop/pr126932.c: New test.
++
+ 2026-09-11  Robin Dapp  <robin.dapp@oss.qualcomm.com>
+ 
+ 	PR middle-end/127256

@@ -1,0 +1,231 @@
+From cbcaa8343590f3aa59db36f23e17f2957f0069c8 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Mon, 21 Sep 2026 12:41:35 -0600
+Subject: [PATCH 275/385] libcpp: Fix up parsing __has_include outside
+ directive [PR121508]
+
+The r17-4537 change broke several tests especially by introducing
+non-determinism into the preprocessor.  The builtin_has_include_1
+function is expected to set *paren and *bracket flags, and early
+exit from the function without setting those flags means the callers
+then use uninitialized variables.  Also, the early exit means that
+when (incorrectly, sure) one uses __has_include/__has_include_next
+or __has_embed outside of a preprocessing directive but with
+correct syntax, it is diagnosed as both using it outside of
+a preprocessing directive (correct) but also as a random sequence
+of unexpected tokens.  This patch reverts that change.
+
+I'm guilty of introducing _cpp_get_token_no_padding 6 years ago
+instead of fixing up get_token_no_padding back then, I wasn't
+sure if the eating of CPP_EOF wasn't intentional in some cases,
+but clearly it is never intentional and always a bug.
+After all, get__Pragma_string has been fighting with it already
+by using
+  paren = get_token_no_padding (pfile);
+  if (paren->type == CPP_EOF)
+    _cpp_backup_tokens (pfile, 1);
+glue_header_name and parse_include weren't doing this, but in
+the usual case when pfile->state.in_directive and not lexing a raw string,
+get_fresh_line_impl returns false and _cpp_lex_direct will just keep
+returning CPP_EOF at the end of the line many times until we clear
+the pfile->state.in_directive flag.
+So, I think we should just drop the dangerous get_token_no_padding
+function and simply never eat a CPP_EOF.
+
+2026-10-09  Jakub Jelinek  <jakub@redhat.com>
+
+	PR preprocessor/121508
+	PR preprocessor/123339
+	* directives.cc (get_token_no_padding): Remove.
+	(glue_header_name): Use _cpp_get_token_no_padding instead of
+	get_token_no_padding.
+	(parse_include): Likewise.
+	(get__Pragma_string): Likewise.  Don't _cpp_backup_tokens on
+	CPP_EOF.
+
+	* c-c++-common/cpp/pr121508-1.c: New test.
+	* c-c++-common/cpp/pr121508-2.c: New test.
+	* c-c++-common/cpp/pr121508-3.c: New test.
+	* c-c++-common/cpp/pr121508-4.c: New test.
+	* c-c++-common/cpp/pr121508-5.c: New test.
+	* c-c++-common/cpp/pr123339.c: New test.
+
+Reviewed-by: Andrea Pinski <andrew.pinski@oss.qualcomm.com>
+(cherry picked from commit 9e5fda8ec5716b6fa2b57bdfd56e2b91116a93ff)
+---
+ gcc/testsuite/c-c++-common/cpp/pr121508-1.c |  8 ++++++
+ gcc/testsuite/c-c++-common/cpp/pr121508-2.c |  8 ++++++
+ gcc/testsuite/c-c++-common/cpp/pr121508-3.c |  8 ++++++
+ gcc/testsuite/c-c++-common/cpp/pr121508-4.c |  8 ++++++
+ gcc/testsuite/c-c++-common/cpp/pr121508-5.c |  8 ++++++
+ gcc/testsuite/c-c++-common/cpp/pr123339.c   |  9 +++++++
+ libcpp/directives.cc                        | 29 ++++-----------------
+ 7 files changed, 54 insertions(+), 24 deletions(-)
+ create mode 100644 gcc/testsuite/c-c++-common/cpp/pr121508-1.c
+ create mode 100644 gcc/testsuite/c-c++-common/cpp/pr121508-2.c
+ create mode 100644 gcc/testsuite/c-c++-common/cpp/pr121508-3.c
+ create mode 100644 gcc/testsuite/c-c++-common/cpp/pr121508-4.c
+ create mode 100644 gcc/testsuite/c-c++-common/cpp/pr121508-5.c
+ create mode 100644 gcc/testsuite/c-c++-common/cpp/pr123339.c
+
+diff --git a/gcc/testsuite/c-c++-common/cpp/pr121508-1.c b/gcc/testsuite/c-c++-common/cpp/pr121508-1.c
+new file mode 100644
+index 000000000000..d02a9dd271e2
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/cpp/pr121508-1.c
+@@ -0,0 +1,8 @@
++/* PR preprocessor/121508 */
++/* { dg-do compile } */
++
++/* { dg-error "'__has_include' used outside of preprocessing directive" "" { target *-*-* } .+4 } */
++/* { dg-error "missing terminating '>' character" "" { target *-*-* } .+3 } */
++/* { dg-error "missing '\\\)' after '__has_include' operand" "" { target *-*-* } .+2 } */
++/* { dg-error "expected ',' or ';' at end of input" "" { target *-*-* } .+1 } */
++int i = __has_include(<__int16_t
+diff --git a/gcc/testsuite/c-c++-common/cpp/pr121508-2.c b/gcc/testsuite/c-c++-common/cpp/pr121508-2.c
+new file mode 100644
+index 000000000000..884924126bde
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/cpp/pr121508-2.c
+@@ -0,0 +1,8 @@
++/* PR preprocessor/121508 */
++/* { dg-do compile } */
++
++/* { dg-error "'__has_include' used outside of preprocessing directive" "" { target *-*-* } .+4 } */
++/* { dg-error "missing terminating '>' character" "" { target *-*-* } .+3 } */
++/* { dg-error "missing '\\\)' after '__has_include' operand" "" { target *-*-* } .+2 } */
++/* { dg-error "expected ',' or ';' at end of input" "" { target *-*-* } .+1 } */
++int i = __has_include(<__int16_t)
+diff --git a/gcc/testsuite/c-c++-common/cpp/pr121508-3.c b/gcc/testsuite/c-c++-common/cpp/pr121508-3.c
+new file mode 100644
+index 000000000000..02cbca9b03a0
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/cpp/pr121508-3.c
+@@ -0,0 +1,8 @@
++/* PR preprocessor/121508 */
++/* { dg-do compile } */
++
++/* { dg-error "'__has_embed' used outside of preprocessing directive" "" { target *-*-* } .+4 } */
++/* { dg-error "missing terminating '>' character" "" { target *-*-* } .+3 } */
++/* { dg-error "expected '\\\)'" "" { target *-*-* } .+2 } */
++/* { dg-error "expected ',' or ';' at end of input" "" { target *-*-* } .+1 } */
++int i = __has_embed(<__int16_t
+diff --git a/gcc/testsuite/c-c++-common/cpp/pr121508-4.c b/gcc/testsuite/c-c++-common/cpp/pr121508-4.c
+new file mode 100644
+index 000000000000..1c2ee78551a9
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/cpp/pr121508-4.c
+@@ -0,0 +1,8 @@
++/* PR preprocessor/121508 */
++/* { dg-do compile } */
++
++/* { dg-error "'__has_embed' used outside of preprocessing directive" "" { target *-*-* } .+4 } */
++/* { dg-error "missing terminating '>' character" "" { target *-*-* } .+3 } */
++/* { dg-error "expected '\\\)'" "" { target *-*-* } .+2 } */
++/* { dg-error "expected ',' or ';' at end of input" "" { target *-*-* } .+1 } */
++int i = __has_embed(<__int16_t)
+diff --git a/gcc/testsuite/c-c++-common/cpp/pr121508-5.c b/gcc/testsuite/c-c++-common/cpp/pr121508-5.c
+new file mode 100644
+index 000000000000..f9be0f0444b3
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/cpp/pr121508-5.c
+@@ -0,0 +1,8 @@
++/* PR preprocessor/121508 */
++/* { dg-do compile } */
++
++/* { dg-error "'__has_embed' used outside of preprocessing directive" "" { target *-*-* } .+4 } */
++/* { dg-error "missing terminating '>' character" "" { target *-*-* } .+3 } */
++/* { dg-error "expected '\\\)'" "" { target *-*-* } .+2 } */
++/* { dg-error "expected ',' or ';' at end of input" "" { target *-*-* } .+1 } */
++int i = __has_embed(<__int16_t + 1 + 2 + 3
+diff --git a/gcc/testsuite/c-c++-common/cpp/pr123339.c b/gcc/testsuite/c-c++-common/cpp/pr123339.c
+new file mode 100644
+index 000000000000..10312a8d6bac
+--- /dev/null
++++ b/gcc/testsuite/c-c++-common/cpp/pr123339.c
+@@ -0,0 +1,9 @@
++/* PR preprocessor/123339 */
++/* { dg-do compile } */
++
++/* { dg-error "'__has_include' used outside of preprocessing directive" "" { target *-*-* } .+5 } */
++/* { dg-error "missing terminating '>' character" "" { target *-*-* } .+4 } */
++/* { dg-error "missing '\\\(' before '__has_include' operand" "" { target *-*-* } .+3 } */
++/* { dg-error "expected identifier or '\\\(' before numeric constant" "" { target c } .+2 } */
++/* { dg-error "expected unqualified-id before numeric constant" "" { target c++ } .+1 } */
++__has_include <"foo"
+diff --git a/libcpp/directives.cc b/libcpp/directives.cc
+index 9accc3798e09..5b7f9adee1ea 100644
+--- a/libcpp/directives.cc
++++ b/libcpp/directives.cc
+@@ -131,7 +131,6 @@ static void do_pragma_warning_or_error (cpp_reader *, bool error);
+ static void do_pragma_warning (cpp_reader *);
+ static void do_pragma_error (cpp_reader *);
+ static void do_linemarker (cpp_reader *);
+-static const cpp_token *get_token_no_padding (cpp_reader *);
+ static const cpp_token *get__Pragma_string (cpp_reader *);
+ static void destringize_and_run (cpp_reader *, const cpp_string *,
+ 				 location_t);
+@@ -825,7 +824,7 @@ glue_header_name (cpp_reader *pfile)
+   buffer = XNEWVEC (char, capacity);
+   for (;;)
+     {
+-      token = get_token_no_padding (pfile);
++      token = _cpp_get_token_no_padding (pfile);
+ 
+       if (token->type == CPP_GREATER)
+ 	break;
+@@ -868,7 +867,7 @@ parse_include (cpp_reader *pfile, int *pangle_brackets,
+   const cpp_token *header;
+ 
+   /* Allow macro expansion.  */
+-  header = get_token_no_padding (pfile);
++  header = _cpp_get_token_no_padding (pfile);
+   *location = header->src_loc;
+   if ((header->type == CPP_STRING && header->val.str.text[0] != 'R')
+       || header->type == CPP_HEADER_NAME)
+@@ -2371,18 +2370,6 @@ do_pragma_error (cpp_reader *pfile)
+   do_pragma_warning_or_error (pfile, true);
+ }
+ 
+-/* Get a token but skip padding.  */
+-static const cpp_token *
+-get_token_no_padding (cpp_reader *pfile)
+-{
+-  for (;;)
+-    {
+-      const cpp_token *result = cpp_get_token (pfile);
+-      if (result->type != CPP_PADDING)
+-	return result;
+-    }
+-}
+-
+ /* Check syntax is "(string-literal)".  Returns the string on success,
+    or NULL on failure.  */
+ static const cpp_token *
+@@ -2391,23 +2378,17 @@ get__Pragma_string (cpp_reader *pfile)
+   const cpp_token *string;
+   const cpp_token *paren;
+ 
+-  paren = get_token_no_padding (pfile);
+-  if (paren->type == CPP_EOF)
+-    _cpp_backup_tokens (pfile, 1);
++  paren = _cpp_get_token_no_padding (pfile);
+   if (paren->type != CPP_OPEN_PAREN)
+     return NULL;
+ 
+-  string = get_token_no_padding (pfile);
+-  if (string->type == CPP_EOF)
+-    _cpp_backup_tokens (pfile, 1);
++  string = _cpp_get_token_no_padding (pfile);
+   if (string->type != CPP_STRING && string->type != CPP_WSTRING
+       && string->type != CPP_STRING32 && string->type != CPP_STRING16
+       && string->type != CPP_UTF8STRING)
+     return NULL;
+ 
+-  paren = get_token_no_padding (pfile);
+-  if (paren->type == CPP_EOF)
+-    _cpp_backup_tokens (pfile, 1);
++  paren = _cpp_get_token_no_padding (pfile);
+   if (paren->type != CPP_CLOSE_PAREN)
+     return NULL;
+ 

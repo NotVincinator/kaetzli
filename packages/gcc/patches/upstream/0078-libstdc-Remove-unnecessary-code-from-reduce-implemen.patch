@@ -1,0 +1,65 @@
+From 1356b29f6cdf4a9cae63afb98d30880b5397bbff Mon Sep 17 00:00:00 2001
+From: Matthias Kretz <m.kretz@gsi.de>
+Date: Thu, 2 Jul 2026 13:37:57 +0200
+Subject: [PATCH 078/385] libstdc++: Remove unnecessary code from reduce
+ implementation
+
+Previously, this was necessary for efficient reductions. When I tried to
+turn it into a missed-optimization PR, there was no issue (anymore). The
+generic _S_static_permute implementation optimizes just fine (or better)
+at this point.
+
+libstdc++-v3/ChangeLog:
+
+	* include/bits/simd_vec.h (_M_elements_shifted_to_front): Remove
+	x86-specific implementation.
+
+Signed-off-by: Matthias Kretz <m.kretz@gsi.de>
+(cherry picked from commit f09bafa778caaeac1faaa16eacf4d0ad7adb6c92)
+---
+ libstdc++-v3/include/bits/simd_vec.h | 32 +++++-----------------------
+ 1 file changed, 5 insertions(+), 27 deletions(-)
+
+diff --git a/libstdc++-v3/include/bits/simd_vec.h b/libstdc++-v3/include/bits/simd_vec.h
+index 5624ec781426..7fe4290cc4ce 100644
+--- a/libstdc++-v3/include/bits/simd_vec.h
++++ b/libstdc++-v3/include/bits/simd_vec.h
+@@ -443,33 +443,11 @@ namespace simd
+ 	  static_assert(_Shift < _S_size && -_Shift < _S_size);
+ 	  if constexpr (_Shift == 0)
+ 	    return *this;
+-#ifdef __SSE2__
+-	  else if (!__is_const_known(*this))
+-	    {
+-	      if constexpr (sizeof(_M_data) == 16 && _Shift > 0)
+-		return reinterpret_cast<_DataType>(
+-			 __builtin_ia32_psrldqi128(__vec_bit_cast<long long>(_M_data),
+-						   _Shift * sizeof(value_type) * 8));
+-	      else if constexpr (sizeof(_M_data) == 16 && _Shift < 0)
+-		return reinterpret_cast<_DataType>(
+-			 __builtin_ia32_pslldqi128(__vec_bit_cast<long long>(_M_data),
+-						   -_Shift * sizeof(value_type) * 8));
+-	      else if constexpr (sizeof(_M_data) < 16)
+-		{
+-		  auto __x = reinterpret_cast<__vec_builtin_type_bytes<long long, 16>>(
+-			       __vec_zero_pad_to_16(_M_data));
+-		  if constexpr (_Shift > 0)
+-		    __x = __builtin_ia32_psrldqi128(__x, _Shift * sizeof(value_type) * 8);
+-		  else
+-		    __x = __builtin_ia32_pslldqi128(__x, -_Shift * sizeof(value_type) * 8);
+-		  return _VecOps<_DataType>::_S_extract(__vec_bit_cast<__canon_value_type>(__x));
+-		}
+-	    }
+-#endif
+-	  return _S_static_permute(*this, [](int __i) consteval {
+-		   int __off = __i + _Shift;
+-		   return __off >= _S_size || __off < 0 ? zero_element : __off;
+-		 });
++	  else
++	    return _S_static_permute(*this, [](int __i) consteval {
++		     int __off = __i + _Shift;
++		     return __off >= _S_size || __off < 0 ? zero_element : __off;
++		   });
+ 	}
+ 
+       /** @internal

@@ -1,0 +1,128 @@
+From 6f1fb60ebcd551ca46d947909ec46db4cbdee696 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Wed, 2 Sep 2026 11:27:11 +0200
+Subject: [PATCH 258/385] vect-patterns: Fix up
+ vect_recog_popcount_clz_ctz_ffs_pattern for non-mode precision types
+ [PR127149]
+
+The following testcase is miscompiled on aarch64-linux.  The problem is that
+vect_recog_popcount_clz_ctz_ffs_pattern for builtins other than clz
+doesn't require type_has_mode_precision_p (lhs_type) and matches to an ifn
+with an argument with say _BitInt(7) type (as well as result) and we then
+happily vectorize it and match something that doesn't properly extend the
+padding bits.
+
+One possibility is to punt in this case (i.e.
+  if (!type_has_mode_precision_p (lhs_type))
+    return NULL;
+), the following patch instead pattern matches it with a cast to/from
+the TREE_TYPE (vec_type), i.e. the actual mode precision type we'll use
+for the vectorization.
+
+2026-09-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/127149
+	* tree-vect-patterns.cc (vect_recog_popcount_clz_ctz_ffs_pattern):
+	Handle lhs_type without mode precision by adding casts.
+
+	* gcc.dg/bitint-142.c: New test.
+
+Reviewed-by: Richard Biener <rguenth@suse.de>
+(cherry picked from commit 431068af077e13f0113f3640385b7b6cfa0a3e68)
+---
+ gcc/testsuite/gcc.dg/bitint-142.c | 38 +++++++++++++++++++++++++++++++
+ gcc/tree-vect-patterns.cc         | 23 +++++++++++++++++++
+ 2 files changed, 61 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.dg/bitint-142.c
+
+diff --git a/gcc/testsuite/gcc.dg/bitint-142.c b/gcc/testsuite/gcc.dg/bitint-142.c
+new file mode 100644
+index 000000000000..4dac4723f09b
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/bitint-142.c
+@@ -0,0 +1,38 @@
++/* PR tree-optimization/127149 */
++/* { dg-do run { target bitint } } */
++/* { dg-options "-O3" } */
++
++typedef unsigned _BitInt(7) B;
++
++[[gnu::noipa]] void
++foo (B *restrict y, const B *restrict x)
++{
++  for (unsigned i = 0; i < 16; ++i)
++    y[i] = __builtin_popcountg (x[i]);
++}
++
++[[gnu::noipa]] void
++bar (B *restrict y, const B *restrict x)
++{
++  for (unsigned i = 0; i < 16; ++i)
++    y[i] = __builtin_ctzg (x[i], 8);
++}
++
++int
++main ()
++{
++  B x[16], y[16], z, w[16];
++  B e[16] = { 0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4 };
++  B f[16] = { 8, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0 };
++  for (unsigned i = 0; i < 16; ++i)
++    x[i] = i;
++  z = ~0;
++  __builtin_clear_padding (&z);
++  for (unsigned i = 0; i < 16; ++i)
++    ((unsigned char *) &x[0])[i] |= ~*(unsigned char *) &z;
++  foo (y, x);
++  bar (w, x);
++  for (unsigned i = 0; i < 16; ++i)
++    if (y[i] != e[i] || w[i] != f[i])
++    __builtin_abort ();
++}
+diff --git a/gcc/tree-vect-patterns.cc b/gcc/tree-vect-patterns.cc
+index 7c6a4722f4ee..f191ed753d99 100644
+--- a/gcc/tree-vect-patterns.cc
++++ b/gcc/tree-vect-patterns.cc
+@@ -2292,6 +2292,17 @@ vect_recog_popcount_clz_ctz_ffs_pattern (vec_info *vinfo,
+   vect_pattern_detected ("vec_recog_popcount_clz_ctz_ffs_pattern",
+ 			 call_stmt);
+ 
++  tree orig_lhs_type = lhs_type;
++  gimple *cast_stmt = NULL;
++  if (!type_has_mode_precision_p (lhs_type))
++    {
++      lhs_type = TREE_TYPE (vec_type);
++      cast_stmt
++	= gimple_build_assign (vect_recog_temp_ssa_var (lhs_type, NULL),
++			       NOP_EXPR, unprom_diff.op);
++      unprom_diff.op = gimple_assign_lhs (cast_stmt);
++    }
++
+   /* Create B = .POPCOUNT (A).  */
+   new_var = vect_recog_temp_ssa_var (lhs_type, NULL);
+   tree arg2 = NULL_TREE;
+@@ -2332,12 +2343,24 @@ vect_recog_popcount_clz_ctz_ffs_pattern (vec_info *vinfo,
+ 	= vect_recog_ctz_ffs_pattern (vinfo, new_stmt_info, type_out);
+       if (pattern_stmt == NULL)
+ 	return NULL;
++      if (cast_stmt)
++	append_pattern_def_seq (vinfo, stmt_vinfo, cast_stmt, vec_type);
+       if (gimple_seq seq = STMT_VINFO_PATTERN_DEF_SEQ (new_stmt_info))
+ 	{
+ 	  gimple_seq *pseq = &STMT_VINFO_PATTERN_DEF_SEQ (stmt_vinfo);
+ 	  gimple_seq_add_seq_without_update (pseq, seq);
+ 	}
+     }
++  else if (cast_stmt)
++    append_pattern_def_seq (vinfo, stmt_vinfo, cast_stmt, vec_type);
++
++  if (cast_stmt)
++    {
++      append_pattern_def_seq (vinfo, stmt_vinfo, pattern_stmt, vec_type);
++      tree ret_var = vect_recog_temp_ssa_var (orig_lhs_type, NULL);
++      pattern_stmt = gimple_build_assign (ret_var, NOP_EXPR,
++					  gimple_get_lhs (pattern_stmt));
++    }
+   return pattern_stmt;
+ }
+ 

@@ -1,0 +1,103 @@
+From c6d9625a15154a745e7bb58ce5b0955739f2d5c6 Mon Sep 17 00:00:00 2001
+From: Vincenzo Calabretta <vincenzo.cal.main@gmail.com>
+Date: Sat, 29 Aug 2026 19:28:12 -0700
+Subject: [PATCH 120/385] c++: unshare RANGE_EXPR CONSTRUCTOR index [PR127046]
+
+unshare_constructor creates an unshared copy of a CONSTRUCTOR and its
+nested CONSTRUCTOR values.  The implementation copies the tree and the
+constructor elements vector, but not constructor_elt::index, which remains
+shared due to the shallow copy.
+
+For an array whose elements share the same initializer, build_vec_init
+generates a single constructor element with a RANGE_EXPR index.  When
+find_array_ctor_elt splits the RANGE_EXPR, it assumes that the CONSTRUCTOR
+being mutated is private.  Since the index is still shared, the tree from
+which the CONSTRUCTOR was unshared is also mutated.
+
+Since r16-3022-gbc42128330c, cxx_eval_store_expression handles
+CLOBBER_OBJECT_END for a subobject instead of immediately returning.  When
+the clobber targets an array element, control flow proceeds to
+get_or_insert_ctor_field.
+
+find_array_ctor_elt splits the RANGE_EXPR to create a separate constructor
+element for the affected array element.  The new element is added only to
+the unshared constructor elements vector, but the range index remains
+shared and is also mutated in the original tree.  Gimplification of the
+original tree can omit initialization by the NSDMI for elements not covered
+by the mutated range.
+
+The change copies RANGE_EXPR indexes in unshare_constructor, so that
+subsequent mutations do not affect the original tree.
+
+Bootstrapped and tested on x86_64-pc-linux-gnu.
+
+	PR c++/127046
+
+gcc/cp/ChangeLog:
+
+	* constexpr.cc (unshare_constructor): Copy RANGE_EXPR indexes.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp2a/constexpr-dtor20.C: New test.
+
+Signed-off-by: Vincenzo Calabretta <vincenzo.cal.main@gmail.com>
+(cherry picked from commit 40cbcd4eedce587c089492213711f4b85ac35843)
+---
+ gcc/cp/constexpr.cc                           |  8 ++++--
+ gcc/testsuite/g++.dg/cpp2a/constexpr-dtor20.C | 27 +++++++++++++++++++
+ 2 files changed, 33 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp2a/constexpr-dtor20.C
+
+diff --git a/gcc/cp/constexpr.cc b/gcc/cp/constexpr.cc
+index 5a28bd63c438..e812067feb79 100644
+--- a/gcc/cp/constexpr.cc
++++ b/gcc/cp/constexpr.cc
+@@ -2844,8 +2844,12 @@ unshare_constructor (tree t MEM_STAT_DECL)
+       vec<constructor_elt, va_gc> *v = CONSTRUCTOR_ELTS (n);
+       constructor_elt *ce;
+       for (HOST_WIDE_INT i = 0; vec_safe_iterate (v, i, &ce); ++i)
+-	if (ce->value && TREE_CODE (ce->value) == CONSTRUCTOR)
+-	  ptrs.safe_push (&ce->value);
++	{
++	  if (ce->index && TREE_CODE (ce->index) == RANGE_EXPR)
++	    ce->index = copy_node (ce->index PASS_MEM_STAT);
++	  if (ce->value && TREE_CODE (ce->value) == CONSTRUCTOR)
++	    ptrs.safe_push (&ce->value);
++	}
+     }
+   return t;
+ }
+diff --git a/gcc/testsuite/g++.dg/cpp2a/constexpr-dtor20.C b/gcc/testsuite/g++.dg/cpp2a/constexpr-dtor20.C
+new file mode 100644
+index 000000000000..fdb6cdb5244f
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp2a/constexpr-dtor20.C
+@@ -0,0 +1,27 @@
++// PR c++/127046
++// { dg-do run { target c++20 } }
++
++struct T {
++  char padding[4] = { 'x' };
++  constexpr ~T () {}
++};
++
++constexpr bool
++test ()
++{
++  T array[3] = {};
++  return (array[0].padding[0] == 'x'
++	  && array[1].padding[0] == 'x'
++	  && array[2].padding[0] == 'x');
++}
++
++static_assert (test ());
++
++bool (*volatile fp) () = test;
++
++int
++main ()
++{
++  if (!fp ())
++    __builtin_abort ();
++}

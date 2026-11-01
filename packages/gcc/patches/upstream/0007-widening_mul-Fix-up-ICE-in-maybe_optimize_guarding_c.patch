@@ -1,0 +1,84 @@
+From 13a6f9865aa6d938389a8361159b32a715d072f1 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Tue, 4 Aug 2026 10:37:09 +0200
+Subject: [PATCH 007/385] widening_mul: Fix up ICE in
+ maybe_optimize_guarding_check [PR126601]
+
+The following testcase ICEs, because we try to quick_push into an already
+full vector.
+The caller (match_arith_overflow) has
+  auto_vec<gimple *, 8> mul_stmts;
+and 0-6 mul_stmts.quick_push (...); calls (none of that in a loop), and then
+call to that maybe_optimize_guarding_check function which does one
+quick_push, but the function is called in a
+  FOR_EACH_IMM_USE_STMT (use_stmt, iter, cast_lhs ? cast_lhs : lhs)
+loop, so if we are unlucky  as on the attached testcase, it is called more
+than twice and either triggers ICE, or worse with checking disabled buffer
+overflow.
+
+The following patch fixes that by using safe_push in that spot instead.
+
+2026-08-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/126601
+	* tree-ssa-math-opts.cc (maybe_optimize_guarding_check): Use safe_push
+	on mul_stmts rather than quick_push.
+
+	* gcc.dg/tree-ssa/pr126601.c: New test.
+
+Reviewed-by: Richard Biener <rguenth@suse.de>
+(cherry picked from commit a49c114c7b3edd33a6ff2e50e6276ca1fbe8ad83)
+---
+ gcc/testsuite/gcc.dg/tree-ssa/pr126601.c | 29 ++++++++++++++++++++++++
+ gcc/tree-ssa-math-opts.cc                |  2 +-
+ 2 files changed, 30 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.dg/tree-ssa/pr126601.c
+
+diff --git a/gcc/testsuite/gcc.dg/tree-ssa/pr126601.c b/gcc/testsuite/gcc.dg/tree-ssa/pr126601.c
+new file mode 100644
+index 000000000000..971ccba5e18b
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/tree-ssa/pr126601.c
+@@ -0,0 +1,29 @@
++/* PR tree-optimization/126601 */
++/* { dg-do compile } */
++/* { dg-options "-Os" } */
++
++volatile int c[16];
++
++[[gnu::noipa]] int
++foo (unsigned x, unsigned y)
++{
++  unsigned r = x * y;
++  int t = 0;
++  if (c[0]) { int u = 0; if (x != 0) u = (r / x != y); t += u; }
++  if (c[1]) { int u = 0; if (x != 0) u = (r / x != y); t += u; }
++  if (c[2]) { int u = 0; if (x != 0) u = (r / x != y); t += u; }
++  if (c[3]) { int u = 0; if (x != 0) u = (r / x != y); t += u; }
++  if (c[4]) { int u = 0; if (x != 0) u = (r / x != y); t += u; }
++  if (c[5]) { int u = 0; if (x != 0) u = (r / x != y); t += u; }
++  if (c[6]) { int u = 0; if (x != 0) u = (r / x != y); t += u; }
++  if (c[7]) { int u = 0; if (x != 0) u = (r / x != y); t += u; }
++  if (c[8]) { int u = 0; if (x != 0) u = (r / x != y); t += u; }
++  if (c[9]) { int u = 0; if (x != 0) u = (r / x != y); t += u; }
++  if (c[10]) { int u = 0; if (x != 0) u = (r / x != y); t += u; }
++  if (c[11]) { int u = 0; if (x != 0) u = (r / x != y); t += u; }
++  if (c[12]) { int u = 0; if (x != 0) u = (r / x != y); t += u; }
++  if (c[13]) { int u = 0; if (x != 0) u = (r / x != y); t += u; }
++  if (c[14]) { int u = 0; if (x != 0) u = (r / x != y); t += u; }
++  if (c[15]) { int u = 0; if (x != 0) u = (r / x != y); t += u; }
++  return t;
++}
+diff --git a/gcc/tree-ssa-math-opts.cc b/gcc/tree-ssa-math-opts.cc
+index cd3fd2fc8fb4..63e7f714f7e6 100644
+--- a/gcc/tree-ssa-math-opts.cc
++++ b/gcc/tree-ssa-math-opts.cc
+@@ -3762,7 +3762,7 @@ maybe_optimize_guarding_check (vec<gimple *> &mul_stmts, gimple *cond_stmt,
+ 	return;
+     }
+   gimple_stmt_iterator gsi = gsi_after_labels (bb);
+-  mul_stmts.quick_push (div_stmt);
++  mul_stmts.safe_push (div_stmt);
+   if (is_gimple_debug (gsi_stmt (gsi)))
+     gsi_next_nondebug (&gsi);
+   unsigned cast_count = 0;

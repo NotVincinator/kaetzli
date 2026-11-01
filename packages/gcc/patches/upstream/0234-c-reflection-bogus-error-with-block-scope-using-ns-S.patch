@@ -1,0 +1,138 @@
+From 7e02198ec7ce453e8de8d6ec333883d375d46e5a Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Fri, 2 Oct 2026 16:53:46 -0400
+Subject: [PATCH 234/385] c++/reflection: bogus error with block-scope using
+ [:ns:]::S [PR126654]
+
+Here we emit error "'::' is not a class, namespace, or
+enumeration" for
+
+  using [:ns:]::S; // where ns=^^::
+
+which is clearly wrong.  tsubst_stmt/DECL_EXPR has
+
+    scope = tsubst (scope, args, complain, in_decl);
+    if (!MAYBE_CLASS_TYPE_P (scope)
+	&& TREE_CODE (scope) != ENUMERAL_TYPE)
+      {
+	if (complain & tf_error)
+	  error_at (DECL_SOURCE_LOCATION (decl), "%qT is not a "
+		    "class, namespace, or enumeration", scope);
+	return error_mark_node;
+      }
+
+but it never checked for a NAMESPACE_DECL.  That was ok before P2996
+which brought dependent namespaces but now we need to allow them.
+
+As it so happens, I found another problem in this space, a failure
+to propagate USING_DECL_TYPENAME_P (127707).
+
+	PR c++/126654
+
+gcc/cp/ChangeLog:
+
+	* pt.cc (tsubst_stmt) <case DECL_EXPR>: If tsubst returns
+	error_mark_node, return error_mark_node.  Allow NAMESPACE_DECL.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/reflect/ns11.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 1801e9f042319e934045f3d4aaaa3ba40e22d017)
+---
+ gcc/cp/pt.cc                        |  3 ++
+ gcc/testsuite/g++.dg/reflect/ns11.C | 69 +++++++++++++++++++++++++++++
+ 2 files changed, 72 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/reflect/ns11.C
+
+diff --git a/gcc/cp/pt.cc b/gcc/cp/pt.cc
+index 6dc6f730e3f3..f5cb7f6bb41b 100644
+--- a/gcc/cp/pt.cc
++++ b/gcc/cp/pt.cc
+@@ -19738,7 +19738,10 @@ tsubst_stmt (tree t, tree args, tsubst_flags_t complain, tree in_decl)
+ 	    if (DECL_DEPENDENT_P (decl))
+ 	      {
+ 		scope = tsubst (scope, args, complain, in_decl);
++		if (scope == error_mark_node)
++		  return error_mark_node;
+ 		if (!MAYBE_CLASS_TYPE_P (scope)
++		    && TREE_CODE (scope) != NAMESPACE_DECL
+ 		    && TREE_CODE (scope) != ENUMERAL_TYPE)
+ 		  {
+ 		    if (complain & tf_error)
+diff --git a/gcc/testsuite/g++.dg/reflect/ns11.C b/gcc/testsuite/g++.dg/reflect/ns11.C
+new file mode 100644
+index 000000000000..54d6a0dc9486
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/reflect/ns11.C
+@@ -0,0 +1,69 @@
++// PR c++/126654
++// { dg-do compile { target c++26 } }
++// { dg-additional-options "-freflection" }
++
++int v;
++
++namespace N {
++  struct S {};
++  namespace M {
++    struct S {};
++    int v;
++  }
++  int v;
++}
++namespace A = N;
++struct S {};
++enum class E { S };
++struct C { struct S {}; };
++
++template<auto ns>
++void
++f ()
++{
++  using [:ns:]::S;
++  using [:ns:]::v;
++  v = 42;
++}
++
++template<auto ns>
++void
++fe ()
++{
++  using [:ns:]::S;
++  auto e = S;
++}
++
++template<auto ns>
++void
++f2 ()
++{
++  using [:ns:]::S; // { dg-error "not usable in a splice scope" }
++}
++
++template<auto ns>
++void
++f3 ()
++{
++  using [:ns:]::S;  // { dg-error "using-declaration for member at non-class scope" }
++}
++
++template<typename T>
++void
++f4 ()
++{
++  using T::x;  // { dg-error "is not a class, namespace, or enumeration" }
++}
++
++void
++g ()
++{
++  f<^^::>();
++  f<^^N>();
++  f<^^A>();
++  f<^^N::M>();
++  fe<^^E>();
++  f2<^^int>();
++  f3<^^C>();
++  f4<int>();
++}

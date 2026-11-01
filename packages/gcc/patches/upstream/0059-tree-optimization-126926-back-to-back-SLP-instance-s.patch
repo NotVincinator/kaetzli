@@ -1,0 +1,131 @@
+From df724d7f92e60cc8c21cda11d0958f4ec69504ee Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Tue, 18 Aug 2026 11:02:12 +0200
+Subject: [PATCH 059/385] tree-optimization/126926 - back-to-back SLP instance
+ scheduling
+
+When we have two SLP instances interacting at the
+c_13 definition point of a vector which is both a vector CTOR root
+for one instance and the leaf (existing vector) of a reduction instance,
+we transform the CTOR instance first replacing the definition
+in vectorize_slp_instance_root_stmt.  That disrupts the SLP scheduling
+process of the 2nd as the replacement now appears to be outside of the
+SLP region.  Avoid this by not replacing the vector constructing stmt but
+only its RHS.
+
+	PR tree-optimization/126926
+	* tree-vect-slp.cc (vectorize_slp_instance_root_stmt): Only
+	replace the RHS of the vector constructing scalar stmt.
+
+	* gcc.dg/vect/bb-slp-pr126926.c: New testcase.
+
+(cherry picked from commit a9c22e6d049bf10e44b6a76384a1eb00991c3eb8)
+---
+ gcc/testsuite/gcc.dg/vect/bb-slp-pr126926.c | 37 +++++++++++++++++++++
+ gcc/tree-vect-slp.cc                        | 26 ++++++---------
+ 2 files changed, 48 insertions(+), 15 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/vect/bb-slp-pr126926.c
+
+diff --git a/gcc/testsuite/gcc.dg/vect/bb-slp-pr126926.c b/gcc/testsuite/gcc.dg/vect/bb-slp-pr126926.c
+new file mode 100644
+index 000000000000..84ebf5cc93d8
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/vect/bb-slp-pr126926.c
+@@ -0,0 +1,37 @@
++/* { dg-do compile } */
++/* { dg-additional-options "-fgimple" } */
++
++float a;
++
++void __GIMPLE (ssa,guessed_local(1073741824),startwith("slp"))
++b ()
++{
++  float [[gnu::vector_size(8)]] c;
++  float _1;
++  float _2;
++  float _3;
++  float _4;
++  float _5;
++  float _6;
++  float _7;
++  float _8;
++  float _9;
++
++  __BB(2,guessed_local(1073741824)):
++  _1 = a;
++  _2 = _1 + _Literal (float) 0.0;
++  c_12 = __BIT_INSERT (c_11(D), _2, 32u);
++  _3 = a;
++  _4 = _3 + _Literal (float) 0.0;
++  c_13 = __BIT_INSERT (c_12, _4, 0u);
++  _5 = __BIT_FIELD_REF <float> (c_13, 32u, 32u);
++  _6 = _5 * _Literal (float) 0.0;
++  _7 = __BIT_FIELD_REF <float> (c_13, 32u, 32u);
++  _8 = _7 * _Literal (float) 2.0e+0;
++  _9 = _6 + _8;
++  a = _9;
++  return;
++
++}
++
++
+diff --git a/gcc/tree-vect-slp.cc b/gcc/tree-vect-slp.cc
+index 48bfd87f8961..94b6aad94008 100644
+--- a/gcc/tree-vect-slp.cc
++++ b/gcc/tree-vect-slp.cc
+@@ -12198,19 +12198,17 @@ vect_remove_slp_scalar_calls (vec_info *vinfo, slp_tree node)
+ void
+ vectorize_slp_instance_root_stmt (vec_info *vinfo, slp_tree node, slp_instance instance)
+ {
+-  gassign *rstmt = NULL;
+-
+   if (instance->kind == slp_inst_kind_ctor)
+     {
++      tree new_def;
+       if (SLP_TREE_VEC_DEFS (node).length () == 1)
+ 	{
+-	  tree vect_lhs = SLP_TREE_VEC_DEFS (node)[0];
++	  new_def = SLP_TREE_VEC_DEFS (node)[0];
+ 	  tree root_lhs = gimple_get_lhs (instance->root_stmts[0]->stmt);
+ 	  if (!useless_type_conversion_p (TREE_TYPE (root_lhs),
+-					  TREE_TYPE (vect_lhs)))
+-	    vect_lhs = build1 (VIEW_CONVERT_EXPR, TREE_TYPE (root_lhs),
+-			       vect_lhs);
+-	  rstmt = gimple_build_assign (root_lhs, vect_lhs);
++					  TREE_TYPE (new_def)))
++	    new_def = build1 (VIEW_CONVERT_EXPR, TREE_TYPE (root_lhs),
++			       new_def);
+ 	}
+       else
+ 	{
+@@ -12225,12 +12223,15 @@ vectorize_slp_instance_root_stmt (vec_info *vinfo, slp_tree node, slp_instance i
+ 	     do not match.  */
+ 	  FOR_EACH_VEC_ELT (SLP_TREE_VEC_DEFS (node), j, child_def)
+ 	    CONSTRUCTOR_APPEND_ELT (v, NULL_TREE, child_def);
+-	  tree lhs = gimple_get_lhs (instance->root_stmts[0]->stmt);
+ 	  tree rtype
+ 	    = TREE_TYPE (gimple_assign_rhs1 (instance->root_stmts[0]->stmt));
+-	  tree r_constructor = build_constructor (rtype, v);
+-	  rstmt = gimple_build_assign (lhs, r_constructor);
++	  new_def = build_constructor (rtype, v);
+ 	}
++
++      gimple_stmt_iterator rgsi = gsi_for_stmt (instance->root_stmts[0]->stmt);
++      gimple_assign_set_rhs_from_tree (&rgsi, new_def);
++      update_stmt (gsi_stmt (rgsi));
++      return;
+     }
+   else if (instance->kind == slp_inst_kind_bb_reduc)
+     {
+@@ -12316,11 +12317,6 @@ vectorize_slp_instance_root_stmt (vec_info *vinfo, slp_tree node, slp_instance i
+     }
+   else
+     gcc_unreachable ();
+-
+-  gcc_assert (rstmt);
+-
+-  gimple_stmt_iterator rgsi = gsi_for_stmt (instance->root_stmts[0]->stmt);
+-  gsi_replace (&rgsi, rstmt, true);
+ }
+ 
+ struct slp_scc_info

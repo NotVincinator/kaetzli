@@ -1,0 +1,48 @@
+From 351264e6d92d62743801395ed36f690fabe629d9 Mon Sep 17 00:00:00 2001
+From: Alexandre Oliva <oliva@adacore.com>
+Date: Tue, 25 Aug 2026 22:38:23 -0300
+Subject: [PATCH 100/385] testsuite: explicitly specify expected endianness
+ [PR126650]
+
+The pr126650.c testcase carries an expectation that the data
+structures are little endian; we don't get the expected results
+otherwise.  Make the nonscalars explicitly little-endian.
+
+
+for  gcc/testsuite/ChangeLog
+
+	PR tree-optimization/126650
+	* gcc.dg/torture/pr126650.c: Be explicit about endianness
+	expectations.
+(cherry picked from commit ea6bfeafc48af3e6dab598376dda4586752ed990)
+---
+ gcc/testsuite/gcc.dg/torture/pr126650.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/gcc/testsuite/gcc.dg/torture/pr126650.c b/gcc/testsuite/gcc.dg/torture/pr126650.c
+index 166705d9cfe6..befeba5259a4 100644
+--- a/gcc/testsuite/gcc.dg/torture/pr126650.c
++++ b/gcc/testsuite/gcc.dg/torture/pr126650.c
+@@ -1,4 +1,4 @@
+-/* { dg-do run } */
++/* { dg-do run { target { le || be } } } */
+ 
+ #include <stdarg.h>
+ #include <stdlib.h>
+@@ -17,14 +17,14 @@ void __attribute__((noipa)) foo (int n, ...)
+ 
+ int main()
+ {
+-  struct b {
++  struct __attribute__ ((scalar_storage_order ("little-endian"))) b {
+     int : 7;
+     int : 2;
+     int : 6;
+     int : 3;
+     int c : 7;
+   };
+-  union {
++  union __attribute__ ((scalar_storage_order ("little-endian"))) {
+     int d;
+     struct b bf;
+     char e[4];

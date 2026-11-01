@@ -1,0 +1,41 @@
+From b9a8eb8b88da658c9133f238a2d7cc2493ac28c5 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Thu, 17 Sep 2026 18:46:41 +0100
+Subject: [PATCH 185/385] libstdc++: Avoid hardcoded -std=gnu++26 in testsuite
+ helper proc
+
+This proc should use -std=gnu++29 but I forgot to update it in
+r17-1905-g70e630b6d29b75 so it's now out of date. Replace the hardcoded
+option by reusing the existing $v3_max_std variable defined earlier.
+
+libstdc++-v3/ChangeLog:
+
+	* testsuite/lib/libstdc++.exp (check_v3_target_cpp_feature_test):
+	Use $v3_max_std variable instead of hardcoding the latest -std
+	option.
+
+(cherry picked from commit 89271387b915d3947817510d248bb48f129e9ef4)
+---
+ libstdc++-v3/testsuite/lib/libstdc++.exp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/libstdc++-v3/testsuite/lib/libstdc++.exp b/libstdc++-v3/testsuite/lib/libstdc++.exp
+index 4ffbf106b6bf..4124e3e87670 100644
+--- a/libstdc++-v3/testsuite/lib/libstdc++.exp
++++ b/libstdc++-v3/testsuite/lib/libstdc++.exp
+@@ -1178,13 +1178,13 @@ proc v3_check_preprocessor_condition { name cond { inc "" } } {
+ 
+ # Return 1 if libstdc++ defines macro for the current target, 0 otherwise.
+ proc check_v3_target_cpp_feature_test { cond } {
++    global v3_max_std
+     global cxxflags
+     set cxxflags_saved $cxxflags
+     # Use the latest standard, so that all feature test macros are defined.
+     # We need to do it here, because this check happens before v3-dg-runtest
+     # runs its loop to test multiple times with different -std options.
+-    # This should be updated when a new -std is added.
+-    set cxxflags "$cxxflags -std=gnu++26"
++    set cxxflags "$cxxflags -std=gnu++$v3_max_std"
+     set inc "#include <version>"
+     set result [v3_check_preprocessor_condition cpp_feature_test "$cond" $inc]
+     set cxxflags $cxxflags_saved

@@ -1,0 +1,148 @@
+From e2d039b4840b44e61bfffc002d3e96597221b991 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Wed, 12 Aug 2026 00:20:54 +0000
+Subject: [PATCH 029/385] Daily bump.
+
+---
+ gcc/ChangeLog           | 27 +++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 87 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 115 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 7df087ca5f26..fa0e6f28fe19 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,30 @@
++2026-08-11  Robin Dapp  <robin.dapp@oss.qualcomm.com>
++
++	Backported from master:
++	2026-07-25  Robin Dapp  <robin.dapp@oss.qualcomm.com>
++
++	PR target/126334
++	* config/riscv/riscv-v.cc (get_gather_scatter_code): Use ordered
++	indexed stores.
++
++2026-08-11  Robin Dapp  <robin.dapp@oss.qualcomm.com>
++
++	Backported from master:
++	2026-08-04  Robin Dapp  <robin.dapp@oss.qualcomm.com>
++
++	PR target/126550
++	* config/riscv/riscv-v.cc (expand_const_vector_single_step_npatterns):
++	User global builder's npatterns.
++
++2026-08-11  Hu, Lin1  <lin1.hu@intel.com>
++
++	Backported from master:
++	2026-08-11  Hu, Lin1  <lin1.hu@intel.com>
++
++	PR target/126676
++	* config/i386/i386-expand.cc (ix86_expand_fp_compare): Only use
++	UNSPEC_OPTCOMX for the modes VCOMX exists for.
++
+ 2026-08-10  H.J. Lu  <hjl.tools@gmail.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index be531dce9220..a2a375f66903 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260811
++20260812
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 42fbdbe6e80e..4d4e5dc3f671 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,90 @@
++2026-08-11  Robin Dapp  <robin.dapp@oss.qualcomm.com>
++
++	Backported from master:
++	2026-07-25  Robin Dapp  <robin.dapp@oss.qualcomm.com>
++
++	PR target/126334
++	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-1.c:
++	Adjust test expectations.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-10.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-11.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-12.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-2.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-3.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-4.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-5.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-6.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-7.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-8.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-9.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-1.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-10.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-11.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-2.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-3.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-4.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-5.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-6.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-7.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-8.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-9.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-1.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-10.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-2.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-3.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-4.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-5.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-6.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-7.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-8.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-9.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-1.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-10.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-2.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-3.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-4.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-5.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-6.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-7.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-8.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-9.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-1.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-10.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-2.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-4.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-5.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-6.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-7.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-8.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-9.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-1.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-10.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-2.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-3.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-4.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-5.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-6.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-7.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-8.c: Ditto.
++	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-9.c: Ditto.
++
++2026-08-11  Robin Dapp  <robin.dapp@oss.qualcomm.com>
++
++	Backported from master:
++	2026-08-04  Robin Dapp  <robin.dapp@oss.qualcomm.com>
++
++	PR target/126550
++	* gcc.target/riscv/rvv/autovec/pr126550-2.c: New test.
++	* gcc.target/riscv/rvv/autovec/pr126550.c: New test.
++
++2026-08-11  Hu, Lin1  <lin1.hu@intel.com>
++
++	Backported from master:
++	2026-08-11  Hu, Lin1  <lin1.hu@intel.com>
++
++	PR target/126676
++	* gcc.target/i386/pr126676.c: New test.
++
+ 2026-08-10  H.J. Lu  <hjl.tools@gmail.com>
+ 
+ 	Backported from master:

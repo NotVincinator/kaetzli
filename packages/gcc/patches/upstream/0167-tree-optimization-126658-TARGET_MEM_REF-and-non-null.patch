@@ -1,0 +1,146 @@
+From d744c19c6ea13454394ceff863df451a781fe165 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Thu, 6 Aug 2026 11:49:20 +0200
+Subject: [PATCH 167/385] tree-optimization/126658 - TARGET_MEM_REF and
+ non-null infering
+
+The following adjusts three places to avoid infering that operand
+zero of a TARGET_MEM_REF is literally dereferenced and thus may
+not be NULL.  This reflects the fact that within IVOPTs we cannot
+easily guarantee that there'll be a real pointer in TMR_BASE
+and fiddling with IVOPTs proved fragile.
+
+So we are taking a conservative stance here, with carving out
+the likely common case of a scaled index which is unlikely
+going to be a pointer (fingers crossing).
+
+For the testcase at hand the apparent non-NULLness was triggering
+a jump-threading miscompiling the testcase.
+
+	PR tree-optimization/126658
+	* gimple.cc (check_loadstore): Restrict TARGET_MEM_REF
+	handling.
+	* gimple-ssa-isolate-paths.cc (check_loadstore): Likewise.
+	* gimple-range-infer.cc (non_null_loadstore): Likewise.
+
+	* gcc.dg/torture/pr126658.c: New testcase.
+
+(cherry picked from commit b947bd4aac67ba3bdb6030aa4ac2f3eb0204df05)
+---
+ gcc/gimple-range-infer.cc               | 13 +++++++++++--
+ gcc/gimple-ssa-isolate-paths.cc         | 10 +++++++++-
+ gcc/gimple.cc                           | 14 ++++++++++---
+ gcc/testsuite/gcc.dg/torture/pr126658.c | 26 +++++++++++++++++++++++++
+ 4 files changed, 57 insertions(+), 6 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/pr126658.c
+
+diff --git a/gcc/gimple-range-infer.cc b/gcc/gimple-range-infer.cc
+index 30b5917e4ede..e85a86da2d29 100644
+--- a/gcc/gimple-range-infer.cc
++++ b/gcc/gimple-range-infer.cc
+@@ -36,6 +36,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "gimple-walk.h"
+ #include "cfganal.h"
+ #include "tree-dfa.h"
++#include "fold-const.h"
+ 
+ // Create the global oracle.
+ 
+@@ -61,9 +62,17 @@ private:
+ // stmt range inference instance.
+ 
+ static bool
+-non_null_loadstore (gimple *, tree op, tree, void *data)
++non_null_loadstore (gimple *stmt, tree op, tree, void *data)
+ {
+-  if (TREE_CODE (op) == MEM_REF || TREE_CODE (op) == TARGET_MEM_REF)
++  if (TREE_CODE (op) == MEM_REF
++      || (TREE_CODE (op) == TARGET_MEM_REF
++	  && !TMR_INDEX2 (op)
++	  && (!TMR_INDEX (op)
++	      || (TMR_STEP (op)
++		  && expr_not_equal_to (TMR_STEP (op),
++					wi::one (TYPE_PRECISION (TREE_TYPE
++							(TMR_STEP (op)))),
++					stmt)))))
+     {
+       /* Some address spaces may legitimately dereference zero.  */
+       addr_space_t as = TYPE_ADDR_SPACE (TREE_TYPE (op));
+diff --git a/gcc/gimple-ssa-isolate-paths.cc b/gcc/gimple-ssa-isolate-paths.cc
+index 4c5b70d108ac..1b27786c367b 100644
+--- a/gcc/gimple-ssa-isolate-paths.cc
++++ b/gcc/gimple-ssa-isolate-paths.cc
+@@ -51,7 +51,15 @@ static bool cfg_altered;
+ static bool
+ check_loadstore (gimple *stmt, tree op, tree, void *data)
+ {
+-  if ((TREE_CODE (op) == MEM_REF || TREE_CODE (op) == TARGET_MEM_REF)
++  if ((TREE_CODE (op) == MEM_REF
++       || (TREE_CODE (op) == TARGET_MEM_REF
++	   && !TMR_INDEX2 (op)
++	   && (!TMR_INDEX (op)
++	       || (TMR_STEP (op)
++		   && expr_not_equal_to (TMR_STEP (op),
++					 wi::one (TYPE_PRECISION (TREE_TYPE
++							(TMR_STEP (op)))),
++					 stmt)))))
+       && operand_equal_p (TREE_OPERAND (op, 0), (tree)data, 0))
+     {
+       TREE_THIS_VOLATILE (op) = 1;
+diff --git a/gcc/gimple.cc b/gcc/gimple.cc
+index c791e0412431..648400aa4445 100644
+--- a/gcc/gimple.cc
++++ b/gcc/gimple.cc
+@@ -3153,9 +3153,17 @@ nonbarrier_call_p (gimple *call)
+    This routine only makes a superficial check for a dereference.  Thus
+    it must only be used if it is safe to return a false negative.  */
+ static bool
+-check_loadstore (gimple *, tree op, tree, void *data)
+-{
+-  if (TREE_CODE (op) == MEM_REF || TREE_CODE (op) == TARGET_MEM_REF)
++check_loadstore (gimple *stmt, tree op, tree, void *data)
++{
++  if (TREE_CODE (op) == MEM_REF
++      || (TREE_CODE (op) == TARGET_MEM_REF
++	  && !TMR_INDEX2 (op)
++	  && (!TMR_INDEX (op)
++	      || (TMR_STEP (op)
++		  && expr_not_equal_to (TMR_STEP (op),
++					wi::one (TYPE_PRECISION (TREE_TYPE
++							(TMR_STEP (op)))),
++					stmt)))))
+     {
+       /* Some address spaces may legitimately dereference zero.  */
+       addr_space_t as = TYPE_ADDR_SPACE (TREE_TYPE (op));
+diff --git a/gcc/testsuite/gcc.dg/torture/pr126658.c b/gcc/testsuite/gcc.dg/torture/pr126658.c
+new file mode 100644
+index 000000000000..c11d637d199f
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/pr126658.c
+@@ -0,0 +1,26 @@
++/* { dg-do run } */
++/* { dg-require-effective-target int32plus } */
++
++long a, b;
++int c, d;
++long long e[1];
++char __attribute__((noipa))
++f(long long *p1, int i, long long *p3)
++{
++  long long *g;
++  for (; a < i; a++)
++    g = p1 + 1;
++  while (g != p1) {
++    --g;
++    b = g - p1;
++    if (p3[b])
++      c = 3;
++  }
++  return c;
++}
++int main() {
++  long long j[] = {1096435691};
++  d = f(e, 2147483647 - 2147279301, j);
++  if (d != 3)
++    __builtin_abort ();
++}

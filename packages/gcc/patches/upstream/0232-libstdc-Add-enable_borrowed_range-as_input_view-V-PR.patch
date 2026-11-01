@@ -1,0 +1,114 @@
+From 35b680a36f403f4fe568305fc967d745351c33cf Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Thu, 1 Oct 2026 21:20:36 +0100
+Subject: [PATCH 232/385] libstdc++: Add
+ enable_borrowed_range<as_input_view<V>> [PR125785]
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Add the missing partial specialization, and test for it.
+
+Also add tests for the as_const_view and as_rvalue_view partial
+specializations that weren't being tested.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/125785
+	* include/std/ranges (enable_borrowed_range<as_input_view<T>>):
+	Define partial specialization.
+	* testsuite/std/ranges/adaptors/as_input/1.cc: Test
+	specialization for as_input_view.
+	* testsuite/std/ranges/adaptors/as_const/1.cc: Test
+	specialization for as_const_view.
+	* testsuite/std/ranges/adaptors/as_rvalue/1.cc: Test
+	specialization for as_rvalue_view.
+
+Reviewed-by: Tomasz Kamiński <tkaminsk@redhat.com>
+(cherry picked from commit b8a469b62d85dc9cf8b995e0eece8eaa7f9ba7aa)
+---
+ libstdc++-v3/include/std/ranges                           | 4 ++++
+ libstdc++-v3/testsuite/std/ranges/adaptors/as_const/1.cc  | 5 +++++
+ libstdc++-v3/testsuite/std/ranges/adaptors/as_input/1.cc  | 6 ++++++
+ libstdc++-v3/testsuite/std/ranges/adaptors/as_rvalue/1.cc | 6 ++++++
+ 4 files changed, 21 insertions(+)
+
+diff --git a/libstdc++-v3/include/std/ranges b/libstdc++-v3/include/std/ranges
+index 92a2ae6db0f7..cad9e49952cc 100644
+--- a/libstdc++-v3/include/std/ranges
++++ b/libstdc++-v3/include/std/ranges
+@@ -10600,6 +10600,10 @@ namespace ranges
+   template<typename _Range>
+     as_input_view(_Range&&) -> as_input_view<views::all_t<_Range>>;
+ 
++  template<typename _Vp>
++    inline constexpr bool enable_borrowed_range<as_input_view<_Vp>>
++      = enable_borrowed_range<_Vp>;
++
+   template<input_range _Vp>
+     requires view<_Vp>
+   template<bool _Const>
+diff --git a/libstdc++-v3/testsuite/std/ranges/adaptors/as_const/1.cc b/libstdc++-v3/testsuite/std/ranges/adaptors/as_const/1.cc
+index 5ccf47d4d300..135cc2911e93 100644
+--- a/libstdc++-v3/testsuite/std/ranges/adaptors/as_const/1.cc
++++ b/libstdc++-v3/testsuite/std/ranges/adaptors/as_const/1.cc
+@@ -81,6 +81,11 @@ test04()
+   VERIFY( ranges::equal(v, x) );
+ }
+ 
++using Owning = ranges::single_view<int>;
++using Borrowed = std::span<int>;
++static_assert( ! ranges::enable_borrowed_range<ranges::as_const_view<Owning>> );
++static_assert( ranges::enable_borrowed_range<ranges::as_const_view<Borrowed>> );
++
+ int
+ main()
+ {
+diff --git a/libstdc++-v3/testsuite/std/ranges/adaptors/as_input/1.cc b/libstdc++-v3/testsuite/std/ranges/adaptors/as_input/1.cc
+index 8bd1a82a7b7f..2d2b2dd15821 100644
+--- a/libstdc++-v3/testsuite/std/ranges/adaptors/as_input/1.cc
++++ b/libstdc++-v3/testsuite/std/ranges/adaptors/as_input/1.cc
+@@ -8,6 +8,7 @@
+ 
+ #include <algorithm>
+ #include <vector>
++#include <span>
+ #include <testsuite_hooks.h>
+ #include <testsuite_iterators.h>
+ 
+@@ -51,6 +52,11 @@ test02()
+ 			      decltype(x | views::as_input | views::as_input)> );
+ }
+ 
++using Owning = ranges::single_view<int>;
++using Borrowed = std::span<int>;
++static_assert( ! ranges::enable_borrowed_range<ranges::as_input_view<Owning>> );
++static_assert( ranges::enable_borrowed_range<ranges::as_input_view<Borrowed>> );
++
+ int
+ main()
+ {
+diff --git a/libstdc++-v3/testsuite/std/ranges/adaptors/as_rvalue/1.cc b/libstdc++-v3/testsuite/std/ranges/adaptors/as_rvalue/1.cc
+index 487700773705..531560ad84af 100644
+--- a/libstdc++-v3/testsuite/std/ranges/adaptors/as_rvalue/1.cc
++++ b/libstdc++-v3/testsuite/std/ranges/adaptors/as_rvalue/1.cc
+@@ -9,6 +9,7 @@
+ 
+ #include <algorithm>
+ #include <memory>
++#include <span>
+ #include <testsuite_hooks.h>
+ #include <testsuite_iterators.h>
+ 
+@@ -55,6 +56,11 @@ test02()
+   VERIFY( *y == 42 );
+ }
+ 
++using Owning = ranges::single_view<int>;
++using Borrowed = std::span<int>;
++static_assert( ! ranges::enable_borrowed_range<ranges::as_rvalue_view<Owning>> );
++static_assert( ranges::enable_borrowed_range<ranges::as_rvalue_view<Borrowed>> );
++
+ int
+ main()
+ {

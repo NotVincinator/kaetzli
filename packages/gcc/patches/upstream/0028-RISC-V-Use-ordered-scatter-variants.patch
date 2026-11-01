@@ -1,0 +1,832 @@
+From 14101132aa3baf0affe755f676bee1eb691cb85f Mon Sep 17 00:00:00 2001
+From: Robin Dapp <robin.dapp@oss.qualcomm.com>
+Date: Tue, 21 Jul 2026 10:37:58 +0200
+Subject: [PATCH 028/385] RISC-V: Use ordered scatter variants.
+
+The vectorizer expects scatters to write in an ordered fashion.
+Only the ordered indexed stores offer this, so use them instead of the
+unordered ones.
+
+	PR target/126334
+
+gcc/ChangeLog:
+
+	* config/riscv/riscv-v.cc (get_gather_scatter_code): Use ordered
+	indexed stores.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-1.c:
+	Adjust test expectations.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-10.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-11.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-12.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-4.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-5.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-6.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-7.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-8.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-9.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-10.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-11.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-4.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-5.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-6.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-7.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-8.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-9.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-10.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-4.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-5.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-6.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-7.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-8.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-9.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-10.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-4.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-5.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-6.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-7.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-8.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-9.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-10.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-4.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-5.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-6.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-7.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-8.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-9.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-1.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-10.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-2.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-3.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-4.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-5.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-6.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-7.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-8.c: Ditto.
+	* gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-9.c: Ditto.
+
+(cherry picked from commit 5b0d2e93e1ad39ee6f731abeee2e8846bcf5da93)
+---
+ gcc/config/riscv/riscv-v.cc                        | 14 +++++++-------
+ .../rvv/autovec/gather-scatter/gather_load_32-1.c  |  2 +-
+ .../rvv/autovec/gather-scatter/gather_load_32-10.c |  2 +-
+ .../rvv/autovec/gather-scatter/gather_load_32-11.c |  2 +-
+ .../rvv/autovec/gather-scatter/gather_load_32-12.c |  2 +-
+ .../rvv/autovec/gather-scatter/gather_load_32-2.c  |  2 +-
+ .../rvv/autovec/gather-scatter/gather_load_32-3.c  |  2 +-
+ .../rvv/autovec/gather-scatter/gather_load_32-4.c  |  2 +-
+ .../rvv/autovec/gather-scatter/gather_load_32-5.c  |  2 +-
+ .../rvv/autovec/gather-scatter/gather_load_32-6.c  |  2 +-
+ .../rvv/autovec/gather-scatter/gather_load_32-7.c  |  2 +-
+ .../rvv/autovec/gather-scatter/gather_load_32-8.c  |  2 +-
+ .../rvv/autovec/gather-scatter/gather_load_32-9.c  |  2 +-
+ .../autovec/gather-scatter/mask_gather_load_32-1.c |  2 +-
+ .../gather-scatter/mask_gather_load_32-10.c        |  2 +-
+ .../gather-scatter/mask_gather_load_32-11.c        |  2 +-
+ .../autovec/gather-scatter/mask_gather_load_32-2.c |  2 +-
+ .../autovec/gather-scatter/mask_gather_load_32-3.c |  2 +-
+ .../autovec/gather-scatter/mask_gather_load_32-4.c |  2 +-
+ .../autovec/gather-scatter/mask_gather_load_32-5.c |  2 +-
+ .../autovec/gather-scatter/mask_gather_load_32-6.c |  2 +-
+ .../autovec/gather-scatter/mask_gather_load_32-7.c |  2 +-
+ .../autovec/gather-scatter/mask_gather_load_32-8.c |  2 +-
+ .../autovec/gather-scatter/mask_gather_load_32-9.c |  2 +-
+ .../gather-scatter/mask_scatter_store_32-1.c       |  3 ++-
+ .../gather-scatter/mask_scatter_store_32-10.c      |  3 ++-
+ .../gather-scatter/mask_scatter_store_32-2.c       |  3 ++-
+ .../gather-scatter/mask_scatter_store_32-3.c       |  3 ++-
+ .../gather-scatter/mask_scatter_store_32-4.c       |  3 ++-
+ .../gather-scatter/mask_scatter_store_32-5.c       |  3 ++-
+ .../gather-scatter/mask_scatter_store_32-6.c       |  3 ++-
+ .../gather-scatter/mask_scatter_store_32-7.c       |  3 ++-
+ .../gather-scatter/mask_scatter_store_32-8.c       |  3 ++-
+ .../gather-scatter/mask_scatter_store_32-9.c       |  3 ++-
+ .../gather-scatter/mask_scatter_store_64-1.c       |  1 +
+ .../gather-scatter/mask_scatter_store_64-10.c      |  1 +
+ .../gather-scatter/mask_scatter_store_64-2.c       |  1 +
+ .../gather-scatter/mask_scatter_store_64-3.c       |  1 +
+ .../gather-scatter/mask_scatter_store_64-4.c       |  1 +
+ .../gather-scatter/mask_scatter_store_64-5.c       |  1 +
+ .../gather-scatter/mask_scatter_store_64-6.c       |  1 +
+ .../gather-scatter/mask_scatter_store_64-7.c       |  1 +
+ .../gather-scatter/mask_scatter_store_64-8.c       |  1 +
+ .../gather-scatter/mask_scatter_store_64-9.c       |  1 +
+ .../autovec/gather-scatter/scatter_store_32-1.c    |  3 ++-
+ .../autovec/gather-scatter/scatter_store_32-10.c   |  3 ++-
+ .../autovec/gather-scatter/scatter_store_32-2.c    |  3 ++-
+ .../autovec/gather-scatter/scatter_store_32-4.c    |  3 ++-
+ .../autovec/gather-scatter/scatter_store_32-5.c    |  3 ++-
+ .../autovec/gather-scatter/scatter_store_32-6.c    |  3 ++-
+ .../autovec/gather-scatter/scatter_store_32-7.c    |  3 ++-
+ .../autovec/gather-scatter/scatter_store_32-8.c    |  3 ++-
+ .../autovec/gather-scatter/scatter_store_32-9.c    |  3 ++-
+ .../autovec/gather-scatter/scatter_store_64-1.c    |  1 +
+ .../autovec/gather-scatter/scatter_store_64-10.c   |  1 +
+ .../autovec/gather-scatter/scatter_store_64-2.c    |  1 +
+ .../autovec/gather-scatter/scatter_store_64-3.c    |  1 +
+ .../autovec/gather-scatter/scatter_store_64-4.c    |  1 +
+ .../autovec/gather-scatter/scatter_store_64-5.c    |  1 +
+ .../autovec/gather-scatter/scatter_store_64-6.c    |  1 +
+ .../autovec/gather-scatter/scatter_store_64-7.c    |  1 +
+ .../autovec/gather-scatter/scatter_store_64-8.c    |  1 +
+ .../autovec/gather-scatter/scatter_store_64-9.c    |  1 +
+ 63 files changed, 88 insertions(+), 49 deletions(-)
+
+diff --git a/gcc/config/riscv/riscv-v.cc b/gcc/config/riscv/riscv-v.cc
+index df927dc7b8b0..fb737284125a 100644
+--- a/gcc/config/riscv/riscv-v.cc
++++ b/gcc/config/riscv/riscv-v.cc
+@@ -4708,7 +4708,7 @@ get_gather_scatter_code (machine_mode vec_mode, machine_mode idx_mode,
+ 	  (UNSPEC_UNORDERED, vec_mode);
+       else
+ 	return code_for_pred_indexed_store_same_eew
+-	  (UNSPEC_UNORDERED, vec_mode);
++	  (UNSPEC_ORDERED, vec_mode);
+     }
+   else if (dst_eew_bitsize > src_eew_bitsize)
+     {
+@@ -4723,21 +4723,21 @@ get_gather_scatter_code (machine_mode vec_mode, machine_mode idx_mode,
+ 	  else
+ 	    return
+ 	      code_for_pred_indexed_store_x2_greater_eew
+-		(UNSPEC_UNORDERED, vec_mode);
++		(UNSPEC_ORDERED, vec_mode);
+ 	case 4:
+ 	  if (is_load)
+ 	    return code_for_pred_indexed_load_x4_greater_eew
+ 		(UNSPEC_UNORDERED, vec_mode);
+ 	  else
+ 	    return code_for_pred_indexed_store_x4_greater_eew
+-		(UNSPEC_UNORDERED, vec_mode);
++		(UNSPEC_ORDERED, vec_mode);
+ 	case 8:
+ 	  if (is_load)
+ 	    return code_for_pred_indexed_load_x8_greater_eew
+ 	      (UNSPEC_UNORDERED, vec_mode);
+ 	  else
+ 	    return code_for_pred_indexed_store_x8_greater_eew
+-	      (UNSPEC_UNORDERED, vec_mode);
++	      (UNSPEC_ORDERED, vec_mode);
+ 	default:
+ 	  gcc_unreachable ();
+ 	}
+@@ -4753,21 +4753,21 @@ get_gather_scatter_code (machine_mode vec_mode, machine_mode idx_mode,
+ 	      (UNSPEC_UNORDERED, vec_mode);
+ 	  else
+ 	    return code_for_pred_indexed_store_x2_smaller_eew
+-	      (UNSPEC_UNORDERED, vec_mode);
++	      (UNSPEC_ORDERED, vec_mode);
+ 	case 4:
+ 	  if (is_load)
+ 	    return code_for_pred_indexed_load_x4_smaller_eew
+ 	      (UNSPEC_UNORDERED, vec_mode);
+ 	  else
+ 	    return code_for_pred_indexed_store_x4_smaller_eew
+-	      (UNSPEC_UNORDERED, vec_mode);
++	      (UNSPEC_ORDERED, vec_mode);
+ 	case 8:
+ 	  if (is_load)
+ 	    return code_for_pred_indexed_load_x8_smaller_eew
+ 	      (UNSPEC_UNORDERED, vec_mode);
+ 	  else
+ 	    return code_for_pred_indexed_store_x8_smaller_eew
+-	      (UNSPEC_UNORDERED, vec_mode);
++	      (UNSPEC_ORDERED, vec_mode);
+ 	default:
+ 	  gcc_unreachable ();
+ 	}
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-1.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-1.c
+index 8ae5106b8a08..61579909a962 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-1.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-1.c
+@@ -37,4 +37,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-10.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-10.c
+index d705c920a2b1..c6aa81650654 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-10.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-10.c
+@@ -34,4 +34,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-11.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-11.c
+index 4e183cd9170f..1f351627a8d9 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-11.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-11.c
+@@ -31,4 +31,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-12.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-12.c
+index 6277682e5293..0f9fc62aaa34 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-12.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-12.c
+@@ -109,4 +109,4 @@ TEST_LOOP (double, uint64_t)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not "vluxei64\.v" } } */
+-/* { dg-final { scan-assembler-not "vsuxei64\.v" } } */
++/* { dg-final { scan-assembler-not "vsoxei64\.v" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-2.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-2.c
+index e4e42fef9726..22e86765d515 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-2.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-2.c
+@@ -37,4 +37,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-3.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-3.c
+index e385fee109d2..471494b68c8f 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-3.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-3.c
+@@ -34,4 +34,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-4.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-4.c
+index e5cb19de42fa..bd874d9e19c9 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-4.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-4.c
+@@ -34,4 +34,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-5.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-5.c
+index a437e7393ee3..3d2879296e54 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-5.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-5.c
+@@ -34,4 +34,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-6.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-6.c
+index 487dca9928b3..121f3bd14044 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-6.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-6.c
+@@ -34,4 +34,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-7.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-7.c
+index ff91929b8e70..51ba792b266e 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-7.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-7.c
+@@ -34,4 +34,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-8.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-8.c
+index 81df57fcbd2a..decbfc6c6db6 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-8.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-8.c
+@@ -34,4 +34,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-9.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-9.c
+index 238b6bce042f..dfb51a1af375 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-9.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/gather_load_32-9.c
+@@ -34,4 +34,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-1.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-1.c
+index c0b583354ada..d5b233fd8159 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-1.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-1.c
+@@ -38,4 +38,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-10.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-10.c
+index 9e4fcee19ff5..25cf4bf1d7e7 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-10.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-10.c
+@@ -35,4 +35,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-11.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-11.c
+index e5741812b21a..49568f65448a 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-11.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-11.c
+@@ -112,5 +112,5 @@ TEST_LOOP (double, uint64_t)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not "vluxei64\.v" } } */
+-/* { dg-final { scan-assembler-not "vsuxei64\.v" } } */
++/* { dg-final { scan-assembler-not "vsoxei64\.v" } } */
+ /* { dg-final { scan-assembler-not {vlse64\.v\s+v[0-9]+,\s*0\([a-x0-9]+\),\s*zero} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-2.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-2.c
+index aadc0206f2e4..c69130e57c5a 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-2.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-2.c
+@@ -38,4 +38,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-3.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-3.c
+index b547dd61616a..99e686b2b172 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-3.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-3.c
+@@ -35,4 +35,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-4.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-4.c
+index ac6012558799..b1ca99cda76a 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-4.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-4.c
+@@ -35,4 +35,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-5.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-5.c
+index f003a17ec31b..fa0a2f6f1b8c 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-5.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-5.c
+@@ -35,4 +35,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-6.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-6.c
+index d1d9581e81dd..23fdefcfb5bd 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-6.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-6.c
+@@ -35,4 +35,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-7.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-7.c
+index c8b5cea359f6..97d75ceb3cb2 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-7.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-7.c
+@@ -35,4 +35,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-8.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-8.c
+index dfb8a93626ae..c9832330ec49 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-8.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-8.c
+@@ -35,4 +35,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-9.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-9.c
+index 32ddba6c167a..40ae9b45898b 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-9.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_gather_load_32-9.c
+@@ -35,4 +35,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_GATHER_LOAD" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-1.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-1.c
+index 39e09f45640b..fce72afa789e 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-1.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-1.c
+@@ -38,4 +38,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-10.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-10.c
+index b1a234441eba..27432c601379 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-10.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-10.c
+@@ -35,4 +35,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-2.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-2.c
+index b52219366ade..fa89d997462f 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-2.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-2.c
+@@ -38,4 +38,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-3.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-3.c
+index 4706d0f15d97..351ca111aff6 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-3.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-3.c
+@@ -35,4 +35,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-4.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-4.c
+index aec7a930c5ea..42084f62291c 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-4.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-4.c
+@@ -35,4 +35,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-5.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-5.c
+index 286e2db19cfd..a17f6a640a45 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-5.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-5.c
+@@ -35,4 +35,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-6.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-6.c
+index 7674e2a7c806..f2d7ac0c0672 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-6.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-6.c
+@@ -35,4 +35,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-7.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-7.c
+index 1738f7367b05..b21f23dd9c68 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-7.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-7.c
+@@ -35,4 +35,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-8.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-8.c
+index d819a1a7515c..87e90c448bee 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-8.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-8.c
+@@ -35,4 +35,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-9.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-9.c
+index ee453e5e4c91..0c6c7a0ce271 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-9.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_32-9.c
+@@ -40,4 +40,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-1.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-1.c
+index 27c982aa3544..61ea7de72e30 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-1.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-1.c
+@@ -37,3 +37,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-10.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-10.c
+index 93f33696a201..480c9543a798 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-10.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-10.c
+@@ -34,3 +34,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-2.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-2.c
+index cbb22507ad35..f5e98c685585 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-2.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-2.c
+@@ -37,3 +37,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-3.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-3.c
+index 93a84056b922..ad39056327e6 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-3.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-3.c
+@@ -34,3 +34,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-4.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-4.c
+index c5816e06fddf..f87100c1b0fb 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-4.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-4.c
+@@ -34,3 +34,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-5.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-5.c
+index c140d05b15e4..37e3df9d0373 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-5.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-5.c
+@@ -34,3 +34,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-6.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-6.c
+index 41a03d31b707..b340e4da9458 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-6.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-6.c
+@@ -34,3 +34,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-7.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-7.c
+index f29ae25e8cc2..a82a29a71930 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-7.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-7.c
+@@ -34,3 +34,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-8.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-8.c
+index 8d72d98fb491..ed9cf262ae6b 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-8.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-8.c
+@@ -34,3 +34,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-9.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-9.c
+index dfd9412376d7..052c82543bae 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-9.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/mask_scatter_store_64-9.c
+@@ -39,3 +39,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-1.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-1.c
+index 4ad244b8e83a..8748b2664d7b 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-1.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-1.c
+@@ -37,4 +37,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei32\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-10.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-10.c
+index a44cbc18b684..65d973467492 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-10.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-10.c
+@@ -34,4 +34,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei32\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-2.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-2.c
+index 35e970124692..b424b8945623 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-2.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-2.c
+@@ -34,4 +34,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei32\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-4.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-4.c
+index fb72b092b7cf..444254ea19bd 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-4.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-4.c
+@@ -34,4 +34,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei32\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-5.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-5.c
+index 7b562bd94a9e..36159a46db1c 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-5.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-5.c
+@@ -34,4 +34,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei32\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-6.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-6.c
+index 67ea0e005f17..f822f6378e1a 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-6.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-6.c
+@@ -34,4 +34,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei32\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-7.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-7.c
+index 76f84850b2b6..0336028c0afe 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-7.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-7.c
+@@ -34,4 +34,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei32\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-8.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-8.c
+index e6e49019fb17..3b71e95b9f61 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-8.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-8.c
+@@ -34,4 +34,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei32\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-9.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-9.c
+index 81eb93525984..37ad2fa321f7 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-9.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_32-9.c
+@@ -34,4 +34,5 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-assembler-not {vluxei64\.v} } } */
+-/* { dg-final { scan-assembler-not {vsuxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsoxei64\.v} } } */
++/* { dg-final { scan-assembler-not {vsuxei32\.v} } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-1.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-1.c
+index 343a3658396c..01caf5bdc4fd 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-1.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-1.c
+@@ -36,3 +36,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-10.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-10.c
+index 76b0b075ba38..1c12ab136251 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-10.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-10.c
+@@ -33,3 +33,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-2.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-2.c
+index 7eb881989b3f..448666fdc4b2 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-2.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-2.c
+@@ -36,3 +36,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-3.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-3.c
+index 47e8ce3e1868..d49bb18e728c 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-3.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-3.c
+@@ -33,3 +33,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-4.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-4.c
+index 5c51741e8929..253f2d36abc9 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-4.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-4.c
+@@ -33,3 +33,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-5.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-5.c
+index cc0b2fe15c47..5a5d233c25e4 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-5.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-5.c
+@@ -33,3 +33,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-6.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-6.c
+index 3408cbd88d66..8a96bd9e20fb 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-6.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-6.c
+@@ -33,3 +33,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-7.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-7.c
+index f45c9bc67277..a6fae8024640 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-7.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-7.c
+@@ -33,3 +33,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-8.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-8.c
+index 64fe30548cb6..ee5a507f258e 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-8.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-8.c
+@@ -33,3 +33,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-9.c b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-9.c
+index bd1538db0456..5f36eb8b37ae 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-9.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/autovec/gather-scatter/scatter_store_64-9.c
+@@ -33,3 +33,4 @@ TEST_ALL (TEST_LOOP)
+ /* { dg-final { scan-tree-dump " \.MASK_LEN_SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.SCATTER_STORE" "vect" } } */
+ /* { dg-final { scan-tree-dump-not " \.MASK_SCATTER_STORE" "vect" } } */
++/* { dg-final { scan-assembler-not "vsuxei" } } */

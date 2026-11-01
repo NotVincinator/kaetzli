@@ -1,0 +1,38 @@
+From 9abaa10eb543314885ab04d2670d69278cd7b617 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Torbj=C3=B6rn=20SVENSSON?= <torbjorn.svensson@foss.st.com>
+Date: Wed, 21 Oct 2026 15:48:53 +0200
+Subject: [PATCH 319/385] doc: arm: Correct arm_v8_1m_lob_hw effective-target
+ name
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Update the documented effective-target name to arm_v8_1m_lob_hw
+to reflect the rename in r15-9387-g5cc8a75140032b.
+
+gcc/ChangeLog:
+
+	* doc/sourcebuild.texi: Correct arm_v8_1_lob_ok to
+	arm_v8_1m_lob_hw.
+
+Signed-off-by: Torbjörn SVENSSON <torbjorn.svensson@foss.st.com>
+(cherry picked from commit 21643ea86da0ecf37d7aaa67db873f9f877c5b82)
+---
+ gcc/doc/sourcebuild.texi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/doc/sourcebuild.texi b/gcc/doc/sourcebuild.texi
+index f3c737126f86..e565adc9e9f1 100644
+--- a/gcc/doc/sourcebuild.texi
++++ b/gcc/doc/sourcebuild.texi
+@@ -2358,8 +2358,8 @@ ARM target supports the @code{-mfloat-abi=hard} option.
+ @anchor{arm_mve}
+ ARM target supports generating MVE instructions.
+ 
+-@item arm_v8_1_lob_ok
+-@anchor{arm_v8_1_lob_ok}
++@item arm_v8_1m_lob_hw
++@anchor{arm_v8_1m_lob_hw}
+ ARM Target supports executing the Armv8.1-M Mainline Low Overhead Loop
+ instructions @code{DLS} and @code{LE}.
+ Some multilibs may be incompatible with these options.

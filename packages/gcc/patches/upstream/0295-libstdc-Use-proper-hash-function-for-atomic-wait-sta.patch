@@ -1,0 +1,161 @@
+From 888cefc00f16d9199372b2dd733c7fdd390adf99 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Tue, 5 May 2026 21:34:41 +0100
+Subject: [PATCH 295/385] libstdc++: Use proper hash function for atomic::wait
+ state [PR115955]
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The table of __waitable_state objects used by std::atomic::wait is
+indexed based on the address of the atomic being waited on, but the
+index is computed using `(uintptr_t(addr) >> 2) % 16`. This has very
+non-uniform properties and results in high numbers of collisions.
+
+This commit uses an efficient hash function that mixes the high bits of
+the address and cascades them to the low bits. This should have better
+distribution and avoid the pathological case where every atomic object
+collides on the same wait state.
+
+The hash function also uses a per-process seed initialized on first use.
+That seed comes from arc4random if available, or std::random_device.
+If neither works, no seed is used.
+
+Before this change collisions in the wait state table meant that
+distinct atomic objects would share the same proxy wait state and a
+notify_one() call would wake threads waiting on completely separate
+atomic objects. When the number of threads was smaller than the core
+count, the false sharing "only" resulted in other CPUs spinning on the
+unrelated atomics that were woken even though their atomic didn't change
+value. This wastes cycles, but for some naive benchmarks it looks like a
+win because all the atomics are kept hot and are acting like a spinlock
+with no back off, never actually doing a futex wait before being
+interrupted again. When the number of threads exceeds the available
+cores the old code has disastrous behaviour, because there aren't enough
+cores to service the thundering herd that wakes up on every notify. The
+CPU usage for a single notify scales with the number of waiters and
+performance drops when every waiter has to wait to get scheduled on a
+CPU.
+
+After this change collisions in the wait state are less likely, avoiding
+the pathological case where every object collides with every other
+because they've been intentionally separated by 64 bytes to sit on
+separate cachelines. Now waking one waiter doesn't affect every other
+waiter, so most waiters stay blocked in the kernel. The CPU usage for a
+single notify is flat and the latency of a notify is approximately just
+the system call overhead for the futex wake.
+
+For a benchmark with 17 threads doing wait/notify on std::atomic<bool>,
+my laptop sees a 30x reduction in CPU time, and almost 2x reduction in
+latency per-notify. The numbers are obviously very workload dependent,
+but the code is now behaving as it was always intended to.
+
+For non-proxy waits (e.g. std::atomic<int> where the atomic is used as a
+futex directly) the benefit of this change is much smaller. Even when
+there is a collision on the wait state, that's only used for contention
+tracking not as the futex object that the real wait/wake syscalls act
+on. But the change doesn't hurt the non-proxy case, so is still a
+significant improvement overall.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/115955
+	* src/c++20/atomic.cc (__waitable_state::_S_state_for): Use a
+	real hash function to map addresses to waitable states.
+
+Reviewed-by: Tomasz Kamiński <tkaminsk@redhat.com>
+(cherry picked from commit 4b690722a0585c50f033deec5637760a671c72f0)
+---
+ libstdc++-v3/src/c++20/atomic.cc | 60 +++++++++++++++++++++++++++++---
+ 1 file changed, 55 insertions(+), 5 deletions(-)
+
+diff --git a/libstdc++-v3/src/c++20/atomic.cc b/libstdc++-v3/src/c++20/atomic.cc
+index 3e02f437db3c..bbfb5127bac9 100644
+--- a/libstdc++-v3/src/c++20/atomic.cc
++++ b/libstdc++-v3/src/c++20/atomic.cc
+@@ -28,6 +28,7 @@
+ #include <atomic>
+ #include <bits/atomic_timed_wait.h>
+ #include <utility> // cmp_less
++#include <numbers> // numbers::phi
+ #include <cstdint> // uint32_t, uint64_t, uintptr_t
+ #include <climits> // INT_MAX
+ #include <cerrno>  // errno, ETIMEDOUT, etc.
+@@ -35,6 +36,12 @@
+ #include <bits/functexcept.h> // __throw_system_error
+ #include <bits/functional_hash.h>
+ 
++#ifdef _GLIBCXX_HAVE_ARC4RANDOM
++# include <stdlib.h> // arc4random
++#else
++# include <random> // random_device
++#endif
++
+ #ifdef _GLIBCXX_HAVE_LINUX_FUTEX
+ # include <sys/syscall.h> // SYS_futex
+ # include <unistd.h>
+@@ -334,16 +341,59 @@ namespace
+       return __res != 0;
+     }
+ 
++    class Table;
++
+     static __waitable_state&
+-    _S_state_for(const void* __addr) noexcept
++    _S_state_for(const void* addr) noexcept;
++  };
++
++  // This aggregates the array of states and the seed into a single object,
++  // so that there is only one static initialization guard needed.
++  class __waitable_state::Table
++  {
++    static constexpr size_t size = 16;
++    __waitable_state wait_states[size];
++
++    static uint32_t gen_seed()
++    {
++#ifdef _GLIBCXX_HAVE_ARC4RANDOM  // glibc 2.36 and BSD
++      // Avoid the overhead of constructing+destroying std::random_device.
++      return arc4random();
++#else
++# if __cpp_exceptions
++      // Use the default platform-specific source of entropy.
++      try { return std::random_device{}(); } catch (...) { }
++# endif
++      return 0;
++#endif
++    }
++
++    const uint32_t seed{ gen_seed() }; // Per-process random seed.
++
++    static size_t
++    hash(const void* p, size_t seed) noexcept
+     {
+-      constexpr __UINTPTR_TYPE__ __ct = 16;
+-      static __waitable_state __w[__ct];
+-      auto __key = ((__UINTPTR_TYPE__)__addr >> 2) % __ct;
+-      return __w[__key];
++      size_t x = reinterpret_cast<uintptr_t>(p);
++      x ^= seed;
++      x ^= x >> (__SIZE_WIDTH__ / 2 + 1);
++      x *= size_t(__SIZE_MAX__ / std::numbers::phi);
++      x ^= x >> (__SIZE_WIDTH__ / 2 - 1);
++      return x;
+     }
++
++  public:
++    __waitable_state&
++    operator[](const void* p)
++    { return wait_states[hash(p, seed) % size]; }
+   };
+ 
++  inline __waitable_state&
++  __waitable_state::_S_state_for(const void* addr) noexcept
++  {
++    static Table table;
++    return table[addr];
++  }
++
+   // Scope-based contention tracking.
+   struct scoped_wait
+   {

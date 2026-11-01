@@ -1,0 +1,137 @@
+From 7ffe5cc45541bcb74c3ea5b043a6d0c8d159e1cd Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Tue, 15 Sep 2026 11:34:30 +0200
+Subject: [PATCH 168/385] tree-optimization/126760 - vectorization of switches
+
+When if-conversion converts a switch statement it requires a certain
+shape of the CFG.  This is verified via if_convertible_switch_p
+but the check is incorrectly elided for blocks dominating the loop
+latch.  The following rectifies this.
+
+	PR tree-optimization/126760
+	PR tree-optimization/127391
+	* tree-if-conv.cc (if_convertible_stmt_p): Delay switch
+	validation to ...
+	(if_convertible_loop_p_1): ... the loop iterating over
+	PHIs.
+
+	* gcc.dg/vect/vect-pr126760.c: New testcase.
+	* gcc.dg/vect/vect-pr127391.c: Likewise.
+
+(cherry picked from commit 6e33c9be872cc7d2474b4224d1a16515e1b0d2b8)
+---
+ gcc/testsuite/gcc.dg/vect/vect-pr126760.c | 33 +++++++++++++++++++++++
+ gcc/testsuite/gcc.dg/vect/vect-pr127391.c | 28 +++++++++++++++++++
+ gcc/tree-if-conv.cc                       | 10 +++++--
+ 3 files changed, 69 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/vect/vect-pr126760.c
+ create mode 100644 gcc/testsuite/gcc.dg/vect/vect-pr127391.c
+
+diff --git a/gcc/testsuite/gcc.dg/vect/vect-pr126760.c b/gcc/testsuite/gcc.dg/vect/vect-pr126760.c
+new file mode 100644
+index 000000000000..ded34a2e2f72
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/vect/vect-pr126760.c
+@@ -0,0 +1,33 @@
++#include "tree-vect.h"
++
++long __attribute__((noipa))
++foo (short a)
++{
++  long c = a;
++  unsigned f;
++  int d = 0, e;
++  for (; d < 6; d++) {
++    e = 0;
++    while (e < 6) {
++      e++;
++      f = c;
++      switch (f) {
++      case 1:
++        c = c + d;
++      case 3:
++        break;
++      default:
++        c = c + d;
++      }
++    }
++  }
++  return c;
++}
++
++int main()
++{
++  check_vect ();
++  if (foo (0) != 3)
++    __builtin_abort ();
++  return 0;
++}
+diff --git a/gcc/testsuite/gcc.dg/vect/vect-pr127391.c b/gcc/testsuite/gcc.dg/vect/vect-pr127391.c
+new file mode 100644
+index 000000000000..b3d70171e850
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/vect/vect-pr127391.c
+@@ -0,0 +1,28 @@
++/* { dg-additional-options "-O3" } */
++
++#include "tree-vect.h"
++
++int __attribute__((noipa))
++fn1 (void)
++{
++  int b = 0;
++  for (int f = 0; f < 16; f++)
++    switch (f % 3) {
++    case 2:
++      b += f;
++      break;
++    case 0:
++      b |= f;
++    case 1:
++      b |= f;
++    }
++  return b;
++}
++int main()
++{
++  check_vect ();
++  if (fn1 () != 63)
++    __builtin_abort ();
++  return 0;
++}
++
+diff --git a/gcc/tree-if-conv.cc b/gcc/tree-if-conv.cc
+index 218d2cb72386..2b8bad6dcaff 100644
+--- a/gcc/tree-if-conv.cc
++++ b/gcc/tree-if-conv.cc
+@@ -1170,7 +1170,8 @@ if_convertible_stmt_p (gimple *stmt, vec<data_reference_p> refs)
+       return true;
+ 
+     case GIMPLE_SWITCH:
+-      return if_convertible_switch_p (as_a <gswitch *> (stmt));
++      /* Checked elsewhere.  */
++      return true;
+ 
+     case GIMPLE_ASSIGN:
+       return if_convertible_gimple_assign_stmt_p (stmt, refs);
+@@ -1702,7 +1703,9 @@ if_convertible_loop_p_1 (class loop *loop, vec<data_reference_p> *refs)
+     }
+ 
+   /* Checking PHIs needs to be done after stmts, as the fact whether there
+-     are any masked loads or stores affects the tests.  */
++     are any masked loads or stores affects the tests.  Also check switch
++     stmts for supported shape as that cannot be skipped for always
++     executed blocks.  */
+   for (i = 0; i < loop->num_nodes; i++)
+     {
+       basic_block bb = ifc_bbs[i];
+@@ -1711,6 +1714,9 @@ if_convertible_loop_p_1 (class loop *loop, vec<data_reference_p> *refs)
+       for (itr = gsi_start_phis (bb); !gsi_end_p (itr); gsi_next (&itr))
+ 	if (!if_convertible_phi_p (loop, bb, itr.phi ()))
+ 	  return false;
++      if (gswitch *s = safe_dyn_cast <gswitch *> (*gsi_last_bb (bb)))
++	if (!if_convertible_switch_p (s))
++	  return false;
+     }
+ 
+   if (dump_file)

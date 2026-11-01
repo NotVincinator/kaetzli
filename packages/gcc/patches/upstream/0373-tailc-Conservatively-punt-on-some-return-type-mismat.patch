@@ -1,0 +1,260 @@
+From d4f62f96d967429220ecdbada57737cb16f58edc Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Tue, 13 Oct 2026 10:47:53 +0200
+Subject: [PATCH 373/385] tailc: Conservatively punt on some return type
+ mismatches in tail call opt [PR127848]
+
+The first testcase is miscompiled on x86_64 and various other
+bitint_ext_undef targets, where the padding bits are unspecified.
+So, if callee returns unsigned _BitInt(15), only low 15 bits are
+specified, when caller returns unsigned short on x86_64, the bits 16-63
+are unspecified, but bit 15 needs to be cleared, so we can't tail
+call.
+
+Now, tailc for casts currently checks TYPE_MODE differences and for
+the destination doesn't have non-mode precision (that one was added
+because of callee returning unsigned char and caller returning bool,
+those have the same mode but need to emit some code in between the
+call to the callee and return from caller).
+For useless_type_conversion_p we keep the distinction between normal
+INTEGER_TYPEs and BITINT_TYPE_P types with the same precision, because
+at function boundaries the target can have different calling convention.
+We don't really know at GIMPLE if the target returns unsigned _BitInt(16)
+and unsigned short the same way, there could be e.g. differences in padding
+bits etc.
+The following patch is a conservative fix, it punts on
+BITINT_TYPE_P != BITINT_TYPE_P conversions (exactly because we don't
+know if it changes ABI or not), and if both are BITINT_TYPE_P with the
+same TYPE_MODE, does some further checks - if TYPE_SIZE is different
+(and mode the same, that could be just BLKmode) it punts on TYPE_SIZE
+differences, for narrowing or same precision casts it punts except
+for bitint_ext_undef targets (on those the padding bits are unspecified
+and if we have more or same amount of unspecified padding bits it is ok),
+for widening casts it punts on the other side for all but bitint_ext_full
+targets (I'm not motivated enough to bother with figuring out all the
+details for bitint_ext_partial), because on those targets the narrower
+bitint has the bits already extended and if the narrower and wider _BitInt
+type have the same signedness, they are fine (now that I think about it,
+perhaps we could allow even narrower unsigned wider signed, can test
+that incrementally).
+In any case, the patch may pessimize code which would work just fine,
+callee returning unsigned _BitInt(16) and caller unsigned short or vice
+versa on many targets, etc.  But, there can be multiple casts, so if we
+want to improve it, we could e.g. have casts where the callee type is
+compatible with the src_var type and dest type is compatible with the
+caller's type (so have these checks for intermediate calls but allow
+one cast from callee to caller return types), and then somehow deal with it
+during expansion (either in generic code try to expand code which converts
+the callee type temporary to caller type and check (and throw away) a
+sequence emitted by that whether it contains only normal moves and no other
+insns, or make sure every target verifies everything in their target hook).
+I don't have time to do that right now though and it might be too risky
+for backports anyway.
+
+2026-10-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/127848
+	* tree-tailcall.cc: Include target.h.
+	(process_assignment): Punt if one of dest and src_var types
+	is BITINT_TYPE_P and the other is not.  If both are BITINT_TYPE_P,
+	punt if TYPE_SIZE is different, or for narrowing or same precision
+	conversions on != bitint_ext_undef targets, or for widening
+	conversions on != bitint_ext_full targets or if signedness differs.
+
+	* gcc.dg/pr127848-1.c: New test.
+	* gcc.dg/pr127848-2.c: New test.
+	* gcc.dg/pr127848-3.c: New test.
+	* gcc.dg/pr127848-4.c: New test.
+	* gcc.dg/pr127848-5.c: New test.
+
+Reviewed-by: Richard Biener <rguenth@suse.de>
+(cherry picked from commit 08c26561e4fe2cb6a26f5217673ed72c22d33e5b)
+---
+ gcc/testsuite/gcc.dg/pr127848-1.c |  8 +++++++
+ gcc/testsuite/gcc.dg/pr127848-2.c | 18 ++++++++++++++
+ gcc/testsuite/gcc.dg/pr127848-3.c | 18 ++++++++++++++
+ gcc/testsuite/gcc.dg/pr127848-4.c | 20 ++++++++++++++++
+ gcc/testsuite/gcc.dg/pr127848-5.c | 20 ++++++++++++++++
+ gcc/tree-tailcall.cc              | 40 +++++++++++++++++++++++++++++--
+ 6 files changed, 122 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/pr127848-1.c
+ create mode 100644 gcc/testsuite/gcc.dg/pr127848-2.c
+ create mode 100644 gcc/testsuite/gcc.dg/pr127848-3.c
+ create mode 100644 gcc/testsuite/gcc.dg/pr127848-4.c
+ create mode 100644 gcc/testsuite/gcc.dg/pr127848-5.c
+
+diff --git a/gcc/testsuite/gcc.dg/pr127848-1.c b/gcc/testsuite/gcc.dg/pr127848-1.c
+new file mode 100644
+index 000000000000..8d3a3e88751f
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr127848-1.c
+@@ -0,0 +1,8 @@
++/* PR middle-end/127848 */
++/* { dg-do compile { target bitint } } */
++/* { dg-options "-O2 -fdump-tree-optimized" } */
++/* For bitint_ext_undef targets, tail call is definitely wrong-code, bit 15 is unspecified from foo and needs to be cleared in bar.  */
++/* { dg-final { scan-tree-dump-not "= foo \\\(\\\); \\\[tail call\\\]" "optimized" { target i?86-*-* x86_64*-*-* aarch64*-*-* powerpc*-*-* } } } */
++
++unsigned _BitInt(15) foo ();
++unsigned short bar () { return foo (); }
+diff --git a/gcc/testsuite/gcc.dg/pr127848-2.c b/gcc/testsuite/gcc.dg/pr127848-2.c
+new file mode 100644
+index 000000000000..518986da3af0
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr127848-2.c
+@@ -0,0 +1,18 @@
++/* PR middle-end/127848 */
++/* { dg-do compile { target bitint } } */
++/* { dg-options "-O2 -fdump-tree-optimized" } */
++/* For bitint_ext_undef targets, narrowing or same precision _BitInt conversion within the same mode and size is ok.  */
++/* { dg-final { scan-tree-dump-times "= foo \\\(\\\); \\\[tail call\\\]" 3 "optimized" { target i?86-*-* x86_64*-*-* aarch64*-*-* powerpc*-*-* } } } */
++/* { dg-final { scan-tree-dump-times "= qux \\\(\\\); \\\[tail call\\\]" 3 "optimized" { target i?86-*-* x86_64*-*-* aarch64*-*-* powerpc*-*-* } } } */
++/* For bitint_ext_full targets, such conversions are definitely not ok.  In these cases even on bitint_ext_partial.  */
++/* { dg-final { scan-tree-dump-not "= foo \\\(\\\); \\\[tail call\\\]" "optimized" { target arm*-*-* riscv*-*-* s390*-*-* loongarch*-*-* } } } */
++/* { dg-final { scan-tree-dump-not "= qux \\\(\\\); \\\[tail call\\\]" "optimized" { target arm*-*-* riscv*-*-* s390*-*-* loongarch*-*-* } } } */
++
++unsigned _BitInt(15) foo ();
++[[gnu::noipa]] unsigned _BitInt(13) bar () { return foo (); }
++[[gnu::noipa]] signed _BitInt(13) baz () { return foo (); }
++[[gnu::noipa]] signed _BitInt(15) corge () { return foo (); }
++signed _BitInt(15) qux ();
++[[gnu::noipa]] signed _BitInt(13) fred () { return qux (); }
++[[gnu::noipa]] unsigned _BitInt(13) waldo () { return qux (); }
++[[gnu::noipa]] unsigned _BitInt(13) xyzzy () { return qux (); }
+diff --git a/gcc/testsuite/gcc.dg/pr127848-3.c b/gcc/testsuite/gcc.dg/pr127848-3.c
+new file mode 100644
+index 000000000000..ac5125d8acbc
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr127848-3.c
+@@ -0,0 +1,18 @@
++/* PR middle-end/127848 */
++/* { dg-do compile { target bitint } } */
++/* { dg-options "-O2 -fdump-tree-optimized" } */
++/* For bitint_ext_undef targets, narrowing or same precision _BitInt conversion within the same mode and size is ok.  */
++/* { dg-final { scan-tree-dump-times "= foo \\\(\\\); \\\[tail call\\\]" 3 "optimized" { target i?86-*-* x86_64*-*-* aarch64*-*-* powerpc*-*-* } } } */
++/* { dg-final { scan-tree-dump-times "= qux \\\(\\\); \\\[tail call\\\]" 3 "optimized" { target i?86-*-* x86_64*-*-* aarch64*-*-* powerpc*-*-* } } } */
++/* For bitint_ext_full targets, such conversions are definitely not ok.  In these cases even on bitint_ext_partial.  */
++/* { dg-final { scan-tree-dump-not "= foo \\\(\\\); \\\[tail call\\\]" "optimized" { target arm*-*-* riscv*-*-* s390*-*-* loongarch*-*-* } } } */
++/* { dg-final { scan-tree-dump-not "= qux \\\(\\\); \\\[tail call\\\]" "optimized" { target arm*-*-* riscv*-*-* s390*-*-* loongarch*-*-* } } } */
++
++unsigned _BitInt(31) foo ();
++[[gnu::noipa]] unsigned _BitInt(25) bar () { return foo (); }
++[[gnu::noipa]] signed _BitInt(25) baz () { return foo (); }
++[[gnu::noipa]] signed _BitInt(31) corge () { return foo (); }
++signed _BitInt(31) qux ();
++[[gnu::noipa]] signed _BitInt(25) fred () { return qux (); }
++[[gnu::noipa]] unsigned _BitInt(25) waldo () { return qux (); }
++[[gnu::noipa]] unsigned _BitInt(25) xyzzy () { return qux (); }
+diff --git a/gcc/testsuite/gcc.dg/pr127848-4.c b/gcc/testsuite/gcc.dg/pr127848-4.c
+new file mode 100644
+index 000000000000..16ad7e287ea9
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr127848-4.c
+@@ -0,0 +1,20 @@
++/* PR middle-end/127848 */
++/* { dg-do compile { target bitint } } */
++/* { dg-options "-O2 -fdump-tree-optimized" } */
++/* For bitint_ext_undef targets, widening precision _BitInt conversion are not ok.  */
++/* For bitint_ext_full targets, widening precisions with the same size are ok if the sign is the same.  */
++/* { dg-final { scan-tree-dump-not "= foo \\\(\\\); \\\[tail call\\\]" "optimized" { target i?86-*-* x86_64*-*-* aarch64*-*-* powerpc*-*-* } } } */
++/* { dg-final { scan-tree-dump-not "= baz \\\(\\\); \\\[tail call\\\]" "optimized" { target i?86-*-* x86_64*-*-* aarch64*-*-* powerpc*-*-* } } } */
++/* { dg-final { scan-tree-dump-not "= fred \\\(\\\); \\\[tail call\\\]" "optimized" { target i?86-*-* x86_64*-*-* aarch64*-*-* powerpc*-*-* arm*-*-* riscv*-*-* s390*-*-* loongarch*-*-* } } } */
++/* { dg-final { scan-tree-dump-not "= corge \\\(\\\); \\\[tail call\\\]" "optimized" { target i?86-*-* x86_64*-*-* aarch64*-*-* powerpc*-*-* arm*-*-* riscv*-*-* s390*-*-* loongarch*-*-* } } } */
++/* { dg-final { scan-tree-dump "= foo \\\(\\\); \\\[tail call\\\]" "optimized" { target arm*-*-* riscv*-*-* s390*-*-* } } } */
++/* { dg-final { scan-tree-dump "= qux \\\(\\\); \\\[tail call\\\]" "optimized" { target arm*-*-* riscv*-*-* s390*-*-* } } } */
++
++unsigned _BitInt(13) foo ();
++[[gnu::noipa]] unsigned _BitInt(15) bar () { return foo (); }
++signed _BitInt(13) baz ();
++[[gnu::noipa]] signed _BitInt(15) qux () { return baz (); }
++unsigned _BitInt(13) fred ();
++[[gnu::noipa]] signed _BitInt(15) waldo () { return fred (); }
++signed _BitInt(13) corge ();
++[[gnu::noipa]] unsigned _BitInt(15) xyzzy () { return corge (); }
+diff --git a/gcc/testsuite/gcc.dg/pr127848-5.c b/gcc/testsuite/gcc.dg/pr127848-5.c
+new file mode 100644
+index 000000000000..f3b8b37fc9d0
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr127848-5.c
+@@ -0,0 +1,20 @@
++/* PR middle-end/127848 */
++/* { dg-do compile { target bitint } } */
++/* { dg-options "-O2 -fdump-tree-optimized" } */
++/* For bitint_ext_undef targets, widening precision _BitInt conversion are not ok.  */
++/* For bitint_ext_full targets, widening precisions with the same size are ok if the sign is the same.  */
++/* { dg-final { scan-tree-dump-not "= foo \\\(\\\); \\\[tail call\\\]" "optimized" { target i?86-*-* x86_64*-*-* aarch64*-*-* powerpc*-*-* } } } */
++/* { dg-final { scan-tree-dump-not "= baz \\\(\\\); \\\[tail call\\\]" "optimized" { target i?86-*-* x86_64*-*-* aarch64*-*-* powerpc*-*-* } } } */
++/* { dg-final { scan-tree-dump-not "= fred \\\(\\\); \\\[tail call\\\]" "optimized" { target i?86-*-* x86_64*-*-* aarch64*-*-* powerpc*-*-* arm*-*-* riscv*-*-* s390*-*-* loongarch*-*-* } } } */
++/* { dg-final { scan-tree-dump-not "= corge \\\(\\\); \\\[tail call\\\]" "optimized" { target i?86-*-* x86_64*-*-* aarch64*-*-* powerpc*-*-* arm*-*-* riscv*-*-* s390*-*-* loongarch*-*-* } } } */
++/* { dg-final { scan-tree-dump "= foo \\\(\\\); \\\[tail call\\\]" "optimized" { target arm*-*-* riscv*-*-* s390*-*-* } } } */
++/* { dg-final { scan-tree-dump "= qux \\\(\\\); \\\[tail call\\\]" "optimized" { target arm*-*-* riscv*-*-* s390*-*-* } } } */
++
++unsigned _BitInt(25) foo ();
++[[gnu::noipa]] unsigned _BitInt(31) bar () { return foo (); }
++signed _BitInt(25) baz ();
++[[gnu::noipa]] signed _BitInt(31) qux () { return baz (); }
++unsigned _BitInt(25) fred ();
++[[gnu::noipa]] signed _BitInt(31) waldo () { return fred (); }
++signed _BitInt(25) corge ();
++[[gnu::noipa]] unsigned _BitInt(31) xyzzy () { return corge (); }
+diff --git a/gcc/tree-tailcall.cc b/gcc/tree-tailcall.cc
+index 821427699cc7..3df1f442342b 100644
+--- a/gcc/tree-tailcall.cc
++++ b/gcc/tree-tailcall.cc
+@@ -53,6 +53,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "ipa-prop.h"
+ #include "attribs.h"
+ #include "asan.h"
++#include "target.h"
+ 
+ /* The file implements the tail recursion elimination.  It is also used to
+    analyze the tail calls in general, passing the results to the rtl level
+@@ -369,11 +370,46 @@ process_assignment (gassign *stmt,
+ 	  if (TYPE_MODE (TREE_TYPE (dest)) != TYPE_MODE (TREE_TYPE (src_var)))
+ 	    return FAIL;
+ 
++	  /* While say unsigned short vs. unsigned _BitInt(16) can be
++	     returned the same on some targets, we don't have a guarantee
++	     that is the case on all targets, the ABI can differ, so just
++	     punt.  */
++	  if (BITINT_TYPE_P (TREE_TYPE (dest))
++	      != BITINT_TYPE_P (TREE_TYPE (src_var)))
++	    return FAIL;
++
++	  if (BITINT_TYPE_P (TREE_TYPE (dest)))
++	    {
++	      /* For _BitInt <-> _BitInt we have more target information.
++		 For BLKmode we need to punt if it has different size.  */
++	      if (wi::to_widest (TYPE_SIZE (TREE_TYPE (dest)))
++		  != wi::to_widest (TYPE_SIZE (TREE_TYPE (src_var))))
++		return FAIL;
++	      struct bitint_info info;
++	      unsigned dest_prec = TYPE_PRECISION (TREE_TYPE (dest));
++	      bool ok = targetm.c.bitint_type_info (dest_prec, &info);
++	      gcc_assert (ok);
++	      if (TYPE_PRECISION (TREE_TYPE (dest))
++		  <= TYPE_PRECISION (TREE_TYPE (src_var)))
++		{
++		  /* Narrowing conversion or possibly same precision
++		     different sign.  This is fine on bitint_ext_undef
++		     targets only.  */
++		  if (info.extended != bitint_ext_undef)
++		    return FAIL;
++		}
++	      /* Widening conversion.  This is fine on bitint_ext_full
++		 target if signedness is the same.  */
++	      else if (info.extended != bitint_ext_full
++		       || (TYPE_UNSIGNED (TREE_TYPE (dest))
++			   != TYPE_UNSIGNED (TREE_TYPE (src_var))))
++		return FAIL;
++	    }
+ 	  /* Even if the type modes are the same, if the precision of the
+ 	     type is smaller than mode's precision,
+ 	     reduce_to_bit_field_precision would generate additional code.  */
+-	  if (INTEGRAL_TYPE_P (TREE_TYPE (dest))
+-	      && !type_has_mode_precision_p (TREE_TYPE (dest)))
++	  else if (INTEGRAL_TYPE_P (TREE_TYPE (dest))
++		   && !type_has_mode_precision_p (TREE_TYPE (dest)))
+ 	    return FAIL;
+ 	}
+ 

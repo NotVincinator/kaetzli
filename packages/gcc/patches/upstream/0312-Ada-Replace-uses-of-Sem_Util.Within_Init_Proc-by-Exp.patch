@@ -1,0 +1,213 @@
+From 095f83f56a7a48dfc0e5c75e75c8485508fb0362 Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Mon, 19 Oct 2026 16:03:52 +0200
+Subject: [PATCH 312/385] Ada: Replace uses of Sem_Util.Within_Init_Proc by
+ Exp_Util.Inside_Init_Proc
+
+The two functions implement the same predicate.
+
+gcc/ada/
+	PR ada/127994
+	* checks.adb (Build_Discriminant_Checks): Replace all calls to
+	Sem_Util.Within_Init_Proc by calls to Exp_Util.Inside_Init_Proc.
+	* exp_aggr.adb (Build_Record_Aggr_Code): Likewise.
+	* exp_ch2.adb (Expand_Discriminant): Likewise.
+	* exp_ch7.adb (Establish_Transient_Scope): Likewise.
+	* exp_pakd.adb (Expand_Bit_Packed_Element_Set): Likewise.
+	* exp_util.adb (Expand_Subtype_From_Expr): Likewise.
+	* sem_ch3.adb (Analyze_Subtype_Declaration): Likewise.
+	(Build_Discriminated_Subtype): Likewise.
+	* sem_util.adb (Normalize_Actuals): Likewise.
+	(Within_Init_Proc): Delete.
+	* sem_util.ads (Within_Init_Proc): Likewise.
+---
+ gcc/ada/checks.adb   |  4 ++--
+ gcc/ada/exp_aggr.adb |  4 ++--
+ gcc/ada/exp_ch2.adb  |  2 +-
+ gcc/ada/exp_ch7.adb  |  2 +-
+ gcc/ada/exp_pakd.adb |  6 ++----
+ gcc/ada/exp_util.adb |  2 +-
+ gcc/ada/sem_ch3.adb  |  4 ++--
+ gcc/ada/sem_util.adb | 22 +---------------------
+ gcc/ada/sem_util.ads |  3 ---
+ 9 files changed, 12 insertions(+), 37 deletions(-)
+
+diff --git a/gcc/ada/checks.adb b/gcc/ada/checks.adb
+index 3a0f86fc7f2c..46fe1ca56659 100644
+--- a/gcc/ada/checks.adb
++++ b/gcc/ada/checks.adb
+@@ -4133,7 +4133,7 @@ package body Checks is
+            and then Etype (N) = Entity (N)
+          then
+             Rewrite (N,
+-              New_Occurrence_Of (First_Formal (Current_Subprogram), Loc));
++              New_Occurrence_Of (First_Formal (Enclosing_Init_Proc), Loc));
+          end if;
+ 
+          return OK;
+@@ -4174,7 +4174,7 @@ package body Checks is
+          --  Replace references to the current instance of the type with the
+          --  corresponding _init formal of the initialization procedure.
+ 
+-         if Within_Init_Proc then
++         if Inside_Init_Proc then
+             Search_And_Replace_Current_Instance (Dval);
+          end if;
+ 
+diff --git a/gcc/ada/exp_aggr.adb b/gcc/ada/exp_aggr.adb
+index 7a52388cb832..2ccbb19ff4ce 100644
+--- a/gcc/ada/exp_aggr.adb
++++ b/gcc/ada/exp_aggr.adb
+@@ -3082,7 +3082,7 @@ package body Exp_Aggr is
+                     Build_Initialization_Call (N,
+                       Id_Ref            => Ref,
+                       Typ               => Init_Typ,
+-                      In_Init_Proc      => Within_Init_Proc,
++                      In_Init_Proc      => Inside_Init_Proc,
+                       With_Default_Init => Has_Default_Init_Comps (N)
+                                              or else
+                                            Has_Task (Base_Type (Init_Typ))));
+@@ -3117,7 +3117,7 @@ package body Exp_Aggr is
+                  Build_Initialization_Call (N,
+                    Id_Ref            => Ref,
+                    Typ               => Init_Typ,
+-                   In_Init_Proc      => Within_Init_Proc,
++                   In_Init_Proc      => Inside_Init_Proc,
+                    With_Default_Init => Has_Default_Init_Comps (N),
+                    Constructor_Ref   => Ancestor));
+ 
+diff --git a/gcc/ada/exp_ch2.adb b/gcc/ada/exp_ch2.adb
+index 1a8d10f9d8aa..fda229c2e8df 100644
+--- a/gcc/ada/exp_ch2.adb
++++ b/gcc/ada/exp_ch2.adb
+@@ -322,7 +322,7 @@ package body Exp_Ch2 is
+             --  because the pragma is analyzed in the task declaration
+             --  but is expanded in the call to Create_Task in the init_proc.
+ 
+-         elsif Within_Init_Proc then
++         elsif Inside_Init_Proc then
+             Set_Entity (N, Discriminal (CR_Discriminant (Entity (N))));
+          else
+             Set_Entity (N, Discriminal (Entity (N)));
+diff --git a/gcc/ada/exp_ch7.adb b/gcc/ada/exp_ch7.adb
+index 3b9943e2740f..0f02fb6396d8 100644
+--- a/gcc/ada/exp_ch7.adb
++++ b/gcc/ada/exp_ch7.adb
+@@ -4606,7 +4606,7 @@ package body Exp_Ch7 is
+                --  to the component. Signal the nearest suitable scope that it
+                --  is safe to manage the secondary stack.
+ 
+-               if Manage_Sec_Stack and then Within_Init_Proc then
++               if Manage_Sec_Stack and then Inside_Init_Proc then
+                   Delegate_Sec_Stack_Management;
+                end if;
+ 
+diff --git a/gcc/ada/exp_pakd.adb b/gcc/ada/exp_pakd.adb
+index e513dc8a7876..54c65d1e82fb 100644
+--- a/gcc/ada/exp_pakd.adb
++++ b/gcc/ada/exp_pakd.adb
+@@ -1169,13 +1169,11 @@ package body Exp_Pakd is
+       --  out-of-range value by design. Compile this value without checks,
+       --  because a call to the array init_proc must not raise an exception.
+ 
+-      --  Condition is not consistent with description above, Within_Init_Proc
++      --  Condition is not consistent with description above, Inside_Init_Proc
+       --  is True also when we are building the IP for a record or protected
+       --  type that has a packed array component???
+ 
+-      if Within_Init_Proc
+-        and then Initialize_Scalars
+-      then
++      if Inside_Init_Proc and then Initialize_Scalars then
+          Analyze_And_Resolve (Rhs, Ctyp, Suppress => All_Checks);
+       else
+          Analyze_And_Resolve (Rhs, Ctyp);
+diff --git a/gcc/ada/exp_util.adb b/gcc/ada/exp_util.adb
+index 568823eaab65..451129b8b3de 100644
+--- a/gcc/ada/exp_util.adb
++++ b/gcc/ada/exp_util.adb
+@@ -5962,7 +5962,7 @@ package body Exp_Util is
+             --  generate the proper actual subtype for it.
+ 
+             if Nkind (Exp) = N_Selected_Component
+-              and then Within_Init_Proc
++              and then Inside_Init_Proc
+             then
+                declare
+                   Decl : constant Node_Id :=
+diff --git a/gcc/ada/sem_ch3.adb b/gcc/ada/sem_ch3.adb
+index 594de4d65145..55a0a9a4bb17 100644
+--- a/gcc/ada/sem_ch3.adb
++++ b/gcc/ada/sem_ch3.adb
+@@ -6438,7 +6438,7 @@ package body Sem_Ch3 is
+               and then not (Is_Internal (Id)
+                              and then Is_TSS (Scope (Id),
+                                               TSS_Composite_Equality))
+-              and then not Within_Init_Proc
++              and then not Inside_Init_Proc
+               and then not All_Composite_Constraints_Static (Cstr)
+             then
+                Check_Restriction (No_Dynamic_Sized_Objects, Cstr);
+@@ -11196,7 +11196,7 @@ package body Sem_Ch3 is
+             Mutate_Ekind (Def_Id, Ekind (T));
+          end if;
+ 
+-         if For_Access and then Within_Init_Proc then
++         if For_Access and then Inside_Init_Proc then
+             null;
+          else
+             Append_Elmt (Def_Id, Private_Dependents (T));
+diff --git a/gcc/ada/sem_util.adb b/gcc/ada/sem_util.adb
+index ad32b25936b2..148356f7a1e7 100644
+--- a/gcc/ada/sem_util.adb
++++ b/gcc/ada/sem_util.adb
+@@ -25892,7 +25892,7 @@ package body Sem_Util is
+          if not Report then
+             return False;
+ 
+-         elsif not Within_Init_Proc then
++         elsif not Inside_Init_Proc then
+             return True;
+ 
+          elsif Is_Init_Proc (Entity (Name (N))) then
+@@ -30551,26 +30551,6 @@ package body Sem_Util is
+       end if;
+    end Warn_On_Hiding_Entity;
+ 
+-   ----------------------
+-   -- Within_Init_Proc --
+-   ----------------------
+-
+-   function Within_Init_Proc return Boolean is
+-      S : Entity_Id;
+-
+-   begin
+-      S := Current_Scope;
+-      while not Is_Overloadable (S) loop
+-         if S = Standard_Standard then
+-            return False;
+-         else
+-            S := Scope (S);
+-         end if;
+-      end loop;
+-
+-      return Is_Init_Proc (S);
+-   end Within_Init_Proc;
+-
+    ---------------------------
+    -- Within_Protected_Type --
+    ---------------------------
+diff --git a/gcc/ada/sem_util.ads b/gcc/ada/sem_util.ads
+index 149f79f984fb..8e0e2a73aa8c 100644
+--- a/gcc/ada/sem_util.ads
++++ b/gcc/ada/sem_util.ads
+@@ -3564,9 +3564,6 @@ package Sem_Util is
+    --  generate the list of visible ancestors; otherwise their partial
+    --  view is added to the resulting list.
+ 
+-   function Within_Init_Proc return Boolean;
+-   --  Determines if Current_Scope is within an init proc
+-
+    function Within_Protected_Type (E : Entity_Id) return Boolean;
+    --  Returns True if entity E is declared within a protected type
+ 

@@ -1,0 +1,92 @@
+From 44f6d5cb9be83c5a8c2b0d84a34ab6dd1092fc36 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Mon, 21 Sep 2026 09:13:34 +0200
+Subject: [PATCH 266/385] i386: Only support GFNI V32QImode rotates with AVX2,
+ not just AVX [PR127498]
+
+The following testcase ICEs, because the middle-end doesn't like a target
+to announce rot{l,r}v32qi3 optab availability only with const_int_operand
+rotate with non-working fallback.
+If the rotate optab fails because of unsatisfiable predicates, the
+middle-end will try to expand the rotate as bitwise or of 2 shifts, but
+the problem with TARGET_GFNI && TARGET_AVX && !TARGET_AVX2 is that
+the V32QImode shifts aren't supported either, one needs AVX2 for that.
+I believe there are no CPUs with GFNI and AVX but without AVX2, I think
+there are just CPUs with both GFNI and AVX/AVX2 or with GFNI and no AVX,
+so the following patch just disables the pattern for the
+TARGET_GFNI && TARGET_AVX combination and just requires
+TARGET_GFNI && TARGET_AVX2 instead.  It is true that rotate can be expanded
+with constant rotate count even for V32QImode, but at the expense of ICEing for
+non-constant rotate count.
+The alternative would be to extend the pattern to provide a fallback for
+TARGET_GFNI && TARGET_AVX && !TARGET_AVX2 when the last operand is not
+const_int_operand, it can be handled as 4 V16QImode shifts, combining stuff
+together, ...
+
+2026-09-21  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/127498
+	* config/i386/sse.md (<insn><mode>3 any_rotate:VI1_AVX512_3264): Add
+	TARGET_AVX2 to condition.
+
+	* gcc.target/i386/gfni-pr127498.c: New test.
+	* gcc.target/i386/shift-gf2p8affine-5.c: Use -mavx2 in dg-options
+	instead of -mavx.  Expect 46 insns instead of 31.
+
+Reviewed-by: Hongtao Liu <hongtao.liu@intel.com>
+(cherry picked from commit fcecd85661f9947d09dd752124279fc537021106)
+---
+ gcc/config/i386/sse.md                          |  2 +-
+ gcc/testsuite/gcc.target/i386/gfni-pr127498.c   | 17 +++++++++++++++++
+ .../gcc.target/i386/shift-gf2p8affine-5.c       |  4 ++--
+ 3 files changed, 20 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/i386/gfni-pr127498.c
+
+diff --git a/gcc/config/i386/sse.md b/gcc/config/i386/sse.md
+index 0d4b38f523a0..4d2ad0fea156 100644
+--- a/gcc/config/i386/sse.md
++++ b/gcc/config/i386/sse.md
+@@ -27790,7 +27790,7 @@
+ 	(any_rotate:VI1_AVX512_3264
+ 	  (match_operand:VI1_AVX512_3264 1 "register_operand")
+ 	  (match_operand:SI 2 "const_int_operand")))]
+-  "TARGET_GFNI"
++  "TARGET_GFNI && TARGET_AVX2"
+ {
+   rtx matrix = ix86_vgf2p8affine_shift_matrix (operands[0], operands[2], <CODE>);
+   emit_insn (gen_vgf2p8affineqb_<mode> (operands[0], operands[1], matrix,
+diff --git a/gcc/testsuite/gcc.target/i386/gfni-pr127498.c b/gcc/testsuite/gcc.target/i386/gfni-pr127498.c
+new file mode 100644
+index 000000000000..048ef7037e4a
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/gfni-pr127498.c
+@@ -0,0 +1,17 @@
++/* PR target/127498 */
++/* { dg-do compile } */
++/* { dg-options "-O2 -mgfni -mavx -mno-avx2" } */
++
++typedef unsigned char V __attribute__ ((vector_size (32)));
++
++V
++foo (V x, int n)
++{
++  return (x >> n) | (x << (8 - n));
++}
++
++V
++bar (V x, int n)
++{
++  return (x << n) | (x >> (8 - n));
++}
+diff --git a/gcc/testsuite/gcc.target/i386/shift-gf2p8affine-5.c b/gcc/testsuite/gcc.target/i386/shift-gf2p8affine-5.c
+index b8489a659a5b..f8dc4b5f8369 100644
+--- a/gcc/testsuite/gcc.target/i386/shift-gf2p8affine-5.c
++++ b/gcc/testsuite/gcc.target/i386/shift-gf2p8affine-5.c
+@@ -1,5 +1,5 @@
+ /* { dg-do compile } */
+-/* { dg-options "-mgfni -mavx -O3 -Wno-shift-count-negative -march=x86-64 -mtune=generic" } */
+-/* { dg-final { scan-assembler-times "vgf2p8affineqb" 31 } } */
++/* { dg-options "-mgfni -mavx2 -O3 -Wno-shift-count-negative -march=x86-64 -mtune=generic" } */
++/* { dg-final { scan-assembler-times "vgf2p8affineqb" 46 } } */
+ 
+ #include "shift-gf2p8affine-2.c"

@@ -1,0 +1,93 @@
+From 7ed28af4fcad61780d5f4b38b5a99fdfcc2e6b03 Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Fri, 14 Aug 2026 15:53:10 -0400
+Subject: [PATCH 040/385] c++: testsuite: Add some opt/is_constant_evaluated3.C
+ variants
+
+r13-6422 added opt/is_constant_evaluated3.C to verify that we constant
+fold copy-init such as a1.  (Later, r14-6506 enabled constant folding of
+the a2-a5 inits.)  r13-6422 turns out to trigger a latent bug and causes
+PR c++/126483, premature folding of is_constant_evaluated in copy-init
+inside a lambda scope.
+
+This patch adds a couple extra variants of this test, one where the
+containing function is constexpr (3a) and one where it's a lambda (3b).
+
+The new 3a.C demonstrates however that we still don't constant fold a1's
+copy-init when inside a constexpr function scope.  3b.C demonstrates that
+we do fold it when inside a (maybe-constexpr) lambda scope.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/opt/is_constant_evaluated3a.C: New test.
+	* g++.dg/opt/is_constant_evaluated3b.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 9b0341a7a6a38912e667982003bcbfebdfb86335)
+---
+ .../g++.dg/opt/is_constant_evaluated3a.C      | 24 +++++++++++++++++++
+ .../g++.dg/opt/is_constant_evaluated3b.C      | 24 +++++++++++++++++++
+ 2 files changed, 48 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/opt/is_constant_evaluated3a.C
+ create mode 100644 gcc/testsuite/g++.dg/opt/is_constant_evaluated3b.C
+
+diff --git a/gcc/testsuite/g++.dg/opt/is_constant_evaluated3a.C b/gcc/testsuite/g++.dg/opt/is_constant_evaluated3a.C
+new file mode 100644
+index 000000000000..4ec3ecdf7b5d
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/opt/is_constant_evaluated3a.C
+@@ -0,0 +1,24 @@
++// A version of is_constant_evaluated3.C where the containing function is
++// constexpr.
++// { dg-do compile { target c++14 } }
++// { dg-additional-options "-O -fdump-tree-original" }
++
++struct A {
++  constexpr A(int n) : n(n), m(__builtin_is_constant_evaluated()) { }
++  constexpr A() : A(42) { }
++  int n, m;
++};
++
++constexpr void f() {
++  A a1 = {42};
++  A a2{42};
++  A a3(42);
++  A a4;
++  A a5{};
++}
++
++// { dg-final { scan-tree-dump "a1 = {\\.n=42, \\.m=0}" "original" { xfail *-*-* } } }
++// { dg-final { scan-tree-dump "a2 = {\\.n=42, \\.m=0}" "original" } }
++// { dg-final { scan-tree-dump "a3 = {\\.n=42, \\.m=0}" "original" } }
++// { dg-final { scan-tree-dump "a4 = {\\.n=42, \\.m=0}" "original" } }
++// { dg-final { scan-tree-dump "a5 = {\\.n=42, \\.m=0}" "original" } }
+diff --git a/gcc/testsuite/g++.dg/opt/is_constant_evaluated3b.C b/gcc/testsuite/g++.dg/opt/is_constant_evaluated3b.C
+new file mode 100644
+index 000000000000..ff708e23832b
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/opt/is_constant_evaluated3b.C
+@@ -0,0 +1,24 @@
++// A version of is_constant_evaluated3.C where the containing function is
++// a (maybe-constexpr) lambda.
++// { dg-do compile { target c++17 } }
++// { dg-additional-options "-O -fdump-tree-original" }
++
++struct A {
++  constexpr A(int n) : n(n), m(__builtin_is_constant_evaluated()) { }
++  constexpr A() : A(42) { }
++  int n, m;
++};
++
++auto f = [] {
++  A a1 = {42};
++  A a2{42};
++  A a3(42);
++  A a4;
++  A a5{};
++};
++
++// { dg-final { scan-tree-dump "a1 = {\\.n=42, \\.m=0}" "original" } }
++// { dg-final { scan-tree-dump "a2 = {\\.n=42, \\.m=0}" "original" } }
++// { dg-final { scan-tree-dump "a3 = {\\.n=42, \\.m=0}" "original" } }
++// { dg-final { scan-tree-dump "a4 = {\\.n=42, \\.m=0}" "original" } }
++// { dg-final { scan-tree-dump "a5 = {\\.n=42, \\.m=0}" "original" } }

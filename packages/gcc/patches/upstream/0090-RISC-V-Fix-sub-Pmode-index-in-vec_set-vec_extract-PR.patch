@@ -1,0 +1,103 @@
+From b476cba88c4d56f7fbd5cb3a6045b45ecb900b83 Mon Sep 17 00:00:00 2001
+From: Jin Ma <jinma@linux.alibaba.com>
+Date: Tue, 18 Aug 2026 23:31:24 +0800
+Subject: [PATCH 090/385] RISC-V: Fix sub-Pmode index in vec_set/vec_extract
+ [PR126873]
+
+When gimple-isel lowers a variable-index element access on a
+fixed-length vector into .VEC_SET or .VEC_EXTRACT, the index may be
+narrower than Pmode.  The vec_set and vec_extract expanders used
+gen_lowpart to convert it to Pmode, which only reinterprets the
+register and drops the source-level truncation.  The full 64-bit
+value is then used as the slide amount of vslideup/vslidedown and
+wrong code is generated.
+
+Fix this by zero-extending a sub-Pmode index with convert_to_mode
+instead.
+
+	PR target/126873
+
+gcc/ChangeLog:
+
+	* config/riscv/autovec.md (vec_set<mode>): Zero-extend a
+	sub-Pmode index to Pmode.
+	(vec_extract<mode><vel>): Likewise.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/pr126873.c: New test.
+
+Reported-by: XChy <xxs_chy@outlook.com>
+Signed-off-by: Jin Ma <jinma@linux.alibaba.com>
+(cherry picked from commit 1a29fdbdcb6775cd93bfc23426bf4e8b6b0475d2)
+---
+ gcc/config/riscv/autovec.md               |  4 +--
+ gcc/testsuite/gcc.target/riscv/pr126873.c | 37 +++++++++++++++++++++++
+ 2 files changed, 39 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/pr126873.c
+
+diff --git a/gcc/config/riscv/autovec.md b/gcc/config/riscv/autovec.md
+index 7eed31391e53..b22fb3ced313 100644
+--- a/gcc/config/riscv/autovec.md
++++ b/gcc/config/riscv/autovec.md
+@@ -1383,7 +1383,7 @@
+ 
+       /* Here we set VL = offset + 1.  */
+       rtx length = gen_reg_rtx (Pmode);
+-      operands[2] = gen_lowpart (Pmode, operands[2]);
++      operands[2] = convert_to_mode (Pmode, operands[2], true);
+       if (CONST_INT_P (operands[2]))
+ 	  emit_move_insn (length, GEN_INT (INTVAL (operands[2]) + 1));
+       else
+@@ -1439,7 +1439,7 @@
+ 
+     /* Emit the slide down to index 0 in a new vector.  */
+     tmp = gen_reg_rtx (<MODE>mode);
+-    operands[2] = gen_lowpart (Pmode, operands[2]);
++    operands[2] = convert_to_mode (Pmode, operands[2], true);
+     rtx ops[] = {tmp, operands[1], operands[2]};
+     riscv_vector::emit_vlmax_insn
+       (code_for_pred_slide (UNSPEC_VSLIDEDOWN, <MODE>mode),
+diff --git a/gcc/testsuite/gcc.target/riscv/pr126873.c b/gcc/testsuite/gcc.target/riscv/pr126873.c
+new file mode 100644
+index 000000000000..eab525d0cf20
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/pr126873.c
+@@ -0,0 +1,37 @@
++/* { dg-do run { target rv64 } } */
++/* { dg-require-effective-target riscv_v } */
++/* { dg-require-effective-target rvv_zvl128b_ok } */
++/* { dg-options "-march=rv64gcv -mabi=lp64d -O1" } */
++
++typedef unsigned short u16 __attribute__ ((vector_size (4)));
++
++unsigned long long g;
++
++void __attribute__ ((noinline))
++f1 (unsigned long long a3)
++{
++  unsigned long long v15
++    = __builtin_bswap64 ((long long) 10398105857157080808ull
++			 / (long long) a3);
++  u16 bc13 = (u16) { 29637 };
++  if (0 >= bc13[(unsigned int) v15])
++    __builtin_abort ();
++}
++
++u16 __attribute__ ((noinline))
++f2 (u16 in)
++{
++  in[(unsigned int) g] = 123;
++  return in;
++}
++
++int
++main (void)
++{
++  f1 (17752357569705450221ull);
++  g = 0x0b00000000000000ull;
++  u16 r = f2 ((u16) { 1, 2 });
++  if (r[0] != 123 || r[1] != 2)
++    __builtin_abort ();
++  return 0;
++}

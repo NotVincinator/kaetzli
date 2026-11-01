@@ -1,0 +1,97 @@
+From 24f9683cefd787c40ebdac11bb6d72b4bd3548cd Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 13 Aug 2026 00:20:54 +0000
+Subject: [PATCH 033/385] Daily bump.
+
+---
+ gcc/DATESTAMP           |  2 +-
+ gcc/cp/ChangeLog        | 25 +++++++++++++++++++++++++
+ gcc/testsuite/ChangeLog | 18 ++++++++++++++++++
+ libgcc/ChangeLog        | 11 +++++++++++
+ 4 files changed, 55 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index a2a375f66903..b945d86017fe 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260812
++20260813
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index f7e675f26d12..53fcfca2d6e5 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,28 @@
++2026-08-12  Wang Jinghao  <zheng.xianyuwang@gmail.com>
++
++	Backported from master:
++	2026-06-17  Wang Jinghao  <zheng.xianyuwang@gmail.com>
++
++	* reflect.cc (eval_is_explicit_object_parameter): Call
++	maybe_update_function_parm before checking the parameter
++	against DECL_ARGUMENTS.
++
++2026-08-12  feedable  <feedabl3@gmail.com>
++
++	Backported from master:
++	2026-06-03  feedable  <feedabl3@gmail.com>
++
++	PR c++/124794
++	PR c++/125069
++	* parser.cc (cp_parser_splice_specifier): Do not strip BASELINKs.
++	(cp_parser_splice_expression): Add parsing for member function
++	template specializations without the "template" keyword.
++	* pt.cc (tsubst_splice_expr): Handle TEMPLATE_ID_EXPR where the
++	template part is a SPLICE_EXPR.
++	(tsubst_expr): Defer to tsubst_splice_expr when the template part of
++	TEMPLATE_ID_EXPR is a SPLICE_EXPR.
++	* reflect.cc (check_splice_expr): Add handling for BASELINKs.
++
+ 2026-08-10  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 4d4e5dc3f671..8679107c6535 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,21 @@
++2026-08-12  Wang Jinghao  <zheng.xianyuwang@gmail.com>
++
++	Backported from master:
++	2026-06-17  Wang Jinghao  <zheng.xianyuwang@gmail.com>
++
++	* g++.dg/reflect/is_explicit_object_parameter2.C: New test.
++
++2026-08-12  feedable  <feedabl3@gmail.com>
++
++	Backported from master:
++	2026-06-03  feedable  <feedabl3@gmail.com>
++
++	PR c++/124794
++	PR c++/125069
++	* g++.dg/reflect/member19.C: Enable tests.
++	* g++.dg/reflect/splice15.C: New test.
++	* g++.dg/reflect/splice16.C: New test.
++
+ 2026-08-11  Robin Dapp  <robin.dapp@oss.qualcomm.com>
+ 
+ 	Backported from master:
+diff --git a/libgcc/ChangeLog b/libgcc/ChangeLog
+index 8ac56eb386a8..7409bddb66b5 100644
+--- a/libgcc/ChangeLog
++++ b/libgcc/ChangeLog
+@@ -1,3 +1,14 @@
++2026-08-12  Piotr Kubaj  <pkubaj@FreeBSD.org>
++
++	PR target/125803
++	* config/rs6000/freebsd-unwind.h (TOC_SAVE_SLOT): New macro,
++	defined according to _CALL_ELF.
++	(frob_update_context): Use TOC_SAVE_SLOT instead of the
++	hard-coded ELFv1 offset 40 when checking for and locating the
++	saved TOC, so that r2 is restored correctly under ELFv2.  Guard
++	the ELFv1-only PLT stub and function pointer call sequences
++	with _CALL_ELF != 2, mirroring linux-unwind.h.
++
+ 2026-08-07  Release Manager
+ 
+ 	* GCC 16.2.0 released.

@@ -1,0 +1,100 @@
+From 141139e43d5d2f0e752e95cc32eaf8b39a2b3510 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Thu, 6 Aug 2026 12:24:15 +0200
+Subject: [PATCH 014/385] c++: Mangling fix for type alias reflections
+ [PR125680]
+
+The following testcase ICEs, because we use write_unqualified_name to
+write the type alias name.  Unfortunately, it is an alias for an unnamed
+type and write_unqualified_name in that case uses
+      if (TREE_CODE (decl) == TYPE_DECL
+          && enum_with_enumerator_for_linkage_p (type))
+        write_unnamed_enum_name (type);
+      else if (TREE_CODE (decl) == TYPE_DECL && TYPE_UNNAMED_P (type))
+        write_unnamed_type_name (type);
+      else if (TREE_CODE (decl) == TYPE_DECL && LAMBDA_TYPE_P (type))
+        write_closure_type_name (type);
+      else
+        write_source_name (DECL_NAME (decl));
+and write_unnamed_type_node
+  else if (TYPE_CLASS_SCOPE_P (type))
+    discriminator = nested_anon_class_index (type);
+and nested_anon_class_index ICEs, because type is the type alias and
+obviously it can't find a type alias among DECL_IMPLICIT_TYPEDEF_P nembers.
+In this case, we really want to write the source name of the type alias
+(which always should have DECL_NAME), regardless of what the dealias
+of the type alias is (that is emitted later in the mangling).
+
+Note, this isn't the only PR against this area, there is another one where
+write_prefix (decl_mangling_context (arg)); doesn't work properly for
+local names.
+
+2026-08-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/125680
+	* mangle.cc (write_reflection): For type aliases use maybe_write_module
+	and write_source_name instead of write_unqualified_name.
+
+	* g++.dg/reflect/mangle8.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 4f751c0b701296bbeb63ff467c7c7e22a9075d19)
+---
+ gcc/cp/mangle.cc                       |  4 +++-
+ gcc/testsuite/g++.dg/reflect/mangle8.C | 32 ++++++++++++++++++++++++++
+ 2 files changed, 35 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/reflect/mangle8.C
+
+diff --git a/gcc/cp/mangle.cc b/gcc/cp/mangle.cc
+index 6ac54c81fc5b..d8a70233beab 100644
+--- a/gcc/cp/mangle.cc
++++ b/gcc/cp/mangle.cc
+@@ -4240,7 +4240,9 @@ write_reflection (tree refl)
+ 	 write_template_args, it shouldn't be
+ 	 remembered among substitutions.  */
+       write_prefix (decl_mangling_context (arg));
+-      write_unqualified_name (arg);
++      if (modules_p ())
++	maybe_write_module (arg);
++      write_source_name (DECL_NAME (arg));
+       tree template_info = maybe_template_info (arg);
+       if (template_info)
+ 	write_template_args (TI_ARGS (template_info));
+diff --git a/gcc/testsuite/g++.dg/reflect/mangle8.C b/gcc/testsuite/g++.dg/reflect/mangle8.C
+new file mode 100644
+index 000000000000..0266aa2d0dab
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/reflect/mangle8.C
+@@ -0,0 +1,32 @@
++// PR c++/125680
++// { dg-do compile { target c++26 } }
++// { dg-additional-options "-freflection" }
++
++#include <meta>
++
++struct A { struct { int b; } a[4]; };
++
++template <std::meta::info I>
++struct B
++{
++  consteval static std::meta::info
++  foo ()
++  {
++    if constexpr (is_array_type (I))
++      {
++	using C = typename [: remove_extent (I) :];
++	return ^^C;
++      }
++    else
++      {
++        constexpr auto c = type_of (nonstatic_data_members_of (I, std::meta::access_context::current ())[0]);
++        using C = typename [: c :];
++        return ^^C;
++      }
++  }
++  constexpr static std::meta::info b = foo ();
++};
++
++constexpr auto a = B <^^A>::b;
++constexpr auto b = B <a>::b;
++constexpr auto c = B <b>::b;

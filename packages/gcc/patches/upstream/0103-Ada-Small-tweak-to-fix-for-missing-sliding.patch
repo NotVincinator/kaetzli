@@ -1,0 +1,53 @@
+From 5050f3391bab222ca6197faeb5f4e08c20b354be Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Thu, 27 Aug 2026 00:18:13 +0200
+Subject: [PATCH 103/385] Ada: Small tweak to fix for missing sliding
+
+The Must_Slide predicate now unnecessarily returns True for an aggregate
+that contains only an Others_Clause.
+
+gcc/ada/
+	PR ada/127026
+	* exp_aggr.adb (Must_Slide): Check for the unconstrained case only
+	after all the negative tests.
+---
+ gcc/ada/exp_aggr.adb | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/gcc/ada/exp_aggr.adb b/gcc/ada/exp_aggr.adb
+index 408b21cfa44f..7a52388cb832 100644
+--- a/gcc/ada/exp_aggr.adb
++++ b/gcc/ada/exp_aggr.adb
+@@ -9617,24 +9617,24 @@ package body Exp_Aggr is
+       Assign  : Boolean) return Boolean
+    is
+    begin
+-      --  No sliding if the type of the object is not established yet, if it is
+-      --  an unconstrained type whose actual subtype comes from the aggregate,
+-      --  or if the two types are identical. If the aggregate contains only
+-      --  an Others_Clause it gets its type from the context and no sliding
+-      --  is involved either.
++      --  No sliding if the type of the object is not established yet, or if
++      --  the two types are identical. And if the aggregate contains only an
++      --  Others_Clause, it gets its type from the context and no sliding is
++      --  involved either. When the type of the object is unconstrained, no
++      --  sliding either if its actual subtype comes from the aggregate.
+ 
+       if not Is_Array_Type (Obj_Typ) then
+          return False;
+ 
+-      elsif not Is_Constrained (Obj_Typ) then
+-         return Assign;
+-
+       elsif Typ = Obj_Typ then
+          return False;
+ 
+       elsif Is_Others_Aggregate (Aggr) then
+          return False;
+ 
++      elsif not Is_Constrained (Obj_Typ) then
++         return Assign;
++
+       --  Check if sliding is required
+ 
+       else

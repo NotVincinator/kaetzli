@@ -1,0 +1,123 @@
+From c2d5855c8746bcee5ed9f8c5768ea3a3944368f1 Mon Sep 17 00:00:00 2001
+From: Paul Thomas <pault@gcc.gnu.org>
+Date: Mon, 1 Jun 2026 12:40:53 +0100
+Subject: [PATCH 086/385] Fortran: Fix submodule access to private symbols in
+ parent module [PR88632,104630]
+
+PRs 88632 and 104630 both suffered link a problem, where a private procedure
+in a parent module was not visible in a descendent submodule if they were
+compiled separately.
+
+The fix is to not filter out private symbols when writing the .smod file.
+Submodules are descendants of their ancestor module and access private symbols
+in the module's contains section via host association (F2018 14.2.2).
+
+The testcase here is that of PR104630. However, it is functionally identical
+to that of PR88632.
+
+2026-06-02  Paul Thomas  <pault@gcc.gnu.org>
+
+gcc/fortran
+	PR fortran/88632
+	PR fortran/104630
+	* module.cc (write_symtree): Do not filter out private symbols
+	when writing a submodule interface file (.smod).  Submodules are
+	descendants of their ancestor module and access private symbols
+	in the module's contains section via host association per
+	Fortran 2018 section 14.2.2.
+
+gcc/testsuite/
+	PR fortran/88632
+	PR fortran/104630
+	* gfortran.dg/submodule_35.f90: New test.
+	* gfortran.dg/submodule_35_aux.f90: Submodule and program for
+	for the new test.
+
+	Assisted by: Claude Sonnet 4.6
+
+(cherry picked from commit 9fc5a7a25e9e29f58359c6363c9b10a99c6f99f0)
+---
+ gcc/fortran/module.cc                         |  3 +-
+ gcc/testsuite/gfortran.dg/submodule_35.f90    | 32 +++++++++++++++++++
+ .../gfortran.dg/submodule_35_aux.f90          | 19 +++++++++++
+ 3 files changed, 53 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/submodule_35.f90
+ create mode 100644 gcc/testsuite/gfortran.dg/submodule_35_aux.f90
+
+diff --git a/gcc/fortran/module.cc b/gcc/fortran/module.cc
+index b728c63c7cc2..2be30260a6d9 100644
+--- a/gcc/fortran/module.cc
++++ b/gcc/fortran/module.cc
+@@ -6666,7 +6666,8 @@ write_symtree (gfc_symtree *st)
+ 	&& sym->ns->proc_name->attr.if_source == IFSRC_IFBODY)
+     return;
+ 
+-  if (!gfc_check_symbol_access (sym)
++  if ((!gfc_check_symbol_access (sym)
++       && (!sym->attr.public_used || submodule_name == NULL))
+       || (sym->attr.flavor == FL_PROCEDURE && sym->attr.generic
+ 	  && !sym->attr.subroutine && !sym->attr.function))
+     return;
+diff --git a/gcc/testsuite/gfortran.dg/submodule_35.f90 b/gcc/testsuite/gfortran.dg/submodule_35.f90
+new file mode 100644
+index 000000000000..8bced2e2d7fb
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/submodule_35.f90
+@@ -0,0 +1,32 @@
++! { dg-do run )
++!
++! Test the fix for prs 88632 and 104630, in which the private procedure
++! 'my_number' was not visible in the submodule 'decendent'.
++!
++! Contributed by Joerg Stiller <joerg.stiller@tu-dresden.de>
++!             and Neil Carlson  <neil.n.carlson@gmail.com>
++!
++module parent
++  private
++  public :: my_type
++  
++  type my_type
++    integer :: i = 1
++  contains
++    procedure :: my_method
++  end type my_type
++  
++  interface
++    module subroutine my_method(this)
++      class(my_type), intent(inout) :: this
++    end subroutine my_method
++  end interface
++  
++contains
++  
++  ! common helper function to be used in different submodules
++  integer function my_number()
++    my_number = 42
++  end function my_number
++
++end module parent
+diff --git a/gcc/testsuite/gfortran.dg/submodule_35_aux.f90 b/gcc/testsuite/gfortran.dg/submodule_35_aux.f90
+new file mode 100644
+index 000000000000..0330b8f06d73
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/submodule_35_aux.f90
+@@ -0,0 +1,19 @@
++! { dg-do run }
++! { dg-compile-aux-modules "submodule_35.f90" }
++! { dg-additional-sources submodule_35.f90 }
++!
++submodule(parent) decendent
++contains
++  module subroutine my_method(this)
++    class(my_type), intent(inout) :: this
++    this%i = my_number()
++  end subroutine my_method
++end submodule decendent
++
++program main
++  use parent
++  type(my_type) :: my
++  call my % my_method()
++  if (my%i /= 42) stop 1
++end program main
++! { dg-final { cleanup-modules "parent" } }

@@ -1,0 +1,95 @@
+From 52db3adefd3e50d7f391a6dd77832cb9cfec71e1 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Sat, 29 Aug 2026 14:19:29 +0200
+Subject: [PATCH 118/385] testsuite: Improve guality/arg1.f90 testcase
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The guality/arg1.f90 testcase started failing on s390x and aarch64 in GCC
+16, on both arches it is
+FAIL: gfortran.dg/guality/arg1.f90   -O3 -fomit-frame-pointer -funroll-loops -fpeel-loops -ftracer -finline-functions  line 14 a(10) == 10
+FAIL: gfortran.dg/guality/arg1.f90   -O3 -g  line 14 a(10) == 10
+I've only looked at s390x, but bet it is the same thing on aarch64.
+
+This regressed with r16-372 which changed inlining heuristics.
+Not really sure whether we shouldn't treat Fortran MAIN__ similarly to
+C/C++ main, because it is again something only called once, but let's
+leave that aside for now.
+
+The result of the inlining heuristic change is that the sub procedure is
+now inlinined into MAIN__, even when it is called twice (but at -O3, so
+we are asking to inline a lot of stuff).
+
+The actual problem why the testcase fails is that the breakpoint is too early
+after that change.
+
+In *.optimized dump we still have
+  # DEBUG i => 10
+  [arg1.f90:12:12] MEM <vector(2) integer(kind=4)> [(integer(kind=4) *)&a] = { 1, 2 };
+  [arg1.f90:12:12] MEM <vector(2) integer(kind=4)> [(integer(kind=4) *)&a + 8B] = { 3, 4 };
+  [arg1.f90:12:12] MEM <vector(2) integer(kind=4)> [(integer(kind=4) *)&a + 16B] = { 5, 6 };
+  [arg1.f90:12:12] MEM <vector(2) integer(kind=4)> [(integer(kind=4) *)&a + 24B] = { 7, 8 };
+  [arg1.f90:12:12] MEM <vector(2) integer(kind=4)> [(integer(kind=4) *)&a + 32B] = { 9, 10 };
+  # DEBUG i => 11
+  [arg1.f90:14:59] [arg1.f90:14:59] [arg1.f90:14:59] dt_parm.2.common.filename = [arg1.f90:14:59] &[arg1.f90:14:59] "arg1.f90"[1]{lb: 1 sz: 1};
+...
+
+so the first statement with line 14 is after all the elements of the array are
+stored into the array.
+
+But later on sched1 moves some instructions from the write (,) a statement
+which don’t depend on the stores to the a array before those stores and
+because breakpoint on line 14 chooses the first insn on that line at least
+in this case (I think partially  Alex Oliva’s DWARF extensions were supposed
+to change it in some cases, but clearly not in this one), when we ask
+about a(10), we see uninitialized memory  and so print whatever happens
+to be there (in my case 0).
+
+Because a is an in memory array, we really don’t do var-tracking for individual
+elements of the array, so I think it is pretty much normal thing in optimized
+code that if a breakpoint happens earlier than all stores from earlier
+statements finished we can see in the debugger something inaccurate.  The user
+can just stepi or step further even in this case and eventually a(10) will
+have the expected value.
+
+The testcase has been added for PR41558, where we emitted some wrong DWARF,
+it doesn't care that much where exactly we query the a(10) value as long as
+it is after all the stores into the array have been done.
+In various gcc.dg/guality tests we put a breakpoint on volatile variable
+increment which tends to be simple instruction or 3 on most arches and
+usually isn't hoisted earlier too much.
+
+The following patch does this for this testcase too.
+I’ve verified the test built with r0-96138 still fails on x86_64 and with
+r0-96139 succeeds, so it is still testing what the test is supposed to
+test.  And on s390x with this change it works even at -O3.
+
+2026-08-29  Jakub Jelinek  <jakub@redhat.com>
+
+	* gfortran.dg/guality/arg1.f90: Put a breakpoint on volatile
+	variable increment instead of on the write statement.
+
+Reviewed-by: Richard Biener <rguenth@suse.de>
+(cherry picked from commit d048c1bb016c3c7b911086ce2ca90f3dc9b24947)
+---
+ gcc/testsuite/gfortran.dg/guality/arg1.f90 | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/testsuite/gfortran.dg/guality/arg1.f90 b/gcc/testsuite/gfortran.dg/guality/arg1.f90
+index 775b7bb304f1..4e9ab8880d5a 100644
+--- a/gcc/testsuite/gfortran.dg/guality/arg1.f90
++++ b/gcc/testsuite/gfortran.dg/guality/arg1.f90
+@@ -8,8 +8,11 @@ end
+ 
+ subroutine sub (a, n)
+   integer :: a(n), n
++  integer, volatile :: v
++  v = 0
+   do i = 1, n
+     a(i) = i
+   end do
+-  write (*,*) a	! { dg-final { gdb-test 14 "a(10)" "10" } }
++  write (*,*) a
++  v = v + 1	! { dg-final { gdb-test 17 "a(10)" "10" } }
+ end subroutine

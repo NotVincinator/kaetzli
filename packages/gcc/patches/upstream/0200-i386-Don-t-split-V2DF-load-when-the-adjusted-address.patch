@@ -1,0 +1,74 @@
+From 214756153531eca553c617a58a1e015d7386754c Mon Sep 17 00:00:00 2001
+From: liuhongt <hongtao.liu@intel.com>
+Date: Sun, 20 Sep 2026 23:09:00 -0700
+Subject: [PATCH 200/385] i386: Don't split V2DF load when the adjusted address
+ is invalid [PR127500]
+
+ix86_split_stlf_stall_load splits a V2DF load from a PARM_DECL into
+movlpd + movhpd, which needs the load address offset by 8.  When the
+original address already uses the largest encodable displacement, e.g.
+
+  (mem/c:V2DF (plus:DI (reg/f:DI 7 sp)
+                       (const_int 2147483640 [0x7ffffff8])))
+
+adding 8 gives 0x80000000, which is out of range for the signed 32-bit
+displacement field of an x86 address, and adjust_address ICEs in
+change_address_1 since the address can no longer be validated after
+reload.  Skip the split in that case.
+
+gcc/ChangeLog:
+
+	PR target/127500
+	* config/i386/i386.cc (ix86_split_stlf_stall_load): Don't split
+	the load when the address adjusted by 8 is not a valid memory
+	address.
+
+gcc/testsuite/ChangeLog:
+
+	PR target/127500
+	* gcc.target/i386/pr127500.c: New test.
+
+(cherry picked from commit 6bc343fa183a01fa30f70d2c0b70d01e4bd78d62)
+---
+ gcc/config/i386/i386.cc                  | 12 +++++++++++-
+ gcc/testsuite/gcc.target/i386/pr127500.c |  8 ++++++++
+ 2 files changed, 19 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr127500.c
+
+diff --git a/gcc/config/i386/i386.cc b/gcc/config/i386/i386.cc
+index bf2a3bdfbea1..392c50ff44c4 100644
+--- a/gcc/config/i386/i386.cc
++++ b/gcc/config/i386/i386.cc
+@@ -24721,7 +24721,17 @@ ix86_split_stlf_stall_load ()
+ 	     register.  */
+ 	  || GET_MODE (src) != E_V2DFmode
+ 	  || !MEM_EXPR (src)
+-	  || TREE_CODE (get_base_address (MEM_EXPR (src))) != PARM_DECL)
++	  || TREE_CODE (get_base_address (MEM_EXPR (src))) != PARM_DECL
++	  /* Avoid invalid memory address.
++	     i.e.
++	     (mem/c:V2DF (plus:DI (reg/f:DI 7 sp)
++				  (const_int 2147483640 [0x7ffffff8])))
++	     Adjusting it by 8 puts the displacement at 0x80000000, out of
++	     range for the signed 32-bit field an x86 address can encode.  */
++	  || !memory_address_addr_space_p (DFmode,
++					   XEXP (adjust_address_nv (src, DFmode,
++								    8), 0),
++					   MEM_ADDR_SPACE (src)))
+ 	continue;
+ 
+       rtx zero = CONST0_RTX (V2DFmode);
+diff --git a/gcc/testsuite/gcc.target/i386/pr127500.c b/gcc/testsuite/gcc.target/i386/pr127500.c
+new file mode 100644
+index 000000000000..cde6058fd6f8
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr127500.c
+@@ -0,0 +1,8 @@
++/* { dg-do compile  { target { ! ia32 } } } */
++/* { dg-options "-msse2 -O2" } */
++
++typedef double v2df __attribute__((vector_size (16)));
++
++struct big { char pad[0x7FFFFFF0]; v2df v; };
++
++v2df f (struct big b) { return b.v; }

@@ -1,0 +1,121 @@
+From 36176e6f0bcf3d5640877bbeeab24f863d8ed738 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Wed, 2 Sep 2026 09:46:31 +0200
+Subject: [PATCH 164/385] ipa: do not match bit-field predicate conditions
+ against byte offsets
+
+Conditions of IPA predicates record the position of an aggregate load as
+a bit offset (ipa_load_from_parm_agg derives it from
+get_ref_base_and_extent_hwi and add_condition stores it verbatim), while
+the aggregate values of jump functions are indexed by byte offsets
+(ipa_argagg_value::unit_offset).
+
+evaluate_conditions_for_known_args bridged the two by simply dividing by
+BITS_PER_UNIT, which for a bit-field silently drops its sub-byte
+position and matches the constant recorded for the containing byte.  The
+subsequent compatibility check only compares TYPE_SIZE, which is the
+mode size and therefore equal for a narrow bit-field type and a char, so
+the whole byte is then reinterpreted as the field with a
+VIEW_CONVERT_EXPR.
+
+In the testcase a 3-bit signed bit-field holding 1 sits at bits 2..4 of
+a byte whose value is 4; the byte is reinterpreted as -4, the guard
+((int) p.f3.f7) >= 0 folds to false, the guarded call edge gets a false
+predicate and edge_set_predicate turns it into __builtin_unreachable.
+Everything dominated by the guard is then removed, main loses its
+return statement and falls through into _start.
+
+Since ipa_argagg_value_list cannot represent a sub-byte position, skip
+the lookup altogether when the condition is not byte aligned.
+
+Assisted-by: Claude Opus 5
+
+	PR ipa/126153
+	* ipa-fnsummary.cc (evaluate_conditions_for_known_args): Do not
+	look up an aggregate value for a condition whose offset is not
+	byte aligned.
+
+	* gcc.dg/torture/pr126153.c: New test.
+
+(cherry picked from commit f3c62858532248b2ee73e20f8d13019a4cb3a210)
+---
+ gcc/ipa-fnsummary.cc                    |  6 ++-
+ gcc/testsuite/gcc.dg/torture/pr126153.c | 52 +++++++++++++++++++++++++
+ 2 files changed, 57 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/pr126153.c
+
+diff --git a/gcc/ipa-fnsummary.cc b/gcc/ipa-fnsummary.cc
+index e187231dfb64..b4fdab97958f 100644
+--- a/gcc/ipa-fnsummary.cc
++++ b/gcc/ipa-fnsummary.cc
+@@ -417,7 +417,11 @@ evaluate_conditions_for_known_args (struct cgraph_node *node,
+ 
+ 	  if (tree sval = avals->safe_sval_at (c->operand_num))
+ 	    val = ipa_find_agg_cst_from_init (sval, c->offset, c->by_ref);
+-	  if (!val)
++	  /* ipa_argagg_value_list is indexed by byte offsets, so a condition
++	     which does not start at a byte boundary (a bit-field) cannot be
++	     looked up in it; the containing byte would be reinterpreted as
++	     the whole field below.  */
++	  if (!val && (c->offset % BITS_PER_UNIT) == 0)
+ 	    {
+ 	      ipa_argagg_value_list avs (avals);
+ 	      val = avs.get_value (c->operand_num, c->offset / BITS_PER_UNIT,
+diff --git a/gcc/testsuite/gcc.dg/torture/pr126153.c b/gcc/testsuite/gcc.dg/torture/pr126153.c
+new file mode 100644
+index 000000000000..70916f2d22c4
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/pr126153.c
+@@ -0,0 +1,52 @@
++/* { dg-do run { target le } } */
++/* { dg-require-effective-target int32plus } */
++/* { dg-options "-O2" } */
++
++/* Conditions of IPA predicates record the position of an aggregate load as
++   a bit offset, while the aggregate values of jump functions are indexed by
++   byte offsets.  Truncating the former used to match the constant recorded
++   for the byte containing the bit-field, which was then reinterpreted with
++   a VIEW_CONVERT_EXPR as if it were the whole field.  Here that turned the
++   value 1 of f7 into -4, the guard below into a false predicate and the
++   call to shifter() into __builtin_unreachable.  */
++
++struct S0 { unsigned f5 : 2; signed f7 : 3; unsigned f6 : 3; };
++struct S1 { int a; struct S0 f3; char pad; short s; };
++
++int g;
++
++__attribute__((noipa)) void ext (int x) { g += x; }
++
++__attribute__((noinline, noclone)) static long long
++shifter (long long l, int r)
++{
++  if (l < 0 || r < 0 || r >= 32 || l > (0x7fffffffffffffffLL >> r))
++    return l;
++  return l << r;
++}
++
++static void
++callee (struct S1 p, int n)
++{
++  ext (n);
++  if ((int) p.f3.f7 >= 0)
++    ext ((int) shifter (0x350631DD6B880108LL, (int) p.f3.f7));
++  ext (n);
++}
++
++/* A second caller, so that callee is not inlined before IPA.  */
++void other (struct S1 q, int n) { callee (q, n); }
++
++int
++main (void)
++{
++  struct S1 l;
++  l.a = 5;
++  l.pad = 7;
++  l.s = 9;
++  *(char *) &l.f3 = 4;		/* f5 = 0, f7 = 1, f6 = 0 */
++  callee (l, 3);
++  if (g != 3 + 3 + (int) (0x350631DD6B880108LL << 1))
++    __builtin_abort ();
++  return 0;
++}

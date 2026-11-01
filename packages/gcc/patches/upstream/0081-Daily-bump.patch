@@ -1,0 +1,62 @@
+From 7821eb2d69c6bab2d32d6b5d306ce35ef7666452 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sat, 22 Aug 2026 00:20:56 +0000
+Subject: [PATCH 081/385] Daily bump.
+
+---
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 12 ++++++++++++
+ libstdc++-v3/ChangeLog  | 16 ++++++++++++++++
+ 3 files changed, 29 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index e500c1b08428..56ffce9b6aed 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260821
++20260822
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 9216a01f59e2..f8d4b8a6d45c 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,15 @@
++2026-08-21  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
++
++	Backported from master:
++	2026-08-19  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
++
++	* gcc.target/arm/cmse/cmse-18.c: Use effective-target
++	arm_arch_v8m_main.
++	* gcc.target/arm/cmse/cmse-19.c: Use effective-target
++	arm_arch_v8_1m_mve.
++	* lib/target-supports.exp: Define effective-target
++	arm_arch_v8m_main.
++
+ 2026-08-20  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index fd8006c02de7..6f6c0cb9a27e 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,19 @@
++2026-08-21  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-08-21  Jonathan Wakely  <jwakely@redhat.com>
++
++	* testsuite/std/time/clock/utc/leap_second_info-2.cc: Create
++	empty ./tzdata.zi file.
++
++2026-08-21  Matthias Kretz  <m.kretz@gsi.de>
++
++	Backported from master:
++	2026-08-19  Matthias Kretz  <m.kretz@gsi.de>
++
++	* include/bits/simd_vec.h (_M_elements_shifted_to_front): Remove
++	x86-specific implementation.
++
+ 2026-08-20  Anlai Lu  <agicy@qq.com>
+ 	    Tomasz Kamiński  <tkaminsk@redhat.com>
+ 

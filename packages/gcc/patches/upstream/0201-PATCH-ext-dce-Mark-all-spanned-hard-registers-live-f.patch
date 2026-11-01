@@ -1,0 +1,94 @@
+From 0ae655f455a253be1af00728e1d5097a931640d8 Mon Sep 17 00:00:00 2001
+From: Zhongyao Chen <chenzhongyao.hit@gmail.com>
+Date: Fri, 18 Sep 2026 15:57:01 -0600
+Subject: [PATCH 201/385] [PATCH] ext-dce: Mark all spanned hard registers live
+ for multi-reg references [PR127367]
+
+In pr127367, ext-dce sees multi-reg hard regs like (reg:TI a0) in call
+fusage on riscv64.  It fails to record a1 in livenow, so the preceding
+extensions are wrongly eliminated.
+
+This patch uses an iteration over all spanned hard registers (via
+end_hard_regno) to mark their chunks live for HARD_REGISTER_P.
+
+	PR rtl-optimization/127367
+
+gcc/ChangeLog:
+
+	* ext-dce.cc: Include regs.h.
+	(ext_dce_process_uses): Handle multi-register hard regs.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.dg/torture/pr127367.c: New test.
+
+Signed-off-by: Zhongyao Chen <chen.zhongyao@zte.com.cn>
+(cherry picked from commit a87de1ad7ab071584907f123ffd7940b3f74f17c)
+---
+ gcc/ext-dce.cc                          | 12 +++++++++++-
+ gcc/testsuite/gcc.dg/torture/pr127367.c | 26 +++++++++++++++++++++++++
+ 2 files changed, 37 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/pr127367.c
+
+diff --git a/gcc/ext-dce.cc b/gcc/ext-dce.cc
+index a008ec910f35..78131a41d552 100644
+--- a/gcc/ext-dce.cc
++++ b/gcc/ext-dce.cc
+@@ -37,6 +37,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "dbgcnt.h"
+ #include "diagnostic-core.h"
+ #include "target.h"
++#include "regs.h"
+ 
+ /* These should probably move into a C++ class.  */
+ static vec<bitmap_head> livein;
+@@ -1028,7 +1029,16 @@ ext_dce_process_uses (rtx_insn *insn, rtx obj,
+       /* If we have a register reference that is not otherwise handled,
+ 	 just assume all the chunks are live.  */
+       else if (REG_P (x))
+-	bitmap_set_range (livenow, REGNO (x) * 4, group_limit (x));
++	{
++	  if (HARD_REGISTER_P (x))
++	    {
++	      unsigned int end = end_hard_regno (GET_MODE (x), REGNO (x));
++	      for (unsigned int r = REGNO (x); r < end; r++)
++		bitmap_set_range (livenow, r * 4, 4);
++	    }
++	  else
++	    bitmap_set_range (livenow, REGNO (x) * 4, group_limit (x));
++	}
+     }
+ }
+ 
+diff --git a/gcc/testsuite/gcc.dg/torture/pr127367.c b/gcc/testsuite/gcc.dg/torture/pr127367.c
+new file mode 100644
+index 000000000000..ed87f45e6f85
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/pr127367.c
+@@ -0,0 +1,26 @@
++/* PR rtl-optimization/127367 */
++/* { dg-do run { target bitint } } */
++
++#if __BITINT_MAXWIDTH__ >= 96
++_BitInt(5) g;
++_BitInt(65) prod;
++
++__attribute__((noipa)) void
++foo (void)
++{
++  _BitInt(6) t = ~g;
++  _BitInt(96) m = t % (unsigned _BitInt(96))362;
++  _BitInt(5) r = __builtin_mul_overflow(t, m, &prod) ?: prod;
++  if ((long long)m != 297 || (int)r != -9 || (long long)prod != -297)
++    __builtin_abort ();
++}
++#endif
++
++int
++main (void)
++{
++#if __BITINT_MAXWIDTH__ >= 96
++  foo ();
++#endif
++  return 0;
++}

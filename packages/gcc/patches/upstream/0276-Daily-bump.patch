@@ -1,0 +1,409 @@
+From fa250e2404e76b8790fb2ae13768bc30de97c612 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sun, 11 Oct 2026 00:21:33 +0000
+Subject: [PATCH 276/385] Daily bump.
+
+---
+ gcc/ChangeLog           |  83 +++++++++++++++++++++
+ gcc/DATESTAMP           |   2 +-
+ gcc/c/ChangeLog         |  12 +++
+ gcc/cp/ChangeLog        |  62 ++++++++++++++++
+ gcc/testsuite/ChangeLog | 160 ++++++++++++++++++++++++++++++++++++++++
+ libcpp/ChangeLog        |  14 ++++
+ libgomp/ChangeLog       |   8 ++
+ 7 files changed, 340 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 316e1a1607b8..4971344e777b 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,86 @@
++2026-10-10  Yongqiang Tian  <yqtian668@gmail.com>
++
++	Backported from master:
++	2026-10-02  Yongqiang Tian  <yqtian668@gmail.com>
++
++	PR tree-optimization/127687
++	* tree-ssa-forwprop.cc (pass_forwprop::execute): Skip debug
++	statements before assigning UIDs.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-25  Jakub Jelinek  <jakub@redhat.com>
++
++	PR middle-end/127517
++	* internal-fn.cc (expand_mul_overflow): Revert the 2023-09-06
++	changes.  Instead promote arg0 and/or arg1 to a type with
++	uns{0,1}_p signedness and mode precision if they have non-mode
++	precision.  Pass the original arg0/arg1 and their type to
++	ubsan_build_overflow_builtin, instead of passing the promoted
++	ones.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-22  Jakub Jelinek  <jakub@redhat.com>
++
++	PR middle-end/127492
++	* builtins.cc (expand_builtin_atomic_fetch_op): Force val into a
++	pseudo if updates to mem could change its value.
++	(expand_ifn_atomic_bit_test_and): Likewise.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-21  Jakub Jelinek  <jakub@redhat.com>
++
++	PR target/127498
++	* config/i386/sse.md (<insn><mode>3 any_rotate:VI1_AVX512_3264): Add
++	TARGET_AVX2 to condition.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-18  Jakub Jelinek  <jakub@redhat.com>
++		    Manjunath Matti  <mmatti@linux.ibm.com>
++
++	PR middle-end/127378
++	* gimple-lower-bitint.cc (bitint_large_huge::lower_mergeable_stmt): On
++	big endian, compare idx_next in separate_ext loop against
++	bo_idx + total - 1 - end, and if that wraps around, compare idx
++	against 0 instead.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-15  Jakub Jelinek  <jakub@redhat.com>
++
++	PR target/127352
++	* config/i386/i386-expand.cc (split_double_mode): For high halves of
++	paradoxical subregs after RA use CONST0_RTX (half_mode) instead of
++	ICE.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-14  Jakub Jelinek  <jakub@redhat.com>
++
++	PR middle-end/127336
++	* optabs.cc (maybe_emit_compare_and_swap_exchange_loop,
++	expand_atomic_fetch_op_no_fallback, expand_atomic_fetch_op): Force
++	val into a pseduo if it updates to mem could change its value
++	and when using val after the atomic op or inside of a loop.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-02  Jakub Jelinek  <jakub@redhat.com>
++
++	PR tree-optimization/127149
++	* tree-vect-patterns.cc (vect_recog_popcount_clz_ctz_ffs_pattern):
++	Handle lhs_type without mode precision by adding casts.
++
+ 2026-10-08  Georg-Johann Lay  <avr@gjlay.de>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 88df830299d2..bb329782a639 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261010
++20261011
+diff --git a/gcc/c/ChangeLog b/gcc/c/ChangeLog
+index 4f871d5cead0..0e15f92b9671 100644
+--- a/gcc/c/ChangeLog
++++ b/gcc/c/ChangeLog
+@@ -1,3 +1,15 @@
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-16  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c/127383
++	* c-typeck.cc (default_conversion): If orig_expr is different
++	from exp and exp is a bit-field of bit-precise integer type, call
++	perform_integral_promotions on orig_exp rather than exp.
++	(build_c_cast): Wrap in NON_LVALUE_EXPR not just lvalues, but
++	also non-lvalue bit-fields of bit-precise integer type.
++
+ 2026-08-07  Release Manager
+ 
+ 	* GCC 16.2.0 released.
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index 844425ecdce3..3517c053e7b2 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,65 @@
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-10-07  Jakub Jelinek  <jakub@redhat.com>
++
++	* cp-gimplify.cc (cp_genericize_r): Don't call warn_for_alloc_size
++	for CALL_FROM_NEW_OR_DELETE_P calls.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-23  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/125536
++	* pt.cc (unify_array_domain): When adding 1 to parm_max or
++	arg_max, perform the addition in the type of those trees
++	rather than unconditionally in int type.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-21  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/127493
++	* reflect.cc (eval_source_location_of): Call maybe_get_first_fn.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-11  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/127276
++	* pt.cc (tsubst_splice_expr): Call convert_from_reference if not
++	member access and SPLICE_EXPR is a splice expression.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-03  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/127109
++	* decl.cc (cp_finish_decomp): Add [dcl.struct.bind]/7 reference
++	to comment.  Use get_temp_regvar and pushdecl instead of
++	get_internal_target_expr and add_stmt.  Set DECL_DECOMP_BASE
++	to NON_LVALUE_EXPR around the temp regvar.
++	* cp-tree.h (DECL_DECOMP_BASE): Adjust macro comment.
++	* semantics.cc (maybe_convert_cond, switch_finish_cond): Check for
++	NON_LVALUE_EXPR rather than TARGET_EXPR and extract its operand
++	rather than TARGET_EXPR_SLOT.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-08-31  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/126922
++	* mangle.cc (write_expression): For CONSTRUCTOR skipped
++	member of std::meta::info type, call write_expression on
++	get_null_reflection rather than build_zero_cst.
++	* tree.cc (zero_init_expr_p): If type is std::meta::info,
++	return true iff t is null reflection.
++
+ 2026-10-07  Jason Merrill  <jason@redhat.com>
+ 
+ 	PR c++/122774
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 62b0f235da70..4e3e4f86eb2b 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,163 @@
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-10-09  Jakub Jelinek  <jakub@redhat.com>
++
++	PR preprocessor/121508
++	PR preprocessor/123339
++	* c-c++-common/cpp/pr121508-1.c: New test.
++	* c-c++-common/cpp/pr121508-2.c: New test.
++	* c-c++-common/cpp/pr121508-3.c: New test.
++	* c-c++-common/cpp/pr121508-4.c: New test.
++	* c-c++-common/cpp/pr121508-5.c: New test.
++	* c-c++-common/cpp/pr123339.c: New test.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-10-07  Jakub Jelinek  <jakub@redhat.com>
++
++	* g++.dg/warn/Walloc-size-2.C: New test.
++
++2026-10-10  Yongqiang Tian  <yqtian668@gmail.com>
++
++	Backported from master:
++	2026-10-02  Yongqiang Tian  <yqtian668@gmail.com>
++
++	PR tree-optimization/127687
++	* gcc.dg/pr127687.c: New test.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-30  Jakub Jelinek  <jakub@redhat.com>
++
++	PR middle-end/127492
++	* gcc.dg/pr127492.c: Require int128 effective target and either
++	sync_int_128_runtime or libatomic_available.  Drop the long long
++	fallback, but define T only if it is not defined already.
++	* gcc.dg/pr127492-2.c: New test.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-25  Jakub Jelinek  <jakub@redhat.com>
++
++	PR middle-end/127517
++	* gcc.dg/torture/bitint-109.c: New test.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-23  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/125536
++	* g++.dg/template/unify14.C: New test.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-22  Jakub Jelinek  <jakub@redhat.com>
++
++	PR middle-end/127492
++	* gcc.dg/pr127492.c: New test.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-21  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/127493
++	* g++.dg/reflect/source_location_of1.C (struct G, struct H): New
++	types.  Add asserts for source_location_of of member function and
++	member function template.
++	* g++.dg/reflect/source_location_of2.C: Expect implicitEqLine rather
++	than 0 for line of ^^ImplicitEq::operator==.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-21  Jakub Jelinek  <jakub@redhat.com>
++
++	PR target/127498
++	* gcc.target/i386/gfni-pr127498.c: New test.
++	* gcc.target/i386/shift-gf2p8affine-5.c: Use -mavx2 in dg-options
++	instead of -mavx.  Expect 46 insns instead of 31.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-18  Jakub Jelinek  <jakub@redhat.com>
++
++	* gcc.dg/bitint-142.c (main): Don't set z to ~0, instead memset
++	it to ~0.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-18  Jakub Jelinek  <jakub@redhat.com>
++		    Manjunath Matti  <mmatti@linux.ibm.com>
++
++	PR middle-end/127378
++	* gcc.dg/bitint-145.c: New test.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-16  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c/127383
++	* gcc.dg/torture/bitint-108.c: New test.
++	* gcc.dg/bitint-143.c: New test.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-15  Jakub Jelinek  <jakub@redhat.com>
++
++	PR target/127352
++	* gcc.target/i386/pr127352.c: New test.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-14  Jakub Jelinek  <jakub@redhat.com>
++
++	PR middle-end/127336
++	* gcc.dg/pr127336.c: New test.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-11  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/127276
++	* g++.dg/reflect/pr127276.C: New test.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-03  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/127109
++	* g++.dg/cpp26/decomp32.C: New test.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-02  Jakub Jelinek  <jakub@redhat.com>
++
++	PR tree-optimization/127149
++	* gcc.dg/bitint-142.c: New test.
++
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-08-31  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/126922
++	* g++.dg/reflect/mangle10.C: New test.
++
+ 2026-10-08  Georg-Johann Lay  <avr@gjlay.de>
+ 
+ 	Backported from master:
+diff --git a/libcpp/ChangeLog b/libcpp/ChangeLog
+index 89936bf6e274..3b9bdb477c68 100644
+--- a/libcpp/ChangeLog
++++ b/libcpp/ChangeLog
+@@ -1,3 +1,17 @@
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-10-09  Jakub Jelinek  <jakub@redhat.com>
++
++	PR preprocessor/121508
++	PR preprocessor/123339
++	* directives.cc (get_token_no_padding): Remove.
++	(glue_header_name): Use _cpp_get_token_no_padding instead of
++	get_token_no_padding.
++	(parse_include): Likewise.
++	(get__Pragma_string): Likewise.  Don't _cpp_backup_tokens on
++	CPP_EOF.
++
+ 2026-08-07  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/libgomp/ChangeLog b/libgomp/ChangeLog
+index bfdced7aa396..dfdea2a2c598 100644
+--- a/libgomp/ChangeLog
++++ b/libgomp/ChangeLog
+@@ -1,3 +1,11 @@
++2026-10-10  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-09-24  Jakub Jelinek  <jakub@redhat.com>
++
++	* alloc.c (gomp_aligned_alloc): Check for overflows in the
++	_aligned_malloc case and in the last fallback.
++
+ 2026-08-07  Release Manager
+ 
+ 	* GCC 16.2.0 released.

@@ -1,0 +1,56 @@
+From ad7082fb5a1b49d2fd9adc714fab8a3f9a1e19cc Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Mon, 3 Aug 2026 13:01:22 +0200
+Subject: [PATCH 004/385] testsuite: Add yet another testcase for float range
+ inverse ops [PR126547]
+
+This got also fixed with r17-2843.
+
+2026-08-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/126547
+	* gcc.dg/torture/pr126547.c: New test.
+
+(cherry picked from commit 81763ec0f01664a5dd9fbfc541b1bf22a857f626)
+---
+ gcc/testsuite/gcc.dg/torture/pr126547.c | 31 +++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/pr126547.c
+
+diff --git a/gcc/testsuite/gcc.dg/torture/pr126547.c b/gcc/testsuite/gcc.dg/torture/pr126547.c
+new file mode 100644
+index 000000000000..c1066a2cfa93
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/pr126547.c
+@@ -0,0 +1,31 @@
++/* PR tree-optimization/126547 */
++/* { dg-do run } */
++
++#if __LDBL_HAS_INFINITY__
++[[gnu::noipa]] static int
++foo (long double a1, long double a2)
++{
++  if (a1 >= 1.0 && a1 <= 8.0)
++    {
++      long double d = a1 / a2;
++      int n = 0;
++      if (d >= __builtin_infl ())
++	n += 1;
++      if (a2 > 0.0L)
++	n += 2;
++      return n;
++    }
++  else
++    return -1;
++}
++#endif
++
++int
++main ()
++{
++#if __LDBL_HAS_INFINITY__
++  if (__builtin_isinf (1.0 / __LDBL_DENORM_MIN__)
++      && foo (1.0, __LDBL_DENORM_MIN__) != 3)
++    __builtin_abort ();
++#endif
++}

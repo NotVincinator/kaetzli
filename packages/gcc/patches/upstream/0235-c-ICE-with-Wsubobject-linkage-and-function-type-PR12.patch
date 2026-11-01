@@ -1,0 +1,66 @@
+From cb095f94da491f4d5e4df92abbc5d55792849e7d Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Wed, 30 Sep 2026 14:02:21 -0400
+Subject: [PATCH 235/385] c++: ICE with -Wsubobject-linkage and function type
+ [PR127672]
+
+Here we crash in decl_namespace_context because function types
+(or pointer-to-data-member types) like void() have no TYPE_MAIN_DECL:
+
+         decl = CP_DECL_CONTEXT (TYPE_MAIN_DECL (decl));
+
+We got there from the constrain_class_visibility TYPE_FIELDS walk
+which emits the -Wsubobject-linkage warning.  And this test has:
+
+  namespace { struct P { }; }
+  struct S { void (*f) (P *); };
+
+I'm using OVERLOAD_TYPE_P, inspired by min_vis_r.
+
+	PR c++/127672
+
+gcc/cp/ChangeLog:
+
+	* decl2.cc (constrain_class_visibility): Check OVERLOAD_TYPE_P
+	before calling decl_anon_ns_mem_p.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/warn/Wsubobject-linkage-6.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 5f9f8711bf791130fd30bc1f04b2097f3ef25f0b)
+---
+ gcc/cp/decl2.cc                                  |  1 +
+ gcc/testsuite/g++.dg/warn/Wsubobject-linkage-6.C | 10 ++++++++++
+ 2 files changed, 11 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/warn/Wsubobject-linkage-6.C
+
+diff --git a/gcc/cp/decl2.cc b/gcc/cp/decl2.cc
+index 8bd893db7753..9e53a14267c9 100644
+--- a/gcc/cp/decl2.cc
++++ b/gcc/cp/decl2.cc
+@@ -3601,6 +3601,7 @@ constrain_class_visibility (tree type)
+ 			       type, t, nlt);
+ 		  }
+ 		else if (cxx_dialect > cxx98
++			 && OVERLOAD_TYPE_P (ftype)
+ 			 && !decl_anon_ns_mem_p (ftype))
+ 		  warning (OPT_Wsubobject_linkage, "\
+ %qT has a field %q#D whose type has internal linkage",
+diff --git a/gcc/testsuite/g++.dg/warn/Wsubobject-linkage-6.C b/gcc/testsuite/g++.dg/warn/Wsubobject-linkage-6.C
+new file mode 100644
+index 000000000000..ea77f14386fe
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/warn/Wsubobject-linkage-6.C
+@@ -0,0 +1,10 @@
++// PR c++/127672
++// { dg-do compile { target c++11 } }
++
++namespace { struct P { }; }
++
++#line 7 "foo.C"
++struct S { void (*f) (P *); };	  // { dg-warning "uses the anonymous namespace" }
++struct S2 { void (P::*m) (); };	  // { dg-warning "uses the anonymous namespace" }
++struct S3 { P (*g) (); };	  // { dg-warning "uses the anonymous namespace" }
++struct S4 { int P::*d; };	  // { dg-warning "uses the anonymous namespace" }

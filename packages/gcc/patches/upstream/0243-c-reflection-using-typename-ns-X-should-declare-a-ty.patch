@@ -1,0 +1,185 @@
+From 1fe23226498c2a8f78fae304cac20277cefba618 Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Tue, 6 Oct 2026 12:20:13 -0400
+Subject: [PATCH 243/385] c++/reflection: using typename [:ns:]::X; should
+ declare a type [PR127707]
+
+This fixes a bogus error for
+
+  namespace N { struct S {}; }
+  template<auto ns> void f () {
+    using typename [:ns:]::S;
+    S s;
+  }
+
+It is a failure to propagate USING_DECL_TYPENAME_P to the USING_DECL
+in case we are not at_class_scope_p.  With that flag set, the dependent
+USING_DECL will be treated as naming a type.
+
+	PR c++/127707
+
+gcc/cp/ChangeLog:
+
+	* name-lookup.cc (finish_nonmember_using_decl): New bool
+	parameter.  Set USING_DECL_TYPENAME_P if it's true.
+	* name-lookup.h (finish_nonmember_using_decl): Adjust
+	declaration.
+	* parser.cc (finish_using_decl): Pass typename_p to
+	finish_nonmember_using_decl.
+	* pt.cc (tsubst_stmt) <case DECL_EXPR>: Pass
+	USING_DECL_TYPENAME_P to finish_nonmember_using_decl.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/reflect/ns12.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 1b961bf9d7e76de9a36f93d8749dbe7fae302246)
+---
+ gcc/cp/name-lookup.cc               |  9 ++++-
+ gcc/cp/name-lookup.h                |  3 +-
+ gcc/cp/parser.cc                    |  2 +-
+ gcc/cp/pt.cc                        |  3 +-
+ gcc/testsuite/g++.dg/reflect/ns12.C | 63 +++++++++++++++++++++++++++++
+ 5 files changed, 75 insertions(+), 5 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/reflect/ns12.C
+
+diff --git a/gcc/cp/name-lookup.cc b/gcc/cp/name-lookup.cc
+index 1db4a314571a..09c83e18d6f7 100644
+--- a/gcc/cp/name-lookup.cc
++++ b/gcc/cp/name-lookup.cc
+@@ -6994,10 +6994,12 @@ push_using_decl_bindings (tree name, tree value)
+   push_using_decl_bindings (nullptr, name, value);
+ }
+ 
+-/* Process a using declaration in non-class scope.  */
++/* Process a using declaration in non-class scope.  TYPENAME_P is true if
++   the using decl had the typename keyword; this is important to record for
++   a block-scope using declaration with a dependent scope (using a splice).  */
+ 
+ void
+-finish_nonmember_using_decl (tree scope, tree name)
++finish_nonmember_using_decl (tree scope, tree name, bool typename_p/*=false*/)
+ {
+   gcc_checking_assert (current_binding_level->kind != sk_class);
+ 
+@@ -7010,6 +7012,9 @@ finish_nonmember_using_decl (tree scope, tree name)
+   if (!using_decl)
+     return;
+ 
++  if (typename_p)
++    USING_DECL_TYPENAME_P (using_decl) = true;
++
+   /* Emit debug info.  */
+   if (!processing_template_decl)
+     cp_emit_debug_info_for_using (lookup.value,
+diff --git a/gcc/cp/name-lookup.h b/gcc/cp/name-lookup.h
+index cd0799a80ded..284fbf9f1602 100644
+--- a/gcc/cp/name-lookup.h
++++ b/gcc/cp/name-lookup.h
+@@ -503,7 +503,8 @@ extern bool decl_in_scope_p (tree);
+ extern cxx_binding *outer_binding (tree, cxx_binding *, bool);
+ extern void cp_emit_debug_info_for_using (tree, tree);
+ 
+-extern void finish_nonmember_using_decl (tree scope, tree name);
++extern void finish_nonmember_using_decl (tree scope, tree name,
++					 bool typename_p = false);
+ extern void finish_using_directive (tree target, tree attribs);
+ void push_local_extern_decl_alias (tree decl);
+ extern tree pushdecl (tree, bool hiding = false);
+diff --git a/gcc/cp/parser.cc b/gcc/cp/parser.cc
+index bf981945aa05..790e0296e3a3 100644
+--- a/gcc/cp/parser.cc
++++ b/gcc/cp/parser.cc
+@@ -24592,7 +24592,7 @@ finish_using_decl (tree qscope, tree identifier, bool typename_p = false)
+       finish_member_declaration (decl);
+     }
+   else
+-    finish_nonmember_using_decl (qscope, identifier);
++    finish_nonmember_using_decl (qscope, identifier, typename_p);
+   return decl;
+ }
+ 
+diff --git a/gcc/cp/pt.cc b/gcc/cp/pt.cc
+index f5cb7f6bb41b..59ba8ea9f63a 100644
+--- a/gcc/cp/pt.cc
++++ b/gcc/cp/pt.cc
+@@ -19749,7 +19749,8 @@ tsubst_stmt (tree t, tree args, tsubst_flags_t complain, tree in_decl)
+ 				"class, namespace, or enumeration", scope);
+ 		    return error_mark_node;
+ 		  }
+-		finish_nonmember_using_decl (scope, DECL_NAME (decl));
++		finish_nonmember_using_decl (scope, DECL_NAME (decl),
++					     USING_DECL_TYPENAME_P (decl));
+ 	      }
+ 	    else
+ 	      {
+diff --git a/gcc/testsuite/g++.dg/reflect/ns12.C b/gcc/testsuite/g++.dg/reflect/ns12.C
+new file mode 100644
+index 000000000000..fcb06eb33a63
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/reflect/ns12.C
+@@ -0,0 +1,63 @@
++// PR c++/127707
++// { dg-do compile { target c++26 } }
++// { dg-additional-options "-freflection" }
++
++namespace N {
++  struct S {};
++  struct R {};
++}
++namespace A = N;
++struct S {};
++
++using typename [:^^N:]::R;
++R r;
++
++template<auto ns>
++void
++f ()
++{
++  using typename [:ns:]::S;
++  S s;
++}
++
++template<auto ns>
++void
++f2 ()
++{
++  [] (auto) {
++    using typename [:ns:]::S;
++    S s;
++  } (0);
++}
++
++template<auto ns>
++void
++f3 ()
++{
++  [] <auto ns2> () {
++    using typename [:ns2:]::S;
++    S s;
++  }.template operator()<ns>();
++}
++
++template<auto ns>
++void
++fbad ()
++{
++  using [:ns:]::S;
++  S s; // { dg-error "expected" }
++}
++
++void
++g ()
++{
++  f<^^::>();
++  f<^^N>();
++  f<^^A>();
++  f2<^^::>();
++  f2<^^N>();
++  f2<^^A>();
++  f3<^^::>();
++  f3<^^N>();
++  f3<^^A>();
++}

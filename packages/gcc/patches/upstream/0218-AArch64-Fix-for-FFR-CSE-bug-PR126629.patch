@@ -1,0 +1,305 @@
+From e03e414c5893bdba3c16cb616d191cce9fab4c55 Mon Sep 17 00:00:00 2001
+From: Alfie Richards <alfie.richards@arm.com>
+Date: Wed, 2 Sep 2026 09:41:07 +0000
+Subject: [PATCH 218/385] AArch64: Fix for FFR CSE bug [PR126629]
+
+Fixes invalid CSE on read FFR's.
+
+This approach moves the entire SET src UNSPEC into the update_ffr
+"token" parameter.
+
+	PR target/126629
+
+gcc/ChangeLog:
+
+	* config/aarch64/aarch64-sve-builtins-base.cc
+	(emit_ldf1_ffr_update): New.
+	(svldff1_gather_impl::expand): Change ffr update.
+	(svldff1_gather_extend::expand): Likewise.
+	(svldxf1_impl::expand): Likewise.
+	(svldxf1_extend_impl::expand): Likewise.
+	* config/aarch64/aarch64-sve.md (aarch64_update_ffr_for_load):
+	Change to...
+	(@aarch64_update_ffr<mode>): ...this.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/aarch64/sve/pr126629.c: New test.
+	* gcc.target/aarch64/sve/pr126629_extend.c: New test.
+	* gcc.target/aarch64/sve/pr126629_gather.c: New test.
+	* gcc.target/aarch64/sve/pr126629_gather2.c: New test.
+
+Co-authored-by: Tamar Christina <Tamar.Christina@arm.com>
+(cherry picked from commit d956c5ad043f767bcde25e09ec48917afb2c8e8c)
+---
+ .../aarch64/aarch64-sve-builtins-base.cc      | 56 ++++++++++++-------
+ gcc/config/aarch64/aarch64-sve.md             | 11 ++--
+ .../gcc.target/aarch64/sve/pr126629.c         | 23 ++++++++
+ .../gcc.target/aarch64/sve/pr126629_extend.c  | 23 ++++++++
+ .../gcc.target/aarch64/sve/pr126629_gather.c  | 24 ++++++++
+ .../gcc.target/aarch64/sve/pr126629_gather2.c | 24 ++++++++
+ 6 files changed, 137 insertions(+), 24 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/sve/pr126629.c
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/sve/pr126629_extend.c
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/sve/pr126629_gather.c
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/sve/pr126629_gather2.c
+
+diff --git a/gcc/config/aarch64/aarch64-sve-builtins-base.cc b/gcc/config/aarch64/aarch64-sve-builtins-base.cc
+index 816e0ef5b654..9f9a35f748e0 100644
+--- a/gcc/config/aarch64/aarch64-sve-builtins-base.cc
++++ b/gcc/config/aarch64/aarch64-sve-builtins-base.cc
+@@ -72,6 +72,18 @@ is_undef (tree val)
+   return false;
+ }
+ 
++/* Emit the notional FFR update for an LDFF1 or LDNF1 instruction.
++   Use the load expression rather than the load result, so that later RTL
++   optimizers can still treat the load result as single-use.  */
++static void
++emit_ldf1_ffr_update (rtx_insn *load_insn)
++{
++  rtx set = single_set (load_insn);
++  gcc_assert (set && GET_CODE (SET_SRC (set)) == UNSPEC);
++  emit_insn (gen_aarch64_update_ffr (GET_MODE (SET_SRC (set)),
++				       copy_rtx (SET_SRC (set))));
++}
++
+ /* Return the UNSPEC_CMLA* unspec for rotation amount ROT.  */
+ static int
+ unspec_cmla (int rot)
+@@ -1976,16 +1988,18 @@ public:
+   rtx
+   expand (function_expander &e) const override
+   {
+-    /* See the block comment in aarch64-sve.md for details about the
+-       FFR handling.  */
+-    emit_insn (gen_aarch64_update_ffr_for_load ());
+-
+     e.prepare_gather_address_operands (1);
+     /* Put the predicate last, since ldff1_gather uses the same operand
+        order as mask_gather_load_optab.  */
+     e.rotate_inputs_left (0, 5);
+     machine_mode mem_mode = e.memory_vector_mode ();
+-    return e.use_exact_insn (code_for_aarch64_ldff1_gather (mem_mode));
++    rtx res = e.use_exact_insn (code_for_aarch64_ldff1_gather (mem_mode));
++
++    /* See the block comment in aarch64-sve.md for details about the
++       FFR handling.  */
++    emit_ldf1_ffr_update (get_last_insn ());
++
++    return res;
+   }
+ };
+ 
+@@ -1998,10 +2012,6 @@ public:
+   rtx
+   expand (function_expander &e) const override
+   {
+-    /* See the block comment in aarch64-sve.md for details about the
+-       FFR handling.  */
+-    emit_insn (gen_aarch64_update_ffr_for_load ());
+-
+     e.prepare_gather_address_operands (1);
+     /* Put the predicate last, since ldff1_gather uses the same operand
+        order as mask_gather_load_optab.  */
+@@ -2011,7 +2021,11 @@ public:
+     insn_code icode = code_for_aarch64_ldff1_gather (extend_rtx_code (),
+ 						     e.vector_mode (0),
+ 						     e.memory_vector_mode ());
+-    return e.use_exact_insn (icode);
++    rtx res = e.use_exact_insn (icode);
++    /* See the block comment in aarch64-sve.md for details about the
++       FFR handling.  */
++    emit_ldf1_ffr_update (get_last_insn ());
++    return res;
+   }
+ };
+ 
+@@ -2050,12 +2064,13 @@ public:
+   rtx
+   expand (function_expander &e) const override
+   {
++    machine_mode mode = e.vector_mode (0);
++    insn_code icode = code_for_aarch64_ldf1 (m_unspec, mode);
++    rtx res = e.use_contiguous_load_insn (icode);
+     /* See the block comment in aarch64-sve.md for details about the
+        FFR handling.  */
+-    emit_insn (gen_aarch64_update_ffr_for_load ());
+-
+-    machine_mode mode = e.vector_mode (0);
+-    return e.use_contiguous_load_insn (code_for_aarch64_ldf1 (m_unspec, mode));
++    emit_ldf1_ffr_update (get_last_insn ());
++    return res;
+   }
+ 
+   /* The unspec associated with the load.  */
+@@ -2078,14 +2093,15 @@ public:
+   rtx
+   expand (function_expander &e) const override
+   {
+-    /* See the block comment in aarch64-sve.md for details about the
+-       FFR handling.  */
+-    emit_insn (gen_aarch64_update_ffr_for_load ());
++    machine_mode mode = e.vector_mode (0);
+ 
+     insn_code icode = code_for_aarch64_ldf1 (m_unspec, extend_rtx_code (),
+-					     e.vector_mode (0),
+-					     e.memory_vector_mode ());
+-    return e.use_contiguous_load_insn (icode);
++					     mode, e.memory_vector_mode ());
++    rtx res = e.use_contiguous_load_insn (icode);
++    /* See the block comment in aarch64-sve.md for details about the
++       FFR handling.  */
++    emit_ldf1_ffr_update (get_last_insn ());
++    return res;
+   }
+ 
+   /* The unspec associated with the load.  */
+diff --git a/gcc/config/aarch64/aarch64-sve.md b/gcc/config/aarch64/aarch64-sve.md
+index e7d98c3754f1..35337dbae498 100644
+--- a/gcc/config/aarch64/aarch64-sve.md
++++ b/gcc/config/aarch64/aarch64-sve.md
+@@ -594,7 +594,7 @@
+ ;;   In addition, any FFRT region that includes a load also has at least one
+ ;;   instance of:
+ ;;
+-;;       L2: FFR = update(FFR, FFRT)  [type == no_insn]
++;;       L2: FFR = update(FFR, FFRT, <load result>)  [type == no_insn]
+ ;;
+ ;;   to make it clear that the region both reads from and writes to the FFR.
+ ;;
+@@ -1150,10 +1150,13 @@
+ ;; so that the FFR value is live on entry to the region and so that the FFR
+ ;; value visibly changes within the region.  This is used (possibly multiple
+ ;; times) in an FFRT region that includes LDFF1 or LDNF1 instructions.
+-(define_insn "aarch64_update_ffr_for_load"
++(define_insn "@aarch64_update_ffr<mode>"
+   [(set (reg:VNx16BI FFR_REGNUM)
+-	(unspec:VNx16BI [(reg:VNx16BI FFRT_REGNUM)
+-			 (reg:VNx16BI FFR_REGNUM)] UNSPEC_UPDATE_FFR))]
++	(unspec:VNx16BI
++	 [(reg:VNx16BI FFRT_REGNUM)
++	  (reg:VNx16BI FFR_REGNUM)
++	  (match_operand:SVE_ALL 0 "" "X")
++	 ] UNSPEC_UPDATE_FFR))]
+   "TARGET_SVE"
+   ""
+   [(set_attr "type" "no_insn")]
+diff --git a/gcc/testsuite/gcc.target/aarch64/sve/pr126629.c b/gcc/testsuite/gcc.target/aarch64/sve/pr126629.c
+new file mode 100644
+index 000000000000..64cb3ece3309
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/sve/pr126629.c
+@@ -0,0 +1,23 @@
++/* { dg-do compile } */
++/* { dg-options "-O3" } */
++
++#include <arm_sve.h>
++
++ void
++two_scans (unsigned char *p, unsigned char *q, unsigned long *r1,
++           unsigned long *r2, unsigned char *o1, unsigned char *o2)
++{
++  svbool_t pt = svptrue_b8 ();
++  svsetffr ();
++  svuint8_t a = svldff1_u8 (pt, p);
++  unsigned long n1 = svcntp_b8 (pt, svrdffr ());
++  svsetffr ();
++  svuint8_t b = svldff1_u8 (pt, q);
++  unsigned long n2 = svcntp_b8 (pt, svrdffr ());
++  svst1_u8 (pt, o1, a);
++  svst1_u8 (pt, o2, b);
++  *r1 = n1;
++  *r2 = n2;
++}
++
++/* { dg-final { scan-assembler-times {\trdffr} 2 } } */
+diff --git a/gcc/testsuite/gcc.target/aarch64/sve/pr126629_extend.c b/gcc/testsuite/gcc.target/aarch64/sve/pr126629_extend.c
+new file mode 100644
+index 000000000000..909a9f1e651a
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/sve/pr126629_extend.c
+@@ -0,0 +1,23 @@
++/* { dg-do compile } */
++/* { dg-options "-O3" } */
++
++#include <arm_sve.h>
++
++ void
++two_scans (unsigned char *p, unsigned char *q, unsigned long *r1,
++           unsigned long *r2, unsigned int *o1, unsigned int *o2)
++{
++  svbool_t pt = svptrue_b8 ();
++  svsetffr ();
++  svuint32_t a = svldff1ub_u32 (pt, p);
++  unsigned long n1 = svcntp_b8 (pt, svrdffr ());
++  svsetffr ();
++  svuint32_t b = svldff1ub_u32 (pt, q);
++  unsigned long n2 = svcntp_b8 (pt, svrdffr ());
++  svst1_u32 (pt, o1, a);
++  svst1_u32 (pt, o2, b);
++  *r1 = n1;
++  *r2 = n2;
++}
++
++/* { dg-final { scan-assembler-times {\trdffr} 2 } } */
+diff --git a/gcc/testsuite/gcc.target/aarch64/sve/pr126629_gather.c b/gcc/testsuite/gcc.target/aarch64/sve/pr126629_gather.c
+new file mode 100644
+index 000000000000..2348082fde52
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/sve/pr126629_gather.c
+@@ -0,0 +1,24 @@
++/* { dg-do compile } */
++/* { dg-options "-O3" } */
++
++#include <arm_sve.h>
++
++ void
++two_scans (unsigned char *p, unsigned char *q, unsigned long *r1,
++           unsigned long *r2, unsigned *o1, unsigned *o2,
++           svuint32_t offset1, svuint32_t offset2)
++{
++  svbool_t pt = svptrue_b8 ();
++  svsetffr ();
++  svuint32_t a = svldff1sb_gather_offset_u32 (pt, p, offset1);
++  unsigned long n1 = svcntp_b8 (pt, svrdffr ());
++  svsetffr ();
++  svuint32_t b = svldff1sb_gather_offset_u32 (pt, q, offset2);
++  unsigned long n2 = svcntp_b8 (pt, svrdffr ());
++  svst1_u32 (pt, o1, a);
++  svst1_u32 (pt, o2, b);
++  *r1 = n1;
++  *r2 = n2;
++}
++
++/* { dg-final { scan-assembler-times {\trdffr} 2 } } */
+diff --git a/gcc/testsuite/gcc.target/aarch64/sve/pr126629_gather2.c b/gcc/testsuite/gcc.target/aarch64/sve/pr126629_gather2.c
+new file mode 100644
+index 000000000000..bb9257fe3828
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/sve/pr126629_gather2.c
+@@ -0,0 +1,24 @@
++/* { dg-do compile } */
++/* { dg-options "-O3" } */
++
++#include <arm_sve.h>
++
++ void
++two_scans (svuint32_t p, svuint32_t q, unsigned long *r1,
++           unsigned long *r2, unsigned *o1, unsigned *o2,
++           long int offset1, long int offset2)
++{
++  svbool_t pt = svptrue_b8 ();
++  svsetffr ();
++  svuint32_t a = svldff1sb_gather_u32base_offset_u32 (pt, p, offset1);
++  unsigned long n1 = svcntp_b8 (pt, svrdffr ());
++  svsetffr ();
++  svuint32_t b = svldff1sb_gather_u32base_offset_u32 (pt, q, offset2);
++  unsigned long n2 = svcntp_b8 (pt, svrdffr ());
++  svst1_u32 (pt, o1, a);
++  svst1_u32 (pt, o2, b);
++  *r1 = n1;
++  *r2 = n2;
++}
++
++/* { dg-final { scan-assembler-times {\trdffr} 2 } } */

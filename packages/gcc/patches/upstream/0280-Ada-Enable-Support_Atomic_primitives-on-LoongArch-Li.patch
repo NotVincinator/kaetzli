@@ -1,0 +1,25 @@
+From 22a91f7173f194e33868400e9cd53f3313cf1876 Mon Sep 17 00:00:00 2001
+From: Yang Yujie <yangyujie@loongson.cn>
+Date: Mon, 12 Oct 2026 08:15:32 +0200
+Subject: [PATCH 280/385] Ada: Enable Support_Atomic_primitives on LoongArch
+ Linux
+
+gcc/ada/
+	* libgnat/system-linux-loongarch.ads(Support_Atomic_Primitives):
+	New boolean constant.
+---
+ gcc/ada/libgnat/system-linux-loongarch.ads | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/gcc/ada/libgnat/system-linux-loongarch.ads b/gcc/ada/libgnat/system-linux-loongarch.ads
+index 5aca5118415b..67bbdbc4b351 100644
+--- a/gcc/ada/libgnat/system-linux-loongarch.ads
++++ b/gcc/ada/libgnat/system-linux-loongarch.ads
+@@ -133,6 +133,7 @@ private
+    Stack_Check_Probes        : constant Boolean := True;
+    Stack_Check_Limits        : constant Boolean := False;
+    Support_Aggregates        : constant Boolean := True;
++   Support_Atomic_Primitives : constant Boolean := True;
+    Support_Composite_Assign  : constant Boolean := True;
+    Support_Composite_Compare : constant Boolean := True;
+    Support_Long_Shifts       : constant Boolean := True;

@@ -1,0 +1,45 @@
+From 32374baf23f8ee1ecf5174bd068ebe28dd60679d Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Mon, 19 Oct 2026 19:08:07 +0200
+Subject: [PATCH 311/385] i386: Do not clobber DRAP register during stack
+ probing
+
+Some cases in get_scratch_register_on_entry are guarded against clobbering
+the DRAP register but not all of them, and we're observing such a clobbering
+with a modified Ada compiler for 32-bit Windows based on GCC 16 (this target
+enabled DRAP-based dynamic stack realignment in GCC 16 and later).
+
+The attached patch addresses all the remaining cases, although only DI_REG
+may be used as the DRAP register for the time being.
+
+gcc/
+	* config/i386/i386.cc (get_scratch_register_on_entry): Never return
+	the DRAP register.
+---
+ gcc/config/i386/i386.cc | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/gcc/config/i386/i386.cc b/gcc/config/i386/i386.cc
+index c124635e0672..561c49421f54 100644
+--- a/gcc/config/i386/i386.cc
++++ b/gcc/config/i386/i386.cc
+@@ -8173,13 +8173,16 @@ get_scratch_register_on_entry (struct scratch_reg *sr)
+ 	       && !static_chain_p
+ 	       && drap_regno != CX_REG)
+ 	regno = CX_REG;
+-      else if (ix86_save_reg (BX_REG, true, false))
++      else if (ix86_save_reg (BX_REG, true, false)
++	       && drap_regno != BX_REG)
+ 	regno = BX_REG;
+       /* esi is the static chain register.  */
+       else if (!(regparm == 3 && static_chain_p)
+-	       && ix86_save_reg (SI_REG, true, false))
++	       && ix86_save_reg (SI_REG, true, false)
++	       && drap_regno != SI_REG)
+ 	regno = SI_REG;
+-      else if (ix86_save_reg (DI_REG, true, false))
++      else if (ix86_save_reg (DI_REG, true, false)
++	       && drap_regno != DI_REG)
+ 	regno = DI_REG;
+       else
+ 	{

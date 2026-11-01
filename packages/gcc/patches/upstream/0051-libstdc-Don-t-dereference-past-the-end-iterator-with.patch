@@ -1,0 +1,212 @@
+From 8618618b466b819d27930bdb6cf1b765099a2c22 Mon Sep 17 00:00:00 2001
+From: Yan Churkin <yanchurkin@gmail.com>
+Date: Fri, 26 Jun 2026 22:45:31 +0300
+Subject: [PATCH 051/385] libstdc++: Don't dereference past-the-end iterator
+ with overloaded operator&& [PR125981]
+
+std::__find_if, std::__mismatch and std::__push_heap drove their loops
+with a condition of the form
+
+  while (__first != __last && PREDICATE_CALL(...))
+
+If the predicate/comparator result type has an ADL-reachable
+operator&&(bool, T), overload resolution selects that user-defined
+operator&& for the loop condition.  It does not short-circuit, so the
+operand that dereferences *__first is evaluated even when
+__first == __last, dereferencing the past-the-end iterator.
+
+Such a result type does not model boolean-testable, so this is undefined
+behaviour and not a conformance issue.  Handle it anyway as a QoI
+extension, consistent with std::equal, std::binary_search and
+std::__partition, by forcing the predicate result to bool so the
+built-in && is used.  This has no effect on well-behaved predicates; the
+ranges:: versions are unaffected because their wrappers already return
+bool.
+
+	PR libstdc++/125981
+
+libstdc++-v3/ChangeLog:
+
+	* include/bits/stl_algobase.h (__find_if): Force the predicate
+	result to bool so that non-boolean_testable predicates cannot
+	cause a past-the-end iterator to be dereferenced.
+	(__mismatch): Likewise for both overloads.
+	* include/bits/stl_heap.h (__push_heap): Likewise for the
+	comparator result.
+	* testsuite/25_algorithms/find_if/overloaded_logical_ops.cc: New
+	test.
+	* testsuite/25_algorithms/mismatch/overloaded_logical_ops.cc:
+	New test.
+
+Signed-off-by: Yan Churkin <yanchurkin@gmail.com>
+(cherry picked from commit a4ceb702480b9f46dd9b862c81ad7505ca344286)
+---
+ libstdc++-v3/include/bits/stl_algobase.h      |  6 +--
+ libstdc++-v3/include/bits/stl_heap.h          |  3 +-
+ .../find_if/overloaded_logical_ops.cc         | 50 +++++++++++++++++
+ .../mismatch/overloaded_logical_ops.cc        | 54 +++++++++++++++++++
+ 4 files changed, 109 insertions(+), 4 deletions(-)
+ create mode 100644 libstdc++-v3/testsuite/25_algorithms/find_if/overloaded_logical_ops.cc
+ create mode 100644 libstdc++-v3/testsuite/25_algorithms/mismatch/overloaded_logical_ops.cc
+
+diff --git a/libstdc++-v3/include/bits/stl_algobase.h b/libstdc++-v3/include/bits/stl_algobase.h
+index 1350736a8d8e..33b1177810a9 100644
+--- a/libstdc++-v3/include/bits/stl_algobase.h
++++ b/libstdc++-v3/include/bits/stl_algobase.h
+@@ -1930,7 +1930,7 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
+     __mismatch(_InputIterator1 __first1, _InputIterator1 __last1,
+ 	       _InputIterator2 __first2, _BinaryPredicate __binary_pred)
+     {
+-      while (__first1 != __last1 && __binary_pred(*__first1, *__first2))
++      while (__first1 != __last1 && bool(__binary_pred(*__first1, *__first2)))
+ 	{
+ 	  ++__first1;
+ 	  ++__first2;
+@@ -2011,7 +2011,7 @@ _GLIBCXX_BEGIN_NAMESPACE_ALGO
+ 	       _BinaryPredicate __binary_pred)
+     {
+       while (__first1 != __last1 && __first2 != __last2
+-	     && __binary_pred(*__first1, *__first2))
++	     && bool(__binary_pred(*__first1, *__first2)))
+ 	{
+ 	  ++__first1;
+ 	  ++__first2;
+@@ -2097,7 +2097,7 @@ _GLIBCXX_END_NAMESPACE_ALGO
+     __find_if(_Iterator __first, _Iterator __last, _Predicate __pred)
+     {
+ #pragma GCC unroll 4
+-      while (__first != __last && !__pred(*__first))
++      while (__first != __last && !bool(__pred(*__first)))
+ 	++__first;
+       return __first;
+     }
+diff --git a/libstdc++-v3/include/bits/stl_heap.h b/libstdc++-v3/include/bits/stl_heap.h
+index 8c5c5df5266d..3c26e6a5332d 100644
+--- a/libstdc++-v3/include/bits/stl_heap.h
++++ b/libstdc++-v3/include/bits/stl_heap.h
+@@ -143,7 +143,8 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+ 		_Compare& __comp)
+     {
+       _Distance __parent = (__holeIndex - 1) / 2;
+-      while (__holeIndex > __topIndex && __comp(*(__first + __parent), __value))
++      while (__holeIndex > __topIndex
++	     && bool(__comp(*(__first + __parent), __value)))
+ 	{
+ 	  *(__first + __holeIndex) = _GLIBCXX_MOVE(*(__first + __parent));
+ 	  __holeIndex = __parent;
+diff --git a/libstdc++-v3/testsuite/25_algorithms/find_if/overloaded_logical_ops.cc b/libstdc++-v3/testsuite/25_algorithms/find_if/overloaded_logical_ops.cc
+new file mode 100644
+index 000000000000..a26f4d557d8c
+--- /dev/null
++++ b/libstdc++-v3/testsuite/25_algorithms/find_if/overloaded_logical_ops.cc
+@@ -0,0 +1,50 @@
++// The predicate's result type does not model boolean-testable (it has an
++// ADL-reachable operator&& and operator!), so this is undefined behaviour.
++// libstdc++ supports it as a QoI extension: std::find_if does not evaluate
++// the predicate on, or dereference, the past-the-end iterator.
++
++#include <algorithm>
++#include <testsuite_hooks.h>
++#include <testsuite_iterators.h>
++
++using __gnu_test::test_container;
++using __gnu_test::forward_iterator_wrapper;
++
++int truth = 0;
++
++struct Logic
++{
++  Logic operator!() const { return Logic(); }
++  operator bool() const { return truth != 0; }
++};
++
++struct Value
++{
++  Logic operator>(Value) const { return Logic(); }
++};
++
++bool operator&&(bool, Logic) { return false; }
++
++struct Pred
++{
++  Logic operator()(Value v) const { return v > v; }
++};
++
++void
++test01()
++{
++  Value arr[1] = { };
++
++  test_container<Value, forward_iterator_wrapper> empty(arr, arr);
++  VERIFY( std::find_if(empty.begin(), empty.end(), Pred()).ptr == arr );
++
++  test_container<Value, forward_iterator_wrapper> con(arr, arr + 1);
++  VERIFY( std::find_if(con.begin(), con.end(), Pred()).ptr == arr + 1 );
++}
++
++int
++main()
++{
++  test01();
++  return 0;
++}
+diff --git a/libstdc++-v3/testsuite/25_algorithms/mismatch/overloaded_logical_ops.cc b/libstdc++-v3/testsuite/25_algorithms/mismatch/overloaded_logical_ops.cc
+new file mode 100644
+index 000000000000..02bc86bfca9a
+--- /dev/null
++++ b/libstdc++-v3/testsuite/25_algorithms/mismatch/overloaded_logical_ops.cc
+@@ -0,0 +1,54 @@
++// The predicate's result type does not model boolean-testable (it has an
++// ADL-reachable operator&& and operator!), so this is undefined behaviour.
++// libstdc++ supports it as a QoI extension: std::mismatch does not evaluate
++// the predicate on, or dereference, the past-the-end iterator.
++
++#include <algorithm>
++#include <testsuite_hooks.h>
++#include <testsuite_iterators.h>
++
++using __gnu_test::test_container;
++using __gnu_test::forward_iterator_wrapper;
++
++int truth = 0;
++
++struct Logic
++{
++  Logic operator!() const { return Logic(); }
++  operator bool() const { return truth != 0; }
++};
++
++struct Value { };
++
++bool operator&&(bool, Logic) { return false; }
++
++struct Eq
++{
++  Logic operator()(Value, Value) const { return Logic(); }
++};
++
++void
++test01()
++{
++  Value arr[1] = { };
++
++  test_container<Value, forward_iterator_wrapper> empty(arr, arr);
++  test_container<Value, forward_iterator_wrapper> other(arr, arr + 1);
++  forward_iterator_wrapper<Value> r
++    = std::mismatch(empty.begin(), empty.end(), other.begin(), Eq()).first;
++  VERIFY( r.ptr == arr );
++
++#ifdef __cpp_lib_robust_nonmodifying_seq_ops  // C++ >= 14
++  test_container<Value, forward_iterator_wrapper> e2(arr, arr);
++  test_container<Value, forward_iterator_wrapper> o2(arr, arr + 1);
++  auto r2 = std::mismatch(e2.begin(), e2.end(), o2.begin(), o2.end(), Eq());
++  VERIFY( r2.first.ptr == arr );
++#endif
++}
++
++int
++main()
++{
++  test01();
++  return 0;
++}

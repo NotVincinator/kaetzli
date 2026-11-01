@@ -1,0 +1,60 @@
+From 9d2389a9929e45b7e9df7135166bf53e70c77b97 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Wed, 28 Oct 2026 15:26:55 +0000
+Subject: [PATCH 369/385] libstdc++: Improve exception text from
+ chrono::tzdb::locate_zone
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+I think "cannot locate time zone" is better than "cannot locate zone".
+If an application shows this message to a user then mentioning "time
+zone" is more user-friendly than expecting people to recognise what
+"std::chrono::tzdb" means. That class name is only meaningful to C++
+developers.
+
+Furthmore, if the application removes the "std::chrono::tzdb: " prefix
+then this leaves a reasonable descriptive message that isn't too
+cryptic.
+
+libstdc++-v3/ChangeLog:
+
+	* src/c++20/tzdb.cc (tzdb::locate_zone): Adjust exception text
+	to say "time zone".
+	* testsuite/std/time/tzdb/links.cc: Adjust expected exception
+	text.
+
+Reviewed-by: Tomasz Kamiński <tkaminsk@redhat.com>
+
+(cherry picked from commit 4df0aa192d9308936d6f2f0dc643c8c7ba31e46c)
+---
+ libstdc++-v3/src/c++20/tzdb.cc                | 2 +-
+ libstdc++-v3/testsuite/std/time/tzdb/links.cc | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/libstdc++-v3/src/c++20/tzdb.cc b/libstdc++-v3/src/c++20/tzdb.cc
+index f3f1ac720fc4..4de3d3221499 100644
+--- a/libstdc++-v3/src/c++20/tzdb.cc
++++ b/libstdc++-v3/src/c++20/tzdb.cc
+@@ -2304,7 +2304,7 @@ constinit tzdb_list::_Node::NumLeapSeconds tzdb_list::_Node::num_leap_seconds;
+   {
+     if (auto tz = do_locate_zone(zones, links, tz_name))
+       return tz;
+-    string_view err = "std::chrono::tzdb: cannot locate zone: ";
++    string_view err = "std::chrono::tzdb: cannot locate time zone: ";
+     string str;
+     str.reserve(err.size() + tz_name.size());
+     str += err;
+diff --git a/libstdc++-v3/testsuite/std/time/tzdb/links.cc b/libstdc++-v3/testsuite/std/time/tzdb/links.cc
+index 0ba214846c6e..8d4cd9349ccb 100644
+--- a/libstdc++-v3/testsuite/std/time/tzdb/links.cc
++++ b/libstdc++-v3/testsuite/std/time/tzdb/links.cc
+@@ -117,7 +117,7 @@ Link Cycle4_D Cycle4_A
+     VERIFY( false );
+   } catch (const std::runtime_error& e) {
+     std::string_view what(e.what());
+-    VERIFY( what.ends_with("cannot locate zone: BadLink") );
++    VERIFY( what.ends_with("cannot locate time zone: BadLink") );
+   }
+ 
+   // LinkSelf forms a link cycle with itself.

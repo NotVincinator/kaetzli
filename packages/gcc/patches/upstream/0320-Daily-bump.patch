@@ -1,0 +1,33 @@
+From af0f29b9335657fc035248d14f7a708c8ab257d1 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 22 Oct 2026 00:21:04 +0000
+Subject: [PATCH 320/385] Daily bump.
+
+---
+ gcc/ChangeLog | 8 ++++++++
+ gcc/DATESTAMP | 2 +-
+ 2 files changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 6314027ac6eb..d65a17fdecba 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,11 @@
++2026-10-21  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
++
++	Backported from master:
++	2026-10-21  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
++
++	* doc/sourcebuild.texi: Correct arm_v8_1_lob_ok to
++	arm_v8_1m_lob_hw.
++
+ 2026-10-20  Uros Bizjak  <ubizjak@gmail.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 0d25cc7575f6..79adab482f96 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261021
++20261022

@@ -1,0 +1,33 @@
+From a79e6dce98dd9550636f3034af2a55cd5cad0e15 Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Fri, 23 Oct 2026 21:27:01 +0200
+Subject: [PATCH 345/385] fortran: Fix invalid read with 'use, only:'
+ [PR128067]
+
+	PR fortran/128067
+
+gcc/fortran/ChangeLog:
+
+	* module.cc (load_needed): Prevent scanning of empty name for
+	prefix "__".
+
+(cherry picked from commit 488509e6d4b243e5bda750b2d4b2fd8a80a1572f)
+---
+ gcc/fortran/module.cc | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/fortran/module.cc b/gcc/fortran/module.cc
+index ef8b13291d2d..649928f20a50 100644
+--- a/gcc/fortran/module.cc
++++ b/gcc/fortran/module.cc
+@@ -5556,7 +5556,9 @@ load_needed (pointer_info *p)
+      but not used warnings; don't mark internal symbols such as __vtab,
+      __def_init etc. Only mark them if they have been explicitly loaded.  */
+ 
+-  if (only_flag && sym->name[0] != '_' && sym->name[1] != '_')
++  if (only_flag
++      && sym->name[0] != '\0'
++      && !(sym->name[0] == '_' && sym->name[1] == '_'))
+     {
+       gfc_use_rename *u;
+ 

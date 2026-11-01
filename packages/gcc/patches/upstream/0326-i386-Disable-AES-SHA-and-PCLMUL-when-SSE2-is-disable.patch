@@ -1,0 +1,42 @@
+From 0788b940a039fa8e9404f4b1a9ea100bfabf2309 Mon Sep 17 00:00:00 2001
+From: Uros Bizjak <ubizjak@gmail.com>
+Date: Fri, 23 Oct 2026 14:30:44 +0200
+Subject: [PATCH 326/385] i386: Disable AES, SHA and PCLMUL when SSE2 is
+ disabled [PR128105]
+
+AES, SHA and PCLMUL all depend on SSE2 (their *_SET masks pull it in),
+but OPTION_MASK_ISA_SSE2_UNSET did not clear them.  As a result,
+-mno-sse (or -mno-sse2) left these ISAs enabled, together with
+anything built on top of them such as VPCLMULQDQ, and the compiler
+could then try to use patterns that require XMM registers when SSE
+is not available.
+
+Add AES, SHA and PCLMUL to the SSE2 unset mask so that disabling SSE2
+also disables the ISAs that depend on it.
+
+	PR target/128105
+
+gcc/ChangeLog:
+
+	* common/config/i386/i386-common.cc (OPTION_MASK_ISA_SSE2_UNSET):
+	Add OPTION_MASK_ISA_AES_UNSET, OPTION_MASK_ISA_SHA_UNSET and
+	OPTION_MASK_ISA_PCLMUL_UNSET.
+---
+ gcc/common/config/i386/i386-common.cc | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/common/config/i386/i386-common.cc b/gcc/common/config/i386/i386-common.cc
+index effc570aca16..2469f3119ff9 100644
+--- a/gcc/common/config/i386/i386-common.cc
++++ b/gcc/common/config/i386/i386-common.cc
+@@ -220,7 +220,9 @@ along with GCC; see the file COPYING3.  If not see
+ #define OPTION_MASK_ISA_SSE_UNSET \
+   (OPTION_MASK_ISA_SSE | OPTION_MASK_ISA_SSE2_UNSET)
+ #define OPTION_MASK_ISA_SSE2_UNSET \
+-  (OPTION_MASK_ISA_SSE2 | OPTION_MASK_ISA_SSE3_UNSET)
++  (OPTION_MASK_ISA_SSE2 | OPTION_MASK_ISA_SSE3_UNSET \
++   | OPTION_MASK_ISA_AES_UNSET | OPTION_MASK_ISA_SHA_UNSET \
++   | OPTION_MASK_ISA_PCLMUL_UNSET)
+ #define OPTION_MASK_ISA_SSE3_UNSET \
+   (OPTION_MASK_ISA_SSE3 \
+    | OPTION_MASK_ISA_SSSE3_UNSET \

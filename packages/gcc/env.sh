@@ -22,3 +22,11 @@ UPSTREAM_REGEX='gcc-([0-9]+(\.[0-9]+)*)/'
 # Every major but 16 — the line to edit when builder/Containerfile's snapshot moves sid
 # to a new gcc.
 UPSTREAM_IGNORE='([0-9]|1[0-57-9]|[2-9][0-9])\..*'
+# The release branch, like glibc: what we ship of gcc is libgcc_s and libstdc++, and the
+# fixes to them — CVE-2026-114690 and -114691 in libstdc++ among them — land on
+# releases/gcc-16 long before a 16.x.y tarball does. Debian builds the branch too
+# (gcc-16 16.2.0-4). patches/upstream/ is `git format-patch` of it since the tag
+# (tools/sync-patches.sh).
+UPSTREAM_PATCH_GIT="https://gcc.gnu.org/git/gcc.git"
+UPSTREAM_PATCH_BRANCH="releases/gcc-${VERSION%%.*}"
+UPSTREAM_PATCH_BASE="releases/${PACKAGE}"

@@ -1,0 +1,29 @@
+From 50d9ca11d6aba84c4e4da9d84776a16274a22c58 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Wed, 16 Sep 2026 15:01:07 +0100
+Subject: [PATCH 180/385] libstdc++: Fix typo in
+ 20_util/function_objects/dr660.cc
+
+libstdc++-v3/ChangeLog:
+
+	* testsuite/20_util/function_objects/dr660.cc: Include the
+	testsuite_hooks.h header not testsuite_hooks.cc.
+
+(cherry picked from commit 2044697b763f133f5e5cffe49b09e4609ce4968f)
+---
+ libstdc++-v3/testsuite/20_util/function_objects/dr660.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/libstdc++-v3/testsuite/20_util/function_objects/dr660.cc b/libstdc++-v3/testsuite/20_util/function_objects/dr660.cc
+index b4223b6b66bc..e4725f23aaed 100644
+--- a/libstdc++-v3/testsuite/20_util/function_objects/dr660.cc
++++ b/libstdc++-v3/testsuite/20_util/function_objects/dr660.cc
+@@ -18,7 +18,7 @@
+ // <http://www.gnu.org/licenses/>.
+ 
+ #include <functional>
+-#include <testsuite_hooks.cc>
++#include <testsuite_hooks.h>
+ 
+ // DR 660. Missing Bitwise Operations.
+ void test01()

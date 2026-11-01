@@ -1,0 +1,320 @@
+From 144566226a88f8e165b7a8ede186ac39129b2bdf Mon Sep 17 00:00:00 2001
+From: Vineet Gupta <vineet.gupta@linux.dev>
+Date: Tue, 13 Oct 2026 18:15:49 +0530
+Subject: [PATCH 371/385] simplify-rtx: Don't merge equal operands with side
+ effects [PR127852]
+
+With -ffuse-ops-with-volatile-access combine can hand
+simplify_binary_operation_1 two copies of the same volatile MEM, e.g.
+(minus (ashift (mem/v) 1) (mem/v)) for
+"int a = *p; return 2 * a - *p;".  The MINUS coefficient fold and the
+(X + 1) * Y - Y and (X - 1) * Y + Y folds merge the two copies into one,
+so one of two sequenced volatile reads is lost.  Only the PLUS
+coefficient fold had a guard, and it only looked at a bare volatile MEM.
+
+Require !side_effects_p for the operand that would be merged, as the
+other folds in this function already do.
+
+Bootstrapped and regression tested on x86_64-linux-gnu and aarch64-linux-gnu.
+
+	PR rtl-optimization/127852
+
+gcc/ChangeLog:
+
+	* simplify-rtx.cc (simplify_context::simplify_binary_operation_1):
+	Don't merge two equal operands with side effects in the PLUS and
+	MINUS coefficient folds and in the (X - 1) * Y + Y and
+	(X + 1) * Y - Y folds.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/aarch64/volatile-fuse-minus-1.c: New test.
+	* gcc.target/aarch64/volatile-fuse-minus-2.c: New test.
+	* gcc.target/i386/volatile-fuse-minus-1.c: New test.
+	* gcc.target/i386/volatile-fuse-minus-2.c: New test.
+
+Signed-off-by: Vineet Gupta <vineet.gupta@linux.dev>
+---
+ gcc/simplify-rtx.cc                           | 12 +--
+ .../aarch64/volatile-fuse-minus-1.c           | 79 +++++++++++++++++++
+ .../aarch64/volatile-fuse-minus-2.c           | 23 ++++++
+ .../gcc.target/i386/volatile-fuse-minus-1.c   | 79 +++++++++++++++++++
+ .../gcc.target/i386/volatile-fuse-minus-2.c   | 23 ++++++
+ 5 files changed, 210 insertions(+), 6 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/volatile-fuse-minus-1.c
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/volatile-fuse-minus-2.c
+ create mode 100644 gcc/testsuite/gcc.target/i386/volatile-fuse-minus-1.c
+ create mode 100644 gcc/testsuite/gcc.target/i386/volatile-fuse-minus-2.c
+
+diff --git a/gcc/simplify-rtx.cc b/gcc/simplify-rtx.cc
+index b3d5c7b4197d..e2c924f0205c 100644
+--- a/gcc/simplify-rtx.cc
++++ b/gcc/simplify-rtx.cc
+@@ -3222,9 +3222,8 @@ simplify_context::simplify_binary_operation_1 (rtx_code code,
+ 	      rhs = XEXP (rhs, 0);
+ 	    }
+ 
+-	  /* Keep PLUS of 2 volatile memory references.  */
+-	  if (rtx_equal_p (lhs, rhs)
+-	      && (!MEM_P (lhs) || !MEM_VOLATILE_P (lhs)))
++	  /* Don't merge operands that have side effects.  */
++	  if (rtx_equal_p (lhs, rhs) && !side_effects_p (lhs))
+ 	    {
+ 	      rtx orig = gen_rtx_PLUS (int_mode, op0, op1);
+ 	      rtx coeff;
+@@ -3270,7 +3269,8 @@ simplify_context::simplify_binary_operation_1 (rtx_code code,
+ 		       && rtx_equal_p (XEXP (op1, 0), op0))
+ 		rhs = XEXP (XEXP (op1, 1), 0);
+ 	    }
+-	  if (lhs != op0 || rhs != op1)
++	  if ((lhs != op0 && !side_effects_p (op1))
++	      || (rhs != op1 && !side_effects_p (op0)))
+ 	    return simplify_gen_binary (MULT, int_mode, lhs, rhs);
+ 	}
+ 
+@@ -3446,7 +3446,7 @@ simplify_context::simplify_binary_operation_1 (rtx_code code,
+ 	      rhs = XEXP (rhs, 0);
+ 	    }
+ 
+-	  if (rtx_equal_p (lhs, rhs))
++	  if (rtx_equal_p (lhs, rhs) && !side_effects_p (lhs))
+ 	    {
+ 	      rtx orig = gen_rtx_MINUS (int_mode, op0, op1);
+ 	      rtx coeff;
+@@ -3476,7 +3476,7 @@ simplify_context::simplify_binary_operation_1 (rtx_code code,
+ 		       && rtx_equal_p (XEXP (op0, 0), op1))
+ 		lhs = XEXP (XEXP (op0, 1), 0);
+ 	    }
+-	  if (lhs != op0)
++	  if (lhs != op0 && !side_effects_p (op1))
+ 	    return simplify_gen_binary (MULT, int_mode, lhs, op1);
+ 	}
+ 
+diff --git a/gcc/testsuite/gcc.target/aarch64/volatile-fuse-minus-1.c b/gcc/testsuite/gcc.target/aarch64/volatile-fuse-minus-1.c
+new file mode 100644
+index 000000000000..17ac2f2d5206
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/volatile-fuse-minus-1.c
+@@ -0,0 +1,79 @@
++/* { dg-do compile } */
++/* { dg-options "-O2" } */
++
++/* Each function reads *P twice, in separate full expressions.  Combine
++   must not merge the two volatile reads when it simplifies the
++   arithmetic on them.  */
++
++int
++dbl (volatile int *p)
++{
++  int a = *p;
++  return 2 * a - *p;
++}
++
++int
++shl3 (volatile int *p)
++{
++  int a = *p;
++  int b = *p;
++  return (a << 3) - b;
++}
++
++long
++lshl3 (volatile long *p)
++{
++  long a = *p;
++  long b = *p;
++  return (a << 3) - b;
++}
++
++unsigned
++poll2 (volatile unsigned *p)
++{
++  unsigned s1 = *p;
++  unsigned s2 = *p;
++  return (s1 << 4) - s2;
++}
++
++short
++sh2 (volatile short *p)
++{
++  short a = *p;
++  short b = *p;
++  return (short) ((a << 2) - b);
++}
++
++int
++xp1 (volatile int *p, int x)
++{
++  int a = *p;
++  int b = *p;
++  return (x + 1) * a - b;
++}
++
++int
++xm1 (volatile int *p, int x)
++{
++  int a = *p;
++  int b = *p;
++  return (x - 1) * a + b;
++}
++
++int
++neg2 (volatile int *p)
++{
++  int a = *p;
++  int b = *p;
++  return -a - b;
++}
++
++int
++mul42 (volatile int *p)
++{
++  int a = *p;
++  int b = *p;
++  return a * 4 - b * 2;
++}
++
++/* { dg-final { scan-assembler-times {\[x0\]} 18 } } */
+diff --git a/gcc/testsuite/gcc.target/aarch64/volatile-fuse-minus-2.c b/gcc/testsuite/gcc.target/aarch64/volatile-fuse-minus-2.c
+new file mode 100644
+index 000000000000..b87a44324fa6
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/volatile-fuse-minus-2.c
+@@ -0,0 +1,23 @@
++/* { dg-do compile } */
++/* { dg-options "-Os" } */
++
++/* At -Os the subtraction of two sequenced volatile reads of *P must keep
++   both reads.  */
++
++int
++sub2 (volatile int *p)
++{
++  int a = *p;
++  int b = *p;
++  return a - b;
++}
++
++long
++lsub2 (volatile long *p)
++{
++  long a = *p;
++  long b = *p;
++  return a - b;
++}
++
++/* { dg-final { scan-assembler-times {\[x0\]} 4 } } */
+diff --git a/gcc/testsuite/gcc.target/i386/volatile-fuse-minus-1.c b/gcc/testsuite/gcc.target/i386/volatile-fuse-minus-1.c
+new file mode 100644
+index 000000000000..23366d11407b
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/volatile-fuse-minus-1.c
+@@ -0,0 +1,79 @@
++/* { dg-do compile { target lp64 } } */
++/* { dg-options "-O2 -masm=att" } */
++
++/* Each function reads *P twice, in separate full expressions.  Combine
++   must not merge the two volatile reads when it simplifies the
++   arithmetic on them.  */
++
++int
++dbl (volatile int *p)
++{
++  int a = *p;
++  return 2 * a - *p;
++}
++
++int
++shl3 (volatile int *p)
++{
++  int a = *p;
++  int b = *p;
++  return (a << 3) - b;
++}
++
++long
++lshl3 (volatile long *p)
++{
++  long a = *p;
++  long b = *p;
++  return (a << 3) - b;
++}
++
++unsigned
++poll2 (volatile unsigned *p)
++{
++  unsigned s1 = *p;
++  unsigned s2 = *p;
++  return (s1 << 4) - s2;
++}
++
++short
++sh2 (volatile short *p)
++{
++  short a = *p;
++  short b = *p;
++  return (short) ((a << 2) - b);
++}
++
++int
++xp1 (volatile int *p, int x)
++{
++  int a = *p;
++  int b = *p;
++  return (x + 1) * a - b;
++}
++
++int
++xm1 (volatile int *p, int x)
++{
++  int a = *p;
++  int b = *p;
++  return (x - 1) * a + b;
++}
++
++int
++neg2 (volatile int *p)
++{
++  int a = *p;
++  int b = *p;
++  return -a - b;
++}
++
++int
++mul42 (volatile int *p)
++{
++  int a = *p;
++  int b = *p;
++  return a * 4 - b * 2;
++}
++
++/* { dg-final { scan-assembler-times "\\(%rdi\\)" 18 } } */
+diff --git a/gcc/testsuite/gcc.target/i386/volatile-fuse-minus-2.c b/gcc/testsuite/gcc.target/i386/volatile-fuse-minus-2.c
+new file mode 100644
+index 000000000000..0135992d5bc7
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/volatile-fuse-minus-2.c
+@@ -0,0 +1,23 @@
++/* { dg-do compile { target lp64 } } */
++/* { dg-options "-Os -masm=att" } */
++
++/* At -Os the subtraction of two sequenced volatile reads of *P must keep
++   both reads.  */
++
++int
++sub2 (volatile int *p)
++{
++  int a = *p;
++  int b = *p;
++  return a - b;
++}
++
++long
++lsub2 (volatile long *p)
++{
++  long a = *p;
++  long b = *p;
++  return a - b;
++}
++
++/* { dg-final { scan-assembler-times "\\(%rdi\\)" 4 } } */

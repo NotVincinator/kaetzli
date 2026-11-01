@@ -1,0 +1,43 @@
+From 4a8174a224d9bc94104e3d34927ddc3173c9793e Mon Sep 17 00:00:00 2001
+From: Nicolas Boulenguez <nicolas@debian.org>
+Date: Mon, 26 Oct 2026 09:51:32 +0100
+Subject: [PATCH 341/385] Ada: Remove superfluous call to
+ Milliseconds_To_Timeval
+
+Timeval is a public type of System.C_Time so aggregates can be used for it.
+
+gcc/ada/
+	PR ada/114065
+	* libgnat/g-sothco.ads (Immediat): Use aggregate initial value.
+	* libgnat/s-c_time.ads (Milliseconds_To_Timeval): Remove comment.
+---
+ gcc/ada/libgnat/g-sothco.ads | 3 +--
+ gcc/ada/libgnat/s-c_time.ads | 1 -
+ 2 files changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/gcc/ada/libgnat/g-sothco.ads b/gcc/ada/libgnat/g-sothco.ads
+index 898ffc2e95d7..7e550d119e78 100644
+--- a/gcc/ada/libgnat/g-sothco.ads
++++ b/gcc/ada/libgnat/g-sothco.ads
+@@ -61,8 +61,7 @@ package GNAT.Sockets.Thin_Common is
+    type socklen_t is mod 2 ** (8 * SOSC.SIZEOF_socklen_t);
+    for socklen_t'Size use (8 * SOSC.SIZEOF_socklen_t);
+ 
+-   Immediat : constant System.C_Time.timeval
+-     := System.C_Time.Milliseconds_To_Timeval (0);
++   Immediat : constant System.C_Time.timeval := (0, 0);
+ 
+    -------------------------------------------
+    -- Mapping tables to low level constants --
+diff --git a/gcc/ada/libgnat/s-c_time.ads b/gcc/ada/libgnat/s-c_time.ads
+index bf1b67219613..c70bd6f04afa 100644
+--- a/gcc/ada/libgnat/s-c_time.ads
++++ b/gcc/ada/libgnat/s-c_time.ads
+@@ -82,7 +82,6 @@ is
+ 
+    function Milliseconds_To_Timeval (M : Interfaces.C.int) return timeval
+      with Inline;
+-   --  g-sothco.ads
+    --  g-spogwa.adb
+ 
+    function Nanoseconds_To_Timespec (N : Interfaces.C.int) return timespec

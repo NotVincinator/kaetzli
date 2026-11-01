@@ -1,0 +1,83 @@
+From 2a59ef66015f83f20096a7f76b348218b1cb9f60 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Fri, 11 Sep 2026 09:31:57 +0200
+Subject: [PATCH 260/385] c++: Fix up tsubst_splice_expr [PR127276]
+
+The following testcase is incorrectly rejected.
+While when parsing the splice expressions outside of templates we call
+finish_id_expression -> finish_id_expression_1 -> convert_from_reference,
+in tsubst_splice_expr that doesn't happen and so build_x_array_ref is
+called with the PARM_DECLs of REFERENCE_TYPE rather than INDIRECT_REFs
+of those.
+
+The following patch adds the convert_from_reference call.
+
+2026-09-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/127276
+	* pt.cc (tsubst_splice_expr): Call convert_from_reference if not
+	member access and SPLICE_EXPR is a splice expression.
+
+	* g++.dg/reflect/pr127276.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit dcaafedee8a34f9ad60ac4d47ffe7529959028d2)
+---
+ gcc/cp/pt.cc                            |  2 ++
+ gcc/testsuite/g++.dg/reflect/pr127276.C | 34 +++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+)
+ create mode 100644 gcc/testsuite/g++.dg/reflect/pr127276.C
+
+diff --git a/gcc/cp/pt.cc b/gcc/cp/pt.cc
+index 59ba8ea9f63a..a60696dcdd8f 100644
+--- a/gcc/cp/pt.cc
++++ b/gcc/cp/pt.cc
+@@ -17046,6 +17046,8 @@ tsubst_splice_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
+      certain kind of entities.  */
+   if (SPLICE_EXPR_MEMBER_ACCESS_P (t))
+     gcc_assert (valid_splice_for_member_access_p (op, /*decls_only_p=*/false));
++  else if (SPLICE_EXPR_EXPRESSION_P (t))
++    op = convert_from_reference (op);
+ 
+   return op;
+ }
+diff --git a/gcc/testsuite/g++.dg/reflect/pr127276.C b/gcc/testsuite/g++.dg/reflect/pr127276.C
+new file mode 100644
+index 000000000000..801e7284cf7d
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/reflect/pr127276.C
+@@ -0,0 +1,34 @@
++// PR c++/127276
++// { dg-do compile { target c++26 } }
++// { dg-additional-options "-freflection" }
++
++struct A {
++  constexpr int &operator[] (int x) { return a[x]; };
++  int a[2];
++};
++
++constexpr int
++foo (A &x, int y)
++{
++  return [: ^^x :][ [: ^^y :] ];
++}
++
++template <typename T>
++constexpr int
++bar (T &x, int y)
++{
++  return [: ^^x :][ [: ^^y :] ];
++}
++
++constexpr bool
++baz ()
++{
++  A a = { 2, 3 };
++  if (foo (a, 0) != 2 || foo (a, 1) != 3)
++    return false;
++  if (bar (a, 0) != 2 || bar (a, 1) != 3)
++    return false;
++  return true;
++}
++
++static_assert (baz ());

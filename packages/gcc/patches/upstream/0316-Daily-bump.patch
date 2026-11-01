@@ -1,0 +1,147 @@
+From 11579170e3e6ea59a712aa8b9910bb0f4fd5b753 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 20 Oct 2026 00:21:05 +0000
+Subject: [PATCH 316/385] Daily bump.
+
+---
+ contrib/ChangeLog       |  8 ++++++++
+ gcc/ChangeLog           | 15 +++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/ada/ChangeLog       | 32 ++++++++++++++++++++++++++++++++
+ gcc/cp/ChangeLog        |  9 +++++++++
+ gcc/testsuite/ChangeLog | 22 ++++++++++++++++++++++
+ 6 files changed, 87 insertions(+), 1 deletion(-)
+
+diff --git a/contrib/ChangeLog b/contrib/ChangeLog
+index dd9df688a2d7..fb0dd5b193ec 100644
+--- a/contrib/ChangeLog
++++ b/contrib/ChangeLog
+@@ -1,3 +1,11 @@
++2026-10-19  Richard Earnshaw  <rearnsha@arm.com>
++
++	Backported from master:
++	2026-10-19  Richard Earnshaw  <rearnsha@arm.com>
++
++	* gcc_update: Add a new option, --no-fetch.  If specified, run
++	git rebase rather than git pull.
++
+ 2026-08-07  Release Manager
+ 
+ 	* GCC 16.2.0 released.
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index c2f0421b91bf..df834ba65b21 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,18 @@
++2026-10-19  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* config/i386/i386.cc (get_scratch_register_on_entry): Never return
++	the DRAP register.
++
++2026-10-19  Kyrylo Tkachov  <ktkachov@nvidia.com>
++
++	Backported from master:
++	2026-10-16  Kyrylo Tkachov  <ktkachov@nvidia.com>
++
++	PR tree-optimization/127357
++	PR tree-optimization/127916
++	* match.pd (signed_integer_sat_add): Require opposite signs
++	for the two constants of the single AND IMM form.
++
+ 2026-10-16  Rasmus Villemoes  <rv@rasmusvillemoes.dk>
+ 
+ 	* doc/extend.texi (Common Attributes): Fix typo in example.
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 1e7995319f27..39b2052b5cc9 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261019
++20261020
+diff --git a/gcc/ada/ChangeLog b/gcc/ada/ChangeLog
+index 04d35eb7ae74..61bd5e469105 100644
+--- a/gcc/ada/ChangeLog
++++ b/gcc/ada/ChangeLog
+@@ -1,3 +1,35 @@
++2026-10-19  Eric Botcazou  <ebotcazou@adacore.com>
++
++	PR ada/127994
++	* exp_aggr.adb (Late_Expansion): Add Ptr_Typ formal parameter and
++	pass it in the call to Build_Record_Aggr_Code.
++	(Build_Record_Aggr_Code): Add Ptr_Typ formal parameter and pass it
++	in the call to Build_Initialization_Call.
++	(Convert_Aggr_In_Allocator): Remove useless test and pass the type
++	of the temporary in the call to Late_Expansion.
++
++2026-10-19  Liam Powell  <liam@liampwll.com>
++
++	PR ada/127974
++	* libgnat/s-fatgen.adb (Valid): Turn Rep into an imported constant
++	and mask out the sign for the test on its Most Significant Word.
++
++2026-10-19  Eric Botcazou  <ebotcazou@adacore.com>
++
++	PR ada/127994
++	* checks.adb (Build_Discriminant_Checks): Replace all calls to
++	Sem_Util.Within_Init_Proc by calls to Exp_Util.Inside_Init_Proc.
++	* exp_aggr.adb (Build_Record_Aggr_Code): Likewise.
++	* exp_ch2.adb (Expand_Discriminant): Likewise.
++	* exp_ch7.adb (Establish_Transient_Scope): Likewise.
++	* exp_pakd.adb (Expand_Bit_Packed_Element_Set): Likewise.
++	* exp_util.adb (Expand_Subtype_From_Expr): Likewise.
++	* sem_ch3.adb (Analyze_Subtype_Declaration): Likewise.
++	(Build_Discriminated_Subtype): Likewise.
++	* sem_util.adb (Normalize_Actuals): Likewise.
++	(Within_Init_Proc): Delete.
++	* sem_util.ads (Within_Init_Proc): Likewise.
++
+ 2026-10-14  Eric Botcazou  <ebotcazou@adacore.com>
+ 
+ 	PR ada/127880
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index 3517c053e7b2..fbca66a08a4d 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,12 @@
++2026-10-19  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2026-10-19  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/126680
++	* name-lookup.cc (set_decl_context_in_fn): Check DECL_THIS_EXTERN
++	instead of DECL_EXTERNAL.
++
+ 2026-10-10  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 09e6a7d138a8..ecf26fdeb2f9 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,25 @@
++2026-10-19  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2026-10-19  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/126680
++	* g++.dg/reflect/decomp1.C: New test.
++
++2026-10-19  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* gnat.dg/task7.adb: New test.
++	* gnat.dg/task7_pkg.ads: New helper package.
++
++2026-10-19  Kyrylo Tkachov  <ktkachov@nvidia.com>
++
++	Backported from master:
++	2026-10-16  Kyrylo Tkachov  <ktkachov@nvidia.com>
++
++	PR tree-optimization/127357
++	PR tree-optimization/127916
++	* gcc.dg/torture/pr127357.c: New test.
++
+ 2026-10-16  Jeff Law  <jeffreyalaw@gmail.com>
+ 
+ 	Backported from master:

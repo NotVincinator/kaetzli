@@ -1,0 +1,156 @@
+From f5850210f2752aa6b81b885fa6e21eddecedec35 Mon Sep 17 00:00:00 2001
+From: Jerry DeLisle <jvdelisle@gcc.gnu.org>
+Date: Wed, 23 Sep 2026 10:26:50 -0700
+Subject: [PATCH 209/385] fortran: [PR127187] ICE with %LEN of deferred-length
+ character in ASSOCIATE
+
+A %LEN or %KIND inquiry of a deferred-length character variable gives
+an INTEGER expression that still carried the deferred flag of the
+character typespec.  An associate-name with such a selector inherited
+it, and gfc_get_symbol_decl then segfaulted looking for its string
+length.
+
+A related bug: for an associate-name whose selector is deferred-length
+character, resolve_variable reset the typespec of the expression to
+that of the associate-name unless a substring reference was present.
+An inquiry reference of the associate-name, e.g. q%len, thus reverted
+to CHARACTER, giving an ICE in conv_inquiry or a spurious error on
+comparison with an INTEGER.
+
+	PR fortran/127187
+
+gcc/fortran/ChangeLog:
+
+	PR fortran/127187
+	* primary.cc (gfc_match_varspec): Clear the deferred flag, and
+	for KIND the charlen, of the INTEGER result of a LEN or KIND
+	inquiry.
+	* resolve.cc (resolve_variable): Do not reset the typespec of a
+	deferred-length character associate-name expression that has an
+	inquiry reference.
+
+gcc/testsuite/ChangeLog:
+
+	PR fortran/127187
+	* gfortran.dg/associate_90.f90: New test.
+
+(cherry picked from commit e0f62720743e7750eef0c86dfa23d5965e2de785)
+---
+ gcc/fortran/primary.cc                     |  6 ++
+ gcc/fortran/resolve.cc                     |  2 +-
+ gcc/testsuite/gfortran.dg/associate_90.f90 | 69 ++++++++++++++++++++++
+ 3 files changed, 76 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/associate_90.f90
+
+diff --git a/gcc/fortran/primary.cc b/gcc/fortran/primary.cc
+index d167036b8086..04d16cdffbd6 100644
+--- a/gcc/fortran/primary.cc
++++ b/gcc/fortran/primary.cc
+@@ -2836,6 +2836,7 @@ gfc_match_varspec (gfc_expr *primary, int equiv_flag, bool sub_flag,
+ 		  return MATCH_ERROR;
+ 		}
+ 	      primary->ts.u.cl = NULL;
++	      primary->ts.deferred = false;
+ 	      primary->ts.type = BT_INTEGER;
+ 	      primary->ts.kind = gfc_default_integer_kind;
+ 	      break;
+@@ -2851,6 +2852,11 @@ gfc_match_varspec (gfc_expr *primary, int equiv_flag, bool sub_flag,
+ 			     "to an expression of intrinsic type");
+ 		  return MATCH_ERROR;
+ 		}
++	      if (primary->ts.type == BT_CHARACTER)
++		{
++		  primary->ts.u.cl = NULL;
++		  primary->ts.deferred = false;
++		}
+ 	      primary->ts.type = BT_INTEGER;
+ 	      primary->ts.kind = gfc_default_integer_kind;
+ 	      break;
+diff --git a/gcc/fortran/resolve.cc b/gcc/fortran/resolve.cc
+index 1667723c49ce..e29cfe428715 100644
+--- a/gcc/fortran/resolve.cc
++++ b/gcc/fortran/resolve.cc
+@@ -6715,7 +6715,7 @@ resolve_variable (gfc_expr *e)
+     {
+       gfc_ref *ref;
+       for (ref = e->ref; ref; ref = ref->next)
+-	if (ref->type == REF_SUBSTRING)
++	if (ref->type == REF_SUBSTRING || ref->type == REF_INQUIRY)
+ 	  break;
+       if (ref == NULL)
+ 	e->ts = sym->ts;
+diff --git a/gcc/testsuite/gfortran.dg/associate_90.f90 b/gcc/testsuite/gfortran.dg/associate_90.f90
+new file mode 100644
+index 000000000000..2190aa83693a
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/associate_90.f90
+@@ -0,0 +1,69 @@
++! { dg-do run }
++!
++! PR 127187
++! %LEN and %KIND inquiries of deferred-length character in ASSOCIATE.
++!
++! Contributed by Ivan Pribec
++!
++program assoc_len_kind
++  implicit none
++  character(:), allocatable :: s, a(:)
++  character(:), pointer :: p
++  character(kind=4,len=:), allocatable :: w
++  character(7) :: f = 'seven07'
++  complex :: z = (1., 2.)
++  s = 'hello'
++  a = ['ab', 'cd', 'ef']
++  w = 4_'wxyz'
++  allocate (p, source='ptr')
++
++  ! Selector contains an inquiry of a deferred-length variable
++  associate (n => s%len)
++    if (n /= 5) error stop 1
++  end associate
++  associate (n => (s%len))
++    if (n /= 5) error stop 2
++  end associate
++  associate (n => f%len)
++    if (n /= 7) error stop 3
++  end associate
++  associate (n => s%len + 0)
++    if (n /= 5) error stop 4
++  end associate
++  associate (k => z%kind)
++    if (k /= kind(z)) error stop 5
++  end associate
++  associate (k => z%kind, n => s%len)
++    if (k /= kind(z)) error stop 6
++    if (n /= 5) error stop 7
++  end associate
++  associate (n => s%len)
++    s = 'longer_string'
++    if (n /= 5) error stop 8
++  end associate
++  s = 'hello'
++  associate (n => s%kind, m => p%len, k => w%kind)
++    if (n /= 1 .or. m /= 3 .or. k /= 4) error stop 9
++  end associate
++
++  ! Inquiry of an associate-name with a deferred-length selector
++  associate (q => s)
++    if (q%len /= 5 .or. q%kind /= 1) error stop 10
++    if (q(2:3)%len /= 2) error stop 11
++    associate (n => q%len + q%kind)
++      if (n /= 6) error stop 12
++    end associate
++  end associate
++  associate (q => a)
++    if (q%len /= 2 .or. size (q) /= 3) error stop 13
++  end associate
++  associate (q => p, r => w)
++    if (q%len /= 3 .or. r%len /= 4 .or. r%kind /= 4) error stop 14
++  end associate
++  associate (q => s)
++    associate (r => q)
++      if (r%len /= 5) error stop 15
++    end associate
++  end associate
++  deallocate (p)
++end program

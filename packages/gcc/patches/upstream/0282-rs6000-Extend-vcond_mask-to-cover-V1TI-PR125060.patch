@@ -1,0 +1,49 @@
+From 041359f347cb1d48622a2c96934d06d514de7a36 Mon Sep 17 00:00:00 2001
+From: Jeevitha <jeevitha@linux.ibm.com>
+Date: Mon, 12 Oct 2026 00:57:14 -0500
+Subject: [PATCH 282/385] rs6000: Extend vcond_mask to cover V1TI [PR125060]
+
+The vcond_mask_<mode><mode> expander used the VEC_I mode iterator,
+while the vec_cmp<mode><mode> and vec_cmpu<mode><mode> expanders
+already used VEC_IC, which includes V1TI for Power10. As a result,
+vcond_mask_v1tiv1ti was not generated for V1TI.
+
+Without vcond_mask_v1tiv1ti, expand_vec_cond_expr_p returns false
+for V1TI and veclower2 scalarises the VEC_COND_EXPR for vector
+__int128 comparisons through GPRs, losing the xxlnor instructions
+expected by fold-vec-cmp-int128.c and pr103316.c.
+
+Fix this by changing the iterator for vcond_mask_<mode><mode> from
+VEC_I to VEC_IC.
+
+2026-10-07  Jeevitha Palanisamy  <jeevitha@linux.ibm.com>
+
+gcc/
+	PR target/125060
+	* config/rs6000/vector.md (vcond_mask_<mode><mode>): Change the mode
+	iterator from VEC_I to VEC_IC to support V1TI.
+
+(cherry picked from commit eb37eb6bf47acc0b08e998de9d7517cbba648166)
+---
+ gcc/config/rs6000/vector.md | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/gcc/config/rs6000/vector.md b/gcc/config/rs6000/vector.md
+index e6adf91002ed..0b2160cab5fd 100644
+--- a/gcc/config/rs6000/vector.md
++++ b/gcc/config/rs6000/vector.md
+@@ -336,10 +336,10 @@
+ 
+ ;; Same mode for condition true/false values and predicate operand.
+ (define_expand "vcond_mask_<mode><mode>"
+-  [(match_operand:VEC_I 0 "vint_operand")
+-   (match_operand:VEC_I 1 "vint_operand")
+-   (match_operand:VEC_I 2 "vint_operand")
+-   (match_operand:VEC_I 3 "vint_operand")]
++  [(match_operand:VEC_IC 0 "vint_operand")
++   (match_operand:VEC_IC 1 "vint_operand")
++   (match_operand:VEC_IC 2 "vint_operand")
++   (match_operand:VEC_IC 3 "vint_operand")]
+   "VECTOR_UNIT_ALTIVEC_OR_VSX_P (<MODE>mode)"
+ {
+   emit_insn (gen_vector_select_<mode> (operands[0], operands[2], operands[1],

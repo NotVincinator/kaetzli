@@ -1,0 +1,46 @@
+From 484bd2e2b5d1c44211f7bf7c2aa5d711ede9d22b Mon Sep 17 00:00:00 2001
+From: Hodong Kim <hodong@nimfsoft.com>
+Date: Wed, 7 Oct 2026 23:41:24 +0200
+Subject: [PATCH 249/385] Ada: Fix oversight in GNAT.Sockets.Thin
+
+As reported in the PR, both C_Accept and C_Socket call Disable_SIGPIPE
+unconditionally, in other words even though the descriptor is invalid.
+
+gcc/ada/
+	PR ada/127759
+	* libgnat/g-socthi.adb (C_Accept): Do not call Disable_SIGPIPE
+	on failure.
+	(C_Socket): Likewise.
+---
+ gcc/ada/libgnat/g-socthi.adb | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/ada/libgnat/g-socthi.adb b/gcc/ada/libgnat/g-socthi.adb
+index f7fa4007dd1b..a369c98a9e22 100644
+--- a/gcc/ada/libgnat/g-socthi.adb
++++ b/gcc/ada/libgnat/g-socthi.adb
+@@ -187,7 +187,10 @@ package body GNAT.Sockets.Thin is
+          Discard := C_Ioctl (R, SOSC.FIONBIO, Val'Access);
+       end if;
+ 
+-      Disable_SIGPIPE (R);
++      if R /= Failure then
++         Disable_SIGPIPE (R);
++      end if;
++
+       return R;
+    end C_Accept;
+ 
+@@ -533,7 +536,11 @@ package body GNAT.Sockets.Thin is
+          Discard := C_Ioctl (R, SOSC.FIONBIO, Val'Access);
+          Set_Non_Blocking_Socket (R, False);
+       end if;
+-      Disable_SIGPIPE (R);
++
++      if R /= Failure then
++         Disable_SIGPIPE (R);
++      end if;
++
+       return R;
+    end C_Socket;
+ 

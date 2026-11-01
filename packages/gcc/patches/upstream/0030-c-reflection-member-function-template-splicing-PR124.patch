@@ -1,0 +1,431 @@
+From 6068870174e6cd102e5c0e6c3df9ce58caa4b47b Mon Sep 17 00:00:00 2001
+From: feedable <feedabl3@gmail.com>
+Date: Wed, 3 Jun 2026 08:40:53 -0400
+Subject: [PATCH 030/385] c++/reflection: member function template splicing
+ [PR124794]
+
+cp_parser_splice_expression is stripping BASELINKs before resolving the
+expr; checks if the result is a BASELINK after that (by which point it never
+is).  To fix it, stop stripping the BASELINK, add handling to
+check_splice_expr instead.
+
+In cp_parser_splice_specifier, the additional template param parsing fails
+to detect that the reflection is a template if it's wrapped in a BASELINKs,
+and decides not to parse the splice-specialization-specifier if the
+'template' keyword is missing. Grab the data from the reflection instead.
+
+During template instantiation, we blindly substitute the template part of a
+TEMPLATE_ID_EXPR, even if it's a SPLICE_EXPR. This, in turn, substitutes the
+SPLICE_EXPR as-if it had no template arguments and finishes up the
+expression, which interferes with later processing by TEMPLATE_ID_EXPR.  To
+fix, we defer such TEMPLATE_ID_EXPRs to tsubst_splice_expr, which itself
+performs the substitution of a TEMPLATE_ID_EXPR and finishes up the
+expression.
+
+check_splice_expr now also accepts TEMPLATE_ID_EXPRs in tsubst_splice_expr;
+this is uniform with cp_parser_splice_expression, and required in order to
+handle `template[:dep:]<>` where `dep` does not reflect a template.
+
+	PR c++/124794
+	PR c++/125069
+
+gcc/cp/ChangeLog:
+
+	* parser.cc (cp_parser_splice_specifier): Do not strip BASELINKs.
+	(cp_parser_splice_expression): Add parsing for member function
+	template specializations without the "template" keyword.
+	* pt.cc (tsubst_splice_expr): Handle TEMPLATE_ID_EXPR where the
+	template part is a SPLICE_EXPR.
+	(tsubst_expr): Defer to tsubst_splice_expr when the template part of
+	TEMPLATE_ID_EXPR is a SPLICE_EXPR.
+	* reflect.cc (check_splice_expr): Add handling for BASELINKs.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/reflect/member19.C: Enable tests.
+	* g++.dg/reflect/splice15.C: New test.
+	* g++.dg/reflect/splice16.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 719156070f5f5f9070a4d9b736c238b5d028f719)
+---
+ gcc/cp/parser.cc                        | 21 +++++---
+ gcc/cp/pt.cc                            | 49 ++++++++++++++---
+ gcc/cp/reflect.cc                       | 14 +++--
+ gcc/testsuite/g++.dg/reflect/member19.C | 18 -------
+ gcc/testsuite/g++.dg/reflect/splice15.C | 70 +++++++++++++++++++++++++
+ gcc/testsuite/g++.dg/reflect/splice16.C | 34 ++++++++++++
+ 6 files changed, 170 insertions(+), 36 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/reflect/splice15.C
+ create mode 100644 gcc/testsuite/g++.dg/reflect/splice16.C
+
+diff --git a/gcc/cp/parser.cc b/gcc/cp/parser.cc
+index d52f5c97039c..fa2fec614895 100644
+--- a/gcc/cp/parser.cc
++++ b/gcc/cp/parser.cc
+@@ -6179,6 +6179,8 @@ cp_parser_splice_specifier (cp_parser *parser, bool template_p = false,
+   /* Get the reflected operand.  */
+   expr = splice (expr);
+ 
++  tree expr_real = maybe_get_first_fn (expr);
++
+   /* If the next token is a <, it could be a splice-specialization-specifier.
+      But we need to handle "[:r:] < 42" where the < doesn't start a template
+      argument list.  [temp.names]/3: A < is interpreted as the delimiter of
+@@ -6190,30 +6192,34 @@ cp_parser_splice_specifier (cp_parser *parser, bool template_p = false,
+       /* As a courtesy to the user, if there is a < after a template
+ 	 name, parse the construct as an s-s-s and warn about the missing
+ 	 'template'; it can't be anything else.  */
+-      && (template_p
+-	  || typename_p
+-	  || TREE_CODE (OVL_FIRST (expr)) == TEMPLATE_DECL))
++      && (template_p || typename_p || TREE_CODE (expr_real) == TEMPLATE_DECL))
+     {
+       /* For member access splice-specialization-specifier, try to wrap
+ 	 non-dependent splice for function template into a BASELINK so
+ 	 that cp_parser_template_id can handle it.  */
+       if (object_type
+-	  && DECL_FUNCTION_TEMPLATE_P (OVL_FIRST (expr))
++	  && reflection_function_template_p (expr_real)
+ 	  && !dependent_type_p (object_type))
+ 	{
+-	  tree scope = DECL_CONTEXT (OVL_FIRST (expr));
++	  tree scope = DECL_CONTEXT (expr_real);
+ 	  if (scope && CLASS_TYPE_P (scope))
+ 	    {
+ 	      tree access_path = lookup_base (object_type, scope, ba_unique,
+ 					      NULL, tf_warning_or_error);
+ 	      if (access_path == error_mark_node)
+ 		expr = error_mark_node;
++	      else if (BASELINK_P (expr))
++		expr = build_baselink (access_path,
++				       BASELINK_ACCESS_BINFO (expr),
++				       BASELINK_FUNCTIONS (expr),
++				       BASELINK_OPTYPE (expr));
+ 	      else
+ 		expr
+ 		  = build_baselink (access_path, TYPE_BINFO (object_type),
+ 				    expr,
+-				    IDENTIFIER_CONV_OP_P (OVL_NAME (expr))
+-				    ? TREE_TYPE (OVL_NAME (expr)) : NULL_TREE);
++				    IDENTIFIER_CONV_OP_P (OVL_NAME (expr_real))
++				    ? TREE_TYPE (OVL_NAME (expr_real))
++				    : NULL_TREE);
+ 	    }
+ 	}
+       /* Let cp_parser_template_id parse the template arguments.  */
+@@ -6316,7 +6322,6 @@ cp_parser_splice_expression (cp_parser *parser, bool template_p,
+   tree t = expr.get_value ();
+   STRIP_ANY_LOCATION_WRAPPER (t);
+   tree unresolved = t;
+-  t = MAYBE_BASELINK_FUNCTIONS (t);
+   t = resolve_nondeduced_context (t, tf_warning_or_error);
+ 
+   if (dependent_splice_p (t))
+diff --git a/gcc/cp/pt.cc b/gcc/cp/pt.cc
+index ab3ae922ac51..9fba230846af 100644
+--- a/gcc/cp/pt.cc
++++ b/gcc/cp/pt.cc
+@@ -16962,7 +16962,34 @@ tsubst_splice_scope (tree t, tree args, tsubst_flags_t complain, tree in_decl)
+ static tree
+ tsubst_splice_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
+ {
+-  tree op = tsubst_expr (TREE_OPERAND (t, 0), args, complain, in_decl);
++  tree template_id = NULL_TREE;
++  auto apply_template = [&](tree templ)
++    {
++      if (!template_id)
++	return templ;
++      template_id = copy_node (template_id);
++      tree ret = template_id;
++
++      /* follow the example of lookup_template_function, but for all
++	 templates.  */
++      if (BASELINK_P (templ))
++	{
++	  ret = copy_node (templ);
++	  BASELINK_FUNCTIONS (ret) = template_id;
++	  templ = BASELINK_FUNCTIONS (templ);
++	}
++      TREE_OPERAND (template_id, 0) = templ;
++      return ret;
++    };
++
++  if (TREE_CODE (t) == TEMPLATE_ID_EXPR)
++    {
++      template_id = t;
++      t = TREE_OPERAND (t, 0);
++    }
++
++  tree op = tsubst_expr (TREE_OPERAND (t, 0), args,
++			 (complain & ~tf_no_name_lookup), in_decl);
+   if (op == error_mark_node)
+     return error_mark_node;
+   op = splice (op);
+@@ -16980,8 +17007,12 @@ tsubst_splice_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
+ 	SET_SPLICE_EXPR_TEMPLATE_P (op, true);
+       if (SPLICE_EXPR_TARGS_P (t))
+ 	SET_SPLICE_EXPR_TARGS_P (op, true);
+-      return op;
++      return apply_template (op);
+     }
++
++  /* We have to form a template-id for checking too.  */
++  op = apply_template (op);
++
+   if (SPLICE_EXPR_EXPRESSION_P (t)
+       && !check_splice_expr (input_location, UNKNOWN_LOCATION, op,
+ 			     SPLICE_EXPR_ADDRESS_P (t),
+@@ -16991,6 +17022,11 @@ tsubst_splice_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
+ 			     (complain & tf_error)))
+     return error_mark_node;
+ 
++  /* For the template-id case, we have to substitute only after checking, to
++     reject the case where the template part is a type.  */
++  if (template_id)
++    op = tsubst_expr (op, args, complain, in_decl);
++
+   if (SPLICE_EXPR_ADDRESS_P (t))
+     {
+       push_deferring_access_checks (dk_no_check);
+@@ -21500,11 +21536,12 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
+ 	tree object;
+ 	tree templ = TREE_OPERAND (t, 0);
+ 	tree targs = TREE_OPERAND (t, 1);
++	tsubst_flags_t complain_lookup = complain | no_name_lookup_flag;
+ 
+-	if (no_name_lookup_flag)
+-	  templ = tsubst_name (templ, args, complain, in_decl);
+-	else
+-	  templ = tsubst_expr (templ, args, complain, in_decl);
++	if (TREE_CODE (templ) == SPLICE_EXPR)
++	  return tsubst_splice_expr (t, args, complain_lookup, in_decl);
++
++	templ = tsubst_expr (templ, args, complain_lookup, in_decl);
+ 
+ 	if (targs)
+ 	  targs = tsubst_template_args (targs, args, complain, in_decl);
+diff --git a/gcc/cp/reflect.cc b/gcc/cp/reflect.cc
+index 58795cfd6bf1..66596fcb15e2 100644
+--- a/gcc/cp/reflect.cc
++++ b/gcc/cp/reflect.cc
+@@ -9242,6 +9242,12 @@ check_splice_expr (location_t loc, location_t start_loc, tree t,
+ 		   bool address_p, bool member_access_p, bool template_p,
+ 		   bool targs_p, bool complain_p)
+ {
++  t = MAYBE_BASELINK_FUNCTIONS (t);
++  tree expr = t;
++  if (TREE_CODE (t) == TEMPLATE_ID_EXPR)
++    t = TREE_OPERAND (t, 0);
++  t = OVL_FIRST (t);
++
+   /* We may not have gotten an expression.  */
+   if (TREE_CODE (t) == TYPE_DECL
+       || TREE_CODE (t) == NAMESPACE_DECL
+@@ -9277,7 +9283,7 @@ check_splice_expr (location_t loc, location_t start_loc, tree t,
+   /* [expr.prim.splice]/2 For a splice-expression of the form
+      splice-specifier, the expression is ill-formed if it is:  */
+   /* -- a constructor or a destructor  */
+-  if (TREE_CODE (t) == FUNCTION_DECL
++  if (TREE_CODE (STRIP_TEMPLATE (t)) == FUNCTION_DECL
+       && (DECL_CONSTRUCTOR_P (t) || DECL_DESTRUCTOR_P (t)))
+     {
+       if (complain_p)
+@@ -9316,7 +9322,7 @@ check_splice_expr (location_t loc, location_t start_loc, tree t,
+     }
+ 
+   if (member_access_p
+-      && !valid_splice_for_member_access_p (t, /*decls_only_p=*/false))
++      && !valid_splice_for_member_access_p (expr, /*decls_only_p=*/false))
+     {
+       if (complain_p)
+ 	error_at (loc, "cannot use %qE to access a class member", t);
+@@ -9414,8 +9420,8 @@ check_splice_expr (location_t loc, location_t start_loc, tree t,
+ 	  return false;
+ 	}
+       gcc_checking_assert (reflection_function_template_p (t)
+-			   || get_template_info (t)
+-			   || TREE_CODE (t) == TEMPLATE_ID_EXPR
++			   || get_template_info (expr)
++			   || TREE_CODE (expr) == TEMPLATE_ID_EXPR
+ 			   || variable_template_p (t)
+ 			   || dependent_splice_p (t));
+     }
+diff --git a/gcc/testsuite/g++.dg/reflect/member19.C b/gcc/testsuite/g++.dg/reflect/member19.C
+index 8523ee55215e..765b456a1f28 100644
+--- a/gcc/testsuite/g++.dg/reflect/member19.C
++++ b/gcc/testsuite/g++.dg/reflect/member19.C
+@@ -92,28 +92,19 @@ baz ()
+   static_assert (s.a <43> == 43);
+   static_assert (s.template [:members_of (^^A, uctx)[0]:] <44> == 44);
+   static_assert (s.template [:members_of (^^A, uctx)[0]:] <45> == 45);
+-#if 0
+-  // TODO: This doesn't work yet.
+   static_assert (s.template [:^^A::a:] <44> == 44);
+   static_assert (s.template [:^^A::a:] <45> == 45);
+-#endif
+   constexpr T t;
+   static_assert (t.a <42> == 142);
+   static_assert (t.a <43> == 143);
+   static_assert (t.template [:members_of (^^A, uctx)[0]:] <44> == 44);
+   static_assert (t.template [:members_of (^^A, uctx)[0]:] <45> == 45);
+-#if 0
+-  // TODO: This doesn't work yet.
+   static_assert (t.template [:^^A::a:] <44> == 44);
+   static_assert (t.template [:^^A::a:] <45> == 45);
+-#endif
+   static_assert (t.template [:members_of (^^B, uctx)[0]:] <44> == 144);
+   static_assert (t.template [:members_of (^^B, uctx)[0]:] <45> == 145);
+-#if 0
+-  // TODO: This doesn't work yet.
+   static_assert (t.template [:^^B::a:] <44> == 144);
+   static_assert (t.template [:^^B::a:] <45> == 145);
+-#endif
+ }
+ 
+ template <typename A, typename B>
+@@ -125,28 +116,19 @@ qux ()
+   static_assert (s.template a <43> == 43);
+   static_assert (s.template [:members_of (^^A, uctx)[0]:] <44> == 44);
+   static_assert (s.template [:members_of (^^A, uctx)[0]:] <45> == 45);
+-#if 0
+-  // TODO: This doesn't work yet.
+   static_assert (s.template [:^^A::a:] <44> == 44);
+   static_assert (s.template [:^^A::a:] <45> == 45);
+-#endif
+   constexpr B t;
+   static_assert (t.template a <42> == 142);
+   static_assert (t.template a <43> == 143);
+   static_assert (t.template [:members_of (^^A, uctx)[0]:] <44> == 44);
+   static_assert (t.template [:members_of (^^A, uctx)[0]:] <45> == 45);
+-#if 0
+-  // TODO: This doesn't work yet.
+   static_assert (t.template [:^^A::a:] <44> == 44);
+   static_assert (t.template [:^^A::a:] <45> == 45);
+-#endif
+   static_assert (t.template [:members_of (^^B, uctx)[0]:] <44> == 144);
+   static_assert (t.template [:members_of (^^B, uctx)[0]:] <45> == 145);
+-#if 0
+-  // TODO: This doesn't work yet.
+   static_assert (t.template [:^^B::a:] <44> == 144);
+   static_assert (t.template [:^^B::a:] <45> == 145);
+-#endif
+ }
+ 
+ void
+diff --git a/gcc/testsuite/g++.dg/reflect/splice15.C b/gcc/testsuite/g++.dg/reflect/splice15.C
+new file mode 100644
+index 000000000000..f72e3f83373b
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/reflect/splice15.C
+@@ -0,0 +1,70 @@
++// PR c++/124794
++// { dg-do compile { target c++26 } }
++// { dg-additional-options "-freflection -Wno-error=missing-template-keyword" }
++
++struct C{
++  template <class T> void f(T);
++  void g(int);
++};
++
++void (C::*p0)(int) = &template[:^^C::f:]<int>;
++void (C::*p1)(int) = template[:^^C::f:]<int>; // { dg-error "cannot implicitly reference a class member" }
++void (C::*p2)(int) = &template[:^^C::f:];
++void (C::*p3)(int) = template[:^^C::f:]; // { dg-error "cannot implicitly reference a class member" }
++void (C::*p4)(int) = &[:^^C::f:]<int>; // { dg-warning "keyword before dependent template name" }
++void (C::*p5)(int) = [:^^C::f:]<int>; // { dg-error "cannot implicitly reference a class member" }
++void (C::*p6)(int) = &[:^^C::f:]; // { dg-warning "keyword before dependent template name" }
++void (C::*p7)(int) = [:^^C::f:]; // { dg-error "cannot implicitly reference a class member" }
++
++template <auto r> void (C::*tp0)(int) = &template[:r:]<int>;
++template <auto r> void (C::*tp1)(int) = template[:r:]<int>; // { dg-error "cannot implicitly reference a class member" }
++template <auto r> void (C::*tp2)(int) = &template[:r:];
++template <auto r> void (C::*tp3)(int) = template[:r:]; // { dg-error "cannot implicitly reference a class member" }
++/* tp4 and tp5 intentionally omitted as they are not applicable in a template context */
++template <auto r> void (C::*tp6)(int) = &[:r:];
++template <auto r> void (C::*tp7)(int) = [:r:]; // { dg-error "cannot implicitly reference a class member" }
++template <auto r> void (C::*tp0n)(int) = &template[:r:]<int>; // { dg-error "no matches converting function" }
++template <auto r> void (C::*tp1n)(int) = template[:r:]<int>; // { dg-error "cannot implicitly reference a class member" }
++template <auto r> void (C::*tp2n)(int) = &template[:r:]; // { dg-error "expected a reflection of a function template" }
++template <auto r> void (C::*tp3n)(int) = template[:r:]; // { dg-error "cannot implicitly reference a class member" }
++/* tp4u and tp5u intentionally omitted as they are not applicable in a template context */
++template <auto r> void (C::*tp6n)(int) = &[:r:];
++template <auto r> void (C::*tp7n)(int) = [:r:]; // { dg-error "cannot implicitly reference a class member" }
++
++static_assert((
++    tp0<^^C::f>,
++    tp1<^^C::f>,
++    tp2<^^C::f>,
++    tp3<^^C::f>,
++    tp6<^^C::f>,
++    tp7<^^C::f>,
++    tp0n<^^C::g>,
++    tp1n<^^C::g>,
++    tp2n<^^C::g>,
++    tp3n<^^C::g>,
++    tp6n<^^C::g>,
++    tp7n<^^C::g>,
++    true));
++
++struct Base1{
++  template<class T>
++  constexpr T f(T x) {
++    return x;
++  }
++};
++struct Base2: Base1 {
++  template<class T>
++  constexpr T g(T x) {
++    return x;
++  }
++};
++struct Base3: Base1, Base2 {}; // { dg-warning "inaccessible" }
++
++static_assert(Base1{}.[:^^Base1::f:](4) == 4); // { dg-warning "keyword before dependent template name" }
++static_assert(Base1{}.[:^^Base1::f:]<int>(13) == 13); // { dg-warning "keyword before dependent template name" }
++static_assert(Base3{}.[:^^Base2::g:](42) == 42); // { dg-warning "keyword before dependent template name" }
++static_assert(Base3{}.[:^^Base2::g:]<int>(67) == 67); // { dg-warning "keyword before dependent template name" }
++constexpr int invalid1 = Base3{}.[:^^Base2::f:]; // { dg-error "cannot resolve overloaded function" }
++// { dg-warning "keyword before dependent template name" "" { target *-*-* } .-1 }
++constexpr int invalid2 = Base3{}.[:^^Base1::f:]; // { dg-error "cannot resolve overloaded function" }
++// { dg-warning "keyword before dependent template name" "" { target *-*-* } .-1 }
+diff --git a/gcc/testsuite/g++.dg/reflect/splice16.C b/gcc/testsuite/g++.dg/reflect/splice16.C
+new file mode 100644
+index 000000000000..a3eb13c5f69c
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/reflect/splice16.C
+@@ -0,0 +1,34 @@
++// PR c++/125069
++// { dg-do compile { target c++26 } }
++// { dg-additional-options "-freflection -Wno-error=missing-template-keyword" }
++
++#include <meta>
++struct x{ x(auto); };
++
++constexpr auto ac = std::meta::access_context::unchecked();
++
++template<auto r>
++constexpr auto t = (
++  [:r:],  // { dg-error "cannot use constructor or destructor" }
++  &[:r:],  // { dg-error "cannot use constructor or destructor" }
++  template [:r:], // { dg-error "cannot use constructor or destructor" }
++  &template [:r:], // { dg-error "cannot use constructor or destructor" }
++  template [:r:]<int>, // { dg-error "cannot use constructor or destructor" }
++  &template [:r:]<int>, // { dg-error "cannot use constructor or destructor" }
++  1);
++
++
++int main() {
++  constexpr auto r = members_of(^^x, ac)[0];
++
++  t<r>;
++
++  [:r:];  // { dg-error "cannot use constructor or destructor" }
++  &[:r:];  // { dg-error "cannot use constructor or destructor" }
++  [:r:]<int>; // { dg-error "cannot use constructor or destructor" }
++  &[:r:]<int>; // { dg-error "cannot use constructor or destructor" }
++  template [:r:]; // { dg-error "cannot use constructor or destructor" }
++  &template [:r:]; // { dg-error "cannot use constructor or destructor" }
++  template [:r:]<int>; // { dg-error "cannot use constructor or destructor" }
++  &template [:r:]<int>; // { dg-error "cannot use constructor or destructor" }
++}

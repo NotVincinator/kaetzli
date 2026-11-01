@@ -1,0 +1,54 @@
+From cfdf43334b32d4251e2aae49a3a3c309c914c7e3 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Fri, 18 Sep 2026 11:36:43 +0200
+Subject: [PATCH 265/385] testsuite: Fix up gcc.dg/bitint-142.c test
+
+The whole excersise here is to set the padding bits (if any) of the x
+elements and keep the non-padding bits as is.
+B here is unsigned _BitInt(7) type.
+On targets with bitint_ext_undef this works well, z = ~0 aka z = -1
+sets the 0x7f bits, __builtin_clear_padding clears the remaining bit
+(which is 0 anyway but pedantically undefined)
+and ~*(unsigned char *) &z is 0x80.
+On targets with bitint_ext_full (or bitint_ext_partial), z = ~0 still
+sets the 0x7f bits, __builtin_clear_padding doesn't do anything (is
+optimized away as there are no padding bits), but we still get 0x80,
+which is not what I wanted, I wanted 0 on such targets.
+The problem is that I chose an unsigned _BitInt(7) type for z.
+One possibility would be to use signed _BitInt(7) instead, in that case
+z = ~0 aka z = -1 on bitint_ext_undef targets sets 0x7f bits and probably
+the upper bit too and __builtin_clear_padding then clears that bit, while
+on other targets it sets all 0xff bits (because it is sign extended) and
+__builtin_clear_padding does nothing.
+The following patch instead uses memset to set all bits and then clear
+padding.
+
+gcc.dg/vect/vect-bitint-1.c test doesn't need fixing, because it uses
+a signed _BitInt(17) type already:
+  _BitInt(17) z = ~0;
+  __builtin_clear_padding (&z);
+
+2026-09-18  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.dg/bitint-142.c (main): Don't set z to ~0, instead memset
+	it to ~0.
+
+Reviewed-by: Richard Biener <rguenth@suse.de>
+(cherry picked from commit 6fc7ff484d354ee4e85ca7e4f555063a06800c6a)
+---
+ gcc/testsuite/gcc.dg/bitint-142.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/gcc/testsuite/gcc.dg/bitint-142.c b/gcc/testsuite/gcc.dg/bitint-142.c
+index 4dac4723f09b..5ff5b80904b0 100644
+--- a/gcc/testsuite/gcc.dg/bitint-142.c
++++ b/gcc/testsuite/gcc.dg/bitint-142.c
+@@ -26,7 +26,7 @@ main ()
+   B f[16] = { 8, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0 };
+   for (unsigned i = 0; i < 16; ++i)
+     x[i] = i;
+-  z = ~0;
++  __builtin_memset (&z, ~0, sizeof (z));
+   __builtin_clear_padding (&z);
+   for (unsigned i = 0; i < 16; ++i)
+     ((unsigned char *) &x[0])[i] |= ~*(unsigned char *) &z;

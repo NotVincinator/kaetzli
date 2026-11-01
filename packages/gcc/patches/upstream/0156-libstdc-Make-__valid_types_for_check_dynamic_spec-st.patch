@@ -1,0 +1,62 @@
+From b7c4fd69b69f6fdb4851a88be29a352c695ad875 Mon Sep 17 00:00:00 2001
+From: Steven Sudit <stevensudit@gmail.com>
+Date: Tue, 8 Sep 2026 21:00:00 -0400
+Subject: [PATCH 156/385] libstdc++: Make __valid_types_for_check_dynamic_spec
+ static [PR127219]
+
+basic_format_parse_context::check_dynamic_spec<_Ts...> checks its
+template arguments with
+
+  static_assert(__valid_types_for_check_dynamic_spec<_Ts...>(), ...);
+
+where __valid_types_for_check_dynamic_spec is a non-static consteval
+member, so the operand is an implicit member access on *this evaluated
+directly by the static_assert, not inside a call to a constexpr member
+function.  P2280R4 allows that use of this (the function never reads
+through it), and GCC and MSVC accept it, but Clang (through 23 and
+trunk, llvm/llvm-project#191104) and EDG 6.9 still reject the
+instantiation:
+
+  error: static assertion expression is not an integral constant
+    expression
+  note: implicit use of 'this' pointer is only allowed within the
+    evaluation of a call to a 'constexpr' member function
+
+so any user formatter that calls check_dynamic_spec<Ts...>(id) fails to
+compile with those front ends in C++26 mode.
+
+The function uses no non-static member, so declaring it static removes
+the this and changes nothing else.  std/format/parse_ctx.cc already
+instantiates check_dynamic_spec<Ts...>, which GCC accepts with either
+spelling.
+
+Assisted-by: Claude Fable 5.1 (Anthropic)
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/127219
+	* include/std/format
+	(basic_format_parse_context::__valid_types_for_check_dynamic_spec):
+	Make static, so that the static_assert in check_dynamic_spec does
+	not use this.
+
+Reviewed-by: Jonathan Wakely <jwakely@redhat.com>
+Signed-off-by: Steven Sudit <stevensudit@gmail.com>
+(cherry picked from commit bb591391ec98a280bb706c20029bbeada87304d0)
+---
+ libstdc++-v3/include/std/format | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/libstdc++-v3/include/std/format b/libstdc++-v3/include/std/format
+index a90a0b03597d..7742c3e50771 100644
+--- a/libstdc++-v3/include/std/format
++++ b/libstdc++-v3/include/std/format
+@@ -371,7 +371,7 @@ namespace __format
+ 	static constexpr bool __once = (is_same_v<_Tp, _Ts> + ...) == 1;
+ 
+       template<typename... _Ts>
+-	consteval bool
++	static consteval bool
+ 	__valid_types_for_check_dynamic_spec()
+ 	{
+ 	  // _GLIBCXX_RESOLVE_LIB_DEFECTS

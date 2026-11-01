@@ -1,0 +1,38 @@
+From f5a93d408f97a5c0de9835e571c92dd2649246a5 Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Sat, 31 Oct 2026 17:15:19 +0100
+Subject: [PATCH 384/385] Ada: Fix adjustment of function result on secondary
+ stack in allocator
+
+This is a regression present on the mainline and 16 branch, introduced by a
+recent optimization: when function calls return on the secondary stack, the
+result is effectively built as a temporary there and, therefore, needs to be
+later copied to the allocated memory, which requires a call to Adjust if the
+type is controlled.
+
+gcc/ada/
+	* exp_ch6.adb (Expand_Ctrl_Function_Call): Do not return early for
+	the qualified expression of an allocator if the call returns on the
+	secondary stack.
+---
+ gcc/ada/exp_ch6.adb | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ada/exp_ch6.adb b/gcc/ada/exp_ch6.adb
+index 950d03af386e..38d13e0e7cfd 100644
+--- a/gcc/ada/exp_ch6.adb
++++ b/gcc/ada/exp_ch6.adb
+@@ -5794,10 +5794,12 @@ package body Exp_Ch6 is
+ 
+       --  The same optimization: if the returned value is used to initialize a
+       --  dynamically allocated object, then no need to copy/readjust/finalize,
+-      --  we can initialize it in place.
++      --  we can initialize it in place, provided that the call does not return
++      --  on the secondary stack.
+ 
+       if Nkind (Par) = N_Qualified_Expression
+         and then Nkind (Parent (Par)) = N_Allocator
++        and then not Use_Sec_Stack
+       then
+          return;
+       end if;

@@ -1,0 +1,167 @@
+From 5aaefd4ac65a39335d8a823b2fa1e75e1c73b8bf Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Tue, 6 Oct 2026 17:12:43 -0400
+Subject: [PATCH 332/385] c++/reflection: ICE with splice member access on
+ uninstantiated class [PR126794]
+
+We ICE in perform_or_defer_access_check on a null binfo of the object
+type here:
+
+  struct A { int m{}; };
+  template <int> struct E : A {};
+
+  template <class W>
+  int get(W *o) {
+      return o->[:^^A::m:];
+  }
+  int main() { return get((E<2> *)0); }
+
+The problem is that in tsubst_expr we call finish_non_static_data_member
+on any FIELD_DECL, but when the FIELD_DECL is coming from o->[:^^A::m:],
+the object's type may not have been instantiated yet.  I think we should
+just send COMPONENT_REFs with a splice expression down the
+finish_class_member_access_expr path which has:
+
+  if (!currently_open_class (object_type)
+      && !complete_type_or_maybe_complain (object_type, object, complain))
+    return error_mark_node;
+
+so it will instantiate the class and create a TREE_BINFO.
+
+With that, the dependent_splice_p check should be unreachable.
+
+	PR c++/126794
+
+gcc/cp/ChangeLog:
+
+	* pt.cc (tsubst_expr) <case COMPONENT_REF>: Don't call
+	finish_non_static_data_member on a FIELD_DECL of a COMPONENT_REF
+	when COMPONENT_REF_SPLICE_P is set.  Don't check
+	dependent_splice_p in an assert.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/reflect/member16.C: Adjust dg-error.
+	* g++.dg/reflect/member25.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 7af3c499e0006fa7087b677dc635be2c2c6da299)
+---
+ gcc/cp/pt.cc                            |  8 ++--
+ gcc/testsuite/g++.dg/reflect/member16.C |  4 +-
+ gcc/testsuite/g++.dg/reflect/member25.C | 61 +++++++++++++++++++++++++
+ 3 files changed, 68 insertions(+), 5 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/reflect/member25.C
+
+diff --git a/gcc/cp/pt.cc b/gcc/cp/pt.cc
+index d67d6ac3262f..55a1d2c50b91 100644
+--- a/gcc/cp/pt.cc
++++ b/gcc/cp/pt.cc
+@@ -22729,13 +22729,15 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
+ 	    r = build_ptrmemfunc_access_expr (object, DECL_NAME (member));
+ 	    RETURN (r);
+ 	  }
+-	else if (TREE_CODE (member) == FIELD_DECL)
++	/* For obj->[:^^A::m:], go down the finish_class_member_access_expr
++	   path because object's type may not be instantiated yet.  */
++	else if (TREE_CODE (member) == FIELD_DECL
++		 && !COMPONENT_REF_SPLICE_P (t))
+ 	  {
+ 	    /* Assume access of this FIELD_DECL has already been checked; we
+ 	       don't recheck it to avoid bogus access errors when substituting
+ 	       a reduced constant initializer (97740).  */
+-	    gcc_checking_assert (TREE_CODE (TREE_OPERAND (t, 1)) == FIELD_DECL
+-				 || dependent_splice_p (TREE_OPERAND (t, 1)));
++	    gcc_checking_assert (TREE_CODE (TREE_OPERAND (t, 1)) == FIELD_DECL);
+ 	    push_deferring_access_checks (dk_deferred);
+ 	    r = finish_non_static_data_member (member, object, NULL_TREE,
+ 					       complain);
+diff --git a/gcc/testsuite/g++.dg/reflect/member16.C b/gcc/testsuite/g++.dg/reflect/member16.C
+index 2679cdc67140..473363d72a48 100644
+--- a/gcc/testsuite/g++.dg/reflect/member16.C
++++ b/gcc/testsuite/g++.dg/reflect/member16.C
+@@ -46,7 +46,7 @@ bar (S &c, T &d, U &g, V &h)
+   d.[: ^^B::b :] = 5;			// { dg-error "'B' is an ambiguous base of 'D'" }
+   d.[: ^^C::c :] = 6;
+   d.[: ^^D::d :] = 7;
+-  d.[: ^^I::i :] = 8;			// { dg-error "invalid use of non-static data member 'I::i'" }
++  d.[: ^^I::i :] = 8;			// { dg-error "'I' is not a base of 'D'" }
+   g.[: ^^E::_ :] = 1;
+   g.[: ^^F::_ :] = 2;
+   g.[: ^^G::_ :] = 3;
+@@ -54,7 +54,7 @@ bar (S &c, T &d, U &g, V &h)
+   h.[: ^^F::_ :] = 5;			// { dg-error "'F' is an ambiguous base of 'H'" }
+   h.[: ^^G::_ :] = 6;
+   h.[: ^^H::_ :] = 7;
+-  h.[: ^^J::_ :] = 8;			// { dg-error "invalid use of non-static data member 'J::_'" }
++  h.[: ^^J::_ :] = 8;			// { dg-error "'J' is not a base of 'H'" }
+ }
+ 
+ void
+diff --git a/gcc/testsuite/g++.dg/reflect/member25.C b/gcc/testsuite/g++.dg/reflect/member25.C
+new file mode 100644
+index 000000000000..4db05cebdd39
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/reflect/member25.C
+@@ -0,0 +1,61 @@
++// PR c++/126794
++// { dg-do compile { target c++26 } }
++// { dg-additional-options "-freflection" }
++
++template<class, class> struct same_type;
++template<class T> struct same_type<T, T> {};
++
++struct A { int m{}; };
++template<int> struct E : A {};
++
++int
++f1 ()
++{
++  E<2> *o = 0;
++  return o->[:^^A::m:];
++}
++
++template<class W>
++int
++get (W *o)
++{
++  return o->[:^^A::m:];
++}
++
++int
++f2 ()
++{
++  return get ((E<2> *) 0);
++}
++
++template<class W>
++void
++f3 (W *o)
++{
++  same_type<decltype (o->[:^^A::m:]), int>();
++  same_type<decltype ((o->[:^^A::m:])), int &>();
++}
++template void f3 (E<3> *);
++
++template<int> struct F;
++
++template<class W>
++int
++f4 (W *o)
++{
++  return o->[:^^A::m:];   // { dg-error "invalid use of incomplete type" }
++}
++
++int
++f5 ()
++{
++  return f4 ((F<0> *) 0);
++}
++
++template<class W>
++int
++f6 (W &o)
++{
++  return o.[:^^A::m:];
++}
++template int f6 (E<4> &);

@@ -1,0 +1,142 @@
+From 10f23521c44ffae46b9fcd351f2817a71806bb3a Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Thu, 1 Oct 2026 00:21:15 +0000
+Subject: [PATCH 224/385] Daily bump.
+
+---
+ ChangeLog               |  8 ++++++++
+ gcc/ChangeLog           | 17 +++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/fortran/ChangeLog   |  9 +++++++++
+ gcc/testsuite/ChangeLog | 21 +++++++++++++++++++++
+ libstdc++-v3/ChangeLog  | 26 ++++++++++++++++++++++++++
+ 6 files changed, 82 insertions(+), 1 deletion(-)
+
+diff --git a/ChangeLog b/ChangeLog
+index 3ad4adbedf58..f548ce26e68d 100644
+--- a/ChangeLog
++++ b/ChangeLog
+@@ -1,3 +1,11 @@
++2026-09-30  Eric Botcazou  <ebotcazou@adacore.com>
++
++	PR ada/120106
++	* Makefile.def (GNATMAKE_FOR_BUILD): New flag to pass.
++	* Makefile.tpl (HOST_EXPORTS): Remove GNATMAKE_FOR_BUILD.
++	(BASE_TARGET_EXPORTS): Likewise.
++	* Makefile.in: Regenerate.
++
+ 2026-09-16  Kishan Parmar  <kishan@linux.ibm.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 9f0746692513..d90ce25a874a 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,20 @@
++2026-09-30  Alfie Richards  <alfie.richards@arm.com>
++
++	Backported from master:
++	2026-09-15  Alfie Richards  <alfie.richards@arm.com>
++		    Tamar Christina  <Tamar.Christina@arm.com>
++
++	PR target/126629
++	* config/aarch64/aarch64-sve-builtins-base.cc
++	(emit_ldf1_ffr_update): New.
++	(svldff1_gather_impl::expand): Change ffr update.
++	(svldff1_gather_extend::expand): Likewise.
++	(svldxf1_impl::expand): Likewise.
++	(svldxf1_extend_impl::expand): Likewise.
++	* config/aarch64/aarch64-sve.md (aarch64_update_ffr_for_load):
++	Change to...
++	(@aarch64_update_ffr<mode>): ...this.
++
+ 2026-09-29  Eric Botcazou  <ebotcazou@adacore.com>
+ 
+ 	* tree-ssa-forwprop.cc (optimize_agr_copyprop_1): Use the index of
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index f32eb3dd80fc..b5a6302beac2 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260930
++20261001
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index 4400fad4d2f3..75fafb417cee 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,12 @@
++2026-09-30  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
++
++	Backported from master:
++	2026-09-29  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
++
++	PR fortran/127187
++	* resolve.cc (resolve_assoc_var): A selector with a LEN or KIND
++	inquiry reference is not a variable.
++
+ 2026-09-26  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 3dcc00b44544..9e3970d4cf3c 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,24 @@
++2026-09-30  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
++
++	Backported from master:
++	2026-09-29  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
++
++	PR fortran/127187
++	* gfortran.dg/associate_90.f90: Add -fdump-tree-original and check
++	that no associate-name points to a string length.
++
++2026-09-30  Alfie Richards  <alfie.richards@arm.com>
++
++	Backported from master:
++	2026-09-15  Alfie Richards  <alfie.richards@arm.com>
++		    Tamar Christina  <Tamar.Christina@arm.com>
++
++	PR target/126629
++	* gcc.target/aarch64/sve/pr126629.c: New test.
++	* gcc.target/aarch64/sve/pr126629_extend.c: New test.
++	* gcc.target/aarch64/sve/pr126629_gather.c: New test.
++	* gcc.target/aarch64/sve/pr126629_gather2.c: New test.
++
+ 2026-09-29  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index e75de1b92155..f08446501cc9 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,29 @@
++2026-09-30  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-09-30  Jonathan Wakely  <jwakely@redhat.com>
++
++	* testsuite/performance/27_io/ifstream_extract_chars.cc: Use
++	stack array instead of dynamic allocation.
++
++2026-09-30  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-09-30  Jonathan Wakely  <jwakely@redhat.com>
++
++	* doc/xml/manual/policy_data_structures.xml: Fix header name in
++	pb_ds examples.
++	* doc/xml/manual/using.xml: Fix names for pb_ds headers.
++	* doc/html/*: Regenerate.
++
++2026-09-30  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-09-30  Jonathan Wakely  <jwakely@redhat.com>
++
++	* testsuite/util/testsuite_performance.h (resource_counter): Do
++	not use memset to clear non-trivial objects.
++
+ 2026-09-29  Jonathan Wakely  <jwakely@redhat.com>
+ 
+ 	Backported from master:

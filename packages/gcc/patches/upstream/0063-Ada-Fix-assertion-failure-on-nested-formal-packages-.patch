@@ -1,0 +1,181 @@
+From 929cafe124d0020c66dea03d069374c9e4c5aec2 Mon Sep 17 00:00:00 2001
+From: Eric Botcazou <ebotcazou@adacore.com>
+Date: Wed, 19 Aug 2026 15:19:41 +0200
+Subject: [PATCH 063/385] Ada: Fix assertion failure on nested formal packages
+ with box notation
+
+The compiler is trying to instantiate a generic body for an instantiation
+present in a transient package that it has discarded.
+
+gcc/ada/
+	PR ada/126928
+	* sem_ch12.adb (In_Local_Package_Of_Formal_Package): New predicate.
+	(Analyze_Package_Instantiation): Do not register the instantiation
+	of the body if it is present in the local package of a formal one.
+	(Need_Subprogram_Instance_Body): Likewise.
+
+gcc/testsuite/
+	* gnat.dg/specs/generic_inst10.ads: New test.
+	* gnat.dg/specs/generic_inst10_g1.ads: New helper.
+	* gnat.dg/specs/generic_inst10_g2.ads: Likewise.
+	* gnat.dg/specs/generic_inst10_g3.ads: Likewise.
+	* gnat.dg/specs/generic_inst10_pkg.ads: Likewise.
+---
+ gcc/ada/sem_ch12.adb                          | 30 +++++++++++++++++++
+ .../gnat.dg/specs/generic_inst10.ads          |  6 ++++
+ .../gnat.dg/specs/generic_inst10_g1.ads       |  3 ++
+ .../gnat.dg/specs/generic_inst10_g2.ads       | 28 +++++++++++++++++
+ .../gnat.dg/specs/generic_inst10_g3.ads       | 13 ++++++++
+ .../gnat.dg/specs/generic_inst10_pkg.ads      |  3 ++
+ 6 files changed, 83 insertions(+)
+ create mode 100644 gcc/testsuite/gnat.dg/specs/generic_inst10.ads
+ create mode 100644 gcc/testsuite/gnat.dg/specs/generic_inst10_g1.ads
+ create mode 100644 gcc/testsuite/gnat.dg/specs/generic_inst10_g2.ads
+ create mode 100644 gcc/testsuite/gnat.dg/specs/generic_inst10_g3.ads
+ create mode 100644 gcc/testsuite/gnat.dg/specs/generic_inst10_pkg.ads
+
+diff --git a/gcc/ada/sem_ch12.adb b/gcc/ada/sem_ch12.adb
+index 8b406f00a727..520f41701e29 100644
+--- a/gcc/ada/sem_ch12.adb
++++ b/gcc/ada/sem_ch12.adb
+@@ -761,6 +761,11 @@ package body Sem_Ch12 is
+    --  not done for the instantiation of the bodies, which only require the
+    --  instances of the generic parents to be in scope.
+ 
++   function In_Local_Package_Of_Formal_Package (N : Node_Id) return Boolean;
++   --  Return whether N is present in the local package created during the
++   --  analysis of a formal package (see Analyze_Formal_Package_Declaration).
++   --  Used to avoid instantiating generic bodies in such a local package.
++
+    function In_Main_Context (E : Entity_Id) return Boolean;
+    --  Check whether an instantiation is in the context of the main unit.
+    --  Used to determine whether its body should be elaborated to allow
+@@ -5424,6 +5429,7 @@ package body Sem_Ch12 is
+                and then Needs_Body_Instantiated (Gen_Unit)
+                and then not Is_Abbrev
+                and then not Inline_Now
++               and then not In_Local_Package_Of_Formal_Package (N)
+                and then (Operating_Mode = Generate_Code
+                           or else (Operating_Mode = Check_Semantics
+                                     and then GNATprove_Mode));
+@@ -6578,6 +6584,10 @@ package body Sem_Ch12 is
+         and then (not Is_Generic_Unit (Cunit_Entity (Main_Unit))
+                    or else Parent (N) = Aux_Decls_Node (Cunit (Main_Unit)))
+ 
++        --  Likewise in the local package built for formal packages
++
++        and then not In_Local_Package_Of_Formal_Package (N)
++
+         --  Must be generating code or analyzing code in GNATprove mode
+ 
+         and then (Operating_Mode = Generate_Code
+@@ -11255,6 +11265,26 @@ package body Sem_Ch12 is
+         (Current_Scope, Current_Scope, Assoc_Null);
+    end Init_Env;
+ 
++   ----------------------------------------
++   -- In_Local_Package_Of_Formal_Package --
++   ----------------------------------------
++
++   function In_Local_Package_Of_Formal_Package (N : Node_Id) return Boolean is
++      Par : Node_Id;
++
++   begin
++      Par := Parent (N);
++      while Present (Par) and then Nkind (Par) /= N_Compilation_Unit loop
++         if Nkind (Original_Node (Par)) = N_Formal_Package_Declaration then
++            return True;
++         end if;
++
++         Par := Parent (Par);
++      end loop;
++
++      return False;
++   end In_Local_Package_Of_Formal_Package;
++
+    ---------------------
+    -- In_Main_Context --
+    ---------------------
+diff --git a/gcc/testsuite/gnat.dg/specs/generic_inst10.ads b/gcc/testsuite/gnat.dg/specs/generic_inst10.ads
+new file mode 100644
+index 000000000000..7a2f5f595b0a
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/specs/generic_inst10.ads
+@@ -0,0 +1,6 @@
++-- { dg-do compile }
++
++with Generic_Inst10_G3;
++with Generic_Inst10_Pkg;
++
++package Generic_Inst10 is new Generic_Inst10_G3 (Generic_Inst10_Pkg);
+diff --git a/gcc/testsuite/gnat.dg/specs/generic_inst10_g1.ads b/gcc/testsuite/gnat.dg/specs/generic_inst10_g1.ads
+new file mode 100644
+index 000000000000..5bc6519a11cd
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/specs/generic_inst10_g1.ads
+@@ -0,0 +1,3 @@
++generic
++package Generic_Inst10_G1 is
++end Generic_Inst10_G1;
+diff --git a/gcc/testsuite/gnat.dg/specs/generic_inst10_g2.ads b/gcc/testsuite/gnat.dg/specs/generic_inst10_g2.ads
+new file mode 100644
+index 000000000000..62b4ae912a66
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/specs/generic_inst10_g2.ads
+@@ -0,0 +1,28 @@
++with Ada.Containers.Indefinite_Ordered_Maps;
++with Generic_Inst10_G1;
++
++generic
++package Generic_Inst10_G2 is
++
++  generic
++    with package Actual_Types is new Generic_Inst10_G1;
++  package Holder is
++  private
++    package Maps is new Ada.Containers.Indefinite_Ordered_Maps
++      (Integer, Integer);
++  end Holder;
++
++  generic
++    with package Actual_Types is new Generic_Inst10_G1;
++    with package Actual_Holder is new Holder (Actual_Types);
++  package User is
++  end User;
++
++  generic
++    with package Actual_Types is new Generic_Inst10_G1;
++    with package Actual_User is
++      new User (Actual_Types => Actual_Types, others => <>);
++  package Final is
++  end Final;
++
++end Generic_Inst10_G2;
+diff --git a/gcc/testsuite/gnat.dg/specs/generic_inst10_g3.ads b/gcc/testsuite/gnat.dg/specs/generic_inst10_g3.ads
+new file mode 100644
+index 000000000000..6131b02e6a70
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/specs/generic_inst10_g3.ads
+@@ -0,0 +1,13 @@
++with Generic_Inst10_G1;
++with Generic_Inst10_G2;
++
++generic
++   with package Actual_Types is new Generic_Inst10_G1;
++package Generic_Inst10_G3 is
++   package Actual_Root is new Generic_Inst10_G2;
++   package Actual_Holder is new Actual_Root.Holder (Actual_Types);
++   package Actual_User is new
++     Actual_Root.User (Actual_Types, Actual_Holder);
++   package Actual_Final is new
++     Actual_Root.Final (Actual_Types, Actual_User);
++end Generic_Inst10_G3;
+diff --git a/gcc/testsuite/gnat.dg/specs/generic_inst10_pkg.ads b/gcc/testsuite/gnat.dg/specs/generic_inst10_pkg.ads
+new file mode 100644
+index 000000000000..6a3caa91d907
+--- /dev/null
++++ b/gcc/testsuite/gnat.dg/specs/generic_inst10_pkg.ads
+@@ -0,0 +1,3 @@
++with Generic_Inst10_G1;
++
++package Generic_Inst10_Pkg is new Generic_Inst10_G1;

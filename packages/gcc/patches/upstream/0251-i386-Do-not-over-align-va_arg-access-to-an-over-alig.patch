@@ -1,0 +1,96 @@
+From 3659136d5a21a23381c0c5effada9a02cf14ea58 Mon Sep 17 00:00:00 2001
+From: Uros Bizjak <ubizjak@gmail.com>
+Date: Tue, 29 Sep 2026 11:24:01 +0200
+Subject: [PATCH 251/385] i386: Do not over-align va_arg access to an
+ over-aligned stack argument [PR127650]
+
+ix86_function_arg_boundary computes the stack slot alignment from
+TYPE_MAIN_VARIANT, so for a typedef with attribute aligned the slot
+is only guaranteed to be 8-byte aligned and ix86_gimplify_va_arg emits
+no rounding of the overflow area pointer.  However, the final
+dereference is built with build_aligned_type (type, TYPE_ALIGN (type)),
+claiming the alignment of the typedef.  With optimization this results
+in aligned vector moves from a misaligned address.
+
+Clamp the alignment claimed for the access to the boundary the
+argument slot is actually placed at.  This also covers types whose
+alignment exceeds MAX_SUPPORTED_STACK_ALIGNMENT.
+
+Assisted-by: Claude Sonnet 5.5
+
+gcc/ChangeLog:
+
+	PR target/127650
+	* config/i386/i386.cc (ix86_gimplify_va_arg): Limit type_align
+	to arg_boundary.
+
+gcc/testsuite/ChangeLog:
+
+	PR target/127650
+	* gcc.target/i386/pr127650.c: New test.
+
+(cherry picked from commit ef7d69b3a91c3b12a647ffca92e2553229f324dd)
+---
+ gcc/config/i386/i386.cc                  |  6 ++++
+ gcc/testsuite/gcc.target/i386/pr127650.c | 35 ++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.target/i386/pr127650.c
+
+diff --git a/gcc/config/i386/i386.cc b/gcc/config/i386/i386.cc
+index 392c50ff44c4..c124635e0672 100644
+--- a/gcc/config/i386/i386.cc
++++ b/gcc/config/i386/i386.cc
+@@ -5231,6 +5231,12 @@ ix86_gimplify_va_arg (tree valist, tree type, gimple_seq *pre_p,
+   if ((unsigned int) arg_boundary > MAX_SUPPORTED_STACK_ALIGNMENT)
+     arg_boundary = MAX_SUPPORTED_STACK_ALIGNMENT;
+ 
++  /* ARG_BOUNDARY is computed from TYPE_MAIN_VARIANT, so it can be smaller
++     than the alignment of a variant type that carries a user-specified
++     alignment (e.g. a typedef with attribute aligned).  Do not let the
++     access claim more alignment than the argument slot is placed at.  */
++  type_align = MIN (type_align, arg_boundary);
++
+   /* Care for on-stack alignment if needed.  */
+   if (arg_boundary <= 64 || size == 0)
+     t = ovf;
+diff --git a/gcc/testsuite/gcc.target/i386/pr127650.c b/gcc/testsuite/gcc.target/i386/pr127650.c
+new file mode 100644
+index 000000000000..ce55b6b17c30
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/pr127650.c
+@@ -0,0 +1,35 @@
++/* PR target/127650 */
++/* { dg-do run } */
++/* { dg-options "-O2" } */
++
++#include <stdarg.h>
++
++struct S { long a, b, c, d, e, f, g, h; };
++typedef struct S S32 __attribute__((aligned (32)));
++
++struct S gg;
++
++/* The stack slot of an S32 argument is only 8-byte aligned, because the
++   ABI boundary is computed from the main variant.  The va_arg access
++   must not assume the typedef's 32-byte alignment, or the copy may use
++   aligned vector moves on a misaligned address.  */
++
++__attribute__((noipa)) void
++f (int n, int b, int c, int d, int e, int g, ...)
++{
++  va_list ap;
++  va_start (ap, g);
++  long l = va_arg (ap, long);
++  gg = va_arg (ap, S32);
++  va_end (ap);
++  if (l != 99 || gg.a != 11 || gg.h != 18)
++    __builtin_abort ();
++}
++
++int
++main (void)
++{
++  S32 s = { 11, 12, 13, 14, 15, 16, 17, 18 };
++  f (0, 1, 2, 3, 4, 5, 99L, s);
++  return 0;
++}

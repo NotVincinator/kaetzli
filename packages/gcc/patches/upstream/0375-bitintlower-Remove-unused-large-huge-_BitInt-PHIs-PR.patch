@@ -1,0 +1,131 @@
+From 8ddb287efebf7f8c73e9839ae9562c060456b56d Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Mon, 19 Oct 2026 09:55:20 +0200
+Subject: [PATCH 375/385] bitintlower: Remove unused large/huge _BitInt PHIs
+ [PR127904]
+
+tree-outof-ssa.cc before performing coalescing does
+eliminate_useless_phis (), which removes removes PHIs and dead PHIs.
+The following testcase is miscompiled because the coalescing performed
+for the large/huge _BitInt SSA_NAME subset is apparently confused by
+such dead PHIs and puts the result of such an PHI into the same partition
+as one of the PHI args which is unfortunately used later on in the
+function as well, so by reusing the partition we clobber the value of
+the argument and then use the incorrect value later on.
+From this, I think the remove dead PHIs part of
+eliminate_useless_phis is not just an optimization but I think the
+coalescing somehow relies on it.
+So, this patch performs such removal (again, for large/huge _BitInt
+PHIs only) before doing the coalescing as well.
+
+2026-10-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/127904
+	* tree-outof-ssa.h (remove_gimple_phi_args): Declare.
+	* tree-outof-ssa.cc (remove_gimple_phi_args): No longer static.
+	* gimple-lower-bitint.cc: Include tree-outof-ssa.h.
+	(gimple_lower_bitint): Remove zero uses large/huge _BitInt
+	PHI results.
+
+	* gcc.dg/torture/bitint-111.c: New test.
+
+Reviewed-by: Richard Biener <rguenth@suse.de>
+(cherry picked from commit 2653d6c63d491dd8f61efff553ad4d7bcc33d53c)
+---
+ gcc/gimple-lower-bitint.cc                | 12 ++++++++++
+ gcc/testsuite/gcc.dg/torture/bitint-111.c | 29 +++++++++++++++++++++++
+ gcc/tree-outof-ssa.cc                     |  2 +-
+ gcc/tree-outof-ssa.h                      |  1 +
+ 4 files changed, 43 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/bitint-111.c
+
+diff --git a/gcc/gimple-lower-bitint.cc b/gcc/gimple-lower-bitint.cc
+index 6d1bb01cbed6..dc7f044c9ac8 100644
+--- a/gcc/gimple-lower-bitint.cc
++++ b/gcc/gimple-lower-bitint.cc
+@@ -58,6 +58,7 @@ along with GCC; see the file COPYING3.  If not see
+ #include "gimple-lower-bitint.h"
+ #include "attribs.h"
+ #include "asan.h"
++#include "tree-outof-ssa.h"
+ 
+ /* Split BITINT_TYPE precisions in 4 categories.  Small _BitInt, where
+    target hook says it is a single limb, middle _BitInt which per ABI
+@@ -7424,6 +7425,17 @@ gimple_lower_bitint (void)
+ 	      default:
+ 		break;
+ 	      }
++	  else if (gphi *phi = dyn_cast <gphi *> (stmt))
++	    {
++	      /* Remove PHIs with no uses, coalescing apparently
++		 relies on this.  */
++	      if (has_zero_uses (s))
++		{
++		  remove_gimple_phi_args (phi);
++		  gsi = gsi_for_stmt (stmt);
++		  remove_phi_node (&gsi, true);
++		}
++	    }
+ 	}
+       /* We need to also rewrite stores of large/huge _BitInt INTEGER_CSTs
+ 	 into memory.  Such functions could have no large/huge SSA_NAMEs.  */
+diff --git a/gcc/testsuite/gcc.dg/torture/bitint-111.c b/gcc/testsuite/gcc.dg/torture/bitint-111.c
+new file mode 100644
+index 000000000000..d89ab05ea704
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/bitint-111.c
+@@ -0,0 +1,29 @@
++/* PR tree-optimization/127904 */
++/* { dg-do run { target bitint575 } } */
++
++typedef unsigned _BitInt(575) B;
++
++[[gnu::noipa]] B
++foo (B a, B b, int c, unsigned n)
++{
++  B r = 0;
++  for (unsigned i = 0; i < n; i++)
++    {
++      B x;
++      if (c)
++       x = a;
++      else
++       x = b;
++      for (unsigned j = 0; j < n; j++)
++       x = (B) j;
++      r += x;
++    }
++  return r + a + b;
++}
++
++int
++main ()
++{
++  if (foo (5, 7, 0, 2) != 14 || foo (5, 7, 1, 3) != 18)
++    __builtin_abort ();
++}
+diff --git a/gcc/tree-outof-ssa.cc b/gcc/tree-outof-ssa.cc
+index af9d79fedcd7..be2fd54fb86a 100644
+--- a/gcc/tree-outof-ssa.cc
++++ b/gcc/tree-outof-ssa.cc
+@@ -793,7 +793,7 @@ eliminate_phi (edge e, elim_graph *g)
+ /* Remove each argument from PHI.  If an arg was the last use of an SSA_NAME,
+    check to see if this allows another PHI node to be removed.  */
+ 
+-static void
++void
+ remove_gimple_phi_args (gphi *phi)
+ {
+   use_operand_p arg_p;
+diff --git a/gcc/tree-outof-ssa.h b/gcc/tree-outof-ssa.h
+index bfe9a1290b88..f571ab458885 100644
+--- a/gcc/tree-outof-ssa.h
++++ b/gcc/tree-outof-ssa.h
+@@ -77,6 +77,7 @@ get_gimple_for_ssa_name (tree exp)
+ extern bool ssa_is_replaceable_p (gimple *stmt);
+ extern void finish_out_of_ssa (struct ssaexpand *sa);
+ extern unsigned int rewrite_out_of_ssa (struct ssaexpand *sa);
++extern void remove_gimple_phi_args (gphi *phi);
+ extern void expand_phi_nodes (struct ssaexpand *sa);
+ 
+ #endif /* GCC_TREE_OUTOF_SSA_H */

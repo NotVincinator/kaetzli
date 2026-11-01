@@ -1,0 +1,304 @@
+From a03833529ad951ca5f95ecc5b566b176f33ebc26 Mon Sep 17 00:00:00 2001
+From: Srinath Parvathaneni <srinath.parvathaneni@arm.com>
+Date: Fri, 18 Sep 2026 09:40:59 +0000
+Subject: [PATCH 183/385] aarch64: Add support for ACLE hint intrinsics
+
+This patch adds support for ACLE system hint intrinsics
+__yield(), __wfe(), __wfi(), __sev() and __sevl().
+
+The ACLE specification is available at [1].
+
+[1] https://github.com/ARM-software/acle/blob/main/main/acle.md#hints
+
+gcc/ChangeLog:
+
+	* config/aarch64/aarch64-builtins.cc (enum aarch64_builtins): Add
+	AARCH64_BUILTIN_YIELD, AARCH64_BUILTIN_WFE, AARCH64_BUILTIN_WFI,
+	AARCH64_BUILTIN_SEV and AARCH64_BUILTIN_SEVL.
+	(aarch64_init_syshintop_builtins): New function.
+	(handle_arm_acle_h): Call aarch64_init_syshintop_builtins.
+	(aarch64_general_expand_builtin): Expand the system hint builtins.
+	* config/aarch64/aarch64.md (unspecv): Add UNSPECV_YIELD, UNSPECV_WFE,
+	UNSPECV_WFI, UNSPECV_SEV and UNSPECV_SEVL.
+	(aarch64_yield): New insn pattern.
+	(aarch64_wfe): Likewise.
+	(aarch64_wfi): Likewise.
+	(aarch64_sev): Likewise.
+	(aarch64_sevl): Likewise.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/aarch64/acle/hint-1.c: New test.
+	* gcc.target/aarch64/acle/hint-2.c: Likewise.
+
+(cherry picked from commit ac5f9f2a9008e90feaa03a870e7e3f9dc765e16b)
+---
+ gcc/config/aarch64/aarch64-builtins.cc        | 51 ++++++++++++
+ gcc/config/aarch64/aarch64.md                 | 45 +++++++++++
+ .../gcc.target/aarch64/acle/hint-1.c          | 26 +++++++
+ .../gcc.target/aarch64/acle/hint-2.c          | 77 +++++++++++++++++++
+ 4 files changed, 199 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/acle/hint-1.c
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/acle/hint-2.c
+
+diff --git a/gcc/config/aarch64/aarch64-builtins.cc b/gcc/config/aarch64/aarch64-builtins.cc
+index 611f6dc45e0a..36b5496f30b8 100644
+--- a/gcc/config/aarch64/aarch64-builtins.cc
++++ b/gcc/config/aarch64/aarch64-builtins.cc
+@@ -911,6 +911,12 @@ enum aarch64_builtins
+   AARCH64_BUILTIN_STSHH_SF,
+   AARCH64_BUILTIN_STSHH_DF,
+   AARCH64_BUILTIN_STSHH_PTR,
++  /* System Hint Operation builtins.  */
++  AARCH64_BUILTIN_YIELD,
++  AARCH64_BUILTIN_WFE,
++  AARCH64_BUILTIN_WFI,
++  AARCH64_BUILTIN_SEV,
++  AARCH64_BUILTIN_SEVL,
+   AARCH64_BUILTIN_MAX
+ };
+ 
+@@ -1460,6 +1466,30 @@ aarch64_get_attributes (unsigned int f, machine_mode mode)
+   return aarch64_add_attribute ("leaf", attrs);
+ }
+ 
++/* System Hint Operation builtins.  */
++void
++aarch64_init_syshintop_builtins (void)
++{
++  tree vtype_node
++    = build_function_type_list (void_type_node, NULL);
++
++  aarch64_builtin_decls[AARCH64_BUILTIN_YIELD]
++    = aarch64_general_simulate_builtin ("__yield", vtype_node,
++					AARCH64_BUILTIN_YIELD);
++  aarch64_builtin_decls[AARCH64_BUILTIN_WFE]
++    = aarch64_general_simulate_builtin ("__wfe", vtype_node,
++					AARCH64_BUILTIN_WFE);
++  aarch64_builtin_decls[AARCH64_BUILTIN_WFI]
++    = aarch64_general_simulate_builtin ("__wfi", vtype_node,
++					AARCH64_BUILTIN_WFI);
++  aarch64_builtin_decls[AARCH64_BUILTIN_SEV]
++    = aarch64_general_simulate_builtin ("__sev", vtype_node,
++					AARCH64_BUILTIN_SEV);
++  aarch64_builtin_decls[AARCH64_BUILTIN_SEVL]
++    = aarch64_general_simulate_builtin ("__sevl", vtype_node,
++					AARCH64_BUILTIN_SEVL);
++}
++
+ /* Due to the architecture not providing lane variant of the lane instructions
+    for fcmla we can't use the standard simd builtin expansion code, but we
+    still want the majority of the validation that would normally be done.  */
+@@ -2407,6 +2437,7 @@ handle_arm_acle_h (void)
+   aarch64_init_tme_builtins ();
+   aarch64_init_memtag_builtins ();
+   aarch64_init_prefetch_builtins ();
++  aarch64_init_syshintop_builtins ();
+ }
+ 
+ /* Initialize fpsr fpcr getters and setters.  */
+@@ -4563,6 +4594,26 @@ aarch64_general_expand_builtin (unsigned int fcode, tree exp, rtx target,
+ 	return ops[0].value;
+       }
+ 
++    case AARCH64_BUILTIN_YIELD:
++      emit_insn (GEN_FCN (CODE_FOR_aarch64_yield) ());
++      return NULL_RTX;
++
++    case AARCH64_BUILTIN_WFE:
++      emit_insn (GEN_FCN (CODE_FOR_aarch64_wfe) ());
++      return NULL_RTX;
++
++    case AARCH64_BUILTIN_WFI:
++      emit_insn (GEN_FCN (CODE_FOR_aarch64_wfi) ());
++      return NULL_RTX;
++
++    case AARCH64_BUILTIN_SEV:
++      emit_insn (GEN_FCN (CODE_FOR_aarch64_sev) ());
++      return NULL_RTX;
++
++    case AARCH64_BUILTIN_SEVL:
++      emit_insn (GEN_FCN (CODE_FOR_aarch64_sevl) ());
++      return NULL_RTX;
++
+     case AARCH64_SIMD_BUILTIN_FCMLA_LANEQ0_V2SF:
+     case AARCH64_SIMD_BUILTIN_FCMLA_LANEQ90_V2SF:
+     case AARCH64_SIMD_BUILTIN_FCMLA_LANEQ180_V2SF:
+diff --git a/gcc/config/aarch64/aarch64.md b/gcc/config/aarch64/aarch64.md
+index 71ea4b8aa999..cab4964fd012 100644
+--- a/gcc/config/aarch64/aarch64.md
++++ b/gcc/config/aarch64/aarch64.md
+@@ -425,6 +425,11 @@
+     UNSPECV_BLOCKAGE		; Represent a blockage
+     UNSPECV_PROBE_STACK_RANGE	; Represent stack range probing.
+     UNSPECV_SPECULATION_BARRIER ; Represent speculation barrier.
++    UNSPECV_YIELD		; Represent yield instruction.
++    UNSPECV_WFE			; Represent wfe instruction.
++    UNSPECV_WFI			; Represent wfi instruction.
++    UNSPECV_SEV			; Represent sev instruction.
++    UNSPECV_SEVL		; Represent sevl instruction.
+     UNSPECV_BTI_NOARG		; Represent BTI.
+     UNSPECV_BTI_C		; Represent BTI c.
+     UNSPECV_BTI_J		; Represent BTI j.
+@@ -1328,6 +1333,46 @@
+   [(set_attr "type" "no_insn")]
+ )
+ 
++(define_insn "aarch64_yield"
++  [(unspec_volatile [(const_int 0)] UNSPECV_YIELD)
++   (clobber (mem:BLK (scratch)))]
++  ""
++  "yield"
++  [(set_attr "type" "nop")]
++)
++
++(define_insn "aarch64_wfe"
++  [(unspec_volatile [(const_int 0)] UNSPECV_WFE)
++   (clobber (mem:BLK (scratch)))]
++  ""
++  "wfe"
++  [(set_attr "type" "nop")]
++)
++
++(define_insn "aarch64_wfi"
++  [(unspec_volatile [(const_int 0)] UNSPECV_WFI)
++   (clobber (mem:BLK (scratch)))]
++  ""
++  "wfi"
++  [(set_attr "type" "nop")]
++)
++
++(define_insn "aarch64_sev"
++  [(unspec_volatile [(const_int 0)] UNSPECV_SEV)
++   (clobber (mem:BLK (scratch)))]
++  ""
++  "sev"
++  [(set_attr "type" "nop")]
++)
++
++(define_insn "aarch64_sevl"
++  [(unspec_volatile [(const_int 0)] UNSPECV_SEVL)
++   (clobber (mem:BLK (scratch)))]
++  ""
++  "sevl"
++  [(set_attr "type" "nop")]
++)
++
+ (define_insn "prefetch"
+   [(prefetch (match_operand:DI 0 "aarch64_prefetch_operand" "Dp")
+             (match_operand:QI 1 "const_int_operand" "")
+diff --git a/gcc/testsuite/gcc.target/aarch64/acle/hint-1.c b/gcc/testsuite/gcc.target/aarch64/acle/hint-1.c
+new file mode 100644
+index 000000000000..17372a096172
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/acle/hint-1.c
+@@ -0,0 +1,26 @@
++/* Test the ACLE hint intrinsics.  */
++/* { dg-do compile } */
++/* { dg-final { check-function-bodies "**" "" } } */
++
++#include <arm_acle.h>
++
++/*
++** test_hint:
++** ...
++**	yield
++**	wfe
++**	sev
++**	sevl
++**	wfi
++**...
++**	ret
++*/
++void
++test_hint ()
++{
++  __yield ();
++  __wfe ();
++  __sev ();
++  __sevl ();
++  __wfi ();
++}
+diff --git a/gcc/testsuite/gcc.target/aarch64/acle/hint-2.c b/gcc/testsuite/gcc.target/aarch64/acle/hint-2.c
+new file mode 100644
+index 000000000000..151fd690fa26
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/acle/hint-2.c
+@@ -0,0 +1,77 @@
++ /* Test the ACLE hint intrinsics effect on memory.  */
++/* { dg-do compile } */
++/* { dg-options "-O2" } */
++/* { dg-final { check-function-bodies "**" "" } } */
++
++#include <arm_acle.h>
++
++/*
++** foo:
++** ...
++**	mov	w[0-9]+, 5
++**	str	w[0-9]+, \[x0\]
++**	yield
++**	mov	w[0-9]+, 4
++**	str	w[0-9]+, \[x0\]
++**	wfe
++**	mov	w[0-9]+, 3
++**	str	w[0-9]+, \[x0\]
++**	sev
++**	str	w[0-9]+, \[x0\]
++**	sevl
++**	mov	w[0-9]+, 9
++**	str	w[0-9]+, \[x0\]
++**	wfi
++**	mov	w0, 0
++**	ret
++*/
++int foo (int* counter)
++{
++  *counter = 5;
++  __yield();
++  *counter = 4;
++  __wfe();
++  *counter = 3;
++  __sev();
++  *counter = 4;
++  __sevl();
++  *counter = 9;
++  __wfi();
++  return 0;
++}
++
++/*
++** foo1:
++** ...
++**	mov	w[0-9]+, 5
++**	str	w[0-9]+, \[x0\]
++**	yield
++**	mov	w[0-9]+, 4
++**	str	w[0-9]+, \[x0\]
++**	yield
++**	mov	w[0-9]+, 3
++**	str	w[0-9]+, \[x0\]
++**	yield
++**	mov	w[0-9]+, 6
++**	str	w[0-9]+, \[x0\]
++**	yield
++**	mov	w[0-9]+, 9
++**	str	w[0-9]+, \[x0\]
++**	yield
++**	mov	w0, 0
++**	ret
++*/
++int foo1 (int* counter)
++{
++  *counter = 5;
++  __yield();
++  *counter = 4;
++  __yield();
++  *counter = 3;
++  __yield();
++  *counter = 6;
++  __yield();
++  *counter = 9;
++  __yield();
++  return 0;
++}

@@ -1,0 +1,107 @@
+From 70cc8ed46bf41a4a7c807cf037b993126b368478 Mon Sep 17 00:00:00 2001
+From: Michael Meissner <meissner@linux.ibm.com>
+Date: Thu, 27 Aug 2026 12:16:33 -0400
+Subject: [PATCH 107/385] Backport changes to use load/store vector pair
+ instructions for -mcpu=future
+
+In the development for the power10 processor, GCC did not enable using the load
+vector pair and store vector pair instructions when optimizing things like
+memory copy.  This patch enables using those instructions if -mcpu=future is
+used.
+
+These changes were back ported from the changes to the master branch on
+2026-08-07.
+
+gcc/
+
+2026-08-27  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000-cpus.def (FUTURE_MASKS_SERVER): Enable using load
+	vector pair and store vector pair instructions for memory and string
+	built-in functions.
+	(POWERPC_MASKS): Make -mblock-ops-vector-pair an option that is set by
+	the -mcpu=<xxx> command line option.
+	* config/rs6000/rs6000.cc (rs6000_machine_from_flags): Disable
+	-mblock-ops-vector-pair from influencing .machine selection.
+
+gcc/testsuite/
+
+	* gcc.target/powerpc/future-3.c: New test.
+---
+ gcc/config/rs6000/rs6000-cpus.def           | 10 +++++++++-
+ gcc/config/rs6000/rs6000.cc                 |  2 +-
+ gcc/testsuite/gcc.target/powerpc/future-3.c | 22 +++++++++++++++++++++
+ 3 files changed, 32 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/future-3.c
+
+diff --git a/gcc/config/rs6000/rs6000-cpus.def b/gcc/config/rs6000/rs6000-cpus.def
+index 365e0c6899c1..4dcdcf7c858d 100644
+--- a/gcc/config/rs6000/rs6000-cpus.def
++++ b/gcc/config/rs6000/rs6000-cpus.def
+@@ -83,9 +83,16 @@
+ #define POWER11_MASKS_SERVER (ISA_3_1_MASKS_SERVER			\
+ 			      | OPTION_MASK_POWER11)
+ 
+-/* -mcpu=future flags.  */
++/* -mcpu=future flags.
++
++   During the development of the power10 support for GCC, using load/store
++   vector pair instructions for string operations was turned off by default,
++   because there was a use case that had really bad performance.  Assume this
++   will be fixed in potential future machines.  */
++
+ #define FUTURE_MASKS_SERVER	(POWER11_MASKS_SERVER			\
+ 				 | OPTION_MASK_FUTURE			\
++				 | OPTION_MASK_BLOCK_OPS_VECTOR_PAIR	\
+ 				 | OPTION_MASK_DMF)
+ 
+ /* Flags that need to be turned off if -mno-vsx.  */
+@@ -116,6 +123,7 @@
+ 
+ /* Mask of all options to set the default isa flags based on -mcpu=<xxx>.  */
+ #define POWERPC_MASKS		(OPTION_MASK_ALTIVEC			\
++				 | OPTION_MASK_BLOCK_OPS_VECTOR_PAIR	\
+ 				 | OPTION_MASK_CMPB			\
+ 				 | OPTION_MASK_CRYPTO			\
+ 				 | OPTION_MASK_DFP			\
+diff --git a/gcc/config/rs6000/rs6000.cc b/gcc/config/rs6000/rs6000.cc
+index e60a99b64856..da8e176ae089 100644
+--- a/gcc/config/rs6000/rs6000.cc
++++ b/gcc/config/rs6000/rs6000.cc
+@@ -5992,7 +5992,7 @@ rs6000_machine_from_flags (void)
+ 
+   /* Disable the flags that should never influence the .machine selection.  */
+   flags &= ~(OPTION_MASK_PPC_GFXOPT | OPTION_MASK_PPC_GPOPT | OPTION_MASK_ISEL
+-	     | OPTION_MASK_ALTIVEC);
++	     | OPTION_MASK_ALTIVEC | OPTION_MASK_BLOCK_OPS_VECTOR_PAIR);
+ 
+   if ((flags & (FUTURE_MASKS_SERVER & ~POWER11_MASKS_SERVER)) != 0)
+     return "future";
+diff --git a/gcc/testsuite/gcc.target/powerpc/future-3.c b/gcc/testsuite/gcc.target/powerpc/future-3.c
+new file mode 100644
+index 000000000000..afa22228b96d
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/future-3.c
+@@ -0,0 +1,22 @@
++/* 32-bit doesn't generate vector pair instructions.  */
++/* { dg-do compile { target lp64 } } */
++/* { dg-options "-mdejagnu-cpu=future -O2" } */
++
++/* Test to see that memcpy will use load/store vector pair with
++   -mcpu=future.  */
++
++#ifndef SIZE
++#define SIZE 4
++#endif
++
++extern vector double to[SIZE], from[SIZE];
++
++void
++copy (void)
++{
++  __builtin_memcpy (to, from, sizeof (to));
++  return;
++}
++
++/* { dg-final { scan-assembler {\mlxvpx?\M}  } } */
++/* { dg-final { scan-assembler {\mstxvpx?\M} } } */

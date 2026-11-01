@@ -1,0 +1,50 @@
+From 7c4a75a3009ad8c43a191623d736b98bff575f08 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Tomasz=20Kami=C5=84ski?= <tkaminsk@redhat.com>
+Date: Wed, 13 May 2026 11:51:25 +0200
+Subject: [PATCH 228/385] libstdc++: Use type_identity_t for operator<=>
+ parameter [PR114400]
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This matches change to operator== from r14-9642-gf4605c53ea2eeaf,
+and implements exact resolution of LWG3950, "std::basic_string_view comparison
+operators are overspecified". The difference between __type_identity and
+type_identity is observable as illustrated by PR.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/114400
+	* include/std/string_view (operator<=>): Use type_identity_t
+	instead of __type_identity_t.
+
+Reviewed-by: Jonathan Wakely <jwakely@redhat.com>
+Signed-off-by: Tomasz Kamiński <tkaminsk@redhat.com>
+(cherry picked from commit bbcc9da1f026b202c692e0b47eeacd28e0c69c0d)
+---
+ libstdc++-v3/include/std/string_view | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/libstdc++-v3/include/std/string_view b/libstdc++-v3/include/std/string_view
+index 735d46f2de7f..efbf432f1129 100644
+--- a/libstdc++-v3/include/std/string_view
++++ b/libstdc++-v3/include/std/string_view
+@@ -621,6 +621,9 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+   // type (see N3766).
+ 
+ #if __cpp_lib_three_way_comparison
++  // _GLIBCXX_RESOLVE_LIB_DEFECTS
++  // 3950. std::basic_string_view comparison operators are overspecified 
++
+   template<typename _CharT, typename _Traits>
+     [[nodiscard]]
+     constexpr bool
+@@ -633,7 +636,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+     [[nodiscard]]
+     constexpr auto
+     operator<=>(basic_string_view<_CharT, _Traits> __x,
+-		__type_identity_t<basic_string_view<_CharT, _Traits>> __y)
++		type_identity_t<basic_string_view<_CharT, _Traits>> __y)
+     noexcept
+     -> decltype(__detail::__char_traits_cmp_cat<_Traits>(0))
+     { return __detail::__char_traits_cmp_cat<_Traits>(__x.compare(__y)); }

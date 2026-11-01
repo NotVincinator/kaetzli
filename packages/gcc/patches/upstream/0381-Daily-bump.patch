@@ -1,0 +1,270 @@
+From 2ca347f973fa7cee33a1dea678618f24d8667c9e Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Fri, 30 Oct 2026 00:21:05 +0000
+Subject: [PATCH 381/385] Daily bump.
+
+---
+ gcc/ChangeLog           | 88 ++++++++++++++++++++++++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/cp/ChangeLog        |  9 +++++
+ gcc/testsuite/ChangeLog | 89 +++++++++++++++++++++++++++++++++++++++++
+ libstdc++-v3/ChangeLog  | 32 +++++++++++++++
+ 5 files changed, 219 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 1061e5c2bdac..19d506de806f 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,91 @@
++2026-10-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-10-20  Jakub Jelinek  <jakub@redhat.com>
++
++	PR tree-optimization/128003
++	* tree-switch-conversion.cc (jump_table_cluster::emit): Cast to
++	unsigned_type_for whenever !TYPE_UNSIGNED rather than when
++	!TYPE_OVERFLOW_WRAPS.
++
++2026-10-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-10-20  Jakub Jelinek  <jakub@redhat.com>
++
++	PR tree-optimization/127965
++	* gimple-isel.cc (optimize_atomic_bit_test_and): For the
++	< 0 and >= 0 cases, punt if TREE_TYPE (use_lhs) is unsigned.
++	Compute ibit from TYPE_PRECISION of TREE_TYPE (use_lhs)
++	rather than TYPE_SIZE_UNIT of TREE_TYPE (use_rhs).  Fix comment
++	pastos and other nits.  Formatting fix.
++	(gimple_isel_builtin_call): Formatting fix.
++
++2026-10-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-10-20  Jakub Jelinek  <jakub@redhat.com>
++
++	PR tree-optimization/127905
++	* gimple-lower-bitint.cc (gimple_lower_bitint): Don't add to
++	m_single_use_names versions of SSA_NAMEs where their single use
++	is within a different loop from the definition (or if use is
++	in irreducible loop, in a different bb than def).
++
++2026-10-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-10-20  Jakub Jelinek  <jakub@redhat.com>
++
++	PR target/128015
++	* config/i386/sgxintrin.h (__enclv_generic): Fix a typo.
++
++2026-10-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-10-19  Jakub Jelinek  <jakub@redhat.com>
++
++	PR tree-optimization/127904
++	* tree-outof-ssa.h (remove_gimple_phi_args): Declare.
++	* tree-outof-ssa.cc (remove_gimple_phi_args): No longer static.
++	* gimple-lower-bitint.cc: Include tree-outof-ssa.h.
++	(gimple_lower_bitint): Remove zero uses large/huge _BitInt
++	PHI results.
++
++2026-10-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-10-13  Jakub Jelinek  <jakub@redhat.com>
++
++	PR middle-end/127848
++	* tree-tailcall.cc: Include target.h.
++	(process_assignment): Punt if one of dest and src_var types
++	is BITINT_TYPE_P and the other is not.  If both are BITINT_TYPE_P,
++	punt if TYPE_SIZE is different, or for narrowing or same precision
++	conversions on != bitint_ext_undef targets, or for widening
++	conversions on != bitint_ext_full targets or if signedness differs.
++
++2026-10-29  Vineet Gupta  <vineet.gupta@linux.dev>
++
++	PR tree-optimization/127853
++	* tree-ssa-forwprop.cc (simplify_count_zeroes): Only pass the
++	value at zero to .CLZ/.CTZ when the target defines it.
++
++2026-10-29  Vineet Gupta  <vineet.gupta@linux.dev>
++
++	PR rtl-optimization/127852
++	* simplify-rtx.cc (simplify_context::simplify_binary_operation_1):
++	Don't merge two equal operands with side effects in the PLUS and
++	MINUS coefficient folds and in the (X - 1) * Y + Y and
++	(X + 1) * Y - Y folds.
++
++2026-10-29  Haochen Jiang  <haochen.jiang@intel.com>
++
++	PR target/127459
++	* config/i386/sse.md (avx_vec_concat_isa): New.
++	(avx_vec_concat<mode>): Allow 256 bit vinsert*64x2/32*4 when
++	AVX512VL is enabled.
++
+ 2026-10-28  Richard Biener  <rguenther@suse.de>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 2e398bcbd4e5..2ba2d0a790d0 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261029
++20261030
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index 0d6cd0f075fb..eca87c3363b7 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,12 @@
++2026-10-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-10-21  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/127766
++	* semantics.cc (finish_structured_binding_size): Call
++	check_trait_type with kind 4.
++
+ 2026-10-23  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index e0105ab04eec..e09373248fe1 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,92 @@
++2026-10-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-10-21  Jakub Jelinek  <jakub@redhat.com>
++
++	PR c++/127766
++	* g++.dg/ext/builtin-structured-binding-size2.C: Expect different
++	diagnostics.
++	* g++.dg/ext/builtin-structured-binding-size7.C: New test.
++
++2026-10-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-10-20  Jakub Jelinek  <jakub@redhat.com>
++
++	PR tree-optimization/128003
++	* gcc.dg/torture/bitint-113.c: New test.
++
++2026-10-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-10-20  Jakub Jelinek  <jakub@redhat.com>
++
++	PR tree-optimization/127965
++	* gcc.dg/pr127965-1.c: New test.
++	* gcc.dg/pr127965-2.c: New test.
++	* gcc.target/i386/pr127965-1.c: New test.
++	* gcc.target/i386/pr127965-2.c: New test.
++
++2026-10-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-10-20  Jakub Jelinek  <jakub@redhat.com>
++
++	PR tree-optimization/127905
++	* gcc.dg/torture/bitint-114.c: New test.
++
++2026-10-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-10-19  Jakub Jelinek  <jakub@redhat.com>
++
++	PR tree-optimization/127904
++	* gcc.dg/torture/bitint-111.c: New test.
++
++2026-10-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-10-17  Jakub Jelinek  <jakub@redhat.com>
++
++	PR testsuite/127945
++	* g++.dg/cpp26/literals1.C: Drop bogus { target c++23 } from dg-error.
++	* g++.dg/cpp26/literals2.C: Likewise.
++
++2026-10-29  Jakub Jelinek  <jakub@redhat.com>
++
++	Backported from master:
++	2026-10-13  Jakub Jelinek  <jakub@redhat.com>
++
++	PR middle-end/127848
++	* gcc.dg/pr127848-1.c: New test.
++	* gcc.dg/pr127848-2.c: New test.
++	* gcc.dg/pr127848-3.c: New test.
++	* gcc.dg/pr127848-4.c: New test.
++	* gcc.dg/pr127848-5.c: New test.
++
++2026-10-29  Vineet Gupta  <vineet.gupta@linux.dev>
++
++	PR tree-optimization/127853
++	* gcc.dg/torture/clz-table-zero-1.c: New test.
++	* gcc.dg/torture/ctz-table-zero-1.c: New test.
++	* gcc.target/aarch64/clz-ctz-table-zero.c: New test.
++	* gcc.target/i386/clz-ctz-table-nonzero.c: New test.
++	* gcc.target/i386/clz-ctz-table-zero.c: New test.
++
++2026-10-29  Vineet Gupta  <vineet.gupta@linux.dev>
++
++	PR rtl-optimization/127852
++	* gcc.target/aarch64/volatile-fuse-minus-1.c: New test.
++	* gcc.target/aarch64/volatile-fuse-minus-2.c: New test.
++	* gcc.target/i386/volatile-fuse-minus-1.c: New test.
++	* gcc.target/i386/volatile-fuse-minus-2.c: New test.
++
++2026-10-29  Haochen Jiang  <haochen.jiang@intel.com>
++
++	PR target/127459
++	* gcc.target/i386/pr127459-1a.c: New test.
++	* gcc.target/i386/pr127459-1b.c: Ditto.
++
+ 2026-10-28  Richard Biener  <rguenther@suse.de>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index 12eeb467c368..7db37d33d105 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,35 @@
++2026-10-29  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-10-29  Jonathan Wakely  <jwakely@redhat.com>
++
++	* include/bits/stl_bvector.h (_M_check_and_initialize): New
++	function.
++	(vector(size_type, const bool&, const allocator_type&))
++	(vector(from_range_t, R&&, const Alloc&))
++	(_M_initialize_dispatch, _M_initialize_range): Use new function
++	instead of _M_initialize.
++	(_M_initialize): Add debug assertion.
++	* testsuite/23_containers/vector/bool/prX.cc: New test.
++
++2026-10-29  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-10-29  Jonathan Wakely  <jwakely@redhat.com>
++
++	* src/c++20/tzdb.cc (tzdb::locate_zone): Adjust exception text
++	to say "time zone".
++	* testsuite/std/time/tzdb/links.cc: Adjust expected exception
++	text.
++
++2026-10-29  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-10-29  Jonathan Wakely  <jwakely@redhat.com>
++
++	* include/parallel/search.h (__search_template): Increase array
++	size.
++
+ 2026-10-28  Jonathan Wakely  <jwakely@redhat.com>
+ 
+ 	Backported from master:

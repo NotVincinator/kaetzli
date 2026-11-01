@@ -1,0 +1,59 @@
+From 1ef50505862d6702e95e76b3ce2c5ed3a93610cb Mon Sep 17 00:00:00 2001
+From: Jason Merrill <jason@redhat.com>
+Date: Fri, 14 Aug 2026 09:37:39 -0400
+Subject: [PATCH 039/385] c++: constexpr class access in generic lambda
+ [PR126754]
+
+We don't want to see TARGET_EXPR in template trees because it's an
+implementation detail, not a representation of the source.  But constant
+evaluation normally represents a constant class value with a TARGET_EXPR.
+For GCC 16 let's duplicate the default case handling.
+
+	PR c++/126754
+
+gcc/cp/ChangeLog:
+
+	* pt.cc (tsubst_expr) <case TARGET_EXPR>: Only unreachable
+	when checking.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/cpp1y/constexpr-lambda2.C: New test.
+---
+ gcc/cp/pt.cc                                   |  4 +++-
+ gcc/testsuite/g++.dg/cpp1y/constexpr-lambda2.C | 11 +++++++++++
+ 2 files changed, 14 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp1y/constexpr-lambda2.C
+
+diff --git a/gcc/cp/pt.cc b/gcc/cp/pt.cc
+index 9fba230846af..0f52a84fb036 100644
+--- a/gcc/cp/pt.cc
++++ b/gcc/cp/pt.cc
+@@ -23187,7 +23187,9 @@ tsubst_expr (tree t, tree args, tsubst_flags_t complain, tree in_decl)
+     case TARGET_EXPR:
+       /* TARGET_EXPR represents temporary objects and should not appear in
+ 	 templated trees.  */
+-      gcc_unreachable ();
++      if (flag_checking)
++	gcc_unreachable ();
++      RETURN (t);
+ 
+     case OFFSET_REF:
+       {
+diff --git a/gcc/testsuite/g++.dg/cpp1y/constexpr-lambda2.C b/gcc/testsuite/g++.dg/cpp1y/constexpr-lambda2.C
+new file mode 100644
+index 000000000000..1ad31f83fc66
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp1y/constexpr-lambda2.C
+@@ -0,0 +1,11 @@
++// PR c++/126754
++// { dg-do compile { target c++14 } }
++
++struct S { int i; };
++int main() {
++  constexpr S a{1};
++  const auto f = [](auto b) {
++    return 1 - a.i;  // this expression must be independent of b in order to trigger the crash
++  };
++  return f(0);
++}

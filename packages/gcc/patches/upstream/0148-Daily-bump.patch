@@ -1,0 +1,71 @@
+From 1c1cf87e07567288d09c5ec07e32d05a37d5faa3 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sat, 12 Sep 2026 00:20:04 +0000
+Subject: [PATCH 148/385] Daily bump.
+
+---
+ gcc/ChangeLog           | 24 ++++++++++++++++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 13 +++++++++++++
+ 3 files changed, 38 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index a9c799eee756..fb017649d5b4 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,27 @@
++2026-09-11  Robin Dapp  <robin.dapp@oss.qualcomm.com>
++
++	PR middle-end/127256
++	* lower-subreg.cc (interesting_mode_p): Don't consider
++	unsplittable modes as interesting.
++	(simple_move_operand): Don't split subregs whose outer mode
++	can be split but the inner mode cannot.
++	(simplify_subreg_concatn): Don't insist the outer mode is
++	interesting but rather check that its size is constant.
++
++2026-09-11  Richard Earnshaw  <rearnsha@arm.com>
++
++	Backported from master:
++	2026-09-04  Richard Earnshaw  <rearnsha@arm.com>
++
++	PR target/126463
++	* config/aarch64/aarch64.cc (aarch64_select_cc_mode): Correctly
++	match overflow detection idioms using MINUS and NEG.
++	* config/aarch64/aarch64.md (subv<GPI:mode>4): Re-order the
++	compare into canonical form.
++	(subv<GPI:mode>4_insn): Likewise.
++	(negv<GPI:mode>4): Likewise.
++	(negv<GPI:mode>_insn): Likewise.  Fix typo in output template.
++
+ 2026-09-08  Jin Ma  <jinma@linux.alibaba.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 59ed0b69b8e7..4987d1122047 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260911
++20260912
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index ec7be1b3c44f..cf508bdc66de 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,16 @@
++2026-09-11  Robin Dapp  <robin.dapp@oss.qualcomm.com>
++
++	PR middle-end/127256
++	* g++.target/aarch64/pr127256.C: New test.
++
++2026-09-11  Richard Earnshaw  <rearnsha@arm.com>
++
++	Backported from master:
++	2026-09-04  Richard Earnshaw  <rearnsha@arm.com>
++
++	PR target/126463
++	* gcc.target/aarch64/negv.c: New test.
++
+ 2026-09-08  Jin Ma  <jinma@linux.alibaba.com>
+ 
+ 	Backported from master:

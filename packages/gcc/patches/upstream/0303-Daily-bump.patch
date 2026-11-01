@@ -1,0 +1,51 @@
+From fb0beed38e80ca264f58c91873b11464b93af9f9 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Fri, 16 Oct 2026 00:20:41 +0000
+Subject: [PATCH 303/385] Daily bump.
+
+---
+ gcc/DATESTAMP           | 2 +-
+ gcc/fortran/ChangeLog   | 9 +++++++++
+ gcc/testsuite/ChangeLog | 8 ++++++++
+ 3 files changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 5d5c53fbebe1..c8a23a41608f 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261015
++20261016
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index 97acc646a591..eb38de8460a7 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,12 @@
++2026-10-15  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
++
++	Backported from master:
++	2026-10-13  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
++
++	PR fortran/110421
++	* trans-expr.cc (alloc_scalar_allocatable_subcomponent): Use
++	gfc_typenode_for_spec for BT_DERIVED values too.
++
+ 2026-10-14  Harald Anlauf  <anlauf@gmx.de>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 9c8a219a6f98..72358bf548c8 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2026-10-15  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
++
++	Backported from master:
++	2026-10-13  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
++
++	PR fortran/110421
++	* gfortran.dg/pr110421.f90: New test.
++
+ 2026-10-14  Harald Anlauf  <anlauf@gmx.de>
+ 
+ 	Backported from master:

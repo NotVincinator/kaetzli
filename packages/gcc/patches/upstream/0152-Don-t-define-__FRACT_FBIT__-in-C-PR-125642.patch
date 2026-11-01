@@ -1,0 +1,47 @@
+From 0f4ddc3a4440fc50b94b18aa0091de38fa046a75 Mon Sep 17 00:00:00 2001
+From: Zhou Qiankang <wszqkzqk@qq.com>
+Date: Mon, 8 Jun 2026 10:30:45 +0800
+Subject: [PATCH 152/385] Don't define __FRACT_FBIT__ in C++ [PR 125642]
+
+	PR c++/125642
+
+gcc/c-family/
+
+	* c-cppbuiltin.cc (c_cpp_builtins): Don't define __FRACT_FBIT__
+	in C++.
+
+gcc/testsuite/
+
+	* g++.dg/pr125642.C: New test.
+
+(cherry picked from commit 6e2ffc51ae89f88292dc9b7256e9fba8db199499)
+---
+ gcc/c-family/c-cppbuiltin.cc    | 2 +-
+ gcc/testsuite/g++.dg/pr125642.C | 5 +++++
+ 2 files changed, 6 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/pr125642.C
+
+diff --git a/gcc/c-family/c-cppbuiltin.cc b/gcc/c-family/c-cppbuiltin.cc
+index 74cbeecb165e..df9c3f988baf 100644
+--- a/gcc/c-family/c-cppbuiltin.cc
++++ b/gcc/c-family/c-cppbuiltin.cc
+@@ -1377,7 +1377,7 @@ c_cpp_builtins (cpp_reader *pfile)
+     }
+ 
+   /* For fixed-point fibt, ibit, max, min, and epsilon.  */
+-  if (targetm.fixed_point_supported_p ())
++  if (!c_dialect_cxx () && targetm.fixed_point_supported_p ())
+     {
+       builtin_define_fixed_point_constants ("SFRACT", "HR",
+ 					    short_fract_type_node);
+diff --git a/gcc/testsuite/g++.dg/pr125642.C b/gcc/testsuite/g++.dg/pr125642.C
+new file mode 100644
+index 000000000000..76807156ad9b
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/pr125642.C
+@@ -0,0 +1,5 @@
++/* { dg-do preprocess } */
++
++#ifdef __FRACT_FBIT__
++#error "we should not report _Fract support in C++"
++#endif

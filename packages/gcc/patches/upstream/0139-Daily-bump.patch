@@ -1,0 +1,54 @@
+From 49b428caae1a8ba0ca118ee00c2770fef0eea2f0 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Mon, 7 Sep 2026 00:21:04 +0000
+Subject: [PATCH 139/385] Daily bump.
+
+---
+ gcc/ChangeLog           | 11 +++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog |  9 +++++++++
+ 3 files changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 22a8c06d2d5e..057321f357ca 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,14 @@
++2026-09-06  Rohith Kapelli  <kapellirohith@gmail.com>
++
++	Backported from master:
++	2026-08-13  Rohith Kapelli  <kapellirohith@gmail.com>
++
++	PR rtl-optimization/125683
++	* simplify-rtx.cc (simplify_context::simplify_ternary_operation):
++	When folding an IF_THEN_ELSE of two equal MEM operands with
++	different memory attributes, return a copy whose attributes are
++	widened to what both operands allow.
++
+ 2026-09-04  Vineet Gupta  <vineet.gupta@linux.dev>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 3a7846ef28b6..bce4a90beeb0 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260906
++20260907
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index a18ca0f11792..d6f3325aebef 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,12 @@
++2026-09-06  Rohith Kapelli  <kapellirohith@gmail.com>
++
++	Backported from master:
++	2026-08-13  Rohith Kapelli  <kapellirohith@gmail.com>
++
++	PR rtl-optimization/125683
++	* gcc.dg/pr125683.c: New test.
++	* gcc.dg/rtl/aarch64/pr125683-flags.c: New test.
++
+ 2026-09-05  Patrick Palka  <ppalka@redhat.com>
+ 
+ 	Backported from master:

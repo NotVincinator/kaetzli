@@ -1,0 +1,171 @@
+From e47c84926bfd72fbd8b680b3b6663913e083ed8a Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Fri, 25 Sep 2026 10:45:00 +0200
+Subject: [PATCH 361/385] tree-optimization/127601 - negative step SLP
+ vectorization with gap
+
+The following disables negative step SLP (with a group size bigger
+than one) vectorization with gaps since the VMAT_STRIDED_SLP path
+does not implement using smaller vectors to avoid touching the gap
+nor can we use peeling for gaps to deal with a gap that would be
+touched with the first vector load.
+
+	PR tree-optimization/127601
+	* tree-vect-stmts.cc (get_load_store_type): Move overrun
+	flags and final handling to the relevant section, after
+	determining the step direction and the memory access type.
+	Only elide overrun with half-vector accesses for the
+	memory access types supporting that.  Do not claim
+	VMAT_STRIDED_SLP can handle overruns when the step is
+	negative.
+	(vectorizable_load): For the last memory access type group
+	analysis/transform assert what memory access type that covers.
+
+	* gcc.dg/vect/vect-pr127601.c: New testcase.
+
+(cherry picked from commit b4a5597ccd6a38f5598c4c190f34162031ad6700)
+---
+ gcc/testsuite/gcc.dg/vect/vect-pr127601.c | 37 +++++++++++++++++
+ gcc/tree-vect-stmts.cc                    | 50 +++++++++++++----------
+ 2 files changed, 65 insertions(+), 22 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/vect/vect-pr127601.c
+
+diff --git a/gcc/testsuite/gcc.dg/vect/vect-pr127601.c b/gcc/testsuite/gcc.dg/vect/vect-pr127601.c
+new file mode 100644
+index 000000000000..bcad4232a887
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/vect/vect-pr127601.c
+@@ -0,0 +1,37 @@
++/* { dg-require-effective-target mmap } */
++
++#include <sys/mman.h>
++#include "tree-vect.h"
++
++#define PG 4096
++
++static long __attribute__((noipa))
++rev (long *a, int n)
++{
++  long s = 0;
++  for (int i = n - 1; i >= 0; i--)
++    s += a[4 * i] + a[4 * i + 1] + a[4 * i + 2];
++  return s;
++}
++
++int main (void)
++{
++  check_vect ();
++
++  unsigned char *p = mmap (0, 2 * PG, PROT_READ | PROT_WRITE,
++                           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++  if (p == MAP_FAILED || mprotect (p + PG, PG, PROT_NONE))
++    return 0;
++
++  int n = 9;
++  unsigned long ne = 4UL * (n - 1) + 3;         /* 35 longs are touched */
++  long *a = (long *) (p + PG - ne * sizeof (long));
++
++#pragma GCC novector
++  for (unsigned long i = 0; i < ne; i++)
++    a[i] = (long) (i * 3 + 1);
++
++  if (rev (a, n) != 1404)
++    __builtin_abort ();
++  return 0;
++}
+diff --git a/gcc/tree-vect-stmts.cc b/gcc/tree-vect-stmts.cc
+index e9b4e8528693..9305bc6e3651 100644
+--- a/gcc/tree-vect-stmts.cc
++++ b/gcc/tree-vect-stmts.cc
+@@ -2128,17 +2128,6 @@ get_load_store_type (vec_info  *vinfo, stmt_vec_info stmt_info,
+     }
+   dr_vec_info *first_dr_info = STMT_VINFO_DR_INFO (first_stmt_info);
+ 
+-  /* True if the vectorized statements would access beyond the last
+-     statement in the group.  */
+-  bool overrun_p = false;
+-
+-  /* True if we can cope with such overrun by peeling for gaps, so that
+-     there is at least one final scalar iteration after the vector loop.  */
+-  bool can_overrun_p = (!masked_p
+-			&& vls_type == VLS_LOAD
+-			&& loop_vinfo
+-			&& !loop->inner);
+-
+   /* There can only be a gap at the end of the group if the stride is
+      known at compile time.  */
+   gcc_assert (!STMT_VINFO_STRIDED_P (first_stmt_info) || gap == 0);
+@@ -2270,6 +2259,19 @@ get_load_store_type (vec_info  *vinfo, stmt_vec_info stmt_info,
+       else
+ 	*memory_access_type = VMAT_CONTIGUOUS;
+ 
++      /* True if the vectorized statements would access beyond the last
++	 statement in the group.  */
++      bool overrun_p = false;
++
++      /* True if we can cope with such overrun by peeling for gaps, so that
++	 there is at least one final scalar iteration after the vector loop.  */
++      bool can_overrun_p = (!masked_p
++			    && vls_type == VLS_LOAD
++			    && loop_vinfo
++			    && !loop->inner
++			    && (*memory_access_type != VMAT_STRIDED_SLP
++				|| cmp > 0));
++
+       /* If this is single-element interleaving with an element
+ 	 distance that leaves unused vector loads around fall back
+ 	 to elementwise access if possible - we otherwise least
+@@ -2355,7 +2357,8 @@ get_load_store_type (vec_info  *vinfo, stmt_vec_info stmt_info,
+       unsigned HOST_WIDE_INT tem, num;
+       if (overrun_p
+ 	  && !masked_p
+-	  && *memory_access_type != VMAT_LOAD_STORE_LANES
++	  && (*memory_access_type == VMAT_CONTIGUOUS
++	      || *memory_access_type == VMAT_CONTIGUOUS_REVERSE)
+ 	  && (((alss = vect_supportable_dr_alignment (vinfo, first_dr_info,
+ 						      vectype, misalign)))
+ 	      == dr_aligned
+@@ -2436,6 +2439,16 @@ get_load_store_type (vec_info  *vinfo, stmt_vec_info stmt_info,
+ 	      LOOP_VINFO_CAN_USE_PARTIAL_VECTORS_P (loop_vinfo) = false;
+ 	    }
+ 	}
++
++      if (overrun_p)
++	{
++	  gcc_assert (can_overrun_p);
++	  if (dump_enabled_p ())
++	    dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
++			     "Data access with gaps requires scalar "
++			     "epilogue loop\n");
++	  LOOP_VINFO_PEELING_FOR_GAPS (loop_vinfo) = true;
++	}
+     }
+ 
+   /* As a last resort, trying using a gather load or scatter store.
+@@ -2532,16 +2545,6 @@ get_load_store_type (vec_info  *vinfo, stmt_vec_info stmt_info,
+ 	}
+     }
+ 
+-  if (overrun_p)
+-    {
+-      gcc_assert (can_overrun_p);
+-      if (dump_enabled_p ())
+-	dump_printf_loc (MSG_MISSED_OPTIMIZATION, vect_location,
+-			 "Data access with gaps requires scalar "
+-			 "epilogue loop\n");
+-      LOOP_VINFO_PEELING_FOR_GAPS (loop_vinfo) = true;
+-    }
+-
+   if ((*memory_access_type == VMAT_ELEMENTWISE
+        || *memory_access_type == VMAT_STRIDED_SLP)
+       && !nunits.is_constant ())
+@@ -11301,6 +11304,9 @@ vectorizable_load (vec_info *vinfo,
+       return true;
+     }
+ 
++  gcc_assert (memory_access_type == VMAT_CONTIGUOUS
++	      || memory_access_type == VMAT_CONTIGUOUS_REVERSE);
++
+   aggr_type = vectype;
+   if (!costing_p)
+     bump = vect_get_data_ptr_increment (vinfo, gsi, dr_info, aggr_type,

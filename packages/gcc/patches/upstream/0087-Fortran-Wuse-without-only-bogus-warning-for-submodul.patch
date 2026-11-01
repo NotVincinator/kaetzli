@@ -1,0 +1,61 @@
+From 840156409887113881f19625a9e2de94f0428df2 Mon Sep 17 00:00:00 2001
+From: Paul Thomas <pault@gcc.gnu.org>
+Date: Wed, 3 Jun 2026 12:02:03 +0100
+Subject: [PATCH 087/385] Fortran: Wuse-without-only bogus warning for
+ submodules [PR105594]
+
+2026-06-03  Steven G. Kargl  <kargl@gcc.gnu.org>
+
+gcc/fortran
+	PR fortran/105594
+	* module.cc (gfc_use_module): Suppress bogus warning for a missing
+	ONLY clause on a submodule.
+
+gcc/testsuite/
+	PR fortran/105594
+	* gfortran.dg/pr105594.f90: New test.
+
+(cherry picked from commit 0cfe86380b58b21f014b57d3964b904ba93008df)
+---
+ gcc/fortran/module.cc                  |  2 +-
+ gcc/testsuite/gfortran.dg/pr105594.f90 | 18 ++++++++++++++++++
+ 2 files changed, 19 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr105594.f90
+
+diff --git a/gcc/fortran/module.cc b/gcc/fortran/module.cc
+index 2be30260a6d9..ef8b13291d2d 100644
+--- a/gcc/fortran/module.cc
++++ b/gcc/fortran/module.cc
+@@ -7694,7 +7694,7 @@ gfc_use_module (gfc_use_list *module)
+   only_flag = module->only_flag;
+   current_intmod = INTMOD_NONE;
+ 
+-  if (!only_flag)
++  if (!only_flag && gfc_state_stack->state != COMP_SUBMODULE)
+     gfc_warning_now (OPT_Wuse_without_only,
+ 		     "USE statement at %C has no ONLY qualifier");
+ 
+diff --git a/gcc/testsuite/gfortran.dg/pr105594.f90 b/gcc/testsuite/gfortran.dg/pr105594.f90
+new file mode 100644
+index 000000000000..9cd5310bbada
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr105594.f90
+@@ -0,0 +1,18 @@
++! { dg-do compile }
++! { dg-options "-Wuse-without-only" }
++! PR105594: Spurious warning when compiled with -Wuse-without-only
++!
++! Contributed by Brad Richardson  <everythingfunctional@protonmail.com>
++!
++module foo_m
++    interface
++        module subroutine foo
++        end subroutine
++    end interface
++end module
++
++submodule (foo_m) foo_s
++contains
++    module procedure foo
++    end procedure
++end submodule

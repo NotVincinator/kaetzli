@@ -1,0 +1,137 @@
+From 01f0a097dc3376dae8cb6cda45e4a7e58965891f Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Fri, 7 Aug 2026 21:20:35 +0200
+Subject: [PATCH 052/385] gimple-range-op: Use widen method even for sqrt
+ reverse op [PR126534]
+
+For glibc the target hook returns 0 for sqrt precision (i.e. 0.5ulp
+precise), but we didn't apply the +-0.5ulp widening when doing
+reverse op and so still came up with a wrong range, even with 0.5ulp
+precision certain values around 25.0 result in sqrt (x) being 5.0.
+Even if the hook returns non-zero, I'd say more reasonable handling
+of it is that it is say worst case 1ulp (or 2ulps etc.) from the
+correct result (i.e. half ulp precise), rather than just 1ulp from
+mathematically exact result.
+
+So, the following patch uses the newly added widen method to add
+this 0.5ulp before we feed it into frange_arithmetic.
+
+2026-08-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/126534
+	* gimple-range-op.cc (cfn_sqrt::op1_range): Widen lb or ub
+	by further 0.5ulp or 1ulp before squaring it.
+	* range-op-float.cc (float_widen_lhs_range): No longer static.
+
+	* gcc.dg/pr126534.c: New test.
+
+Reviewed-by: Aldy Hernandez <aldy@quesejoda.com>
+(cherry picked from commit 500d82452bdba0de71dae1056ccf366fa07147e9)
+---
+ gcc/gimple-range-op.cc          | 12 +++++++--
+ gcc/range-op-float.cc           |  2 +-
+ gcc/testsuite/gcc.dg/pr126534.c | 45 +++++++++++++++++++++++++++++++++
+ 3 files changed, 56 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/pr126534.c
+
+diff --git a/gcc/gimple-range-op.cc b/gcc/gimple-range-op.cc
+index da8feda22567..f053c3d3f2c7 100644
+--- a/gcc/gimple-range-op.cc
++++ b/gcc/gimple-range-op.cc
+@@ -467,6 +467,8 @@ frange_mpfr_arg1 (REAL_VALUE_TYPE *res_low, REAL_VALUE_TYPE *res_high,
+   return true;
+ }
+ 
++extern frange float_widen_lhs_range (tree, const frange &);
++
+ class cfn_sqrt : public range_operator
+ {
+ public:
+@@ -573,7 +575,10 @@ public:
+ 	  frange_nextafter (TYPE_MODE (type), lb, dconstninf);
+ 	if (real_less (&dconst0, &lb))
+ 	  {
+-	    REAL_VALUE_TYPE op = lb;
++	    frange wlhs (type, lb, dconstinf);
++	    wlhs.clear_nan ();
++	    REAL_VALUE_TYPE op
++	      = float_widen_lhs_range (type, wlhs).lower_bound ();
+ 	    frange_arithmetic (MULT_EXPR, type, lb, op, op, dconstninf);
+ 	  }
+ 	else
+@@ -587,7 +592,10 @@ public:
+ 	  frange_nextafter (TYPE_MODE (type), ub, dconstinf);
+ 	if (real_isfinite (&ub))
+ 	  {
+-	    REAL_VALUE_TYPE op = ub;
++	    frange wlhs (type, dconstninf, ub);
++	    wlhs.clear_nan ();
++	    REAL_VALUE_TYPE op
++	      = float_widen_lhs_range (type, wlhs).upper_bound ();
+ 	    frange_arithmetic (MULT_EXPR, type, ub, op, op, dconstinf);
+ 	  }
+ 	else
+diff --git a/gcc/range-op-float.cc b/gcc/range-op-float.cc
+index e3633565680d..25b28a878525 100644
+--- a/gcc/range-op-float.cc
++++ b/gcc/range-op-float.cc
+@@ -2365,7 +2365,7 @@ zero_to_inf_range (REAL_VALUE_TYPE &lb, REAL_VALUE_TYPE &ub, int signbit_known)
+    So, for op1_range/op2_range extend the lhs range by 1ulp (or 0.5ulp)
+    in each direction.  See PR109008 for more details.  */
+ 
+-static frange
++frange
+ float_widen_lhs_range (tree type, const frange &lhs)
+ {
+   frange ret = lhs;
+diff --git a/gcc/testsuite/gcc.dg/pr126534.c b/gcc/testsuite/gcc.dg/pr126534.c
+new file mode 100644
+index 000000000000..4ffb49a8d6ad
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr126534.c
+@@ -0,0 +1,45 @@
++/* PR tree-optimization/126534 */
++/* { dg-do run } */
++/* { dg-options "-O2" } */
++
++[[gnu::noipa]] int
++foo (double x)
++{
++  double y = __builtin_sqrt (x);
++  if (y <= 5.0)
++    {
++      if (x > 25.0)
++	return 1;
++      return 2;
++    }
++  return 3;
++}
++
++[[gnu::noipa]] int
++bar (double x)
++{
++  double y = __builtin_sqrt (x);
++  if (y >= 5.0)
++    {
++      if (x < 25.0)
++	return 1;
++      return 2;
++    }
++  return 3;
++}
++
++int
++main ()
++{
++#if __DBL_MANT_DIG__ == 53 && __DBL_MAX_EXP__ == 1024 && __FLT_EVAL_METHOD__ == 0
++  volatile double x = 0x1.9000000000001p+4;
++  volatile double y = 0x1.8ffffffffffffp+4;
++  if (__builtin_sqrt (x) == 5.0 && __builtin_sqrt (y) == 5.0)
++    {
++      if (foo (0x1.9000000000001p+4) != 1)    /* 25.000000000000004 */
++	__builtin_abort ();
++      if (bar (0x1.8ffffffffffffp+4) != 1)    /* 24.999999999999996 */
++	__builtin_abort ();
++    }
++#endif
++}

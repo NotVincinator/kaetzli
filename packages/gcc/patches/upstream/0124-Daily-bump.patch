@@ -1,0 +1,52 @@
+From 74261d0f33b85599122e06dbfe443e5ae2e091b4 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 1 Sep 2026 00:21:36 +0000
+Subject: [PATCH 124/385] Daily bump.
+
+---
+ gcc/DATESTAMP          |  2 +-
+ libstdc++-v3/ChangeLog | 27 +++++++++++++++++++++++++++
+ 2 files changed, 28 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 08239b647341..820b8ba596e0 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260831
++20260901
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index c30d57be4258..bfc2e68b4b3e 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,30 @@
++2026-08-31  Tomasz Kamiński  <tkaminsk@redhat.com>
++
++	Backported from master:
++	2026-08-31  Tomasz Kamiński  <tkaminsk@redhat.com>
++
++	PR libstdc++/118665
++	* include/bits/uniform_int_dist.h (uniform_int_distribution::_S_nd):
++	Substract __min (_Urbg::min()) from each generator invocation.
++	* testsuite/26_numerics/random/uniform_int_distribution/operators/values.cc:
++	Add testDiscreteDist for shifted (with non-zero min()) engine.
++
++2026-08-31  Tomasz Kamiński  <tkaminsk@redhat.com>
++
++	Backported from master:
++	2026-08-27  Tomasz Kamiński  <tkaminsk@redhat.com>
++
++	PR libstdc++/123510
++	* src/c++20/tzdb.cc (at_time::is_indicator): Add case labels
++	for uppercase letters.
++	(operator>>(istream&, years_from_to)): Check for 'M' and 'O',
++	(chrono::reload_tzdb): Add case labels for lowercase letters,
++	and normalize first letter of type.
++	(operator>>(istream&, abbrev_month&)): Match all cases in
++	switch and days_chars.
++	(operator>>(istream&, on_month_day&)): Check for 'L'.
++	* testsuite/std/time/tzdb/name_matching.cc: New test.
++
+ 2026-08-25  Matthias Kretz  <m.kretz@gsi.de>
+ 
+ 	Backported from master:

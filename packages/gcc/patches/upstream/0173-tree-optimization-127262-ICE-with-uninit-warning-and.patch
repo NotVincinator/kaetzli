@@ -1,0 +1,102 @@
+From a3f0101ea908248e1d46e9714a482ae696230812 Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Wed, 9 Sep 2026 09:13:25 +0200
+Subject: [PATCH 173/385] tree-optimization/127262 - ICE with uninit warning
+ and switches
+
+We are not expecting the switch index and the case labels to differ
+in types.  The following fixes this by converting the case label
+values accordingly.
+
+	PR tree-optimization/127262
+	* gimple-predicate-analysis.cc (predicate::init_from_control_deps):
+	Convert switch label values to the type of the switch index.
+
+	* gcc.dg/pr127262.c: New testcase.
+
+(cherry picked from commit 388aada52115970d85926c07072aeb7fce4498e7)
+---
+ gcc/gimple-predicate-analysis.cc | 12 +++++++---
+ gcc/testsuite/gcc.dg/pr127262.c  | 40 ++++++++++++++++++++++++++++++++
+ 2 files changed, 49 insertions(+), 3 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/pr127262.c
+
+diff --git a/gcc/gimple-predicate-analysis.cc b/gcc/gimple-predicate-analysis.cc
+index 3df0c11070a7..4bfb06b94ef0 100644
+--- a/gcc/gimple-predicate-analysis.cc
++++ b/gcc/gimple-predicate-analysis.cc
+@@ -1858,7 +1858,9 @@ predicate::init_from_control_deps (const vec<edge> *dep_chains,
+ 		{
+ 		  pred_info one_pred;
+ 		  one_pred.pred_lhs = gimple_switch_index (gs);
+-		  one_pred.pred_rhs = CASE_LOW (l);
++		  one_pred.pred_rhs
++		    = wide_int_to_tree (TREE_TYPE (one_pred.pred_lhs),
++					wi::to_widest (CASE_LOW (l)));
+ 		  one_pred.cond_code = EQ_EXPR;
+ 		  one_pred.invert = false;
+ 		  t_chain.safe_push (one_pred);
+@@ -1872,11 +1874,15 @@ predicate::init_from_control_deps (const vec<edge> *dep_chains,
+ 		     of two here.  */
+ 		  pred_info one_pred;
+ 		  one_pred.pred_lhs = gimple_switch_index (gs);
+-		  one_pred.pred_rhs = CASE_LOW (l);
++		  one_pred.pred_rhs
++		    = wide_int_to_tree (TREE_TYPE (one_pred.pred_lhs),
++					wi::to_widest (CASE_LOW (l)));
+ 		  one_pred.cond_code = GE_EXPR;
+ 		  one_pred.invert = false;
+ 		  t_chain.safe_push (one_pred);
+-		  one_pred.pred_rhs = CASE_HIGH (l);
++		  one_pred.pred_rhs
++		    = wide_int_to_tree (TREE_TYPE (one_pred.pred_lhs),
++					wi::to_widest (CASE_HIGH (l)));
+ 		  one_pred.cond_code = LE_EXPR;
+ 		  t_chain.safe_push (one_pred);
+ 		  has_valid_pred = true;
+diff --git a/gcc/testsuite/gcc.dg/pr127262.c b/gcc/testsuite/gcc.dg/pr127262.c
+new file mode 100644
+index 000000000000..0ae968d4e5e9
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr127262.c
+@@ -0,0 +1,40 @@
++/* { dg-do compile } */
++/* { dg-options "-O -Wmaybe-uninitialized" } */
++
++_Bool g18, f1_c17;
++void *f1_a0;
++void f1() {
++  unsigned char init8;
++  _Bool c15, c18 = 0;
++lbl_f2_b0:
++  if (g18)
++  lbl_f2_b1:
++  lbl_f2_b4:
++  lbl_f2_b8:
++    if (f1_c17)
++    lbl_f2_b9:
++      if (f1_c17)
++        goto lbl_f2_b28;
++lbl_f2_b14:
++  if (g18)
++    goto lbl_f2_b62;
++lbl_f2_b28:
++  init8 = c18;
++  switch (init8) {
++  case 9:
++    goto lbl_f2_b1;
++  case 13:
++    goto lbl_f2_b9;
++  case 1:
++    goto lbl_f2_b0;
++  case 11:
++  case 25:
++    goto lbl_f2_b4;
++  }
++lbl_f2_b62:
++  c18 = 80;
++  if (c15) /* { dg-warning "may be used uninitialized" } */
++    goto lbl_f2_b1;
++  c15 = f1_a0;
++  goto lbl_f2_b14;
++}

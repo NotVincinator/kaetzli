@@ -1,0 +1,37 @@
+From cf2c0ec35f59a76a7d0fd3d9e8dc7e377c240fae Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Mon, 19 Oct 2026 21:59:46 +0100
+Subject: [PATCH 354/385] libstdc++: Do not include <bits/indirect.h> for
+ freestanding [PR127476]
+
+This header is not installed for freestanding builds, so we should not
+try to include it.
+
+We could consider making std::indirect and std::polymorphic available
+for freestanding, but that would be more effort as it requires
+installing <bits/new_allocator.h> and other headers.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/127476
+	* include/std/memory [!_GLIBCXX_HOSTED]: Do not include
+	bits/indirect.h.
+
+(cherry picked from commit 7e5fe1837c79233a9cdb2fdef655f82f8cabdafb)
+---
+ libstdc++-v3/include/std/memory | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/libstdc++-v3/include/std/memory b/libstdc++-v3/include/std/memory
+index cbe9f5ad2007..f83745081590 100644
+--- a/libstdc++-v3/include/std/memory
++++ b/libstdc++-v3/include/std/memory
+@@ -97,7 +97,7 @@
+ #  include <bits/out_ptr.h>
+ #endif
+ 
+-#if __cplusplus > 202302L
++#if __cplusplus > 202302L && _GLIBCXX_HOSTED
+ #  include <bits/indirect.h>
+ #endif
+ 

@@ -1,0 +1,195 @@
+From 34477a5f60d03f38e2f92a7308cf35269323c900 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Thu, 3 Sep 2026 09:45:58 +0200
+Subject: [PATCH 259/385] c++: Fix up constexpr structured bindings used as
+ condition [PR127109]
+
+The following testcase is incorrectly rejected with
+error: accessing '<anonymous>' outside its lifetime
+where <anonymous> is the TARGET_EXPR_SLOT of get_internal_target_expr
+returned TARGET_EXPR created in cp_finish_decomp.
+The problem is we create
+    <<cleanup_point <<< Unknown tree: expr_stmt
+      D.2723.a = v >>>;
+    <<< Unknown tree: expr_stmt
+      D.2723.b = v * 2 >>>;
+    <<< Unknown tree: expr_stmt
+      D.2723.c = v != 0 >>>;
+    D.2758 = 1;
+    TARGET_EXPR <D.2759, A::operator bool (&D.2723)>;
+        const type & a;
+    <<cleanup_point <<< Unknown tree: expr_stmt
+      (void) (a = (const type &) A::get<0> (&D.2723)) >>>>>;
+        const type & b;
+    <<cleanup_point <<< Unknown tree: expr_stmt
+      (void) (b = (const type &) A::get<1> (&D.2723)) >>>>>;>>;
+    if (D.2759)
+      {
+        return <retval> = (int) *a + (int) *b;
+      }
+where because of CWG2867 the first CLEANUP_POINT_EXPR wraps the whole
+structured binding initialization.  The <anonymous> var is D.2759
+above, we need to remember the return value from operator bool,
+but it is then used in the if condition after the initialization.
+The CLEANUP_POINT_EXPR around the whole initialization does destruct_value
+the TARGET_EXPR slot though, so the use in if (D.2759) is then during
+constant evaluation considered out of lifetime use.
+
+This patch stops using TARGET_EXPR for this and instead uses get_temp_regvar
+with pushdecl, instead of DECL_DECOMP_BASE recorded as NON_LVALUE_EXPR around
+that temp var to differentiate it from structured binding vars other than
+the base where the VAR_DECL stands for the base.
+
+2026-09-03  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/127109
+	* decl.cc (cp_finish_decomp): Add [dcl.struct.bind]/7 reference
+	to comment.  Use get_temp_regvar and pushdecl instead of
+	get_internal_target_expr and add_stmt.  Set DECL_DECOMP_BASE
+	to NON_LVALUE_EXPR around the temp regvar.
+	* cp-tree.h (DECL_DECOMP_BASE): Adjust macro comment.
+	* semantics.cc (maybe_convert_cond, switch_finish_cond): Check for
+	NON_LVALUE_EXPR rather than TARGET_EXPR and extract its operand
+	rather than TARGET_EXPR_SLOT.
+
+	* g++.dg/cpp26/decomp32.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 84ec92254bda8e7675dd2b3bfd5c76255568e72e)
+---
+ gcc/cp/cp-tree.h                      |  2 +-
+ gcc/cp/decl.cc                        | 19 +++++++++------
+ gcc/cp/semantics.cc                   | 16 ++++++-------
+ gcc/testsuite/g++.dg/cpp26/decomp32.C | 33 +++++++++++++++++++++++++++
+ 4 files changed, 54 insertions(+), 16 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/cpp26/decomp32.C
+
+diff --git a/gcc/cp/cp-tree.h b/gcc/cp/cp-tree.h
+index 16e5317e151e..42da025674ee 100644
+--- a/gcc/cp/cp-tree.h
++++ b/gcc/cp/cp-tree.h
+@@ -4879,7 +4879,7 @@ get_vec_init_expr (tree t)
+ /* The underlying artificial VAR_DECL for structured binding.  On the
+    artificial base VAR_DECL this can be NULL, or integer_{zero,one}_node
+    for structured binding used in if/while/for resp. switch conditions,
+-   or a TARGET_EXPR with the condition value after cp_finish_decomp in
++   or a NON_LVALUE_EXPR with the condition value after cp_finish_decomp in
+    those cases.  */
+ #define DECL_DECOMP_BASE(NODE) \
+   (LANG_DECL_DECOMP_CHECK (NODE)->base)
+diff --git a/gcc/cp/decl.cc b/gcc/cp/decl.cc
+index d6164fead613..4ddc1e7579d0 100644
+--- a/gcc/cp/decl.cc
++++ b/gcc/cp/decl.cc
+@@ -10983,7 +10983,10 @@ cp_finish_decomp (tree decl, cp_decomp *decomp, bool test_p)
+ 	  /* For structured bindings used in conditions we need to evaluate
+ 	     the conversion of decl (aka e in the standard) to bool or
+ 	     integral/enumeral type (the latter for switch conditions)
+-	     before the get methods.  */
++	     before the get methods, as [dcl.struct.bind]/7 requires that:
++	     "The initialization of e and any conversion of e considered as
++	     a decision variable is sequenced before the initialization of
++	     any r_i."  */
+ 	  tree cond = convert_from_reference (decl);
+ 	  if (integer_onep (DECL_DECOMP_BASE (decl)))
+ 	    /* switch condition.  */
+@@ -10994,12 +10997,14 @@ cp_finish_decomp (tree decl, cp_decomp *decomp, bool test_p)
+ 	    cond = contextual_conv_bool (cond, tf_warning_or_error);
+ 	  if (cond && !error_operand_p (cond))
+ 	    {
+-	      /* Wrap that value into a TARGET_EXPR, emit it right
+-		 away and save for later uses in the cp_parse_condition
+-		 or its instantiation.  */
+-	      cond = get_internal_target_expr (cond);
+-	      add_stmt (cond);
+-	      DECL_DECOMP_BASE (decl) = cond;
++	      cond = get_temp_regvar (TREE_TYPE (cond), cond);
++	      pushdecl (cond);
++	      /* Set DECL_DECOMP_BASE to cond VAR_DECL wrapped in
++		 NON_LVALUE_EXPR, such that it is considered to be
++		 the condition of a structured binding rather than
++		 structured binding's base variable.  */
++	      DECL_DECOMP_BASE (decl)
++		= build1 (NON_LVALUE_EXPR, TREE_TYPE (cond), cond);
+ 	    }
+ 	}
+       int save_read = DECL_READ_P (decl);
+diff --git a/gcc/cp/semantics.cc b/gcc/cp/semantics.cc
+index d8a623c201ce..7e9a29aa3ba0 100644
+--- a/gcc/cp/semantics.cc
++++ b/gcc/cp/semantics.cc
+@@ -1138,13 +1138,13 @@ maybe_convert_cond (tree cond)
+ 
+   /* For structured binding used in condition, the conversion needs to be
+      evaluated before the individual variables are initialized in the
+-     std::tuple_{size,elemenet} case.  cp_finish_decomp saved the conversion
+-     result in a TARGET_EXPR, pick it up from there.  */
++     std::tuple_{size,element} case.  cp_finish_decomp saved the conversion
++     result in a NON_LVALUE_EXPR, pick it up from there.  */
+   if (DECL_DECOMPOSITION_P (cond)
+       && DECL_DECOMP_IS_BASE (cond)
+       && DECL_DECOMP_BASE (cond)
+-      && TREE_CODE (DECL_DECOMP_BASE (cond)) == TARGET_EXPR)
+-    cond = TARGET_EXPR_SLOT (DECL_DECOMP_BASE (cond));
++      && TREE_CODE (DECL_DECOMP_BASE (cond)) == NON_LVALUE_EXPR)
++    cond = TREE_OPERAND (DECL_DECOMP_BASE (cond), 0);
+ 
+   if (warn_sequence_point && !processing_template_decl)
+     verify_sequence_points (cond);
+@@ -1931,13 +1931,13 @@ finish_switch_cond (tree cond, tree switch_stmt)
+       tree orig_cond = cond;
+       /* For structured binding used in condition, the conversion needs to be
+ 	 evaluated before the individual variables are initialized in the
+-	 std::tuple_{size,elemenet} case.  cp_finish_decomp saved the
+-	 conversion result in a TARGET_EXPR, pick it up from there.  */
++	 std::tuple_{size,element} case.  cp_finish_decomp saved the
++	 conversion result in a NON_LVALUE_EXPR, pick it up from there.  */
+       if (DECL_DECOMPOSITION_P (cond)
+ 	  && DECL_DECOMP_IS_BASE (cond)
+ 	  && DECL_DECOMP_BASE (cond)
+-	  && TREE_CODE (DECL_DECOMP_BASE (cond)) == TARGET_EXPR)
+-	cond = TARGET_EXPR_SLOT (DECL_DECOMP_BASE (cond));
++	  && TREE_CODE (DECL_DECOMP_BASE (cond)) == NON_LVALUE_EXPR)
++	cond = TREE_OPERAND (DECL_DECOMP_BASE (cond), 0);
+       cond = build_expr_type_conversion (WANT_INT | WANT_ENUM, cond, true);
+       if (cond == NULL_TREE)
+ 	{
+diff --git a/gcc/testsuite/g++.dg/cpp26/decomp32.C b/gcc/testsuite/g++.dg/cpp26/decomp32.C
+new file mode 100644
+index 000000000000..e8b039675532
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/cpp26/decomp32.C
+@@ -0,0 +1,33 @@
++// PR c++/127109
++// { dg-do compile { target c++14 } }
++// { dg-options "" }
++
++namespace std {
++  using size_t = decltype (sizeof 0);
++  template <typename> struct tuple_size;
++  template <size_t, typename> struct tuple_element;
++}
++
++struct A {
++  int a, b;
++  bool c;
++  constexpr explicit operator bool () const { return c; }
++  template <std::size_t I>
++  constexpr const int &get () const { return I == 0 ? a : b; }
++};
++
++template <>
++struct std::tuple_size <A> { static constexpr int value = 2; };
++template <std::size_t I>
++struct std::tuple_element <I, A> { using type = const int; };
++
++constexpr int
++foo (int v)
++{
++  if (auto [a, b] = A { v, v * 2, v != 0 })	// { dg-warning "structured bindings in conditions only available with" "" { target c++23_down } }
++    return a + b;
++  return -1;
++}
++
++static_assert (foo (1) == 3);
++static_assert (foo (0) == -1);

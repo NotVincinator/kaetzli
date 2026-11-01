@@ -1,0 +1,218 @@
+From 4a459598063f4a7867aa142e9e1bf49479b91c13 Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Fri, 31 Jul 2026 11:57:14 -0400
+Subject: [PATCH 075/385] c++/reflection: ICE with &template [:members_of():]
+ [PR124794]
+
+Given
+
+  struct C { template <class T> void f(T); };
+
+we handle "&template [:^^C::f:]" correctly because the spliced
+expression is
+
+  BASELINK<OVERLOAD<TEMPLATE_DECL f>>, binfo C>
+
+which is fine: we have an OVERLOAD around the TEMPLATE_DECL and
+lookup_member wrapped the whole thing in a BASELINK.  But when
+we're splicing members_of(^^C, ac)[0], we ended up with
+
+  OVERLOAD<TEMPLATE_DECL f>>
+
+and then go down the wrong path in cp_parser_splice_expression.
+
+splice already correctly adds the missing OVERLOAD but it also
+needs to (maybe) add a BASELINK.
+
+This patch also adjusts baselink_for_fns to gain a parameter
+controlling if we want to ignore currently_open_derived_class.
+It matters when we're in a member function of a class derived
+from C and the object argument of the -> is a different derived class,
+as exercised in splice17.C: pd->[:g1:] (42); in D2::mfn.  There, if
+we didn't ignore currently_open_derived_class, the BASELINK would
+use D2 as the access_binfo, which is wrong because it has no
+derivation relationship to the object type (here D1).  With this
+patch access_binfo will be C, which is what members_of gave us.
+
+	PR c++/124794
+
+gcc/cp/ChangeLog:
+
+	* cp-tree.h (baselink_for_fns): Adjust declaration.
+	* parser.cc (cp_parser_reflect_expression): Adjust the call to
+	baselink_for_fns.
+	* reflect.cc (splice): Call baselink_for_fns.
+	* semantics.cc (baselink_for_fns): Add a bool parameter.  If
+	it's true, ignore currently_open_derived_class.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/reflect/splice17.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 8fb57eda04f88f4e0d1cbbcc209533fd9689dd9d)
+---
+ gcc/cp/cp-tree.h                        |  2 +-
+ gcc/cp/parser.cc                        |  2 +-
+ gcc/cp/reflect.cc                       |  5 ++
+ gcc/cp/semantics.cc                     | 17 +++---
+ gcc/testsuite/g++.dg/reflect/splice17.C | 72 +++++++++++++++++++++++++
+ 5 files changed, 87 insertions(+), 11 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/reflect/splice17.C
+
+diff --git a/gcc/cp/cp-tree.h b/gcc/cp/cp-tree.h
+index fb0965872661..724f8aa72e81 100644
+--- a/gcc/cp/cp-tree.h
++++ b/gcc/cp/cp-tree.h
+@@ -8653,7 +8653,7 @@ extern void finish_transaction_stmt		(tree, tree, int, tree);
+ extern tree build_transaction_expr		(location_t, tree, int, tree);
+ extern bool cxx_omp_create_clause_info		(tree, tree, bool, bool,
+ 						 bool, bool);
+-extern tree baselink_for_fns                    (tree);
++extern tree baselink_for_fns                    (tree, bool = false);
+ extern void finish_static_assert                (tree, tree, location_t,
+ 						 bool, bool, bool = false);
+ extern tree finish_decltype_type                (tree, bool, tsubst_flags_t);
+diff --git a/gcc/cp/parser.cc b/gcc/cp/parser.cc
+index fa2fec614895..bf981945aa05 100644
+--- a/gcc/cp/parser.cc
++++ b/gcc/cp/parser.cc
+@@ -10183,7 +10183,7 @@ cp_parser_reflect_expression (cp_parser *parser)
+ 	&& !concept_check_p (t))
+       t = finish_template_variable (t);
+     else if (is_overloaded_fn (t))
+-      t = baselink_for_fns (t);
++      t = baselink_for_fns (t, /*ignore_current_class_p=*/true);
+     if (cp_parser_parse_definitely (parser))
+       return get_reflection (loc, t);
+   }
+diff --git a/gcc/cp/reflect.cc b/gcc/cp/reflect.cc
+index 952551e9f95c..34189ffc80dc 100644
+--- a/gcc/cp/reflect.cc
++++ b/gcc/cp/reflect.cc
+@@ -8778,6 +8778,11 @@ splice (tree refl)
+      it comes from e.g. members_of it is not.  */
+   if (DECL_FUNCTION_TEMPLATE_P (refl))
+     refl = ovl_make (refl, NULL_TREE);
++  /* Also add a BASELINK so that we handle &[:R:].  Since R was already
++     resolved (e.g. via members_of), we don't want to consider the enclosing
++     class for the access path.  */
++  if (is_overloaded_fn (refl))
++    refl = baselink_for_fns (refl, /*ignore_current_class_p=*/true);
+ 
+   return refl;
+ }
+diff --git a/gcc/cp/semantics.cc b/gcc/cp/semantics.cc
+index 18808354b6e8..d8a623c201ce 100644
+--- a/gcc/cp/semantics.cc
++++ b/gcc/cp/semantics.cc
+@@ -4505,23 +4505,22 @@ finish_base_specifier (tree base, tree access, bool virtual_p,
+ /* If FNS is a member function, a set of member functions, or a
+    template-id referring to one or more member functions, return a
+    BASELINK for FNS, incorporating the current access context.
+-   Otherwise, return FNS unchanged.  */
++   Otherwise, return FNS unchanged.  If IGNORE_CURRENT_CLASS_P is
++   true, we do not consider the currently open derived class.  */
+ 
+ tree
+-baselink_for_fns (tree fns)
++baselink_for_fns (tree fns, bool ignore_current_class_p/*=false*/)
+ {
+-  tree scope;
+-  tree cl;
+-
+-  if (BASELINK_P (fns)
+-      || error_operand_p (fns))
++  if (BASELINK_P (fns) || error_operand_p (fns))
+     return fns;
+ 
+-  scope = ovl_scope (fns);
++  tree scope = ovl_scope (fns);
+   if (!CLASS_TYPE_P (scope))
+     return fns;
+ 
+-  cl = currently_open_derived_class (scope);
++  tree cl = (ignore_current_class_p
++	     ? NULL_TREE
++	     : currently_open_derived_class (scope));
+   if (!cl)
+     cl = scope;
+   tree access_path = TYPE_BINFO (cl);
+diff --git a/gcc/testsuite/g++.dg/reflect/splice17.C b/gcc/testsuite/g++.dg/reflect/splice17.C
+new file mode 100644
+index 000000000000..634b58534722
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/reflect/splice17.C
+@@ -0,0 +1,72 @@
++// PR c++/124794
++// { dg-do compile { target c++26 } }
++// { dg-additional-options "-freflection" }
++
++#include <meta>
++
++struct C {
++  template <class T> void f(T);
++  void g (int);
++
++  static constexpr int val = 42;
++};
++
++constexpr auto ac = std::meta::access_context::current();
++constexpr auto f1 = members_of(^^C, ac)[0];
++constexpr auto f2 = ^^C::f;
++void (C::*p1)(int) = &template [:f1:];
++void (C::*p2)(int) = &template [:f2:];
++
++constexpr auto g1 = members_of(^^C, ac)[1];
++constexpr auto g2 = ^^C::g;
++void (C::*p3)(int) = &[:g1:];
++void (C::*p4)(int) = &[:g2:];
++
++void
++g (C *pc)
++{
++  auto p = &pc->[: ^^C::val :];
++  auto q = &pc->C::val;
++
++  pc->f (42);
++  pc->template [:f1:](42);
++  pc->template [:f2:](42);
++  pc->g (42);
++  pc->[:g1:] (42);
++  pc->[:g2:] (42);
++}
++
++struct D1 : C {
++  void mfn (D1 *pd)
++  {
++    auto p = &pd->[: ^^C::val :];
++    auto q = &pd->C::val;
++
++    pd->f (42);
++    pd->template [:f1:](42);
++    pd->template [:f2:](42);
++    pd->g (42);
++    pd->[:g1:] (42);
++    pd->[:g2:] (42);
++  }
++};
++
++struct D2 : C {
++  void mfn (D1 *pd)
++  {
++    auto p = &pd->[: ^^C::val :];
++    auto q = &pd->C::val;
++
++    constexpr auto rg = ^^C::g;
++    pd->[:rg:] (42);
++    constexpr auto rf = ^^C::f;
++    pd->template [:rf:] (42);
++
++    pd->f (42);
++    pd->template [:f1:](42);
++    pd->template [:f2:](42);
++    pd->g (42);
++    pd->[:g1:] (42);
++    pd->[:g2:] (42);
++  }
++};

@@ -1,0 +1,70 @@
+From 12f15701b46cdf99b07b0bfc21effadd76b320e1 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 13 Oct 2026 00:20:26 +0000
+Subject: [PATCH 283/385] Daily bump.
+
+---
+ gcc/ChangeLog     | 9 +++++++++
+ gcc/DATESTAMP     | 2 +-
+ gcc/ada/ChangeLog | 9 +++++++++
+ libssp/ChangeLog  | 9 +++++++++
+ 4 files changed, 28 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 2763b0701e0d..e6c202d13ce7 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,12 @@
++2026-10-12  Jeevitha  <jeevitha@linux.ibm.com>
++
++	Backported from master:
++	2026-10-07  Jeevitha Palanisamy  <jeevitha@linux.ibm.com>
++
++	PR target/125060
++	* config/rs6000/vector.md (vcond_mask_<mode><mode>): Change the mode
++	iterator from VEC_I to VEC_IC to support V1TI.
++
+ 2026-10-11  Robin Dapp  <robin.dapp@oss.qualcomm.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 2a44af499b51..d3a8eecd09be 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261012
++20261013
+diff --git a/gcc/ada/ChangeLog b/gcc/ada/ChangeLog
+index 0b66362476f5..689704aa9d82 100644
+--- a/gcc/ada/ChangeLog
++++ b/gcc/ada/ChangeLog
+@@ -1,3 +1,12 @@
++2026-10-12  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* libgnat/system-linux-loongarch.ads (Address): Add size clause.
++
++2026-10-12  Yang Yujie  <yangyujie@loongson.cn>
++
++	* libgnat/system-linux-loongarch.ads(Support_Atomic_Primitives):
++	New boolean constant.
++
+ 2026-10-07  Hodong Kim  <hodong@nimfsoft.com>
+ 
+ 	PR ada/127759
+diff --git a/libssp/ChangeLog b/libssp/ChangeLog
+index 843d986e408b..ec5b274ae7de 100644
+--- a/libssp/ChangeLog
++++ b/libssp/ChangeLog
+@@ -1,3 +1,12 @@
++2026-10-12  WHR  <whr@rivoreo.one>
++
++	Backported from master:
++	2026-07-03  WHR  <whr@rivoreo.one>
++		    Thomas Schwinge  <tschwinge@baylibre.com>
++
++	PR other/116547
++	* ssp.c: Include stdlib.h for alloca(3).
++
+ 2026-08-07  Release Manager
+ 
+ 	* GCC 16.2.0 released.

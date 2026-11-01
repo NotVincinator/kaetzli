@@ -1,0 +1,56 @@
+From 1ad853b1da5ff0fb262819959412209fc9fb956e Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Wed, 21 Oct 2026 00:20:48 +0000
+Subject: [PATCH 318/385] Daily bump.
+
+---
+ gcc/ChangeLog           | 11 +++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 11 +++++++++++
+ 3 files changed, 23 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index df834ba65b21..6314027ac6eb 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,14 @@
++2026-10-20  Uros Bizjak  <ubizjak@gmail.com>
++
++	Backported from master:
++	2026-10-19  Uros Bizjak  <ubizjak@gmail.com>
++		    Vineet Gupta  <vineet.gupta@linux.dev>
++
++	PR target/127851
++	* config/i386/i386.md (@ccmp<mode>, *cmp<mode>_1)
++	(*cmp<mode>_minus_1): Reject operands that are both volatile
++	memory references.
++
+ 2026-10-19  Eric Botcazou  <ebotcazou@adacore.com>
+ 
+ 	* config/i386/i386.cc (get_scratch_register_on_entry): Never return
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 39b2052b5cc9..0d25cc7575f6 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261020
++20261021
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index ecf26fdeb2f9..df0f58b1bfcf 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,14 @@
++2026-10-20  Uros Bizjak  <ubizjak@gmail.com>
++
++	Backported from master:
++	2026-10-19  Uros Bizjak  <ubizjak@gmail.com>
++		    Vineet Gupta  <vineet.gupta@linux.dev>
++
++	PR target/127851
++	* gcc.target/i386/volatile-fuse-order-1.c: New test.
++	* gcc.target/i386/volatile-fuse-order-2.c: Likewise.
++	* gcc.target/i386/volatile-fuse-order-3.c: Likewise.
++
+ 2026-10-19  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:

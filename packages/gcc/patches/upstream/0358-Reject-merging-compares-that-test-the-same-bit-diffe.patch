@@ -1,0 +1,172 @@
+From 407d7d0061c6651a7460e8669cf12df18fa54c9b Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Fri, 9 Oct 2026 12:05:41 +0200
+Subject: [PATCH 358/385] Reject merging compares that test the same bit
+ differently
+
+In fold_truth_andor_for_ifcombine, when combining comparisons between
+two non-constant variables or fields, each compare tests, for every bit
+in its masks, either that the bits on both sides are equal (the bit is
+in both masks), or that the bit on one side is zero (the bit is in only
+one of the masks).  The combined compare can only express one such test
+per bit, but we did not check that both compares agreed on what to test
+for bits they both covered.
+
+E.g., d1 == (d2 & 32767) tests that bit 15 of d1 is zero, whereas
+(d2 ^ d1) >= 0 tests that bit 15 of d1 and d2 are equal.  Both combined
+masks then covered all 16 bits, and the two comparisons were folded
+into d2 == d1, losing the zero-check on d1's sign bit and miscompiling
+cases where both d1 and d2 were negative (e.g. d1 = d2 = -32768).
+
+Fix this by rejecting the combination if any bit covered by both
+compares is tested in different ways.  Compares with different masks on
+each side are still combined when they don't conflict, e.g. when the
+fields don't overlap.
+
+	PR tree-optimization/127521
+	* gimple-fold.cc (fold_truth_andor_for_ifcombine): Reject
+	non-constant compares that test the same bit in different ways.
+
+	* gcc.dg/field-merge-30.c: New test.
+	* gcc.dg/field-merge-31.c: New test.
+
+(cherry picked from commit 7bbe3670947e1901435763690f75049ff089b266)
+---
+ gcc/gimple-fold.cc                    | 21 ++++++++++++
+ gcc/testsuite/gcc.dg/field-merge-30.c | 46 +++++++++++++++++++++++++++
+ gcc/testsuite/gcc.dg/field-merge-31.c | 41 ++++++++++++++++++++++++
+ 3 files changed, 108 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.dg/field-merge-30.c
+ create mode 100644 gcc/testsuite/gcc.dg/field-merge-31.c
+
+diff --git a/gcc/gimple-fold.cc b/gcc/gimple-fold.cc
+index fab871ffcd64..4c14cd377dd3 100644
+--- a/gcc/gimple-fold.cc
++++ b/gcc/gimple-fold.cc
+@@ -8867,6 +8867,27 @@ fold_truth_andor_for_ifcombine (enum tree_code code, tree truth_type,
+ 	  || ll_bitpos - rl_bitpos != lr_bitpos - rr_bitpos)
+ 	return 0;
+ 
++      /* Each compare tests, for every bit in its masks, either that the bits
++	 on both sides are equal (bit in both masks), or that the bit on one
++	 side is zero (bit in one mask only).  The combined compare can only
++	 express one such test per bit, so reject combinations in which both
++	 compares test the same bit in different ways.  Check this in the
++	 left-hand frame, since the right-hand fields are laid out alike.  */
++      wide_int lr_m, rr_m;
++      if (lr_and_mask.get_precision ())
++	lr_m = wi::lshift (wide_int::from (lr_and_mask, lnprec, UNSIGNED),
++			   xll_bitpos);
++      else
++	lr_m = wi::shifted_mask (xll_bitpos, lr_bitsize, false, lnprec);
++      if (rr_and_mask.get_precision ())
++	rr_m = wi::lshift (wide_int::from (rr_and_mask, lnprec, UNSIGNED),
++			   xrl_bitpos);
++      else
++	rr_m = wi::shifted_mask (xrl_bitpos, rr_bitsize, false, lnprec);
++      if (((ll_mask | lr_m) & (rl_mask | rr_m)
++	   & ((ll_mask ^ rl_mask) | (lr_m ^ rr_m))) != 0)
++	return 0;
++
+       bool r_split_load;
+       scalar_int_mode rnmode2;
+ 
+diff --git a/gcc/testsuite/gcc.dg/field-merge-30.c b/gcc/testsuite/gcc.dg/field-merge-30.c
+new file mode 100644
+index 000000000000..3bd93ef23e6e
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/field-merge-30.c
+@@ -0,0 +1,46 @@
++/* { dg-do run } */
++/* { dg-require-effective-target int32plus } */
++/* { dg-options "-O1 -fdump-tree-ifcombine-details" } */
++
++__attribute__((noipa))
++short
++cmp3 (short d1, short d2)
++{
++  short x = d2 ^ d1;
++  if (x < 0 || d1 != (d2 & 32767))
++    return 0;
++  return 1;
++}
++
++__attribute__((noipa))
++int
++cmp_int (int d1, int d2)
++{
++  int x = d2 ^ d1;
++  if (x < 0 || d1 != (d2 & 0x7fffffff))
++    return 0;
++  return 1;
++}
++
++int main ()
++{
++  if (cmp3 (-32768, -32768) != 0)
++    __builtin_abort ();
++  if (cmp3 (0, 0) != 1)
++    __builtin_abort ();
++  if (cmp3 (1234, 1234) != 1)
++    __builtin_abort ();
++  if (cmp3 (-1, -1) != 0)
++    __builtin_abort ();
++  if (cmp_int (-0x7fffffff - 1, -0x7fffffff - 1) != 0)
++    __builtin_abort ();
++  if (cmp_int (0, 0) != 1)
++    __builtin_abort ();
++  if (cmp_int (123456, 123456) != 1)
++    __builtin_abort ();
++  if (cmp_int (-1, -1) != 0)
++    __builtin_abort ();
++  return 0;
++}
++
++/* { dg-final { scan-tree-dump-not "optimizing two comparisons" "ifcombine" } } */
+diff --git a/gcc/testsuite/gcc.dg/field-merge-31.c b/gcc/testsuite/gcc.dg/field-merge-31.c
+new file mode 100644
+index 000000000000..8645d81cf44e
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/field-merge-31.c
+@@ -0,0 +1,41 @@
++/* { dg-do run } */
++/* { dg-options "-O1 -fdump-tree-ifcombine-details" } */
++
++/* Check that compares with different masks on each side are still merged
++   when the merged compare tests each bit the same way as the originals,
++   and that they are not merged when it would not.  */
++
++struct S { unsigned char x, y; } __attribute__ ((aligned (4))) s, t;
++
++#define F(n, e)							\
++  __attribute__ ((noipa)) int n (void) { return (e) ? 1 : 0; }	\
++  __attribute__ ((noipa, optimize ("O0")))			\
++  int n##_ref (void) { return (e) ? 1 : 0; }
++
++/* Merged: the fields don't overlap.  */
++F (f1, s.x == (t.x & 0x7f) && s.y == t.y)
++/* Merged: the second compare is implied by the first.  */
++F (f2, s.x == (t.x & 0x7f) && (s.x & 0xf) == (t.x & 0xf))
++/* Not merged: bit 7 is tested for zero in s.x by the first compare, and
++   for equality by the second.  */
++F (f3, s.x == (t.x & 0x7f) && (s.x & 0x80) == (t.x & 0x80))
++/* Not merged: bits 4 and 5 are tested for equality by the first compare,
++   and for zero in t.x by the second.  */
++F (f4, (s.x & 0x3c) == (t.x & 0x3c) && (s.x & 0xf0) == t.x)
++
++int
++main ()
++{
++  for (int a = 0; a < 256; a++)
++    for (int b = 0; b < 256; b++)
++      for (int y = 0; y < 2; y++)
++	{
++	  s.x = a; t.x = b; s.y = 3; t.y = 3 + y;
++	  if (f1 () != f1_ref () || f2 () != f2_ref ()
++	      || f3 () != f3_ref () || f4 () != f4_ref ())
++	    __builtin_abort ();
++	}
++  return 0;
++}
++
++/* { dg-final { scan-tree-dump-times "optimizing two comparisons" 2 "ifcombine" { target { ! { avr-*-* pru-*-* } } } } } */

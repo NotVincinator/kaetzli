@@ -1,0 +1,43 @@
+From ea5e337ed0e3937fd70914f3d2f632be3f31eb2d Mon Sep 17 00:00:00 2001
+From: John David Anglin <danglin@gcc.gnu.org>
+Date: Thu, 15 Oct 2026 18:13:44 -0400
+Subject: [PATCH 330/385] hppa: Allow cross-class mode changes for
+ TARGET_SOFT_FLOAT
+
+Floating-point register support is disabled for TARGET_SOFT_FLOAT,
+so we can allow cross-class mode changes.
+
+2026-10-15  John David Anglin  <danglin@gcc.gnu.org>
+
+gcc/ChangeLog:
+
+	* config/pa/pa.cc (pa_can_change_mode_class): Don't reject
+	cross-class mode changes when floating-point registers are
+	disabled.
+---
+ gcc/config/pa/pa.cc | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/gcc/config/pa/pa.cc b/gcc/config/pa/pa.cc
+index b30bcb82a2c0..1ca06edb8c74 100644
+--- a/gcc/config/pa/pa.cc
++++ b/gcc/config/pa/pa.cc
+@@ -10635,7 +10635,8 @@ pa_can_change_mode_class (machine_mode from, machine_mode to,
+      before reload completes.  If the allocator is forced to use
+      GENERAL_REGS, disallow the mode change so it forces a proper
+      instruction breakdown.  */
+-  if ((rclass == GENERAL_REGS || rclass == R1_REGS)
++  if (!TARGET_SOFT_FLOAT
++      && (rclass == GENERAL_REGS || rclass == R1_REGS)
+       && !reload_completed
+       && GET_MODE_SIZE (to) <= GET_MODE_SIZE (DFmode)
+       && GET_MODE_SIZE (from) <= GET_MODE_SIZE (DFmode)
+@@ -10651,7 +10652,7 @@ pa_can_change_mode_class (machine_mode from, machine_mode to,
+      of LOAD_EXTEND_OP.  Thus, we reject all mode changes in the FP registers
+      except for DImode to SImode on the 64-bit target.  It is handled by
+      register renaming in pa_print_operand.  */
+-  if (MAYBE_FP_REG_CLASS_P (rclass))
++  if (!TARGET_SOFT_FLOAT && MAYBE_FP_REG_CLASS_P (rclass))
+     return TARGET_64BIT && from == DImode && to == SImode;
+ 
+   /* TARGET_HARD_REGNO_MODE_OK places modes with sizes larger than a word

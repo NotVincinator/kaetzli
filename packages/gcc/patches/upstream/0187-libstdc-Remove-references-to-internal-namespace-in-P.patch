@@ -1,0 +1,398 @@
+From b1f57942cd02bce28a79f04aec25de1b7aa61eb1 Mon Sep 17 00:00:00 2001
+From: Jonathan Wakely <jwakely@redhat.com>
+Date: Wed, 26 Aug 2026 18:00:28 +0100
+Subject: [PATCH 187/385] libstdc++: Remove references to internal namespace in
+ PSTL tests
+
+libstdc++-v3/ChangeLog:
+
+	* testsuite/20_util/specialized_algorithms/pstl/uninitialized_copy_move.cc:
+	Replace references to namespace __pstl with std.
+	* testsuite/25_algorithms/pstl/alg_merge/inplace_merge.cc:
+	Likewise.
+	* testsuite/25_algorithms/pstl/alg_modifying_operations/copy_if.cc:
+	Likewise.
+	* testsuite/25_algorithms/pstl/alg_modifying_operations/copy_move.cc:
+	Likewise.
+	* testsuite/25_algorithms/pstl/alg_modifying_operations/is_partitioned.cc:
+	Likewise.
+	* testsuite/25_algorithms/pstl/alg_modifying_operations/partition.cc:
+	Likewise.
+	* testsuite/25_algorithms/pstl/alg_modifying_operations/partition_copy.cc:
+	Likewise.
+	* testsuite/25_algorithms/pstl/alg_modifying_operations/remove.cc:
+	Likewise.
+	* testsuite/25_algorithms/pstl/alg_modifying_operations/rotate.cc:
+	Likewise.
+	* testsuite/25_algorithms/pstl/alg_modifying_operations/rotate_copy.cc:
+	Likewise.
+	* testsuite/25_algorithms/pstl/alg_modifying_operations/unique.cc:
+	Likewise.
+	* testsuite/25_algorithms/pstl/alg_modifying_operations/unique_copy_equal.cc:
+	Likewise.
+	* testsuite/util/pstl/test_utils.h: Likewise.
+---
+ .../pstl/uninitialized_copy_move.cc                  |  4 ++--
+ .../25_algorithms/pstl/alg_merge/inplace_merge.cc    |  4 ++--
+ .../pstl/alg_modifying_operations/copy_if.cc         |  4 ++--
+ .../pstl/alg_modifying_operations/copy_move.cc       | 12 ++++++------
+ .../pstl/alg_modifying_operations/is_partitioned.cc  |  4 ++--
+ .../pstl/alg_modifying_operations/partition.cc       |  8 ++++----
+ .../pstl/alg_modifying_operations/partition_copy.cc  |  4 ++--
+ .../pstl/alg_modifying_operations/remove.cc          |  8 ++++----
+ .../pstl/alg_modifying_operations/rotate.cc          |  4 ++--
+ .../pstl/alg_modifying_operations/rotate_copy.cc     |  4 ++--
+ .../pstl/alg_modifying_operations/unique.cc          |  8 ++++----
+ .../alg_modifying_operations/unique_copy_equal.cc    |  4 ++--
+ libstdc++-v3/testsuite/util/pstl/test_utils.h        |  2 +-
+ 13 files changed, 35 insertions(+), 35 deletions(-)
+
+diff --git a/libstdc++-v3/testsuite/20_util/specialized_algorithms/pstl/uninitialized_copy_move.cc b/libstdc++-v3/testsuite/20_util/specialized_algorithms/pstl/uninitialized_copy_move.cc
+index 38c1bf136df2..53d297b7e8be 100644
+--- a/libstdc++-v3/testsuite/20_util/specialized_algorithms/pstl/uninitialized_copy_move.cc
++++ b/libstdc++-v3/testsuite/20_util/specialized_algorithms/pstl/uninitialized_copy_move.cc
+@@ -84,13 +84,13 @@ struct test_uninitialized_copy_move
+ #if defined(_PSTL_ICC_17_VC141_TEST_SIMD_LAMBDA_DEBUG_32_BROKEN) || defined(_PSTL_ICC_16_VC14_TEST_SIMD_LAMBDA_DEBUG_32_BROKEN)
+     template <typename InputIterator, typename OutputIterator>
+     void
+-    operator()(__pstl::execution::unsequenced_policy, InputIterator first, InputIterator last, OutputIterator out_first,
++    operator()(std::execution::unsequenced_policy, InputIterator first, InputIterator last, OutputIterator out_first,
+                size_t n, /*is_trivial<T>=*/std::true_type)
+     {
+     }
+     template <typename InputIterator, typename OutputIterator>
+     void
+-    operator()(__pstl::execution::parallel_unsequenced_policy, InputIterator first, InputIterator last,
++    operator()(std::execution::parallel_unsequenced_policy, InputIterator first, InputIterator last,
+                OutputIterator out_first, size_t n, /*is_trivial<T>=*/std::true_type)
+     {
+     }
+diff --git a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_merge/inplace_merge.cc b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_merge/inplace_merge.cc
+index a9205553574a..a01974552d38 100644
+--- a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_merge/inplace_merge.cc
++++ b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_merge/inplace_merge.cc
+@@ -34,14 +34,14 @@ struct test_one_policy
+     defined(_PSTL_ICC_16_VC14_TEST_SIMD_LAMBDA_DEBUG_32_BROKEN) // dummy specialization by policy type, in case of broken configuration
+     template <typename BiDirIt1, typename Size, typename Generator1, typename Generator2, typename Compare>
+     void
+-    operator()(__pstl::execution::unsequenced_policy, BiDirIt1 first1, BiDirIt1 last1, BiDirIt1 first2, BiDirIt1 last2,
++    operator()(std::execution::unsequenced_policy, BiDirIt1 first1, BiDirIt1 last1, BiDirIt1 first2, BiDirIt1 last2,
+                Size n, Size m, Generator1 generator1, Generator2 generator2, Compare comp)
+     {
+     }
+ 
+     template <typename BiDirIt1, typename Size, typename Generator1, typename Generator2, typename Compare>
+     void
+-    operator()(__pstl::execution::parallel_unsequenced_policy, BiDirIt1 first1, BiDirIt1 last1, BiDirIt1 first2,
++    operator()(std::execution::parallel_unsequenced_policy, BiDirIt1 first1, BiDirIt1 last1, BiDirIt1 first2,
+                BiDirIt1 last2, Size n, Size m, Generator1 generator1, Generator2 generator2, Compare comp)
+     {
+     }
+diff --git a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/copy_if.cc b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/copy_if.cc
+index 9c1f1725ac21..d554cb29925a 100644
+--- a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/copy_if.cc
++++ b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/copy_if.cc
+@@ -33,7 +33,7 @@ struct run_copy_if
+     template <typename InputIterator, typename OutputIterator, typename OutputIterator2, typename Size,
+               typename Predicate, typename T>
+     void
+-    operator()(__pstl::execution::parallel_policy, InputIterator first, InputIterator last, OutputIterator out_first,
++    operator()(std::execution::parallel_policy, InputIterator first, InputIterator last, OutputIterator out_first,
+                OutputIterator out_last, OutputIterator2 expected_first, OutputIterator2 expected_last, Size n,
+                Predicate pred, T trash)
+     {
+@@ -41,7 +41,7 @@ struct run_copy_if
+     template <typename InputIterator, typename OutputIterator, typename OutputIterator2, typename Size,
+               typename Predicate, typename T>
+     void
+-    operator()(__pstl::execution::parallel_unsequenced_policy, InputIterator first, InputIterator last,
++    operator()(std::execution::parallel_unsequenced_policy, InputIterator first, InputIterator last,
+                OutputIterator out_first, OutputIterator out_last, OutputIterator2 expected_first,
+                OutputIterator2 expected_last, Size n, Predicate pred, T trash)
+     {
+diff --git a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/copy_move.cc b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/copy_move.cc
+index 5f4f984ae067..6c0e4048b544 100644
+--- a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/copy_move.cc
++++ b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/copy_move.cc
+@@ -35,7 +35,7 @@ struct run_copy
+     defined(_PSTL_ICC_16_VC14_TEST_SIMD_LAMBDA_DEBUG_32_BROKEN) //dummy specialization by policy type, in case of broken configuration
+     template <typename InputIterator, typename OutputIterator, typename OutputIterator2, typename Size, typename T>
+     void
+-    operator()(__pstl::execution::unsequenced_policy, InputIterator first, InputIterator last, OutputIterator out_first,
++    operator()(std::execution::unsequenced_policy, InputIterator first, InputIterator last, OutputIterator out_first,
+                OutputIterator out_last, OutputIterator2 expected_first, OutputIterator2 expected_last, Size size,
+                Size n, T trash)
+     {
+@@ -43,7 +43,7 @@ struct run_copy
+ 
+     template <typename InputIterator, typename OutputIterator, typename OutputIterator2, typename Size, typename T>
+     void
+-    operator()(__pstl::execution::parallel_unsequenced_policy, InputIterator first, InputIterator last,
++    operator()(std::execution::parallel_unsequenced_policy, InputIterator first, InputIterator last,
+                OutputIterator out_first, OutputIterator out_last, OutputIterator2 expected_first,
+                OutputIterator2 expected_last, Size size, Size n, T trash)
+     {
+@@ -87,7 +87,7 @@ struct run_move
+     defined(_PSTL_ICC_16_VC14_TEST_SIMD_LAMBDA_DEBUG_32_BROKEN) //dummy specialization by policy type, in case of broken configuration
+     template <typename InputIterator, typename OutputIterator, typename OutputIterator2, typename Size>
+     void
+-    operator()(__pstl::execution::unsequenced_policy, InputIterator first, InputIterator last, OutputIterator out_first,
++    operator()(std::execution::unsequenced_policy, InputIterator first, InputIterator last, OutputIterator out_first,
+                OutputIterator out_last, OutputIterator2 expected_first, OutputIterator2 expected_last, Size size,
+                Size n, T trash)
+     {
+@@ -95,7 +95,7 @@ struct run_move
+ 
+     template <typename InputIterator, typename OutputIterator, typename OutputIterator2, typename Size>
+     void
+-    operator()(__pstl::execution::parallel_unsequenced_policy, InputIterator first, InputIterator last,
++    operator()(std::execution::parallel_unsequenced_policy, InputIterator first, InputIterator last,
+                OutputIterator out_first, OutputIterator out_last, OutputIterator2 expected_first,
+                OutputIterator2 expected_last, Size size, Size n, T trash)
+     {
+@@ -129,7 +129,7 @@ struct run_move<Wrapper<T>>
+     defined(_PSTL_ICC_16_VC14_TEST_SIMD_LAMBDA_DEBUG_32_BROKEN) //dummy specialization by policy type, in case of broken configuration
+     template <typename InputIterator, typename OutputIterator, typename OutputIterator2, typename Size>
+     void
+-    operator()(__pstl::execution::unsequenced_policy, InputIterator first, InputIterator last, OutputIterator out_first,
++    operator()(std::execution::unsequenced_policy, InputIterator first, InputIterator last, OutputIterator out_first,
+                OutputIterator out_last, OutputIterator2 expected_first, OutputIterator2 expected_last, Size size,
+                Size n, Wrapper<T> trash)
+     {
+@@ -137,7 +137,7 @@ struct run_move<Wrapper<T>>
+ 
+     template <typename InputIterator, typename OutputIterator, typename OutputIterator2, typename Size>
+     void
+-    operator()(__pstl::execution::parallel_unsequenced_policy, InputIterator first, InputIterator last,
++    operator()(std::execution::parallel_unsequenced_policy, InputIterator first, InputIterator last,
+                OutputIterator out_first, OutputIterator out_last, OutputIterator2 expected_first,
+                OutputIterator2 expected_last, Size size, Size n, Wrapper<T> trash)
+     {
+diff --git a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/is_partitioned.cc b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/is_partitioned.cc
+index 20ee7d296f7e..b4d85d93bfdc 100644
+--- a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/is_partitioned.cc
++++ b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/is_partitioned.cc
+@@ -33,12 +33,12 @@ struct test_one_policy
+ 
+     template <typename Iterator1, typename Predicate>
+     void
+-    operator()(__pstl::execution::unsequenced_policy, Iterator1 begin1, Iterator1 end1, Predicate pred)
++    operator()(std::execution::unsequenced_policy, Iterator1 begin1, Iterator1 end1, Predicate pred)
+     {
+     }
+     template <typename Iterator1, typename Predicate>
+     void
+-    operator()(__pstl::execution::parallel_unsequenced_policy, Iterator1 begin1, Iterator1 end1, Predicate pred)
++    operator()(std::execution::parallel_unsequenced_policy, Iterator1 begin1, Iterator1 end1, Predicate pred)
+     {
+     }
+ #endif
+diff --git a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/partition.cc b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/partition.cc
+index 58979bac2b00..d69f4060a10f 100644
+--- a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/partition.cc
++++ b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/partition.cc
+@@ -86,28 +86,28 @@ struct test_one_policy
+     defined(_PSTL_ICC_16_VC14_TEST_SIMD_LAMBDA_DEBUG_32_BROKEN) //dummy specializations to skip testing in case of broken configuration
+     template <typename BiDirIt, typename Size, typename UnaryOp, typename Generator>
+     void
+-    operator()(__pstl::execution::unsequenced_policy, BiDirIt first, BiDirIt last, BiDirIt exp_first, BiDirIt exp_last,
++    operator()(std::execution::unsequenced_policy, BiDirIt first, BiDirIt last, BiDirIt exp_first, BiDirIt exp_last,
+                Size n, UnaryOp unary_op, Generator generator)
+     {
+     }
+ 
+     template <typename BiDirIt, typename Size, typename UnaryOp, typename Generator>
+     void
+-    operator()(__pstl::execution::parallel_unsequenced_policy, BiDirIt first, BiDirIt last, BiDirIt exp_first,
++    operator()(std::execution::parallel_unsequenced_policy, BiDirIt first, BiDirIt last, BiDirIt exp_first,
+                BiDirIt exp_last, Size n, UnaryOp unary_op, Generator generator)
+     {
+     }
+ #elif defined(_PSTL_ICC_16_VC14_TEST_PAR_TBB_RT_RELEASE_64_BROKEN) //dummy specializations to skip testing in case of broken configuration
+     template <typename BiDirIt, typename Size, typename UnaryOp, typename Generator>
+     void
+-    operator()(__pstl::execution::parallel_policy, BiDirIt first, BiDirIt last, BiDirIt exp_first, BiDirIt exp_last,
++    operator()(std::execution::parallel_policy, BiDirIt first, BiDirIt last, BiDirIt exp_first, BiDirIt exp_last,
+                Size n, UnaryOp unary_op, Generator generator)
+     {
+     }
+ 
+     template <typename BiDirIt, typename Size, typename UnaryOp, typename Generator>
+     void
+-    operator()(__pstl::execution::parallel_unsequenced_policy, BiDirIt first, BiDirIt last, BiDirIt exp_first,
++    operator()(std::execution::parallel_unsequenced_policy, BiDirIt first, BiDirIt last, BiDirIt exp_first,
+                BiDirIt exp_last, Size n, UnaryOp unary_op, Generator generator)
+     {
+     }
+diff --git a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/partition_copy.cc b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/partition_copy.cc
+index 804fcba2bf2b..597de6833fe7 100644
+--- a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/partition_copy.cc
++++ b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/partition_copy.cc
+@@ -51,7 +51,7 @@ struct test_partition_copy
+ #if defined(_PSTL_ICC_1800_TEST_MONOTONIC_RELEASE_64_BROKEN)
+     template <typename InputIterator, typename OutputIterator, typename OutputIterator2, typename UnaryOp>
+     void
+-    operator()(__pstl::execution::unsequenced_policy, std::reverse_iterator<InputIterator> first,
++    operator()(std::execution::unsequenced_policy, std::reverse_iterator<InputIterator> first,
+                std::reverse_iterator<InputIterator> last, std::reverse_iterator<OutputIterator> true_first,
+                std::reverse_iterator<OutputIterator> true_last, std::reverse_iterator<OutputIterator2> false_first,
+                OutputIterator2 false_last, UnaryOp unary_op)
+@@ -59,7 +59,7 @@ struct test_partition_copy
+     }
+     template <typename InputIterator, typename OutputIterator, typename OutputIterator2, typename UnaryOp>
+     void
+-    operator()(__pstl::execution::parallel_unsequenced_policy, std::reverse_iterator<InputIterator> first,
++    operator()(std::execution::parallel_unsequenced_policy, std::reverse_iterator<InputIterator> first,
+                std::reverse_iterator<InputIterator> last, std::reverse_iterator<OutputIterator> true_first,
+                std::reverse_iterator<OutputIterator> true_last, std::reverse_iterator<OutputIterator2> false_first,
+                OutputIterator2 false_last, UnaryOp unary_op)
+diff --git a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/remove.cc b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/remove.cc
+index 9d8e5b9b305e..c8ad1c71e050 100644
+--- a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/remove.cc
++++ b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/remove.cc
+@@ -33,14 +33,14 @@ struct run_remove
+     defined(_PSTL_ICC_16_VC14_TEST_SIMD_LAMBDA_DEBUG_32_BROKEN) //dummy specialization by policy type, in case of broken configuration
+     template <typename InputIterator, typename OutputIterator, typename Size, typename T>
+     void
+-    operator()(__pstl::execution::unsequenced_policy, InputIterator first, InputIterator last, OutputIterator out_first,
++    operator()(std::execution::unsequenced_policy, InputIterator first, InputIterator last, OutputIterator out_first,
+                OutputIterator out_last, OutputIterator expected_first, OutputIterator expected_last, Size n,
+                const T& value)
+     {
+     }
+     template <typename InputIterator, typename OutputIterator, typename Size, typename T>
+     void
+-    operator()(__pstl::execution::parallel_unsequenced_policy, InputIterator first, InputIterator last,
++    operator()(std::execution::parallel_unsequenced_policy, InputIterator first, InputIterator last,
+                OutputIterator out_first, OutputIterator out_last, OutputIterator expected_first,
+                OutputIterator expected_last, Size n, const T& value)
+     {
+@@ -71,14 +71,14 @@ struct run_remove_if
+     defined(_PSTL_ICC_16_VC14_TEST_SIMD_LAMBDA_DEBUG_32_BROKEN) //dummy specialization by policy type, in case of broken configuration
+     template <typename InputIterator, typename OutputIterator, typename Size, typename Predicate>
+     void
+-    operator()(__pstl::execution::unsequenced_policy, InputIterator first, InputIterator last, OutputIterator out_first,
++    operator()(std::execution::unsequenced_policy, InputIterator first, InputIterator last, OutputIterator out_first,
+                OutputIterator out_last, OutputIterator expected_first, OutputIterator expected_last, Size n,
+                Predicate pred)
+     {
+     }
+     template <typename InputIterator, typename OutputIterator, typename Size, typename Predicate>
+     void
+-    operator()(__pstl::execution::parallel_unsequenced_policy, InputIterator first, InputIterator last,
++    operator()(std::execution::parallel_unsequenced_policy, InputIterator first, InputIterator last,
+                OutputIterator out_first, OutputIterator out_last, OutputIterator expected_first,
+                OutputIterator expected_last, Size n, Predicate pred)
+     {
+diff --git a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/rotate.cc b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/rotate.cc
+index 9ec9b3bcc9b4..6b2fe8f6ea4c 100644
+--- a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/rotate.cc
++++ b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/rotate.cc
+@@ -87,13 +87,13 @@ struct test_one_policy
+     defined(_PSTL_ICC_16_VC14_TEST_SIMD_LAMBDA_DEBUG_32_BROKEN) // dummy specializations to skip testing in case of broken configuration
+     template <typename Iterator, typename Size>
+     void
+-    operator()(__pstl::execution::unsequenced_policy, Iterator data_b, Iterator data_e, Iterator actual_b,
++    operator()(std::execution::unsequenced_policy, Iterator data_b, Iterator data_e, Iterator actual_b,
+                Iterator actual_e, Size shift)
+     {
+     }
+     template <typename Iterator, typename Size>
+     void
+-    operator()(__pstl::execution::parallel_unsequenced_policy, Iterator data_b, Iterator data_e, Iterator actual_b,
++    operator()(std::execution::parallel_unsequenced_policy, Iterator data_b, Iterator data_e, Iterator actual_b,
+                Iterator actual_e, Size shift)
+     {
+     }
+diff --git a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/rotate_copy.cc b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/rotate_copy.cc
+index 1b788e1b7ee5..297670458708 100644
+--- a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/rotate_copy.cc
++++ b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/rotate_copy.cc
+@@ -83,13 +83,13 @@ struct test_one_policy
+     defined(_PSTL_ICC_16_VC14_TEST_SIMD_LAMBDA_DEBUG_32_BROKEN) // dummy specialization by policy type, in case of broken configuration
+     template <typename Iterator1, typename Iterator2>
+     typename std::enable_if<is_same_iterator_category<Iterator1, std::random_access_iterator_tag>::value, void>::type
+-    operator()(__pstl::execution::unsequenced_policy, Iterator1 data_b, Iterator1 data_e, Iterator2 actual_b,
++    operator()(std::execution::unsequenced_policy, Iterator1 data_b, Iterator1 data_e, Iterator2 actual_b,
+                Iterator2 actual_e, std::size_t shift)
+     {
+     }
+     template <typename Iterator1, typename Iterator2>
+     typename std::enable_if<is_same_iterator_category<Iterator1, std::random_access_iterator_tag>::value, void>::type
+-    operator()(__pstl::execution::parallel_unsequenced_policy, Iterator1 data_b, Iterator1 data_e, Iterator2 actual_b,
++    operator()(std::execution::parallel_unsequenced_policy, Iterator1 data_b, Iterator1 data_e, Iterator2 actual_b,
+                Iterator2 actual_e, std::size_t shift)
+     {
+     }
+diff --git a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/unique.cc b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/unique.cc
+index 0f21e0450896..16fd5e5dcf34 100644
+--- a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/unique.cc
++++ b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/unique.cc
+@@ -33,28 +33,28 @@ struct run_unique
+     defined(_PSTL_ICC_16_VC14_TEST_SIMD_LAMBDA_DEBUG_32_BROKEN) //dummy specialization by policy type, in case of broken configuration
+     template <typename ForwardIt, typename Generator>
+     void
+-    operator()(__pstl::execution::unsequenced_policy, ForwardIt first1, ForwardIt last1, ForwardIt first2,
++    operator()(std::execution::unsequenced_policy, ForwardIt first1, ForwardIt last1, ForwardIt first2,
+                ForwardIt last2, Generator generator)
+     {
+     }
+ 
+     template <typename ForwardIt, typename Generator>
+     void
+-    operator()(__pstl::execution::parallel_unsequenced_policy, ForwardIt first1, ForwardIt last1, ForwardIt first2,
++    operator()(std::execution::parallel_unsequenced_policy, ForwardIt first1, ForwardIt last1, ForwardIt first2,
+                ForwardIt last2, Generator generator)
+     {
+     }
+ 
+     template <typename ForwardIt, typename BinaryPred, typename Generator>
+     void
+-    operator()(__pstl::execution::unsequenced_policy, ForwardIt first1, ForwardIt last1, ForwardIt first2,
++    operator()(std::execution::unsequenced_policy, ForwardIt first1, ForwardIt last1, ForwardIt first2,
+                ForwardIt last2, BinaryPred pred, Generator generator)
+     {
+     }
+ 
+     template <typename ForwardIt, typename BinaryPred, typename Generator>
+     void
+-    operator()(__pstl::execution::parallel_unsequenced_policy, ForwardIt first1, ForwardIt last1, ForwardIt first2,
++    operator()(std::execution::parallel_unsequenced_policy, ForwardIt first1, ForwardIt last1, ForwardIt first2,
+                ForwardIt last2, BinaryPred pred, Generator generator)
+     {
+     }
+diff --git a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/unique_copy_equal.cc b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/unique_copy_equal.cc
+index c5bc25c9140c..782726ee63b1 100644
+--- a/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/unique_copy_equal.cc
++++ b/libstdc++-v3/testsuite/25_algorithms/pstl/alg_modifying_operations/unique_copy_equal.cc
+@@ -33,7 +33,7 @@ struct run_unique_copy
+     template <typename InputIterator, typename OutputIterator, typename OutputIterator2, typename Size,
+               typename Predicate, typename T>
+     void
+-    operator()(__pstl::execution::parallel_policy, InputIterator first, InputIterator last, OutputIterator out_first,
++    operator()(std::execution::parallel_policy, InputIterator first, InputIterator last, OutputIterator out_first,
+                OutputIterator out_last, OutputIterator2 expected_first, OutputIterator2 expected_last, Size n,
+                Predicate pred, T trash)
+     {
+@@ -42,7 +42,7 @@ struct run_unique_copy
+     template <typename InputIterator, typename OutputIterator, typename OutputIterator2, typename Size,
+               typename Predicate, typename T>
+     void
+-    operator()(__pstl::execution::parallel_unsequenced_policy, InputIterator first, InputIterator last,
++    operator()(std::execution::parallel_unsequenced_policy, InputIterator first, InputIterator last,
+                OutputIterator out_first, OutputIterator out_last, OutputIterator2 expected_first,
+                OutputIterator2 expected_last, Size n, Predicate pred, T trash)
+     {
+diff --git a/libstdc++-v3/testsuite/util/pstl/test_utils.h b/libstdc++-v3/testsuite/util/pstl/test_utils.h
+index 9c61a7145f59..02861178e344 100644
+--- a/libstdc++-v3/testsuite/util/pstl/test_utils.h
++++ b/libstdc++-v3/testsuite/util/pstl/test_utils.h
+@@ -1115,7 +1115,7 @@ template <typename Op, typename... T>
+ void
+ invoke_on_all_policies(Op op, T&&... rest)
+ {
+-    using namespace __pstl::execution;
++    using namespace std::execution;
+ 
+     // Try static execution policies
+     invoke_on_all_iterator_types()(seq, op, std::forward<T>(rest)...);

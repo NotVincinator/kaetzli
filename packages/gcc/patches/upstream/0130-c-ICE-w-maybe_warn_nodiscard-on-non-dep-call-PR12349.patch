@@ -1,0 +1,75 @@
+From 0c8300a9e0481130961415b4a5d7e647dec3ba66 Mon Sep 17 00:00:00 2001
+From: Patrick Palka <ppalka@redhat.com>
+Date: Fri, 14 Aug 2026 14:33:46 -0400
+Subject: [PATCH 130/385] c++: ICE w/ maybe_warn_nodiscard on non-dep call
+ [PR123495, PR126860]
+
+Another latent issue uncovered by the NON_DEPENDENT_EXPR removal.
+cp_get_fndecl_from_callee, called from maybe_warn_nodiscard, tries to
+fold the templated callee via constant evaluation, but constant
+evaluation expects non-templated trees.  So use fold_non_dependent_expr
+which instantiates templated trees beforehand.  We could use f_n_d_init
+also but there should be no difference for a result that doesn't end up
+as NULL_TREE.
+
+	PR c++/123495
+	PR c++/126860
+
+gcc/cp/ChangeLog:
+
+	* cvt.cc (cp_get_fndecl_from_callee): Use fold_non_dependent_expr
+	instead of maybe_constant_init.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/template/non-dependent36.C: New test.
+	* g++.dg/template/non-dependent37.C: New test.
+
+Reviewed-by: Jason Merrill <jason@redhat.com>
+(cherry picked from commit 0e74517b70d06105bd40c8caa6dc192b4af3ccff)
+---
+ gcc/cp/cvt.cc                                   | 2 +-
+ gcc/testsuite/g++.dg/template/non-dependent36.C | 4 ++++
+ gcc/testsuite/g++.dg/template/non-dependent37.C | 9 +++++++++
+ 3 files changed, 14 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/g++.dg/template/non-dependent36.C
+ create mode 100644 gcc/testsuite/g++.dg/template/non-dependent37.C
+
+diff --git a/gcc/cp/cvt.cc b/gcc/cp/cvt.cc
+index b1176317d996..44e7d8061859 100644
+--- a/gcc/cp/cvt.cc
++++ b/gcc/cp/cvt.cc
+@@ -1048,7 +1048,7 @@ cp_get_fndecl_from_callee (tree fn, bool fold /* = true */)
+   if (type == NULL_TREE || !INDIRECT_TYPE_P (type))
+     return NULL_TREE;
+   if (fold)
+-    fn = maybe_constant_init (fn);
++    fn = fold_non_dependent_expr (fn);
+   STRIP_NOPS (fn);
+   if (TREE_CODE (fn) == ADDR_EXPR
+       || TREE_CODE (fn) == FDESC_EXPR)
+diff --git a/gcc/testsuite/g++.dg/template/non-dependent36.C b/gcc/testsuite/g++.dg/template/non-dependent36.C
+new file mode 100644
+index 000000000000..a4bf06974028
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/template/non-dependent36.C
+@@ -0,0 +1,4 @@
++// PR c++/123495
++
++template <int N>
++void foo () { ((int (*) ()) 0) (); }
+diff --git a/gcc/testsuite/g++.dg/template/non-dependent37.C b/gcc/testsuite/g++.dg/template/non-dependent37.C
+new file mode 100644
+index 000000000000..ad58cf6f10ce
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/template/non-dependent37.C
+@@ -0,0 +1,9 @@
++// PR c++/126860
++
++struct A {
++  int (*foo)();
++};
++
++template <typename T> struct S : public A {
++  void bar() { A::foo(); }
++};

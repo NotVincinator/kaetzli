@@ -1,0 +1,66 @@
+From e47727a876ca2adccfab8bb1b4ede8a97326b636 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Tomasz=20Kami=C5=84ski?= <tkaminsk@redhat.com>
+Date: Fri, 11 Sep 2026 10:23:33 +0200
+Subject: [PATCH 160/385] libstdc++: Remove unecessary std::start_lifetime_as
+ call in inplace_vector [PR124121].
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This removes use of std::start_lifetime_as from inplace_vector::_M_init,
+that was preventing optimizations (see PR124121), it is not required as
+GCC treats any write to union as potentially changing active member.
+Furthermore when available __builtin_constexpr_diag is used to emit better
+error message. TODO comment is also removed, as suggested new call is not
+supported until clang 23.
+
+This backports parts of r17-4164-ga6cb4f45, that does not depend on
+start_lifetime.
+
+libstdc++-v3/ChangeLog:
+
+	PR libstdc++/124121
+	* include/std/inplace_vector (inplace_vector::_M_init): Remove
+	unnecessary start_lifetime_as call. Emit error using
+	__builtin_constexpr_diag.
+
+Reviewed-by: Jonathan Wakely <jwakely@redhat.com>
+Signed-off-by: Tomasz Kamiński <tkaminsk@redhat.com>
+---
+ libstdc++-v3/include/std/inplace_vector | 17 ++++++++---------
+ 1 file changed, 8 insertions(+), 9 deletions(-)
+
+diff --git a/libstdc++-v3/include/std/inplace_vector b/libstdc++-v3/include/std/inplace_vector
+index 131bdc4ca47f..0159f7021f37 100644
+--- a/libstdc++-v3/include/std/inplace_vector
++++ b/libstdc++-v3/include/std/inplace_vector
+@@ -841,21 +841,20 @@ _GLIBCXX_BEGIN_NAMESPACE_CONTAINER
+       constexpr void
+       _M_init()
+       {
+-	if !consteval
++	if consteval
+ 	  {
+-#if __glibcxx_start_lifetime_as
+-	    std::start_lifetime_as_array<_Tp>(data(), _Nm);
+-#endif
+-	  }
+-	else
+-	  {
+-	    // TODO: use new(_M_elems) _Tp[_Nm]() once PR121068 is fixed
+ 	    if constexpr (is_trivially_default_constructible_v<_Tp>
+ 			    && is_trivially_copyable_v<_Tp>)
+ 	      for (size_t __i = 0; __i < _Nm; ++__i)
+ 		_M_elems[__i] = _Tp();
+ 	    else
+-	      __builtin_unreachable(); // only trivial types are supported at compile time
++#if __has_builtin(__builtin_constexpr_diag)
++	     __builtin_constexpr_diag(2, "",
++		"std::inplace_vector supports only trivally copyable and "
++		"trivially default constructible types at compile time");
++#else
++	     __builtin_unreachable();
++#endif
+ 	  }
+       }
+ 

@@ -1,0 +1,58 @@
+From 40478c0b0634682a6336ad35f1b4f9fa7ed32f0e Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Mon, 17 Aug 2026 00:20:32 +0000
+Subject: [PATCH 045/385] Daily bump.
+
+---
+ gcc/DATESTAMP           |  2 +-
+ gcc/fortran/ChangeLog   | 16 ++++++++++++++++
+ gcc/testsuite/ChangeLog |  8 ++++++++
+ 3 files changed, 25 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 434dacbd75de..16d61608baff 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260816
++20260817
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index cf18152be757..e38b78319ca8 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,19 @@
++2026-08-16  Christopher Albert  <albert@tugraz.at>
++
++	Backported from master:
++	2026-08-16  Christopher Albert  <albert@tugraz.at>
++
++	PR fortran/110626
++	* gfortran.h : Add finalize_only bitfield to gfc_expr.
++	* resolve.cc (generate_component_assignments): If the lhs has
++	no pointer or allocatable components, set use_finalize_only to
++	false. Otherwise it equals finalizable_lhs. Use the value to
++	set the expr1 finalize_only field and add the assignment to the
++	chain. If use_finalize_only is false, free the statements and
++	transfer the value to the final result.
++	* trans-expr.cc (gfc_trans_assignment_1): If expr1 is finalize_
++	only emit an empty statement.
++
+ 2026-08-14  Paul Thomas  <pault@gcc.gnu.org>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 16414fd56b0e..594174fd2a7d 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2026-08-16  Christopher Albert  <albert@tugraz.at>
++
++	Backported from master:
++	2026-08-16  Christopher Albert  <albert@tugraz.at>
++
++	PR fortran/110626
++	* gfortran.dg/finalize_62.f90: New test.
++
+ 2026-08-14  Patrick Palka  <ppalka@redhat.com>
+ 
+ 	Backported from master:

@@ -1,0 +1,125 @@
+From a8ce20256d4ffac873c81bae1a339e4eac9472f5 Mon Sep 17 00:00:00 2001
+From: Anlai Lu <agicy@qq.com>
+Date: Sun, 16 Aug 2026 04:01:03 +0000
+Subject: [PATCH 073/385] libstdc++: Fix SIGSEGV in std::print with a setvbuf'd
+ FILE
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This is a regression introduced by the P3107R5 implementation in
+r16-4350-g8bd872f1ea7414. Before that formatting to a FILE* wrote to
+_Str_sink and used fwrite, which handles this legal stream state.
+
+This fixes it by calling __overflow from the _File_sink constructor
+when _IO_write_ptr is null.
+
+libstdc++-v3/ChangeLog:
+
+	* include/bits/print.h (_File_sink::_File::_File)
+	[_GLIBCXX_USE_STDIO_LOCKING && _GLIBCXX_USE_GLIBC_STDIO_EXT]:
+	Move __overflow call to separate member function.
+	(_File_sink::_File::_M_init_write_buf)
+	[_GLIBCXX_USE_STDIO_LOCKING && _GLIBCXX_USE_GLIBC_STDIO_EXT]:
+	Extracted from constructor, call __overflow for null
+	_M_file->_IO_write_ptr.
+	(_File_sink::_File_sink)
+	[_GLIBCXX_USE_STDIO_LOCKING && _GLIBCXX_USE_GLIBC_STDIO_EXT]:
+	Call _M_init_write_buf instead of _M_write_buf.
+	* testsuite/27_io/print/1.cc: Add test_print_setvbuf.
+
+Reviewed-by: Jonathan Wakely <jwakely@redhat.com>
+Co-authored-by: Tomasz Kamiński <tkaminsk@redhat.com>
+Signed-off-by: Anlai Lu <agicy@qq.com>
+Signed-off-by: Tomasz Kamiński <tkaminsk@redhat.com>
+	(cherry picked from commits 4cb7258da9bd637ccce023693ae6a167d179784d)
+	(74b3180bb616fbc35d1b655da75d8f6d8b39d368)
+---
+ libstdc++-v3/include/bits/print.h       | 25 +++++++++++++++----------
+ libstdc++-v3/testsuite/27_io/print/1.cc | 17 +++++++++++++++++
+ 2 files changed, 32 insertions(+), 10 deletions(-)
+
+diff --git a/libstdc++-v3/include/bits/print.h b/libstdc++-v3/include/bits/print.h
+index 207248447264..722d82146ac8 100644
+--- a/libstdc++-v3/include/bits/print.h
++++ b/libstdc++-v3/include/bits/print.h
+@@ -80,20 +80,25 @@ namespace __format
+ 	    ::funlockfile(__f);
+ 	    __throw_system_error(EACCES);
+ 	  }
+-	// Allocate buffer if needed:
+-	if (_M_write_buf().empty())
+-	  if (::__overflow(__f, EOF) == EOF)
+-	    {
+-	      const int __err = errno;
+-	      ::funlockfile(__f);
+-	      __throw_system_error(__err);
+-	    }
+       }
+ 
+       ~_File() { ::funlockfile(_M_file); }
+ 
+       _File(_File&&) = delete;
+ 
++      // Allocate FILE's output buffer if needed, and return a span
++      // viewing unused portion of it.
++      std::span<char>
++      _M_init_write_buf()
++      {
++	// After setvbuf glibc pre-allocates the buffer but _IO_write_ptr
++	// remains null until the first write.
++	if (!_M_file->_IO_write_ptr || _M_write_buf().empty())
++	  if (::__overflow(_M_file, EOF) == EOF)
++	    __throw_system_error(errno);
++	return _M_write_buf();
++      }
++
+       // A span viewing the unused portion of the stream's output buffer.
+       std::span<char>
+       _M_write_buf() noexcept
+@@ -158,8 +163,8 @@ namespace __format
+     : _M_file(__f), _M_add_newline(__add_newline)
+     {
+       if (!_M_file._M_unbuffered())
+-	// Write directly to the FILE's output buffer.
+-	this->_M_reset(_M_file._M_write_buf());
++	// Allocate FILE's output buffer if needed, and write directly to it.
++	this->_M_reset(_M_file._M_init_write_buf());
+     }
+ 
+     // This calls I/O functions which are cancellation points, so they
+diff --git a/libstdc++-v3/testsuite/27_io/print/1.cc b/libstdc++-v3/testsuite/27_io/print/1.cc
+index 58f1eb163dfa..41314adb8203 100644
+--- a/libstdc++-v3/testsuite/27_io/print/1.cc
++++ b/libstdc++-v3/testsuite/27_io/print/1.cc
+@@ -65,6 +65,22 @@ test_print_raw()
+   VERIFY( txt == "\xa3" );
+ }
+ 
++void
++test_print_setvbuf()
++{
++  __gnu_test::scoped_file f;
++  FILE* strm = std::fopen(f.path.string().c_str(), "w");
++  VERIFY( strm );
++  VERIFY( std::setvbuf(strm, nullptr, _IOFBF, 4096) == 0 );
++  std::string str{"Hello, World!"};
++  std::print(strm, "{}", str);
++  std::fclose(strm);
++
++  std::ifstream in(f.path);
++  std::string txt(std::istreambuf_iterator<char>(in), {});
++  VERIFY( txt == "Hello, World!" );
++}
++
+ void
+ test_vprint_nonunicode()
+ {
+@@ -140,6 +156,7 @@ int main()
+   test_print_file();
+   test_println_file();
+   test_print_raw();
++  test_print_setvbuf();
+   test_vprint_nonunicode();
+ #ifdef __cpp_exceptions
+   test_errors();

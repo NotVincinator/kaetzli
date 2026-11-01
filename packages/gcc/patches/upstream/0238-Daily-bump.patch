@@ -1,0 +1,47 @@
+From 8558887e492cd45347f188ed86248a86cdb33ea8 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Mon, 5 Oct 2026 00:20:42 +0000
+Subject: [PATCH 238/385] Daily bump.
+
+---
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 22 ++++++++++++++++++++++
+ 2 files changed, 23 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 6259657651ae..91c1b11a268e 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261004
++20261005
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index e18abc4211b4..000ed157c380 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,25 @@
++2026-10-04  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
++
++	Backported from master:
++	2026-10-04  Torbjörn SVENSSON  <torbjorn.svensson@foss.st.com>
++
++	* gcc.target/arm/mve/intrinsics/vcmpeqq_n_f16.c: Set
++	-mtune=cortex-m55 to get stable assembly.
++	* gcc.target/arm/mve/intrinsics/vcmpeqq_n_f32.c: Likewise.
++	* gcc.target/arm/mve/intrinsics/vcmpgeq_n_f16.c: Likewise.
++	* gcc.target/arm/mve/intrinsics/vcmpgeq_n_f32.c: Likewise.
++	* gcc.target/arm/mve/intrinsics/vcmpgtq_n_f16.c: Likewise.
++	* gcc.target/arm/mve/intrinsics/vcmpgtq_n_f32.c: Likewise.
++	* gcc.target/arm/mve/intrinsics/vcmpleq_n_f16.c: Likewise.
++	* gcc.target/arm/mve/intrinsics/vcmpleq_n_f32.c: Likewise.
++	* gcc.target/arm/mve/intrinsics/vcmpltq_n_f16.c: Likewise.
++	* gcc.target/arm/mve/intrinsics/vcmpltq_n_f32.c: Likewise.
++	* gcc.target/arm/mve/intrinsics/vcmpneq_n_f16.c: Likewise.
++	* gcc.target/arm/mve/intrinsics/vcmpneq_n_f32.c: Likewise.
++	* gcc.target/arm/mve/intrinsics/vdupq_n_f16.c: Likewise.
++	* gcc.target/arm/mve/intrinsics/vdupq_n_f32.c: Likewise.
++	* gcc.target/arm/mve/dlstp-invalid-asm.c: Likewise.
++
+ 2026-10-03  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:

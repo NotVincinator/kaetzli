@@ -1,0 +1,59 @@
+From 84fd91ed7b5c670d3af671d6b44a732c8d93a3ed Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Fri, 25 Sep 2026 00:20:50 +0000
+Subject: [PATCH 205/385] Daily bump.
+
+---
+ gcc/ChangeLog          |  9 +++++++++
+ gcc/DATESTAMP          |  2 +-
+ libstdc++-v3/ChangeLog | 16 ++++++++++++++++
+ 3 files changed, 26 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 713af0a4749a..060213995e93 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,12 @@
++2026-09-24  Richard Biener  <rguenther@suse.de>
++
++	Backported from master:
++	2026-09-24  Richard Biener  <rguenther@suse.de>
++
++	PR tree-optimization/127571
++	* tree-ssa-sccvn.cc (vn_walk_cb_data::push_partial_def):
++	Re-associate offset computation to avoid overflow.
++
+ 2026-09-23  Zhongyao Chen  <chenzhongyao.hit@gmail.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 0d3a0d16876a..147e2265a569 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260924
++20260925
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index 9ec3188cec4a..b5a88cf4d9a1 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,19 @@
++2026-09-24  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-09-23  Jonathan Wakely  <jwakely@redhat.com>
++
++	* libsupc++/new_opa.cc
++	[_GLIBCXX_HAVE_ALIGNED_ALLOC] (__gnu_cxx::aligned_alloc):
++	Replace using-directive with new function. Check for size_t
++	overflow.
++	[_GLIBCXX_HAVE__ALIGNED_MALLOC] (__gnu_cxx::aligned_alloc):
++	Check for size_t overflow.
++	(__gnu_cxx::aligned_alloc): Likewise in fallback definition.
++	(operator new) [_GLIBCXX_HAVE_ALIGNED_ALLOC]: Move parameter
++	adjustments to new __gnu_cxx::aligned_alloc function.
++	* testsuite/18_support/new_aligned_wrap.cc: New test.
++
+ 2026-09-21  Tomasz Kamiński  <tkaminsk@redhat.com>
+ 
+ 	Backported from master:

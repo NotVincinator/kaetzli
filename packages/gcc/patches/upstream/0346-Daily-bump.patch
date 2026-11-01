@@ -1,0 +1,108 @@
+From 3dee9cf8c724b38035a4e6fbebdb0678f27bab21 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Tue, 27 Oct 2026 00:20:51 +0000
+Subject: [PATCH 346/385] Daily bump.
+
+---
+ gcc/DATESTAMP           |  2 +-
+ gcc/ada/ChangeLog       | 16 ++++++++++++++++
+ gcc/fortran/ChangeLog   | 18 ++++++++++++++++++
+ gcc/testsuite/ChangeLog |  9 +++++++++
+ libstdc++-v3/ChangeLog  | 13 +++++++++++++
+ 5 files changed, 57 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index 8de6589b93e7..856e9a1b54b3 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261026
++20261027
+diff --git a/gcc/ada/ChangeLog b/gcc/ada/ChangeLog
+index 53de7069c8b6..0e15b9c5ed12 100644
+--- a/gcc/ada/ChangeLog
++++ b/gcc/ada/ChangeLog
+@@ -1,3 +1,19 @@
++2026-10-26  Nicolas Boulenguez  <nicolas@debian.org>
++
++	PR ada/114065
++	* s-oscons-tmplt.c (SIZEOF_tv_nsec): Adjust for Glibc platforms.
++
++2026-10-26  Nicolas Boulenguez  <nicolas@debian.org>
++
++	PR ada/114065
++	* libgnat/g-sothco.ads (Immediat): Use aggregate initial value.
++	* libgnat/s-c_time.ads (Milliseconds_To_Timeval): Remove comment.
++
++2026-10-26  Nicolas Boulenguez  <nicolas@debian.org>
++
++	PR ada/114065
++	* gcc-interface/Makefile.in (cal.o): Remove.
++
+ 2026-10-22  Eric Botcazou  <ebotcazou@adacore.com>
+ 
+ 	PR ada/128044
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index 2387534f1656..1b67fdd3a03f 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,21 @@
++2026-10-26  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2026-10-24  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/128067
++	* module.cc (load_needed): Prevent scanning of empty name for
++	prefix "__".
++
++2026-10-26  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2026-10-19  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/127881
++	* trans-expr.cc (conv_scalar_char_value): Fix passing of the case of
++	non-constant strings: always pass first first character by value.
++
+ 2026-10-25  Thomas Koenig  <tkoenig@gcc.gnu.org>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 0be16509bdc4..ec42b2db1918 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,12 @@
++2026-10-26  Harald Anlauf  <anlauf@gmx.de>
++
++	Backported from master:
++	2026-10-19  Harald Anlauf  <anlauf@gmx.de>
++
++	PR fortran/127881
++	* gfortran.dg/bind_c_char_value.f90: New test.
++	* gfortran.dg/bind_c_char_value_aux.c: New test.
++
+ 2026-10-25  Thomas Koenig  <tkoenig@gcc.gnu.org>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index baea39b971e4..92db65e9cd94 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,16 @@
++2026-10-26  Tomasz Kamiński  <tkaminsk@redhat.com>
++
++	* include/std/mdspan (layout_stride::mapping::_M_check_unique):
++	Define.
++	(layout_stride::mapping(const extents_type&, span<....>)):
++	Add __glibcxx_assert on _M_check_unique.
++	* testsuite/23_containers/mdspan/layouts/stride_neg.cc:
++	Test for the new added assertions.
++	* testsuite/23_containers/mdspan/layouts/stride_debug_neg.cc:
++	New test covering cases detected only in debug mode.
++	(cherry picked from commits 1a4d8dc0d2dc045bbb93654ae66fb80276dc6690)
++	(0b3c5e87f6c5a93076227883fa2f882a4e879e63)
++
+ 2026-10-24  John David Anglin  <danglin@gcc.gnu.org>
+ 
+ 	* config/abi/post/hppa-linux-gnu/baseline_symbols.txt: Update.

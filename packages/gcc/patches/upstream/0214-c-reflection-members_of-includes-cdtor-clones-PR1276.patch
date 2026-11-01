@@ -1,0 +1,106 @@
+From 0eb7cf727763327fb19a0d4bdaf34ba4f7619484 Mon Sep 17 00:00:00 2001
+From: Marek Polacek <polacek@redhat.com>
+Date: Mon, 28 Sep 2026 16:56:47 -0400
+Subject: [PATCH 214/385] c++/reflection: members_of includes cdtor clones
+ [PR127643]
+
+Given
+
+  struct X {
+    template<class T1, class T2> X(T1, T2); // #1
+  };
+
+our members_of(^^X) included #1 three times: __ct, and then also the two
+clones: __ct_comp and __ct_base.  In class_members_of we have code to skip
+DECL_CLONED_FUNCTION_P, but it doesn't cover templates.  Do so.
+
+	PR c++/127643
+
+gcc/cp/ChangeLog:
+
+	* reflect.cc (class_members_of): Also skip templated clones.
+
+gcc/testsuite/ChangeLog:
+
+	* g++.dg/reflect/members_of18.C: New test.
+
+Reviewed-by: Jakub Jelinek <jakub@redhat.com>
+(cherry picked from commit a6c2657fc6aa507315d4ca81573ebb026fae1142)
+---
+ gcc/cp/reflect.cc                           |  9 ++---
+ gcc/testsuite/g++.dg/reflect/members_of18.C | 40 +++++++++++++++++++++
+ 2 files changed, 45 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/g++.dg/reflect/members_of18.C
+
+diff --git a/gcc/cp/reflect.cc b/gcc/cp/reflect.cc
+index 34189ffc80dc..5c7b86823c22 100644
+--- a/gcc/cp/reflect.cc
++++ b/gcc/cp/reflect.cc
+@@ -7087,16 +7087,17 @@ class_members_of (location_t loc, const constexpr_ctx *ctx, tree r,
+     {
+       tree m = field;
+       if (TREE_CODE (field) == FIELD_DECL && DECL_ARTIFICIAL (field))
+-	continue; /* Ignore bases and the vptr.  */
++	/* Ignore bases and the vptr.  */
++	continue;
++      else if (DECL_CLONED_FUNCTION_P (field))
++	/* Ignore cloned cdtors.  */
++	continue;
+       else if (DECL_SELF_REFERENCE_P (field))
+ 	continue;
+       else if (TREE_CODE (field) == TYPE_DECL)
+ 	m = TREE_TYPE (field);
+       else if (TREE_CODE (field) == FUNCTION_DECL)
+ 	{
+-	  /* Ignore cloned cdtors.  */
+-	  if (DECL_CLONED_FUNCTION_P (field))
+-	    continue;
+ 	  /* Ignore functions with unsatisfied constraints.  */
+ 	  if (!constraints_satisfied_p (field))
+ 	    continue;
+diff --git a/gcc/testsuite/g++.dg/reflect/members_of18.C b/gcc/testsuite/g++.dg/reflect/members_of18.C
+new file mode 100644
+index 000000000000..18e96b28dd88
+--- /dev/null
++++ b/gcc/testsuite/g++.dg/reflect/members_of18.C
+@@ -0,0 +1,40 @@
++// PR c++/127643
++// { dg-do compile { target c++26 } }
++// { dg-additional-options "-freflection" }
++
++#include <meta>
++
++struct X {
++  template<class T1, class T2> X(T1, T2);
++  template<class T1, class T2> void f(T1, T2);
++};
++
++template<typename>
++struct Y {
++  template<class T> Y(T);
++};
++
++static constexpr auto ctx = std::meta::access_context::unchecked();
++
++/* 7 because we expect:
++  template<class T1, class T2> X::X(T1, T2)
++  template<class T1, class T2> void X::f(T1, T2)
++  constexpr X::X(const X&)
++  constexpr X& X::operator=(const X&)
++  constexpr X::X(X&&)
++  constexpr X& X::operator=(X&&)
++  constexpr X::~X()  */
++static_assert (members_of (^^X, ctx).size () == 7);
++
++consteval auto
++count_ctor_templates (std::meta::info r)
++{
++  int n = 0;
++  for (auto m : members_of (r, ctx))
++    if (is_constructor_template (m))
++      ++n;
++  return n;
++}
++
++static_assert (count_ctor_templates (^^X) == 1);
++static_assert (count_ctor_templates (^^Y<int>) == 1);

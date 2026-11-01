@@ -1,0 +1,381 @@
+From edf0b4d6a33e42b2c76cb1cfc5b38707c0de6f32 Mon Sep 17 00:00:00 2001
+From: Vineet Gupta <vineet.gupta@linux.dev>
+Date: Tue, 13 Oct 2026 18:15:49 +0530
+Subject: [PATCH 372/385] forwprop: Only pass the value at zero to .CLZ/.CTZ if
+ the target defines it [PR127853]
+
+On x86 without BMI, fwprop (simplify_count_zeroes) can build a .CTZ,
+claiming ctx(0) = 32, although target specifies ctz(0) is undefined
+and the instruction it emits leaves zero undefined (or destination
+unchanged on AMD). A later match.pd (cond (ne x 0) (IFN_C?Z x C) C)
+can fold that 32 with user's "x ? clz (x) : 32" giving undefined
+result for the 0 input.
+
+Follow the convention documented in fold_builtin_bit_query and only pass
+the second argument when the macro returns 2; the existing COND_EXPR
+already supplies the table's value for zero.
+
+Bootstrapped and regression tested on x86_64-linux-gnu and aarch64-linux-gnu
+(Full disclosure: the testing was with combined fixes for 3 other PRs).
+
+	PR tree-optimization/127853
+
+gcc/ChangeLog:
+
+	* tree-ssa-forwprop.cc (simplify_count_zeroes): Only pass the
+	value at zero to .CLZ/.CTZ when the target defines it.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.dg/torture/clz-table-zero-1.c: New test.
+	* gcc.dg/torture/ctz-table-zero-1.c: New test.
+	* gcc.target/aarch64/clz-ctz-table-zero.c: New test.
+	* gcc.target/i386/clz-ctz-table-nonzero.c: New test.
+	* gcc.target/i386/clz-ctz-table-zero.c: New test.
+
+Signed-off-by: Vineet Gupta <vineet.gupta@linux.dev>
+---
+ .../gcc.dg/torture/clz-table-zero-1.c         | 55 ++++++++++++++
+ .../gcc.dg/torture/ctz-table-zero-1.c         | 42 +++++++++++
+ .../gcc.target/aarch64/clz-ctz-table-zero.c   | 68 +++++++++++++++++
+ .../gcc.target/i386/clz-ctz-table-nonzero.c   | 47 ++++++++++++
+ .../gcc.target/i386/clz-ctz-table-zero.c      | 74 +++++++++++++++++++
+ gcc/tree-ssa-forwprop.cc                      |  4 +-
+ 6 files changed, 289 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/clz-table-zero-1.c
+ create mode 100644 gcc/testsuite/gcc.dg/torture/ctz-table-zero-1.c
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/clz-ctz-table-zero.c
+ create mode 100644 gcc/testsuite/gcc.target/i386/clz-ctz-table-nonzero.c
+ create mode 100644 gcc/testsuite/gcc.target/i386/clz-ctz-table-zero.c
+
+diff --git a/gcc/testsuite/gcc.dg/torture/clz-table-zero-1.c b/gcc/testsuite/gcc.dg/torture/clz-table-zero-1.c
+new file mode 100644
+index 000000000000..04c17ede848d
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/clz-table-zero-1.c
+@@ -0,0 +1,55 @@
++/* { dg-do run } */
++/* { dg-require-effective-target int32plus } */
++
++/* Table-based count-leading-zeros (the zstd De Bruijn fallback) guarded
++   against zero by the caller.  forwprop turned the lookup into a call with
++   an explicit value at zero even when the target does not define one, and
++   the guard was then folded away.  */
++
++static const unsigned T[32] = {
++  0, 9, 1, 10, 13, 21, 2, 29, 11, 14, 16, 18, 22, 25, 3, 30,
++  8, 12, 20, 28, 15, 17, 24, 7, 19, 27, 23, 6, 26, 5, 4, 31
++};
++
++static inline unsigned
++clz_fb (unsigned v)
++{
++  v |= v >> 1;
++  v |= v >> 2;
++  v |= v >> 4;
++  v |= v >> 8;
++  v |= v >> 16;
++  return 31 - T[(v * 0x07C4ACDDU) >> 27];
++}
++
++__attribute__((noipa)) unsigned
++f (unsigned v)
++{
++  return v ? clz_fb (v) : 32;
++}
++
++__attribute__((noipa)) unsigned
++g (unsigned v)
++{
++  unsigned x = v;
++  x |= x >> 1;
++  x |= x >> 2;
++  x |= x >> 4;
++  x |= x >> 8;
++  x |= x >> 16;
++  unsigned r = 31 - T[(x * 0x07C4ACDDU) >> 27];
++  return v ? r : 32;
++}
++
++int
++main ()
++{
++  if (__SIZEOF_INT__ * __CHAR_BIT__ != 32)
++    return 0;
++  if (f (0) != 32 || g (0) != 32)
++    __builtin_abort ();
++  for (int i = 0; i < 32; i++)
++    if (f (1U << i) != 31 - i || g (1U << i) != 31 - i)
++      __builtin_abort ();
++  return 0;
++}
+diff --git a/gcc/testsuite/gcc.dg/torture/ctz-table-zero-1.c b/gcc/testsuite/gcc.dg/torture/ctz-table-zero-1.c
+new file mode 100644
+index 000000000000..c3cbf6abe5bf
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/ctz-table-zero-1.c
+@@ -0,0 +1,42 @@
++/* { dg-do run } */
++/* { dg-require-effective-target int32plus } */
++
++/* Table-based count-trailing-zeros guarded against zero.  Same problem as
++   clz-table-zero-1.c for CTZ.  */
++
++static const unsigned char T[32] = {
++  0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
++  31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
++};
++
++static inline unsigned
++ctz_fb (unsigned v)
++{
++  return T[((v & -v) * 0x077CB531U) >> 27];
++}
++
++__attribute__((noipa)) unsigned
++f (unsigned v)
++{
++  return v ? ctz_fb (v) : 32;
++}
++
++__attribute__((noipa)) unsigned
++g (unsigned v)
++{
++  unsigned r = T[((v & -v) * 0x077CB531U) >> 27];
++  return v ? r : 32;
++}
++
++int
++main ()
++{
++  if (__SIZEOF_INT__ * __CHAR_BIT__ != 32)
++    return 0;
++  if (f (0) != 32 || g (0) != 32)
++    __builtin_abort ();
++  for (int i = 0; i < 32; i++)
++    if (f (1U << i) != i || g (1U << i) != i)
++      __builtin_abort ();
++  return 0;
++}
+diff --git a/gcc/testsuite/gcc.target/aarch64/clz-ctz-table-zero.c b/gcc/testsuite/gcc.target/aarch64/clz-ctz-table-zero.c
+new file mode 100644
+index 000000000000..f83d7e231b81
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/clz-ctz-table-zero.c
+@@ -0,0 +1,68 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -fdump-tree-forwprop1" } */
++/* { dg-final { check-function-bodies "**" "" "" } } */
++
++/* AArch64 defines the value of CLZ and CTZ at zero, so the table lookups
++   should still become calls that carry it, and a guard against zero that
++   yields that same value should fold away.  */
++
++static const unsigned TC[32] = {
++  0, 9, 1, 10, 13, 21, 2, 29, 11, 14, 16, 18, 22, 25, 3, 30,
++  8, 12, 20, 28, 15, 17, 24, 7, 19, 27, 23, 6, 26, 5, 4, 31
++};
++
++static const unsigned char TT[32] = {
++  0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
++  31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
++};
++
++unsigned
++clz_fb (unsigned v)
++{
++  v |= v >> 1;
++  v |= v >> 2;
++  v |= v >> 4;
++  v |= v >> 8;
++  v |= v >> 16;
++  return 31 - TC[(v * 0x07C4ACDDU) >> 27];
++}
++
++unsigned
++ctz_fb (unsigned v)
++{
++  return TT[((v & -v) * 0x077CB531U) >> 27];
++}
++
++/*
++** clz_g:
++**	clz	w0, w0
++**	ret
++*/
++
++unsigned
++clz_g (unsigned v)
++{
++  return v ? clz_fb (v) : 32;
++}
++
++/*
++** ctz_g:
++** (
++**	rbit	w0, w0
++**	clz	w0, w0
++** |
++**	ctz	w0, w0
++** )
++**	ret
++*/
++
++unsigned
++ctz_g (unsigned v)
++{
++  return v ? ctz_fb (v) : 32;
++}
++
++/* { dg-final { scan-tree-dump-times "\\.CLZ \\(" 2 "forwprop1" } } */
++/* { dg-final { scan-tree-dump-times "\\.CTZ \\(" 2 "forwprop1" } } */
++/* { dg-final { scan-tree-dump-times "\\.CLZ \\(\[^\\n,\]*, 32\\)" 2 "forwprop1" } } */
++/* { dg-final { scan-tree-dump-times "\\.CTZ \\(\[^\\n,\]*, 32\\)" 2 "forwprop1" } } */
+diff --git a/gcc/testsuite/gcc.target/i386/clz-ctz-table-nonzero.c b/gcc/testsuite/gcc.target/i386/clz-ctz-table-nonzero.c
+new file mode 100644
+index 000000000000..2bfdc580eb24
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/clz-ctz-table-nonzero.c
+@@ -0,0 +1,47 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -mbmi -mlzcnt -fdump-tree-forwprop1 -fdump-tree-optimized" } */
++
++/* With BMI and LZCNT the value of CTZ and CLZ at zero is defined, but here
++   the table lookups are only reached for a non-zero input.  The calls must
++   not carry a value at zero then: it would be 0 rather than the target's
++   value, and once the guard is folded away the call would claim the wrong
++   result for zero.  */
++
++static const unsigned TC[32] = {
++  0, 9, 1, 10, 13, 21, 2, 29, 11, 14, 16, 18, 22, 25, 3, 30,
++  8, 12, 20, 28, 15, 17, 24, 7, 19, 27, 23, 6, 26, 5, 4, 31
++};
++
++static const unsigned char TT[32] = {
++  0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
++  31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
++};
++
++unsigned
++clz_nz (unsigned v)
++{
++  if (v)
++    {
++      unsigned x = v;
++      x |= x >> 1;
++      x |= x >> 2;
++      x |= x >> 4;
++      x |= x >> 8;
++      x |= x >> 16;
++      return 31 - TC[(x * 0x07C4ACDDU) >> 27];
++    }
++  return 0;
++}
++
++unsigned
++ctz_nz (unsigned v)
++{
++  if (v)
++    return TT[((v & -v) * 0x077CB531U) >> 27];
++  return 0;
++}
++
++/* { dg-final { scan-tree-dump-times "\\.CLZ \\(" 1 "forwprop1" } } */
++/* { dg-final { scan-tree-dump-times "\\.CTZ \\(" 1 "forwprop1" } } */
++/* { dg-final { scan-tree-dump-not "\\.C\[LT\]Z \\(\[^\\n,\]*, " "forwprop1" } } */
++/* { dg-final { scan-tree-dump-not "\\.C\[LT\]Z \\(\[^\\n,\]*, " "optimized" } } */
+diff --git a/gcc/testsuite/gcc.target/i386/clz-ctz-table-zero.c b/gcc/testsuite/gcc.target/i386/clz-ctz-table-zero.c
+new file mode 100644
+index 000000000000..00ae3de51193
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/i386/clz-ctz-table-zero.c
+@@ -0,0 +1,74 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -mno-lzcnt -mno-bmi -fdump-tree-forwprop1 -fdump-tree-optimized" } */
++
++/* Without LZCNT and BMI the value of CLZ and CTZ at zero is not defined
++   on x86, so the table lookups must not become calls that carry a value
++   at zero, and a caller's guard against zero must survive.  A runtime
++   test can't check the CTZ case reliably: at -O1 and above it expands to
++   rep bsf, which BMI1 hardware executes as tzcnt, returning 32 for zero
++   even without the guard.  */
++
++static const unsigned TC[32] = {
++  0, 9, 1, 10, 13, 21, 2, 29, 11, 14, 16, 18, 22, 25, 3, 30,
++  8, 12, 20, 28, 15, 17, 24, 7, 19, 27, 23, 6, 26, 5, 4, 31
++};
++
++static const unsigned char TT[32] = {
++  0, 1, 28, 2, 29, 14, 24, 3, 30, 22, 20, 15, 25, 17, 4, 8,
++  31, 27, 13, 23, 21, 19, 16, 7, 26, 12, 18, 6, 11, 5, 10, 9
++};
++
++unsigned
++clz_fb (unsigned v)
++{
++  v |= v >> 1;
++  v |= v >> 2;
++  v |= v >> 4;
++  v |= v >> 8;
++  v |= v >> 16;
++  return 31 - TC[(v * 0x07C4ACDDU) >> 27];
++}
++
++unsigned
++ctz_fb (unsigned v)
++{
++  return TT[((v & -v) * 0x077CB531U) >> 27];
++}
++
++unsigned
++clz_guard (unsigned v)
++{
++  return v ? clz_fb (v) : 32;
++}
++
++unsigned
++ctz_guard (unsigned v)
++{
++  return v ? ctz_fb (v) : 32;
++}
++
++unsigned
++clz_sel (unsigned v)
++{
++  unsigned x = v;
++  x |= x >> 1;
++  x |= x >> 2;
++  x |= x >> 4;
++  x |= x >> 8;
++  x |= x >> 16;
++  unsigned r = 31 - TC[(x * 0x07C4ACDDU) >> 27];
++  return v ? r : 32;
++}
++
++unsigned
++ctz_sel (unsigned v)
++{
++  unsigned r = TT[((v & -v) * 0x077CB531U) >> 27];
++  return v ? r : 32;
++}
++
++/* { dg-final { scan-tree-dump-times "\\.CLZ \\(" 3 "forwprop1" } } */
++/* { dg-final { scan-tree-dump-times "\\.CTZ \\(" 3 "forwprop1" } } */
++/* { dg-final { scan-tree-dump-not "\\.C\[LT\]Z \\(\[^\\n,\]*, " "forwprop1" } } */
++/* { dg-final { scan-tree-dump-not "\\.C\[LT\]Z \\(\[^\\n,\]*, " "optimized" } } */
++/* { dg-final { scan-tree-dump-times "PHI <32\\(" 4 "optimized" } } */
+diff --git a/gcc/tree-ssa-forwprop.cc b/gcc/tree-ssa-forwprop.cc
+index 97b35e926af4..dadffe32c085 100644
+--- a/gcc/tree-ssa-forwprop.cc
++++ b/gcc/tree-ssa-forwprop.cc
+@@ -3490,7 +3490,9 @@ simplify_count_zeroes (gimple_stmt_iterator *gsi)
+ 					   ctz_val) == 2;
+       zero_val = input_bits - 1 - zero_val;
+     }
+-  int nargs = 2;
++  /* Pass the value at zero only if the target defines it; otherwise the
++     COND_EXPR below supplies the result for zero.  */
++  int nargs = zero_ok ? 2 : 1;
+ 
+   /* If the input value can't be zero, don't special case ctz (0).  */
+   range_query *q = get_range_query (cfun);

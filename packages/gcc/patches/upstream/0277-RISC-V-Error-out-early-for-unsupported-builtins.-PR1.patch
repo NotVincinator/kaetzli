@@ -1,0 +1,598 @@
+From edec216117d563c244ebedd2e565fa286b9ab94b Mon Sep 17 00:00:00 2001
+From: Robin Dapp <robin.dapp@oss.qualcomm.com>
+Date: Tue, 22 Sep 2026 14:18:45 +0200
+Subject: [PATCH 277/385] RISC-V: Error out early for unsupported builtins.
+ [PR127553]
+
+Right now we only show an error if the expansion of a builtin fails.
+But there is builtin code that get optimized away before expansion and
+never shows an error message.  It's not strictly wrong code but at least
+surprising and will mislead compilation checks.
+
+This patch just copies the checks of expand_builtin to
+check_builtin_call.  We don't have the exact same expression of the
+affected call available at that point, though.  The basic fndecl just
+contains the function name and not its arguments.  We can reconstruct
+the call but in my tests there were always slight difference to the
+expand-time diagnostic.  Therefore I adjusted the test expectations
+instead.
+
+	PR target/127553
+
+gcc/ChangeLog:
+
+	* config/riscv/riscv-vector-builtins.cc (validate_instance_type_required_extensions):
+	Add location param for logging.
+	(expand_builtin): Pass location.
+	(check_builtin_call): Likewise.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/riscv/rvv/base/bug-9.c: Adjust test expectation.
+	* gcc.target/riscv/rvv/base/intrinsic_required_ext-1.c: Ditto.
+	* gcc.target/riscv/rvv/base/intrinsic_required_ext-10.c: Ditto.
+	* gcc.target/riscv/rvv/base/intrinsic_required_ext-2.c: Ditto.
+	* gcc.target/riscv/rvv/base/intrinsic_required_ext-3.c: Ditto.
+	* gcc.target/riscv/rvv/base/intrinsic_required_ext-4.c: Ditto.
+	* gcc.target/riscv/rvv/base/intrinsic_required_ext-5.c: Ditto.
+	* gcc.target/riscv/rvv/base/intrinsic_required_ext-6.c: Ditto.
+	* gcc.target/riscv/rvv/base/intrinsic_required_ext-7.c: Ditto.
+	* gcc.target/riscv/rvv/base/intrinsic_required_ext-8.c: Ditto.
+	* gcc.target/riscv/rvv/base/intrinsic_required_ext-9.c: Ditto.
+	* gcc.target/riscv/rvv/base/pr114988-1.c: Ditto.
+	* gcc.target/riscv/rvv/base/pr114988-2.c: Ditto.
+	* gcc.target/riscv/rvv/base/pr120436.c: Ditto.
+	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-17.c:
+	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-18.c:
+	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-19.c:
+	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-20.c:
+	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-21.c:
+	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-22.c:
+	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-23.c:
+	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-24.c:
+	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-25.c:
+	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-26.c:
+	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-27.c:
+	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-28.c:
+	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-29.c:
+	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-3.c:
+	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-7.c:
+	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-8.c:
+	* gcc.target/riscv/pr127553.c: New test.
+
+(cherry picked from commit 2b980c3e11a6b6ef0223d1668672bac877038185)
+---
+ gcc/config/riscv/riscv-vector-builtins.cc     | 46 +++++++++++++------
+ gcc/testsuite/gcc.target/riscv/pr127553.c     | 13 ++++++
+ .../gcc.target/riscv/rvv/base/bug-9.c         |  2 +-
+ .../riscv/rvv/base/intrinsic_required_ext-1.c |  2 +-
+ .../rvv/base/intrinsic_required_ext-10.c      |  2 +-
+ .../riscv/rvv/base/intrinsic_required_ext-2.c |  2 +-
+ .../riscv/rvv/base/intrinsic_required_ext-3.c |  2 +-
+ .../riscv/rvv/base/intrinsic_required_ext-4.c |  2 +-
+ .../riscv/rvv/base/intrinsic_required_ext-5.c |  2 +-
+ .../riscv/rvv/base/intrinsic_required_ext-6.c |  2 +-
+ .../riscv/rvv/base/intrinsic_required_ext-7.c |  2 +-
+ .../riscv/rvv/base/intrinsic_required_ext-8.c |  2 +-
+ .../riscv/rvv/base/intrinsic_required_ext-9.c |  2 +-
+ .../gcc.target/riscv/rvv/base/pr114988-1.c    |  2 +-
+ .../gcc.target/riscv/rvv/base/pr114988-2.c    |  2 +-
+ .../gcc.target/riscv/rvv/base/pr120436.c      |  6 +--
+ .../target_attribute_v_with_intrinsic-17.c    |  2 +-
+ .../target_attribute_v_with_intrinsic-18.c    |  2 +-
+ .../target_attribute_v_with_intrinsic-19.c    |  2 +-
+ .../target_attribute_v_with_intrinsic-20.c    |  2 +-
+ .../target_attribute_v_with_intrinsic-21.c    |  2 +-
+ .../target_attribute_v_with_intrinsic-22.c    |  2 +-
+ .../target_attribute_v_with_intrinsic-23.c    |  2 +-
+ .../target_attribute_v_with_intrinsic-24.c    |  2 +-
+ .../target_attribute_v_with_intrinsic-25.c    |  2 +-
+ .../target_attribute_v_with_intrinsic-26.c    |  2 +-
+ .../target_attribute_v_with_intrinsic-27.c    |  2 +-
+ .../target_attribute_v_with_intrinsic-28.c    |  2 +-
+ .../target_attribute_v_with_intrinsic-29.c    |  2 +-
+ .../target_attribute_v_with_intrinsic-3.c     |  2 +-
+ .../target_attribute_v_with_intrinsic-7.c     |  2 +-
+ .../target_attribute_v_with_intrinsic-8.c     |  2 +-
+ 32 files changed, 78 insertions(+), 45 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/riscv/pr127553.c
+
+diff --git a/gcc/config/riscv/riscv-vector-builtins.cc b/gcc/config/riscv/riscv-vector-builtins.cc
+index b3bce40e5bf3..ef9d84cd8d35 100644
+--- a/gcc/config/riscv/riscv-vector-builtins.cc
++++ b/gcc/config/riscv/riscv-vector-builtins.cc
+@@ -5652,56 +5652,56 @@ gimple_fold_builtin (unsigned int code, gimple_stmt_iterator *gsi, gcall *stmt)
+ 
+ static bool
+ validate_instance_type_required_extensions (const rvv_type_info type,
+-					    tree exp)
++					    location_t location, tree fndecl)
+ {
+   uint64_t exts = type.required_extensions;
+ 
+   if ((exts & RVV_REQUIRE_ELEN_BF_16)
+       && !TARGET_VECTOR_ELEN_BF_16_P (riscv_vector_elen_flags))
+     {
+-      error_at (EXPR_LOCATION (exp),
++      error_at (location,
+ 		"built-in function %qE requires the "
+ 		"zvfbfmin or zvfbfwma ISA extension",
+-		exp);
++		fndecl);
+       return false;
+     }
+ 
+   if ((exts & RVV_REQUIRE_ELEN_FP_16)
+     && !TARGET_VECTOR_ELEN_FP_16_P (riscv_vector_elen_flags))
+     {
+-      error_at (EXPR_LOCATION (exp),
++      error_at (location,
+ 		"built-in function %qE requires the "
+ 		"zvfhmin or zvfh ISA extension",
+-		exp);
++		fndecl);
+       return false;
+     }
+ 
+   if ((exts & RVV_REQUIRE_ELEN_FP_32)
+     && !TARGET_VECTOR_ELEN_FP_32_P (riscv_vector_elen_flags))
+     {
+-      error_at (EXPR_LOCATION (exp),
++      error_at (location,
+ 		"built-in function %qE requires the "
+ 		"zve32f, zve64f, zve64d or v ISA extension",
+-		exp);
++		fndecl);
+       return false;
+     }
+ 
+   if ((exts & RVV_REQUIRE_ELEN_FP_64)
+     && !TARGET_VECTOR_ELEN_FP_64_P (riscv_vector_elen_flags))
+     {
+-      error_at (EXPR_LOCATION (exp),
++      error_at (location,
+ 		"built-in function %qE requires the zve64d or v ISA extension",
+-		exp);
++		fndecl);
+       return false;
+     }
+ 
+   if ((exts & RVV_REQUIRE_ELEN_64)
+     && !TARGET_VECTOR_ELEN_64_P (riscv_vector_elen_flags))
+     {
+-      error_at (EXPR_LOCATION (exp),
++      error_at (location,
+ 		"built-in function %qE requires the "
+ 		"zve64x, zve64f, zve64d or v ISA extension",
+-		exp);
++		fndecl);
+       return false;
+     }
+ 
+@@ -5725,12 +5725,14 @@ expand_builtin (unsigned int code, tree exp, rtx target)
+     {
+       error_at (EXPR_LOCATION (exp),
+ 		"built-in function %qE requires the %qs ISA extension",
+-		exp,
++		rfn->decl,
+ 		required_ext_to_isa_name (rfn->required));
+       return target;
+     }
+ 
+-  if (!validate_instance_type_required_extensions (rfn->instance.type, exp))
++  if (!validate_instance_type_required_extensions (rfn->instance.type,
++						   EXPR_LOCATION (exp),
++						   rfn->decl))
+     return target;
+ 
+   return function_expander (rfn->instance, rfn->decl, exp, target).expand ();
+@@ -5750,6 +5752,24 @@ check_builtin_call (location_t location, vec<location_t>, unsigned int code,
+   registered_function *rfn = lookup_registered_function (code);
+   if (!rfn)
+     return false;
++
++  /* Only check resolved functions.  */
++  if (!rfn->overloaded_p)
++    {
++      if (!required_extensions_specified (rfn->required))
++	{
++	  error_at (location,
++		    "built-in function %qE requires the %qs ISA extension",
++		    fndecl,
++		    required_ext_to_isa_name (rfn->required));
++	  return false;
++	}
++
++      if (!validate_instance_type_required_extensions (rfn->instance.type,
++						       location, fndecl))
++	return false;
++    }
++
+   return function_checker (location, rfn->instance, fndecl,
+ 			   TREE_TYPE (rfn->decl), nargs, args).check ();
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/pr127553.c b/gcc/testsuite/gcc.target/riscv/pr127553.c
+new file mode 100644
+index 000000000000..9747c20ec942
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/riscv/pr127553.c
+@@ -0,0 +1,13 @@
++/* { dg-do compile } */
++/* { dg-options "-O1 -march=rv64gc" } */
++
++#include <riscv_vector.h>
++#include <stdint.h>
++#include <stddef.h>
++
++int main() {
++    uint8_t val = 3, dup[8];
++    size_t vl = __riscv_vsetvl_e8m1(8); /* { dg-error "built-in function '__riscv_vsetvl_e8m1' requires the 'v' ISA extension" } */
++    vuint8m1_t v = __riscv_vmv_v_x_u8m1(val, vl); /* { dg-error "built-in function '__riscv_vmv_v_x_u8m1' requires the 'v' ISA extension" } */
++    return 0;
++}
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/bug-9.c b/gcc/testsuite/gcc.target/riscv/rvv/base/bug-9.c
+index f7c9ad10ccba..b3d270109666 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/bug-9.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/bug-9.c
+@@ -7,7 +7,7 @@
+ 
+ vfloat16m1_t f0 (vfloat16m1_t vs2, vfloat16m1_t vs1, size_t vl)
+ {
+-  return __riscv_vfadd_vv_f16m1_rm (vs2, vs1, 0, vl); 
++  return __riscv_vfadd_vv_f16m1_rm (vs2, vs1, 0, vl); /* { dg-error "built-in function '__riscv_vfadd_vv_f16m1_rm' requires the zvfhmin or zvfh ISA extension" } */
+ }
+ 
+ /* { dg-error "return type 'vfloat16m1_t' requires the zvfhmin or zvfh ISA extension" "" { target { "riscv*-*-*" } } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-1.c b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-1.c
+index 143a3d66016c..7958d4f1f76d 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-1.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-1.c
+@@ -6,5 +6,5 @@
+ size_t
+ test_3 (size_t vl)
+ {
+-  return __riscv_vsetvl_e8m4 (vl); /* { dg-error {built-in function '__riscv_vsetvl_e8m4\(vl\)' requires the 'v' ISA extension} } */
++  return __riscv_vsetvl_e8m4 (vl); /* { dg-error {built-in function '__riscv_vsetvl_e8m4' requires the 'v' ISA extension} } */
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-10.c b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-10.c
+index b0a9851d4c77..b5d163af1a81 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-10.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-10.c
+@@ -7,5 +7,5 @@ vuint32m1_t
+ __attribute__((target("arch=+v")))
+ test_1 (vuint32m1_t op_1, vuint32m1_t op_2, size_t vl)
+ {
+-  return __riscv_vsm3me_vv_u32m1 (op_1, op_2, vl); /* { dg-error {built-in function '__riscv_vsm3me_vv_u32m1\(op_1,  op_2,  vl\)' requires the 'zvksh' ISA extension} } */
++  return __riscv_vsm3me_vv_u32m1 (op_1, op_2, vl); /* { dg-error {built-in function '__riscv_vsm3me_vv_u32m1' requires the 'zvksh' ISA extension} } */
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-2.c b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-2.c
+index 20ab9775a1e6..82ae95d8410b 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-2.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-2.c
+@@ -7,5 +7,5 @@ vuint32m1_t
+ __attribute__((target("arch=+v")))
+ test_1 (vuint32m1_t op_1, vuint32m1_t op_2, size_t vl)
+ {
+-  return __riscv_vandn_vv_u32m1 (op_1, op_2, vl); /* { dg-error {built-in function '__riscv_vandn_vv_u32m1\(op_1,  op_2,  vl\)' requires the 'zvbb or zvkb' ISA extension} } */
++  return __riscv_vandn_vv_u32m1 (op_1, op_2, vl); /* { dg-error {built-in function '__riscv_vandn_vv_u32m1' requires the 'zvbb or zvkb' ISA extension} } */
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-3.c b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-3.c
+index 9b7d37f5b333..2128c543ee54 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-3.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-3.c
+@@ -7,5 +7,5 @@ vuint32m1_t
+ __attribute__((target("arch=+v")))
+ test_1 (vuint32m1_t op_1, size_t vl)
+ {
+-  return __riscv_vclz_v_u32m1 (op_1, vl); /* { dg-error {built-in function '__riscv_vclz_v_u32m1\(op_1,  vl\)' requires the 'zvbb' ISA extension} } */
++  return __riscv_vclz_v_u32m1 (op_1, vl); /* { dg-error {built-in function '__riscv_vclz_v_u32m1' requires the 'zvbb' ISA extension} } */
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-4.c b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-4.c
+index fdaab62b17d7..3110e278edbf 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-4.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-4.c
+@@ -7,5 +7,5 @@ vuint64m1_t
+ __attribute__((target("arch=+v")))
+ test_1 (vuint64m1_t op_1, vuint64m1_t op_2, size_t vl)
+ {
+-  return __riscv_vclmul_vv_u64m1 (op_1, op_2, vl); /* { dg-error {built-in function '__riscv_vclmul_vv_u64m1\(op_1,  op_2,  vl\)' requires the 'zvbc' ISA extension} } */
++  return __riscv_vclmul_vv_u64m1 (op_1, op_2, vl); /* { dg-error {built-in function '__riscv_vclmul_vv_u64m1' requires the 'zvbc' ISA extension} } */
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-5.c b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-5.c
+index 6a4bb431f4a0..77525ce86738 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-5.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-5.c
+@@ -7,5 +7,5 @@ vuint32m1_t
+ __attribute__((target("arch=+v")))
+ test_1 (vuint32m1_t dest, vuint32m1_t op_1, vuint32m1_t op_2, size_t vl)
+ {
+-  return __riscv_vghsh_vv_u32m1 (dest, op_1, op_2, vl); /* { dg-error {built-in function '__riscv_vghsh_vv_u32m1\(dest,  op_1,  op_2,  vl\)' requires the 'zvkg' ISA extension} } */
++  return __riscv_vghsh_vv_u32m1 (dest, op_1, op_2, vl); /* { dg-error {built-in function '__riscv_vghsh_vv_u32m1' requires the 'zvkg' ISA extension} } */
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-6.c b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-6.c
+index 943a2cf653be..6df436ad616a 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-6.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-6.c
+@@ -7,5 +7,5 @@ vuint32m1_t
+ __attribute__((target("arch=+v")))
+ test_1 (vuint32m1_t dest, vuint32mf2_t op_1, size_t vl)
+ {
+-  return __riscv_vaesef_vs_u32mf2_u32m1 (dest, op_1, vl); /* { dg-error {built-in function '__riscv_vaesef_vs_u32mf2_u32m1\(dest,  op_1,  vl\)' requires the 'zvkned' ISA extension} } */
++  return __riscv_vaesef_vs_u32mf2_u32m1 (dest, op_1, vl); /* { dg-error {built-in function '__riscv_vaesef_vs_u32mf2_u32m1' requires the 'zvkned' ISA extension} } */
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-7.c b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-7.c
+index c2ccb739f6ed..d5d65fe6a602 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-7.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-7.c
+@@ -7,5 +7,5 @@ vuint32m1_t
+ __attribute__((target("arch=+v")))
+ test_1 (vuint32m1_t dest, vuint32m1_t op_1, vuint32m1_t op_2, size_t vl)
+ {
+-  return __riscv_vsha2ms_vv_u32m1 (dest, op_1, op_2, vl); /* { dg-error {built-in function '__riscv_vsha2ms_vv_u32m1\(dest,  op_1,  op_2,  vl\)' requires the 'zvknha or zvknhb' ISA extension} } */
++  return __riscv_vsha2ms_vv_u32m1 (dest, op_1, op_2, vl); /* { dg-error {built-in function '__riscv_vsha2ms_vv_u32m1' requires the 'zvknha or zvknhb' ISA extension} } */
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-8.c b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-8.c
+index e4312cc0530a..1a026e2f7a2a 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-8.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-8.c
+@@ -7,5 +7,5 @@ vuint64m1_t
+ __attribute__((target("arch=+v")))
+ test_1 (vuint64m1_t dest, vuint64m1_t op_1, vuint64m1_t op_2, size_t vl)
+ {
+-  return __riscv_vsha2ms_vv_u64m1 (dest, op_1, op_2, vl); /* { dg-error {built-in function '__riscv_vsha2ms_vv_u64m1\(dest,  op_1,  op_2,  vl\)' requires the 'zvknhb' ISA extension} } */
++  return __riscv_vsha2ms_vv_u64m1 (dest, op_1, op_2, vl); /* { dg-error {built-in function '__riscv_vsha2ms_vv_u64m1' requires the 'zvknhb' ISA extension} } */
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-9.c b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-9.c
+index 442d49170539..ea35b3d7e450 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-9.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/intrinsic_required_ext-9.c
+@@ -7,5 +7,5 @@ vuint32m1_t
+ __attribute__((target("arch=+v")))
+ test_1 (vuint32m1_t op_1, size_t vl)
+ {
+-  return __riscv_vsm4k_vi_u32m1 (op_1, 0, vl); /* { dg-error {built-in function '__riscv_vsm4k_vi_u32m1\(op_1, 0,  vl\)' requires the 'zvksed' ISA extension} } */
++  return __riscv_vsm4k_vi_u32m1 (op_1, 0, vl); /* { dg-error {built-in function '__riscv_vsm4k_vi_u32m1' requires the 'zvksed' ISA extension} } */
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/pr114988-1.c b/gcc/testsuite/gcc.target/riscv/rvv/base/pr114988-1.c
+index b8474804c880..b797d5996b70 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/pr114988-1.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/pr114988-1.c
+@@ -5,5 +5,5 @@
+ 
+ vfloat32mf2_t test_vfwsub_wf_f32mf2(vfloat32mf2_t vs2, _Float16 rs1, size_t vl)
+ {
+-  return __riscv_vfwsub_wf_f32mf2(vs2, rs1, vl); /* { dg-error {built-in function '__riscv_vfwsub_wf_f32mf2\(vs2,  rs1,  vl\)' requires the zvfhmin or zvfh ISA extension} } */
++  return __riscv_vfwsub_wf_f32mf2(vs2, rs1, vl); /* { dg-error {built-in function '__riscv_vfwsub_wf_f32mf2' requires the zvfhmin or zvfh ISA extension} } */
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/pr114988-2.c b/gcc/testsuite/gcc.target/riscv/rvv/base/pr114988-2.c
+index 49aa3141af31..7491359c0115 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/pr114988-2.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/pr114988-2.c
+@@ -5,5 +5,5 @@
+ 
+ vfloat32mf2_t test_vfwadd_wf_f32mf2(vfloat32mf2_t vs2, _Float16 rs1, size_t vl)
+ {
+-  return __riscv_vfwadd_wf_f32mf2(vs2, rs1, vl); /* { dg-error {built-in function '__riscv_vfwadd_wf_f32mf2\(vs2,  rs1,  vl\)' requires the zvfhmin or zvfh ISA extension} } */
++  return __riscv_vfwadd_wf_f32mf2(vs2, rs1, vl); /* { dg-error {built-in function '__riscv_vfwadd_wf_f32mf2' requires the zvfhmin or zvfh ISA extension} } */
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/pr120436.c b/gcc/testsuite/gcc.target/riscv/rvv/base/pr120436.c
+index d22091e59490..3ebdf3562df4 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/pr120436.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/pr120436.c
+@@ -8,9 +8,9 @@
+ #include "riscv_vector.h"
+ 
+ void
+-clean_subreg (int32_t *in, int32_t *out, size_t m) /* { dg-error {this operation requires the RVV ISA extension} } */
++clean_subreg (int32_t *in, int32_t *out, size_t m)
+ {
+   vint16m8_t v24, v8, v16;
+-  vint32m8_t result = __riscv_vle32_v_i32m8 (in, 32); /* { dg-error {built-in function '__riscv_vle32_v_i32m8\(in, 32\)' requires the 'v' ISA extension} } */
+-  vint32m1_t v0 = __riscv_vget_v_i32m8_i32m1 (result, 0);
++  vint32m8_t result = __riscv_vle32_v_i32m8 (in, 32); /* { dg-error {built-in function '__riscv_vle32_v_i32m8' requires the 'v' ISA extension} } */
++  vint32m1_t v0 = __riscv_vget_v_i32m8_i32m1 (result, 0); /* { dg-error {built-in function '__riscv_vget_v_i32m8_i32m1' requires the 'v' ISA extension} } */
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-17.c b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-17.c
+index ebe31f5c961b..9c5904cddc62 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-17.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-17.c
+@@ -7,7 +7,7 @@ vint64m1_t
+ __attribute__((target("arch=+zve32x")))
+ test_1 (vint64m1_t a, vint64m1_t b, size_t vl)
+ {
+-  return __riscv_vadd_vv_i64m1 (a, b, vl);
++  return __riscv_vadd_vv_i64m1 (a, b, vl); /* { dg-error "built-in function '__riscv_vadd_vv_i64m1' requires the zve64x, zve64f, zve64d or v ISA extension" } */
+ }
+ 
+ /* { dg-error "return type 'vint64m1_t' requires the zve64x, zve64f, zve64d or v ISA extension" "" { target { "riscv*-*-*" } } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-18.c b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-18.c
+index 7e9a101795dc..abb7e8014c70 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-18.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-18.c
+@@ -7,7 +7,7 @@ vfloat32m1_t
+ __attribute__((target("arch=+zve32x")))
+ test_1 (vfloat32m1_t a, vfloat32m1_t b, size_t vl)
+ {
+-  return __riscv_vfadd_vv_f32m1 (a, b, vl);
++  return __riscv_vfadd_vv_f32m1 (a, b, vl); /* { dg-error "built-in function '__riscv_vfadd_vv_f32m1' requires the zve32f, zve64f, zve64d or v ISA extension" } */
+ }
+ 
+ /* { dg-error "return type 'vfloat32m1_t' requires the zve32f, zve64f, zve64d or v ISA extension" "" { target { "riscv*-*-*" } } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-19.c b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-19.c
+index b5354f4291f9..63b350f5eccd 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-19.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-19.c
+@@ -7,7 +7,7 @@ vfloat16m1_t
+ __attribute__((target("arch=+zve32x")))
+ test_1 (vfloat16m1_t a, vfloat16m1_t b, size_t vl)
+ {
+-  return __riscv_vfadd_vv_f16m1 (a, b, vl);
++  return __riscv_vfadd_vv_f16m1 (a, b, vl); /* { dg-error "built-in function '__riscv_vfadd_vv_f16m1' requires the zvfhmin or zvfh ISA extension" } */
+ }
+ 
+ /* { dg-error "return type 'vfloat16m1_t' requires the zvfhmin or zvfh ISA extension" "" { target { "riscv*-*-*" } } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-20.c b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-20.c
+index c1a574d5e294..a630a02c0294 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-20.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-20.c
+@@ -7,7 +7,7 @@ vfloat64m1_t
+ __attribute__((target("arch=+zve32x")))
+ test_1 (vfloat64m1_t a, vfloat64m1_t b, size_t vl)
+ {
+-  return __riscv_vfadd_vv_f64m1 (a, b, vl);
++  return __riscv_vfadd_vv_f64m1 (a, b, vl); /* { dg-error "built-in function '__riscv_vfadd_vv_f64m1' requires the zve64d or v ISA extension" } */
+ }
+ 
+ /* { dg-error "return type 'vfloat64m1_t' requires the zve64d or v ISA extension" "" { target { "riscv*-*-*" } } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-21.c b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-21.c
+index 62c2815fdad1..a6a39029b396 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-21.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-21.c
+@@ -7,7 +7,7 @@ vint64m1_t
+ __attribute__((target("arch=+zve32f")))
+ test_1 (vint64m1_t a, vint64m1_t b, size_t vl)
+ {
+-  return __riscv_vadd_vv_i64m1 (a, b, vl);
++  return __riscv_vadd_vv_i64m1 (a, b, vl); /* { dg-error "built-in function '__riscv_vadd_vv_i64m1' requires the zve64x, zve64f, zve64d or v ISA extension" } */
+ }
+ 
+ /* { dg-error "return type 'vint64m1_t' requires the zve64x, zve64f, zve64d or v ISA extension" "" { target { "riscv*-*-*" } } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-22.c b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-22.c
+index f0b72e5060b2..bdd80cb731d1 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-22.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-22.c
+@@ -7,7 +7,7 @@ vfloat16m1_t
+ __attribute__((target("arch=+zve32f")))
+ test_1 (vfloat16m1_t a, vfloat16m1_t b, size_t vl)
+ {
+-  return __riscv_vfadd_vv_f16m1 (a, b, vl);
++  return __riscv_vfadd_vv_f16m1 (a, b, vl); /* { dg-error "built-in function '__riscv_vfadd_vv_f16m1' requires the zvfhmin or zvfh ISA extension" } */
+ }
+ 
+ /* { dg-error "return type 'vfloat16m1_t' requires the zvfhmin or zvfh ISA extension" "" { target { "riscv*-*-*" } } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-23.c b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-23.c
+index 9f22a182d4ca..b78f9d792d87 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-23.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-23.c
+@@ -7,7 +7,7 @@ vfloat64m1_t
+ __attribute__((target("arch=+zve32f")))
+ test_1 (vfloat64m1_t a, vfloat64m1_t b, size_t vl)
+ {
+-  return __riscv_vfadd_vv_f64m1 (a, b, vl);
++  return __riscv_vfadd_vv_f64m1 (a, b, vl); /* { dg-error "built-in function '__riscv_vfadd_vv_f64m1' requires the zve64d or v ISA extension" } */
+ }
+ 
+ /* { dg-error "return type 'vfloat64m1_t' requires the zve64d or v ISA extension" "" { target { "riscv*-*-*" } } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-24.c b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-24.c
+index 1006ad4af186..b6209bbd6673 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-24.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-24.c
+@@ -7,7 +7,7 @@ vfloat32m1_t
+ __attribute__((target("arch=+zve64x")))
+ test_1 (vfloat32m1_t a, vfloat32m1_t b, size_t vl)
+ {
+-  return __riscv_vfadd_vv_f32m1 (a, b, vl);
++  return __riscv_vfadd_vv_f32m1 (a, b, vl); /* { dg-error "built-in function '__riscv_vfadd_vv_f32m1' requires the zve32f, zve64f, zve64d or v ISA extension" } */
+ }
+ 
+ /* { dg-error "return type 'vfloat32m1_t' requires the zve32f, zve64f, zve64d or v ISA extension" "" { target { "riscv*-*-*" } } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-25.c b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-25.c
+index de36e4310b02..217bf37626ca 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-25.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-25.c
+@@ -7,7 +7,7 @@ vfloat16m1_t
+ __attribute__((target("arch=+zve64x")))
+ test_1 (vfloat16m1_t a, vfloat16m1_t b, size_t vl)
+ {
+-  return __riscv_vfadd_vv_f16m1 (a, b, vl);
++  return __riscv_vfadd_vv_f16m1 (a, b, vl); /* { dg-error "built-in function '__riscv_vfadd_vv_f16m1' requires the zvfhmin or zvfh ISA extension" } */
+ }
+ 
+ /* { dg-error "return type 'vfloat16m1_t' requires the zvfhmin or zvfh ISA extension" "" { target { "riscv*-*-*" } } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-26.c b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-26.c
+index f87f8c54c8de..39d687143ef7 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-26.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-26.c
+@@ -7,7 +7,7 @@ vfloat64m1_t
+ __attribute__((target("arch=+zve64x")))
+ test_1 (vfloat64m1_t a, vfloat64m1_t b, size_t vl)
+ {
+-  return __riscv_vfadd_vv_f64m1 (a, b, vl);
++  return __riscv_vfadd_vv_f64m1 (a, b, vl); /* { dg-error "built-in function '__riscv_vfadd_vv_f64m1' requires the zve64d or v ISA extension" } */
+ }
+ 
+ /* { dg-error "return type 'vfloat64m1_t' requires the zve64d or v ISA extension" "" { target { "riscv*-*-*" } } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-27.c b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-27.c
+index c5bc8511b677..54bb00505c28 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-27.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-27.c
+@@ -7,7 +7,7 @@ vfloat64m1_t
+ __attribute__((target("arch=+zve64f")))
+ test_1 (vfloat64m1_t a, vfloat64m1_t b, size_t vl)
+ {
+-  return __riscv_vfadd_vv_f64m1 (a, b, vl);
++  return __riscv_vfadd_vv_f64m1 (a, b, vl); /* { dg-error "built-in function '__riscv_vfadd_vv_f64m1' requires the zve64d or v ISA extension" } */
+ }
+ 
+ /* { dg-error "return type 'vfloat64m1_t' requires the zve64d or v ISA extension" "" { target { "riscv*-*-*" } } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-28.c b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-28.c
+index 738d2e627486..5b5bff594a83 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-28.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-28.c
+@@ -7,7 +7,7 @@ vfloat16m1_t
+ __attribute__((target("arch=+zve64f")))
+ test_1 (vfloat16m1_t a, vfloat16m1_t b, size_t vl)
+ {
+-  return __riscv_vfadd_vv_f16m1 (a, b, vl);
++  return __riscv_vfadd_vv_f16m1 (a, b, vl); /* { dg-error "built-in function '__riscv_vfadd_vv_f16m1' requires the zvfhmin or zvfh ISA extension" } */
+ }
+ 
+ /* { dg-error "return type 'vfloat16m1_t' requires the zvfhmin or zvfh ISA extension" "" { target { "riscv*-*-*" } } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-29.c b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-29.c
+index f82ad41cd50e..32233876a2d7 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-29.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-29.c
+@@ -7,7 +7,7 @@ vfloat16m1_t
+ __attribute__((target("arch=+zve64d")))
+ test_1 (vfloat16m1_t a, vfloat16m1_t b, size_t vl)
+ {
+-  return __riscv_vfadd_vv_f16m1 (a, b, vl);
++  return __riscv_vfadd_vv_f16m1 (a, b, vl); /* { dg-error "built-in function '__riscv_vfadd_vv_f16m1' requires the zvfhmin or zvfh ISA extension" } */
+ }
+ 
+ /* { dg-error "return type 'vfloat16m1_t' requires the zvfhmin or zvfh ISA extension" "" { target { "riscv*-*-*" } } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-3.c b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-3.c
+index b9aceb83682f..861d892b69a9 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-3.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-3.c
+@@ -7,7 +7,7 @@ vint32m1_t
+ __attribute__((target("arch=+zbb")))
+ test_1 (vint32m1_t a, vint32m1_t b, size_t vl)
+ {
+-  return __riscv_vadd_vv_i32m1 (a, b, vl);
++  return __riscv_vadd_vv_i32m1 (a, b, vl); /* { dg-error "built-in function '__riscv_vadd_vv_i32m1' requires the 'v' ISA extension" } */
+ }
+ 
+ /* { dg-error "return type 'vint32m1_t' requires the V ISA extension" "" { target { "riscv*-*-*" } } 0 } */
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-7.c b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-7.c
+index d1dd811d14b1..dd212d0fd6b7 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-7.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-7.c
+@@ -5,5 +5,5 @@
+ 
+ size_t test_1 (size_t vl)
+ {
+-  return __riscv_vsetvl_e8m4 (vl); /* { dg-error {built-in function '__riscv_vsetvl_e8m4\(vl\)' requires the 'v' ISA extension} } */
++  return __riscv_vsetvl_e8m4 (vl); /* { dg-error {built-in function '__riscv_vsetvl_e8m4' requires the 'v' ISA extension} } */
+ }
+diff --git a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-8.c b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-8.c
+index 9ff4c238124d..83f040a82a7f 100644
+--- a/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-8.c
++++ b/gcc/testsuite/gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-8.c
+@@ -19,5 +19,5 @@ test_2 ()
+ size_t
+ test_3 (size_t vl)
+ {
+-  return __riscv_vsetvl_e8m4 (vl); /* { dg-error {built-in function '__riscv_vsetvl_e8m4\(vl\)' requires the 'v' ISA extension} } */
++  return __riscv_vsetvl_e8m4 (vl); /* { dg-error {built-in function '__riscv_vsetvl_e8m4' requires the 'v' ISA extension} } */
+ }

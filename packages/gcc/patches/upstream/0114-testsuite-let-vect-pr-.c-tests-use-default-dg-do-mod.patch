@@ -1,0 +1,43 @@
+From 6a08905ba3f04841189c5882503725b60b0a511a Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Torbj=C3=B6rn=20SVENSSON?= <torbjorn.svensson@foss.st.com>
+Date: Mon, 10 Aug 2026 19:48:38 +0200
+Subject: [PATCH 114/385] testsuite: let vect/pr*.c tests use default dg-do
+ mode
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The default mode for tests contained in vect.exp is configured in
+check_vect_support_and_set_flags.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.dg/vect/pr122797.c: Remove explict "dg-do run".
+	* gcc.dg/vect/pr123731.c: Likewise.
+
+Signed-off-by: Torbjörn SVENSSON <torbjorn.svensson@foss.st.com>
+(cherry picked from commit a1c033c811ed433d4a7163c2759f3d19005dd563)
+---
+ gcc/testsuite/gcc.dg/vect/pr122797.c | 1 -
+ gcc/testsuite/gcc.dg/vect/pr123731.c | 2 --
+ 2 files changed, 3 deletions(-)
+
+diff --git a/gcc/testsuite/gcc.dg/vect/pr122797.c b/gcc/testsuite/gcc.dg/vect/pr122797.c
+index 11819ef69e7e..4c3d5718013d 100644
+--- a/gcc/testsuite/gcc.dg/vect/pr122797.c
++++ b/gcc/testsuite/gcc.dg/vect/pr122797.c
+@@ -1,4 +1,3 @@
+-/* { dg-do run } */
+ /* { dg-additional-options "-O3" } */
+ 
+ int src_stride = 0;
+diff --git a/gcc/testsuite/gcc.dg/vect/pr123731.c b/gcc/testsuite/gcc.dg/vect/pr123731.c
+index 81fdb5d53bc5..730f22c10a46 100644
+--- a/gcc/testsuite/gcc.dg/vect/pr123731.c
++++ b/gcc/testsuite/gcc.dg/vect/pr123731.c
+@@ -1,5 +1,3 @@
+-/* { dg-do run } */
+-
+ typedef unsigned short A __attribute__ ((vector_size (4 * sizeof (short))));
+ typedef short B __attribute__ ((vector_size (8 * sizeof (short))));
+ typedef unsigned C __attribute__ ((vector_size (4 * sizeof (int))));

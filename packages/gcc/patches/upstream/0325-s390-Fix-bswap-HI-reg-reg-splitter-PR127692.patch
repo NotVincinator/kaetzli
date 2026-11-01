@@ -1,0 +1,81 @@
+From bf47c9d07f4c4364c48b093acf30fe98a296a00f Mon Sep 17 00:00:00 2001
+From: Stefan Schulze Frielinghaus <stefansf@gcc.gnu.org>
+Date: Tue, 6 Oct 2026 08:10:44 +0200
+Subject: [PATCH 325/385] s390: Fix bswap:HI reg-reg splitter [PR127692]
+
+The splitter could fire before register allocation for which the
+attached test ICEs.  There we end up for operands[1] with (subreg:HI
+(reg:HF 70) 0) for which simplify_gen_subreg tries to fold two subregs
+into (subreg:SI (reg:HF 70) 0) which is invalid.  For an invalid
+simplification NULL_RTX is returned which is just propagated and
+dereferenced later on leading to an ICE.
+
+The splitter is supposed to fire only after register allocation once we
+decided to go for the GPR alternative in bswaphi2.  This also solves the
+initial problem since after RA we should only deal with hard registers
+and simplify_gen_subreg folds subregs of GPRs (additionally this solves
+the problem of using a paradoxical subreg as a left-hand side operand).
+As a safety net, still test for NULL_RTX which would lead to more
+descriptive ICEs.
+
+	PR target/127692
+
+gcc/ChangeLog:
+
+	* config/s390/s390.md: Fix bswap:HI reg-reg splitter.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/s390/pr127692-1.c: New test.
+
+Co-authored-by: Jakub Jelinek <jakub@redhat.com>
+(cherry picked from commit 1de4393ddec6ce2980184f32b0fd428c54d82a20)
+---
+ gcc/config/s390/s390.md                    |  4 +++-
+ gcc/testsuite/gcc.target/s390/pr127692-1.c | 17 +++++++++++++++++
+ 2 files changed, 20 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.target/s390/pr127692-1.c
+
+diff --git a/gcc/config/s390/s390.md b/gcc/config/s390/s390.md
+index 0343007d9b1e..20e9a495463c 100644
+--- a/gcc/config/s390/s390.md
++++ b/gcc/config/s390/s390.md
+@@ -12417,12 +12417,14 @@
+ (define_split
+   [(set (match_operand:HI 0           "register_operand" "")
+ 	(bswap:HI (match_operand:HI 1 "register_operand" "")))]
+-  ""
++  "reload_completed"
+   [(set (match_dup 2) (bswap:SI (match_dup 3)))
+    (set (match_dup 2) (lshiftrt:SI (match_dup 2) (const_int 16)))]
+ {
+   operands[2] = simplify_gen_subreg (SImode, operands[0], HImode, 0);
+   operands[3] = simplify_gen_subreg (SImode, operands[1], HImode, 0);
++  if (operands[2] == NULL_RTX || operands[3] == NULL_RTX)
++    FAIL;
+ })
+ 
+ 
+diff --git a/gcc/testsuite/gcc.target/s390/pr127692-1.c b/gcc/testsuite/gcc.target/s390/pr127692-1.c
+new file mode 100644
+index 000000000000..d68b6bef82aa
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/s390/pr127692-1.c
+@@ -0,0 +1,17 @@
++/* { dg-do compile } */
++/* { dg-options "-O2 -march=z13" } */
++
++void
++foo (double x, char *y, int z)
++{
++  _Float16 a = (_Float16) x;
++  if (!z)
++    {
++      unsigned short b;
++      __builtin_memcpy (&b, &a, 2);
++      b = __builtin_bswap16(b);
++      __builtin_memcpy (y, &b, 2);
++    }
++  else
++    __builtin_memcpy (y, &a, sizeof (_Float16));
++}

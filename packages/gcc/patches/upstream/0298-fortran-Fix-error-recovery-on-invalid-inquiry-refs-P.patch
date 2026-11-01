@@ -1,0 +1,80 @@
+From 95b5eb7776b15342b957865bf6dc3317af4b8b10 Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Fri, 2 Oct 2026 23:37:46 +0200
+Subject: [PATCH 298/385] fortran: Fix error recovery on invalid inquiry refs
+ [PR127683]
+
+Commit r14-9489 added an assert that could trigger while parsing an inquiry
+ref.  Replace assertion by the return of a failure value.  Fix latent
+frontend memleaks on error return path.
+
+	PR fortran/127683
+
+gcc/fortran/ChangeLog:
+
+	* primary.cc (gfc_match_varspec): Fix two minor frontend memleaks.
+	* symbol.cc (gfc_find_derived_types): Return 0 when sym->assoc is
+	NULL.
+
+gcc/testsuite/ChangeLog:
+
+	* gfortran.dg/pr127683.f90: New test.
+
+(cherry picked from commit ab3c778a2530b25713002ba78af65334174deb3d)
+---
+ gcc/fortran/primary.cc                 |  2 ++
+ gcc/fortran/symbol.cc                  |  3 ++-
+ gcc/testsuite/gfortran.dg/pr127683.f90 | 10 ++++++++++
+ 3 files changed, 14 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/pr127683.f90
+
+diff --git a/gcc/fortran/primary.cc b/gcc/fortran/primary.cc
+index 04d16cdffbd6..9b31e6bba7a6 100644
+--- a/gcc/fortran/primary.cc
++++ b/gcc/fortran/primary.cc
+@@ -2651,6 +2651,7 @@ gfc_match_varspec (gfc_expr *primary, int equiv_flag, bool sub_flag,
+ 		    {
+ 			gfc_error ("The RE or IM part_ref at %C must be "
+ 				   "applied to a COMPLEX expression");
++			gfc_free_ref_list (tmp);
+ 			return MATCH_ERROR;
+ 		    }
+ 		  else if (tmp->u.i == INQUIRY_LEN
+@@ -2658,6 +2659,7 @@ gfc_match_varspec (gfc_expr *primary, int equiv_flag, bool sub_flag,
+ 		    {
+ 			gfc_error ("The LEN part_ref at %C must be applied "
+ 				   "to a CHARACTER expression");
++			gfc_free_ref_list (tmp);
+ 			return MATCH_ERROR;
+ 		    }
+ 		}
+diff --git a/gcc/fortran/symbol.cc b/gcc/fortran/symbol.cc
+index 39f707f38927..066b9e58807f 100644
+--- a/gcc/fortran/symbol.cc
++++ b/gcc/fortran/symbol.cc
+@@ -2519,7 +2519,8 @@ gfc_find_derived_types (gfc_symbol *sym, gfc_namespace *ns,
+ 			const char *name, bool stash)
+ {
+   gfc_namespace *encompassing = NULL;
+-  gcc_assert (sym->assoc);
++  if (sym->assoc == NULL)
++    return 0;
+ 
+   cts = 0;
+   while (ns->parent)
+diff --git a/gcc/testsuite/gfortran.dg/pr127683.f90 b/gcc/testsuite/gfortran.dg/pr127683.f90
+new file mode 100644
+index 000000000000..8e31c87df3ec
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/pr127683.f90
+@@ -0,0 +1,10 @@
++! { dg-do compile }
++!
++! PR fortran/127683 - we used to ICE on invalid inquiry refs
++
++program test
++  implicit none
++  print *, z%re   ! { dg-error "must be applied to a COMPLEX expression" }
++  print *, c%len  ! { dg-error "must be applied to a CHARACTER expression" }
++! print *, x%kind ! this also used to ICE, now gives a fatal error
++end program

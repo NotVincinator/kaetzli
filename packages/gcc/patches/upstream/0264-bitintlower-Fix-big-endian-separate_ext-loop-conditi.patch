@@ -1,0 +1,145 @@
+From dbae82bbb5aee537b0f87604658ea45742167669 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Fri, 18 Sep 2026 11:03:28 +0200
+Subject: [PATCH 264/385] bitintlower: Fix big-endian separate_ext loop
+ condition [PR127378]
+
+On the following testcase on powerpc64-linux (both -m32 and -m64) we emit
+incorrect loop condition in the separate_ext loop.
+For little endian, we do the addition on the least significant 3 limbs
+(straight line code), 2 lowest limbs regular, the third on 7 bits and
+then sign extension, and then a separate_ext loop
+  <bb 3> [local count: 1073741824]:
+  # _34 = PHI <3(2), _35(3)>
+  VIEW_CONVERT_EXPR<unsigned long[8]>(a)[_34] = _33;
+  _35 = _34 + 1;
+  if (_35 != 8)
+    goto <bb 3>; [0.05%]
+  else
+    goto <bb 4>; [99.95%]
+to copy the sign extension into the remaining 5 limbs.
+On big endian, we do the least significant 3 limbs similarly (of course,
+the result is 512-bit, so with 56, 48, 40 instead of 0, 8, 16 on LE)
+and then do the separate_ext loop:
+  <bb 3> [local count: 1073741824]:
+  # _35 = PHI <4(2), _36(3)>
+  VIEW_CONVERT_EXPR<unsigned long[8]>(a)[_35] = _34;
+  _36 = _35 + 18446744073709551615;
+  if (_36 != 0)
+    goto <bb 3>; [0.05%]
+  else
+    goto <bb 4>; [99.95%]
+That is wrong, we start on limb 4 (i.e. offset 32) and go down until
+1 (i.e. offset 8) rather than 0 (i.e. offset 0), because like in LE in this
+case we compare idx_next (idx + increment, in BE case -1) instead of idx.
+There was already code to handle specially BE rem != 0 case.
+Note, the starting offset is
+          else if (i == (bo_shift != 0))
+            idx = create_loop (size_int (bo_idx
+                                         + (bitint_big_endian
+                                            ? total - 1 - start - i
+                                            : start + i)), &idx_next);
+and we want to perform the same number of iterations on LE and BE,
+just the LE offsets bo_idx + start + i + I for I going from 0 up until
+bo_idx + start + i + I == bo_idx + end - 1 inclusive, while for BE
+they should be bo_idx + total - 1 - start - i - I for I going from 0
+up until bo_idx + total - 1 - start - i - I == bo_idx + total - 1 - end + 1
+inclusive.  So, the BE correction is to add total - 1 and subtract instead
+of add the start + i up to end - 1 values.
+
+So, this patch uses the exact same BE correction, with one exception.
+If bo_idx + total - 1 - end + 1 is 0 (which is quite the common case,
+when bo_idx is 0 (e.g. whenever it is not a bit-field store) and bo_shift
+isn't non-zero either (again, e.g. no bit-field store) and rem == 0),
+I think comparing idx != 0 instead of idx_next != (size_t) -1 is faster
+(plus we'd in the evaluation need to care about types of all the addends,
+do everything say in unsigned HOST_WIDE_INT and then map all ones in UHWI
+to all ones in target size_t).
+
+2026-09-18  Jakub Jelinek  <jakub@redhat.com>
+	    Manjunath Matti  <mmatti@linux.ibm.com>
+
+	PR middle-end/127378
+	* gimple-lower-bitint.cc (bitint_large_huge::lower_mergeable_stmt): On
+	big endian, compare idx_next in separate_ext loop against
+	bo_idx + total - 1 - end, and if that wraps around, compare idx
+	against 0 instead.
+
+	* gcc.dg/bitint-145.c: New test.
+
+Reviewed-by: Richard Biener <rguenth@suse.de>
+(cherry picked from commit d9d078c216150bbe0397ded72f035c35b476e88e)
+---
+ gcc/gimple-lower-bitint.cc        | 11 ++++++----
+ gcc/testsuite/gcc.dg/bitint-145.c | 35 +++++++++++++++++++++++++++++++
+ 2 files changed, 42 insertions(+), 4 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/bitint-145.c
+
+diff --git a/gcc/gimple-lower-bitint.cc b/gcc/gimple-lower-bitint.cc
+index e6716acb7ed0..6d1bb01cbed6 100644
+--- a/gcc/gimple-lower-bitint.cc
++++ b/gcc/gimple-lower-bitint.cc
+@@ -3270,15 +3270,18 @@ bitint_large_huge::lower_mergeable_stmt (gimple *stmt, tree_code &cmp_code,
+ 				       bitint_big_endian
+ 				       ? size_int (-1) : size_one_node);
+ 	      insert_before (g);
+-	      if (bitint_big_endian && rem != 0)
+-		g = gimple_build_cond (NE_EXPR, idx,
+-				       size_int (bo_idx + 1),
++	      /* For big-endian, if bo_idx + total - 1 - end is all ones, then
++		 compare idx (which is equal to idx_next + 1) against 0
++		 instead.  */
++	      if (bitint_big_endian && bo_idx + total - end == 0)
++		g = gimple_build_cond (NE_EXPR, idx, size_zero_node,
+ 				       NULL_TREE, NULL_TREE);
+ 	      else
+ 		g = gimple_build_cond (NE_EXPR, idx_next,
+ 				       size_int (bo_idx
+ 						 + (bitint_big_endian
+-						    ? 0 : end)),
++						    ? total - 1 - end
++						    : end)),
+ 				       NULL_TREE, NULL_TREE);
+ 	      insert_before (g);
+ 	      m_gsi = gsi_for_stmt (stmt);
+diff --git a/gcc/testsuite/gcc.dg/bitint-145.c b/gcc/testsuite/gcc.dg/bitint-145.c
+new file mode 100644
+index 000000000000..8434f5173864
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/bitint-145.c
+@@ -0,0 +1,35 @@
++/* PR middle-end/127378 */
++/* { dg-do run { target bitint } } */
++/* { dg-options "-std=c23 -O2" } */
++
++#if __BITINT_MAXWIDTH__ >= 768
++unsigned _BitInt(512) a;
++unsigned _BitInt(768) b = -1;
++
++__attribute__((noipa)) void
++foo (unsigned _BitInt(135) *p)
++{
++  a = (_BitInt(135)) (p[0] + p[1]);
++}
++
++__attribute__((noipa)) void
++bar (unsigned _BitInt(200) *p)
++{
++  b = p[0] + p[1];
++}
++#endif
++
++int
++main ()
++{
++#if __BITINT_MAXWIDTH__ >= 768
++  static unsigned _BitInt(135) p[2] = { -1, 0 };
++  static unsigned _BitInt(200) q[2] = { 1, 2 };
++  foo (p);
++  if (a != (unsigned _BitInt(512)) -1)
++    __builtin_abort ();
++  bar (q);
++  if (b != 3)
++    __builtin_abort ();
++#endif
++}

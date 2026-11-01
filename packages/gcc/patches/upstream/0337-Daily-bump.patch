@@ -1,0 +1,63 @@
+From 67d114b6277db0fdc772d4827f18177f070b09cc Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sun, 25 Oct 2026 00:20:42 +0000
+Subject: [PATCH 337/385] Daily bump.
+
+---
+ gcc/ChangeLog           |  6 ++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 10 ++++++++++
+ libstdc++-v3/ChangeLog  |  4 ++++
+ 4 files changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 02c4b823c0b8..caab5502ad70 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,9 @@
++2026-10-24  Igor Shevlyakov  <igor@tachyum.com>
++
++	PR middle-end/127785
++	* match.pd ((ordered @0 @1) & (ne @0 @1)): Only fold to LTGT
++	without trapping math or when NaNs are not honored.
++
+ 2026-10-23  John David Anglin  <danglin@gcc.gnu.org>
+ 
+ 	* config/pa/pa.cc (pa_can_change_mode_class): Don't reject
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index e39ba340ae10..01341cfb1f0d 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261024
++20261025
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index ba7c2f0bc240..75cbcded8af4 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,13 @@
++2026-10-24  Igor Shevlyakov  <igor@tachyum.com>
++
++	PR middle-end/127785
++	* gcc.dg/opt-ordered-and-nonequal-1.c: Add -fno-trapping-math and
++	scan the optimized dump.
++	* gcc.dg/opt-ordered-and-nonequal-2.c: New test.
++	* gcc.dg/torture/cmp-of-cmp-fenv-1.c: New test.
++	* gcc.target/i386/opt-comi-1.c: Add -fno-trapping-math.
++	* gcc.target/i386/avx10_2-compare-1b.c: Likewise.
++
+ 2026-10-23  Marek Polacek  <polacek@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index 6ed88efbcdf4..baea39b971e4 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,7 @@
++2026-10-24  John David Anglin  <danglin@gcc.gnu.org>
++
++	* config/abi/post/hppa-linux-gnu/baseline_symbols.txt: Update.
++
+ 2026-10-14  Hugo Beauzée-Luyssen  <hugo.beauzee@datadoghq.com>
+ 
+ 	Backported from master:

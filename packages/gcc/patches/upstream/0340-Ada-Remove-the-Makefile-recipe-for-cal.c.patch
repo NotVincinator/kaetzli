@@ -1,0 +1,26 @@
+From fc3157e5064c4e55ee427a0524d9bbbb6fd8b89c Mon Sep 17 00:00:00 2001
+From: Nicolas Boulenguez <nicolas@debian.org>
+Date: Mon, 26 Oct 2026 09:48:23 +0100
+Subject: [PATCH 340/385] Ada: Remove the Makefile recipe for cal.c
+
+The cal.c source file was removed some time ago.
+
+gcc/ada/
+	PR ada/114065
+	* gcc-interface/Makefile.in (cal.o): Remove.
+---
+ gcc/ada/gcc-interface/Makefile.in | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/gcc/ada/gcc-interface/Makefile.in b/gcc/ada/gcc-interface/Makefile.in
+index d0500c727c0e..483f19e09df0 100644
+--- a/gcc/ada/gcc-interface/Makefile.in
++++ b/gcc/ada/gcc-interface/Makefile.in
+@@ -902,7 +902,6 @@ tracebak.o  : tracebak.c
+ adadecode.o : adadecode.c adadecode.h
+ aux-io.o  : aux-io.c
+ argv.o    : argv.c
+-cal.o     : cal.c
+ errno.o   : errno.c
+ exit.o    : adaint.h exit.c
+ expect.o  : expect.c

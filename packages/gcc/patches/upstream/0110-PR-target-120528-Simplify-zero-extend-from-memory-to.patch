@@ -1,0 +1,259 @@
+From bae48b6fce6a574618ded8cfc1dd4006c2e94879 Mon Sep 17 00:00:00 2001
+From: Michael Meissner <meissner@linux.ibm.com>
+Date: Thu, 27 Aug 2026 12:29:37 -0400
+Subject: [PATCH 110/385] PR target/120528 -- Simplify zero extend from memory
+ to VSX register on power10
+
+Previously GCC would zero extend a DImode value in memory to a TImode
+target in a vector register by firt zero extending the DImode value
+into a GPR TImode register pair, and then do a MTVSRDD to move this
+value to a VSX register.
+
+For example, consider the following code:
+
+	#ifndef TYPE
+	#define TYPE unsigned long long
+	#endif
+
+	void
+	mem_to_vsx (TYPE *p, __uint128_t *q)
+	{
+	  /* lxvrdx 0,0,3
+	     stxv 0,0(4)  */
+
+	  __uint128_t x = *p;
+	  __asm__ (" # %x0" : "+wa" (x));
+	  *q = x;
+	}
+
+It currently generates the following code on power10:
+
+	mem_to_vsx:
+		ld 10,0(3)
+		li 11,0
+		mtvsrdd 0,11,10
+	#APP
+		 # 0
+	#NO_APP
+		stxv 0,0(4)
+		blr
+
+Instead it could generate:
+
+	mem_to_vsx:
+		lxvrdx 0,0,3
+	#APP
+		 # 0
+	#NO_APP
+		stxv 0,0(4)
+		blr
+
+The lxvr{b,h,w,d}x instructions were added in power10, and they load up
+a vector register with a byte, half-word, word, or double-word value in
+the right most bits, and fill the remaining bits to 0.  I noticed this
+code when working on PR target/108958 (which I just posted the patch).
+
+This patch creates a peephole2 to catch this case, and it eliminates
+creating the TImode variable.  Instead it just does the LXVR{B,H,W,D}x
+instruction directly.
+
+This change was back ported from changes made to the master branch on
+2026-08-07.
+
+2026-08-27  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/120528
+	* config/rs6000/rs6000.md (zero_extend??ti2 peephole2): Add a
+	peephole2 to simplify zero extending a QI/HI/SI/DImode value in
+	memory to a TImode target in a vector register to use the
+	LXVR{B,H,W,D}X instructins.
+
+gcc/testsuite/
+
+	PR target/120528
+	* gcc.target/powerpc/pr120528.c: New test.
+---
+ gcc/config/rs6000/rs6000.md                 | 69 ++++++++++++++++
+ gcc/testsuite/gcc.target/powerpc/pr120528.c | 91 +++++++++++++++++++++
+ 2 files changed, 160 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.target/powerpc/pr120528.c
+
+diff --git a/gcc/config/rs6000/rs6000.md b/gcc/config/rs6000/rs6000.md
+index cf6a5b68ece2..57f8ede1949a 100644
+--- a/gcc/config/rs6000/rs6000.md
++++ b/gcc/config/rs6000/rs6000.md
+@@ -984,6 +984,75 @@
+    (set_attr "length" "4,8")])
+ 
+ 
++;; On power10, optimize zero extending a QI/HI/SI/DImode value from memory that
++;; is going to a vector register target by generating a LXVR{B,H,W,D}X
++;; instruction without creating the TImode value in a GPR and using MTVSRDD to
++;; move it to the vector register.
++(define_peephole2
++  [(set (match_operand:DI 0 "int_reg_operand")
++	(match_operand:DI 1 "memory_operand"))
++   (set (match_operand:DI 2 "base_reg_operand")
++	(const_int 0))
++   (set (match_operand:TI 3 "vsx_register_operand")
++	(match_operand:TI 4 "int_reg_operand"))]
++  "TARGET_POWER10 && TARGET_POWERPC64
++   && (reg_or_subregno (operands[0])
++       == reg_or_subregno (operands[4]) + !!WORDS_BIG_ENDIAN)
++   && (reg_or_subregno (operands[2])
++       == reg_or_subregno (operands[4]) + !WORDS_BIG_ENDIAN)
++   && peep2_reg_dead_p (3, operands[4])
++   && (REG_P (XEXP (operands[1], 0))
++       || SUBREG_P (XEXP (operands[1], 0))
++       || GET_CODE (XEXP (operands[1], 0)) == PLUS)"
++  [(set (match_dup 3)
++	(zero_extend:TI (match_dup 5)))]
++{
++  rtx mem = operands[1];
++  rtx addr = XEXP (mem, 0);
++
++  if (indexed_or_indirect_address (addr, DImode))
++    operands[5] = mem;
++  else
++    {
++      rtx op2 = operands[2];
++      emit_insn (gen_rtx_SET (op2, addr));
++      operands[5] = change_address (mem, DImode, op2);
++    }
++})
++
++(define_peephole2
++  [(set (match_operand:DI 0 "int_reg_operand")
++	(zero_extend:DI
++	 (match_operand:QHSI 1 "memory_operand")))
++   (set (match_operand:DI 2 "base_reg_operand")
++	(const_int 0))
++   (set (match_operand:TI 3 "vsx_register_operand")
++	(match_operand:TI 4 "int_reg_operand"))]
++  "TARGET_POWER10 && TARGET_POWERPC64
++   && (reg_or_subregno (operands[0])
++       == reg_or_subregno (operands[4]) + !!WORDS_BIG_ENDIAN)
++   && (reg_or_subregno (operands[2])
++       == reg_or_subregno (operands[4]) + !WORDS_BIG_ENDIAN)
++   && peep2_reg_dead_p (3, operands[4])
++   && (REG_P (XEXP (operands[1], 0))
++       || SUBREG_P (XEXP (operands[1], 0))
++       || GET_CODE (XEXP (operands[1], 0)) == PLUS)"
++  [(set (match_dup 3)
++	(zero_extend:TI (match_dup 5)))]
++{
++  rtx mem = operands[1];
++  rtx addr = XEXP (mem, 0);
++
++  if (indexed_or_indirect_address (addr, DImode))
++    operands[5] = mem;
++  else
++    {
++      rtx op2 = operands[2];
++      emit_insn (gen_rtx_SET (op2, addr));
++      operands[5] = change_address (mem, DImode, op2);
++    }
++})
++
+ (define_insn "zero_extendsi<mode>2"
+   [(set (match_operand:EXTSI 0 "gpc_reg_operand" "=r,r,d,wa,wa,r,wa")
+ 	(zero_extend:EXTSI (match_operand:SI 1 "reg_or_mem_operand" "m,r,?Z,?Z,r,wa,wa")))]
+diff --git a/gcc/testsuite/gcc.target/powerpc/pr120528.c b/gcc/testsuite/gcc.target/powerpc/pr120528.c
+new file mode 100644
+index 000000000000..476725eaa4fb
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/powerpc/pr120528.c
+@@ -0,0 +1,91 @@
++/* { dg-do compile } */
++/* { dg-require-effective-target int128 } */
++/* { dg-require-effective-target lp64 } */
++/* { dg-require-effective-target power10_ok } */
++/* { dg-options "-mdejagnu-cpu=power10 -O2" } */
++
++#include <stddef.h>
++
++#ifndef TYPE
++#define TYPE unsigned long long
++#endif
++
++void
++mem_to_vsx (TYPE *p, __uint128_t *q)
++{
++  /* lxvrdx 0,0,3
++     stxv 0,0(4)  */
++
++  __uint128_t x = *p;
++  __asm__ (" # %x0" : "+wa" (x));
++  *q = x;
++}
++
++void
++memx_to_vsx (TYPE *p, size_t n, __uint128_t *q)
++{
++  /* sldi 4,4,3
++     lxvrdx 0,3,4
++     stxv 0,0(4)  */
++
++  __uint128_t x = p[n];
++  __asm__ (" # %x0" : "+wa" (x));
++  *q = x;
++}
++
++void
++mem3_to_vsx (TYPE *p, __uint128_t *q)
++{
++  /* addi 2,3,24
++     lxvrdx 0,0,2
++     stxv 0,0(4)  */
++
++  __uint128_t x = p[3];
++  __asm__ (" # %x0" : "+wa" (x));
++  *q = x;
++}
++
++void
++mem_to_gpr (TYPE *p, __uint128_t *q)
++{
++  /* ld 2,0(3)
++     li 3,0
++     std 2,0(4)
++     std 3,8(8)  */
++
++  __uint128_t x = *p;
++  __asm__ (" # %0" : "+r" (x));
++  *q = x;
++}
++
++void
++memx_to_gpr (TYPE *p, size_t n, __uint128_t *q)
++{
++  /* sldi 4,4,3
++     ldx 2,3,4
++     li 3,0
++     std 2,0(4)
++     std 3,8(8)  */
++
++  __uint128_t x = p[n];
++  __asm__ (" # %0" : "+r" (x));
++  *q = x;
++}
++
++void
++mem3_to_gpr (TYPE *p, __uint128_t *q)
++{
++  /* ld 2,24(3)
++     li 3,0
++     std 2,0(4)
++     std 3,8(8)  */
++
++  __uint128_t x = p[3];
++  __asm__ (" # %0" : "+r" (x));
++  *q = x;
++}
++
++/* { dg-final { scan-assembler-times {\maddi\M}   1 } } */
++/* { dg-final { scan-assembler-times {\mli\M}     3 } } */
++/* { dg-final { scan-assembler-times {\mlxvrdx\M} 3 } } */
++/* { dg-final { scan-assembler-times {\mstxv\M}   3 } } */

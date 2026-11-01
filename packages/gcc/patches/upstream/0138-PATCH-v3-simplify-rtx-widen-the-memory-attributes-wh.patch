@@ -1,0 +1,353 @@
+From 91b8af1769ec459569479087d2017b0fb94d3b88 Mon Sep 17 00:00:00 2001
+From: Rohith Kapelli <kapellirohith@gmail.com>
+Date: Wed, 12 Aug 2026 22:05:23 -0600
+Subject: [PATCH 138/385] [PATCH v3] simplify-rtx: widen the memory attributes
+ when folding "c ? a : a" [PR125683]
+
+simplify_ternary_operation folds IF_THEN_ELSE (cond, a, a) to a using
+rtx_equal_p, which ignores the memory attributes.  Two loads from the
+same address into the same register are rtx_equal_p even when they have
+incompatible alias sets, so the fold returned one arm's MEM and the
+result inherited just that arm's (too narrow) alias set.
+
+noce_try_ifelse_collapse builds exactly such an IF_THEN_ELSE from the two
+sides of
+
+  long f (int a, void *cc, long *d)
+  {
+    long long c;
+    *d = 0;
+    if (a) c = *(long *) cc; else c = *(long long *) cc;
+    *d = 1;
+    return c;
+  }
+
+so ce1 replaced the two loads with a single long long load; a later pass,
+seeing that a long long load does not alias the long store to *d, deleted
+the "dead" *d = 0, and with cc == d the function returned a stale value.
+
+Rather than dropping the fold when the attributes differ, keep it and
+return a reference that only claims what both operands guarantee, in the
+spirit of merge_memattrs: alias set 0 when the sets differ, MEM_EXPR and
+offset cleared when they disagree, and the minimum alignment.  The
+operands can be shared, so the attributes are set on a shallow copy
+rather than in place.
+
+MEM_READONLY_P, MEM_NOTRAP_P and MEM_POINTER each assert something about
+the reference, so the copy keeps them only when both operands do.  They
+are rtx flag bits rather than MEM_ATTRS fields, so shallow_copy_rtx takes
+them from the first operand and they have to be cleared by hand; the
+equal-attributes early exit tests them too, so a disagreement in a flag
+alone still goes through the copy.  merge_memattrs already drops the
+first two this way when it commons two references, so this only follows
+it; it does not look at MEM_POINTER, which is treated the same way here
+because it is an assertion about the loaded value in just the same
+sense.
+
+Unlike merge_memattrs, which fixes up two references that both remain in
+the instruction stream, this returns a single reference standing in for
+either arm, so the size is kept only when both agree instead of taking
+the larger one.  BLKmode is left alone because there MEM_ATTRS describes
+the size of the access itself.  Volatility is not merged: it constrains
+when the access happens rather than describing the memory, so it can be
+neither weakened (that would lose a required access) nor strengthened as
+merge_memattrs does (that would add a volatile access on the arm which
+did not have one, there being a single access left for either arm), and
+the fold is declined instead.  Address spaces need no check: rtx_equal_p
+already fails for MEMs in different address spaces.
+
+Several tree passes can factor the two loads with a conservative type
+before RTL and so hide this: PRE and code hoisting on the release
+branches, and the phi-opt load factoring (PR125557) on trunk.  The test
+disables them so the if-conversion path is exercised on every affected
+version.  It is a live wrong-code at -O2 on the 13/14/15/16 branches --
+gcc-13 miscompiles the reduced case at plain -O2 with no such flags at
+all.
+
+---
+
+Changes since v2: MEM_READONLY_P, MEM_NOTRAP_P and MEM_POINTER are now
+dropped when the two arms disagree.  They are rtx flag bits rather than
+MEM_ATTRS fields, so shallow_copy_rtx brings them across from the first
+operand and they have to be cleared by hand; they are cleared on the
+fresh MEM the fold already builds, not on either operand, which can be
+shared.  The equal-attributes early exit tests them too, so a
+disagreement in a flag alone still goes through the copy.
+
+merge_memattrs already clears the first two this way, so MEM_POINTER is
+the one flag this adds to that treatment.
+
+New test gcc.dg/rtl/aarch64/pr125683-flags.c builds the disagreement
+directly, because it cannot be produced from C source: MEM_READONLY_P
+and MEM_NOTRAP_P are derived from the base object, which two loads from
+the same address share.  It is gated to aarch64-*-* because rtl.exp
+collects tests recursively, so every __RTL test has to gate itself, and
+__RTL tests hard-code target register names.
+
+Testing, on aarch64-unknown-linux-gnu: patched and unpatched bootstrapped
+from clean trees in the same environment, both stage2 == stage3.
+Comparing every result line across gcc, g++, libstdc++, libgomp, libitm
+and libatomic -- normalising the build directory, which g++.dg/modules
+embeds in test names -- the two runs are identical except for this
+patch's own tests.  One apparent transition,
+g++.dg/tsan/pthread_cond_clockwait.C at -O0, is a flaky execution test:
+re-run idle eight times per compiler it passed 2/8 unpatched and 1/8
+patched.  The runtime test is revert-sensitive: the unpatched compiler
+aborts on it, the patched one exits 0.  The patch applies cleanly to
+trunk and to the gcc-16, gcc-15, gcc-14 and gcc-13 branches.
+
+	PR rtl-optimization/125683
+
+gcc/ChangeLog:
+
+	* simplify-rtx.cc (simplify_context::simplify_ternary_operation):
+	When folding an IF_THEN_ELSE of two equal MEM operands with
+	different memory attributes, return a copy whose attributes are
+	widened to what both operands allow.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.dg/pr125683.c: New test.
+	* gcc.dg/rtl/aarch64/pr125683-flags.c: New test.
+
+Signed-off-by: Rohith Kapelli <kapellirohith@gmail.com>
+(cherry picked from commit 542d7eaf767057fbd224d44dbc1772dea3e41891)
+---
+ gcc/simplify-rtx.cc                           | 73 +++++++++++++-
+ gcc/testsuite/gcc.dg/pr125683.c               | 38 ++++++++
+ .../gcc.dg/rtl/aarch64/pr125683-flags.c       | 96 +++++++++++++++++++
+ 3 files changed, 205 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/pr125683.c
+ create mode 100644 gcc/testsuite/gcc.dg/rtl/aarch64/pr125683-flags.c
+
+diff --git a/gcc/simplify-rtx.cc b/gcc/simplify-rtx.cc
+index 50fc51152cab..b3d5c7b4197d 100644
+--- a/gcc/simplify-rtx.cc
++++ b/gcc/simplify-rtx.cc
+@@ -7441,9 +7441,78 @@ simplify_context::simplify_ternary_operation (rtx_code code, machine_mode mode,
+       if (CONST_INT_P (op0))
+ 	return op0 != const0_rtx ? op1 : op2;
+ 
+-      /* Convert c ? a : a into "a".  */
++      /* Convert c ? a : a into "a".  Beware that two rtx_equal_p MEMs can
++	 still carry different memory attributes, in particular incompatible
++	 alias sets; returning one of them would narrow the aliasing of the
++	 result to that operand's, which is unsound (PR125683).  When the
++	 attributes differ, fold to a copy that keeps only what both operands
++	 guarantee, like merge_memattrs does when cross-jumping commons two
++	 memory references.  */
+       if (rtx_equal_p (op1, op2) && ! side_effects_p (op0))
+-	return op1;
++	{
++	  if (op1 == op2
++	      || !MEM_P (op1)
++	      || (mem_attrs_eq_p (get_mem_attrs (op1), get_mem_attrs (op2))
++		  && MEM_READONLY_P (op1) == MEM_READONLY_P (op2)
++		  && MEM_NOTRAP_P (op1) == MEM_NOTRAP_P (op2)
++		  && MEM_POINTER (op1) == MEM_POINTER (op2)))
++	    return op1;
++
++	  /* For BLKmode the size in MEM_ATTRS describes the access itself,
++	     so it cannot be dropped.  Volatility is not merged either: it
++	     constrains when the access happens rather than describing the
++	     memory, so unlike the flags below it cannot be weakened to what
++	     both operands allow.  Dropping it would lose a required access;
++	     merge_memattrs and noce_try_cmove_arith instead set it, which is
++	     sound but claims more than either operand did.  Those two have to
++	     put something on a reference they are already committed to, while
++	     this fold is free to do nothing, and if-conversion never reaches
++	     it with a volatile operand in any case: side_effects_p is true
++	     for one, so noce_operand_ok rejects it.  Decline the fold.  */
++	  if (GET_MODE (op1) != BLKmode
++	      && MEM_VOLATILE_P (op1) == MEM_VOLATILE_P (op2))
++	    {
++	      rtx mem = shallow_copy_rtx (op1);
++
++	      if (MEM_ALIAS_SET (op1) != MEM_ALIAS_SET (op2))
++		set_mem_alias_set (mem, 0);
++
++	      if (!mem_expr_equal_p (MEM_EXPR (op1), MEM_EXPR (op2)))
++		{
++		  set_mem_expr (mem, NULL_TREE);
++		  clear_mem_offset (mem);
++		}
++	      else if (MEM_OFFSET_KNOWN_P (op1) != MEM_OFFSET_KNOWN_P (op2)
++		       || (MEM_OFFSET_KNOWN_P (op1)
++			   && maybe_ne (MEM_OFFSET (op1), MEM_OFFSET (op2))))
++		clear_mem_offset (mem);
++
++	      /* Unlike merge_memattrs, which fixes up two references that
++		 both stay in the stream, this returns a single reference
++		 that stands in for either arm, so keep the size only when
++		 both agree rather than taking the larger one.  */
++	      if (!MEM_SIZE_KNOWN_P (op1) || !MEM_SIZE_KNOWN_P (op2)
++		  || maybe_ne (MEM_SIZE (op1), MEM_SIZE (op2)))
++		clear_mem_size (mem);
++
++	      set_mem_align (mem, MIN (MEM_ALIGN (op1), MEM_ALIGN (op2)));
++
++	      /* MEM_READONLY_P, MEM_NOTRAP_P and MEM_POINTER are rtx flag
++		 bits rather than MEM_ATTRS fields, so shallow_copy_rtx has
++		 already taken them from OP1 and they need clearing by hand.
++		 Each asserts something about the reference, so the copy may
++		 only keep it when both operands do, as merge_memattrs does
++		 for the first two.  */
++	      if (MEM_READONLY_P (op1) != MEM_READONLY_P (op2))
++		MEM_READONLY_P (mem) = 0;
++	      if (MEM_NOTRAP_P (op1) != MEM_NOTRAP_P (op2))
++		MEM_NOTRAP_P (mem) = 0;
++	      if (MEM_POINTER (op1) != MEM_POINTER (op2))
++		MEM_POINTER (mem) = 0;
++
++	      return mem;
++	    }
++	}
+ 
+       /* Convert a != b ? a : b into "a".  */
+       if (GET_CODE (op0) == NE
+diff --git a/gcc/testsuite/gcc.dg/pr125683.c b/gcc/testsuite/gcc.dg/pr125683.c
+new file mode 100644
+index 000000000000..1f5706261b8f
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/pr125683.c
+@@ -0,0 +1,38 @@
++/* PR rtl-optimization/125683 */
++/* { dg-do run } */
++/* { dg-options "-O2 -fno-tree-pre -fno-code-hoisting -fdisable-tree-phiopt1 -fdisable-tree-phiopt2 -fdisable-tree-phiopt3 -fdisable-tree-phiopt4 -fdisable-tree-cselim" } */
++
++/* if-conversion (ce1) used to collapse the two conditional loads below
++   into a single load through simplify_gen_ternary's
++   (if_then_else c X X) -> X rule, which ignores the memory attributes.
++   The two loads have incompatible alias sets, so the collapsed load kept
++   just one of them; a later pass then treated it as not aliasing the
++   long store to *d and moved it, giving the wrong value when cc == d.
++   Several tree passes (PRE/code-hoisting on the release branches, phi-opt
++   load factoring on trunk) can factor the two loads with a conservative
++   type before RTL and so hide the bug; they are disabled here so the
++   if-conversion path is exercised on every affected version.  */
++
++long __attribute__ ((noipa))
++f (int a, void *cc, long *d)
++{
++  long long c;
++  *d = 0;
++  if (a)
++    c = *(long *) cc;
++  else
++    c = *(long long *) cc;
++  *d = 1;
++  return c;
++}
++
++int
++main (void)
++{
++  long storage = -1;
++  /* cc == d, and a != 0 so the taken load reads *(long *)cc, which is a
++     type-compatible access to the object *d that was just set to 0.  */
++  if (f (1, &storage, &storage) != 0)
++    __builtin_abort ();
++  return 0;
++}
+diff --git a/gcc/testsuite/gcc.dg/rtl/aarch64/pr125683-flags.c b/gcc/testsuite/gcc.dg/rtl/aarch64/pr125683-flags.c
+new file mode 100644
+index 000000000000..11b2b77d6b4d
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/rtl/aarch64/pr125683-flags.c
+@@ -0,0 +1,96 @@
++/* { dg-do compile { target aarch64-*-* } } */
++/* { dg-options "-O2 -fdump-rtl-ce1" } */
++
++/* PR125683: when ce1 collapses "c ? a : a" the folded MEM must not claim
++   anything only one arm guaranteed.  MEM_READONLY_P and MEM_NOTRAP_P
++   disagreement cannot be produced from C source -- both are derived from
++   the base object, which two loads from the same address share -- so the
++   two MEMs are built here directly.  The else arm is the one the fold
++   copies, so it is the arm that carries the flags.
++
++   Based on the ce1 input for
++
++     long f (int a, void *cc, long *d)
++     { long c; *d = 0; if (a) c = *(long *) cc; else c = *(long *) cc;
++       *d = 1; return c; }  */
++
++long __RTL (startwith ("ce1")) f (int a, void *cc, long *d)
++{
++(function "f"
++  (param "a"
++    (DECL_RTL (reg/v:SI <3> [ a ]))
++    (DECL_RTL_INCOMING (reg:SI x0 [ a ])))
++  (param "cc"
++    (DECL_RTL (reg/v/f:DI <4> [ cc ]))
++    (DECL_RTL_INCOMING (reg:DI x1 [ cc ])))
++  (param "d"
++    (DECL_RTL (reg/v/f:DI <5> [ d ]))
++    (DECL_RTL_INCOMING (reg:DI x2 [ d ])))
++  (insn-chain
++    (block 2
++      (edge-from entry (flags "FALLTHRU"))
++      (cnote 6 [bb 2] NOTE_INSN_BASIC_BLOCK)
++      (cinsn 2 (set (reg/v:SI <3> [ a ])
++                    (reg:SI x0 [ a ])))
++      (cinsn 3 (set (reg/v/f:DI <4> [ cc ])
++                    (reg:DI x1 [ cc ])))
++      (cinsn 4 (set (reg/v/f:DI <5> [ d ])
++                    (reg:DI x2 [ d ])))
++      (cnote 5 NOTE_INSN_FUNCTION_BEG)
++      (cinsn 8 (set (mem:DI (reg/v/f:DI <5> [ d ]) [3  S8 A64])
++                    (const_int 0)))
++      (cinsn 9 (set (reg:CC cc)
++                    (compare:CC (reg/v:SI <3> [ a ])
++                        (const_int 0))))
++      (cjump_insn 10 (set (pc)
++                    (if_then_else (eq (reg:CC cc)
++                            (const_int 0))
++                        (label_ref 15)
++                        (pc))))
++      (edge-to 3 (flags "FALLTHRU"))
++      (edge-to 4)
++    ) ;; block 2
++    (block 3
++      (edge-from 2 (flags "FALLTHRU"))
++      (cnote 11 [bb 3] NOTE_INSN_BASIC_BLOCK)
++      (cinsn 12 (set (reg/v:DI <2>)
++                    (mem:DI (reg/v/f:DI <4> [ cc ]) [2  S8 A64])))
++      (edge-to 5 (flags "FALLTHRU"))
++    ) ;; block 3
++    (block 4
++      (edge-from 2)
++      (clabel 15 2)
++      (cnote 16 [bb 4] NOTE_INSN_BASIC_BLOCK)
++      (cinsn 17 (set (reg/v:DI <2>)
++                    (mem/u/c/f:DI (reg/v/f:DI <4> [ cc ]) [1  S8 A64])))
++      (edge-to 5 (flags "FALLTHRU"))
++    ) ;; block 4
++    (block 5
++      (edge-from 3 (flags "FALLTHRU"))
++      (edge-from 4 (flags "FALLTHRU"))
++      (cnote 20 [bb 5] NOTE_INSN_BASIC_BLOCK)
++      (cinsn 19 (set (reg:DI <6>)
++                    (const_int 1)))
++      (cinsn 21 (set (mem:DI (reg/v/f:DI <5> [ d ]) [3  S8 A64])
++                    (reg:DI <6>)))
++      (cinsn 22 (set (reg/i:DI x0)
++                    (reg/v:DI <2>)))
++      (cinsn 23 (use (reg/i:DI x0)))
++      (edge-to exit (flags "FALLTHRU"))
++    ) ;; block 5
++  ) ;; insn-chain
++) ;; function
++}
++
++/* The diamond must actually be collapsed, otherwise the rest proves
++   nothing.  */
++/* { dg-final { scan-rtl-dump "noce_try_ifelse_collapse" "ce1" } } */
++
++/* The alias sets disagree, so the fold drops to alias set 0.  That MEM is
++   the folded one; it must carry no flag bits, since each was set on only
++   one arm.  Before the flags were handled it came out as
++   "(mem/u/c:DI (reg...) [0  S8 A64])".  The dump also lists the pass input,
++   where the /u/c arm legitimately appears, so both checks are anchored on
++   the alias set 0 that only the folded MEM has.  */
++/* { dg-final { scan-rtl-dump "mem:DI \\(reg\[^\)\]*\\) \\\[0 " "ce1" } } */
++/* { dg-final { scan-rtl-dump-not "mem/\[a-z/\]*:DI \\(reg\[^\)\]*\\) \\\[0 " "ce1" } } */

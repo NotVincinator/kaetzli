@@ -1,0 +1,83 @@
+From 3199c272adff511531e49806716bbbf0df0fae76 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Mon, 12 Oct 2026 00:20:55 +0000
+Subject: [PATCH 278/385] Daily bump.
+
+---
+ gcc/ChangeLog           | 11 +++++++++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/testsuite/ChangeLog | 38 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 50 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index 4971344e777b..2763b0701e0d 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,14 @@
++2026-10-11  Robin Dapp  <robin.dapp@oss.qualcomm.com>
++
++	Backported from master:
++	2026-09-28  Robin Dapp  <robin.dapp@oss.qualcomm.com>
++
++	PR target/127553
++	* config/riscv/riscv-vector-builtins.cc (validate_instance_type_required_extensions):
++	Add location param for logging.
++	(expand_builtin): Pass location.
++	(check_builtin_call): Likewise.
++
+ 2026-10-10  Yongqiang Tian  <yqtian668@gmail.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index bb329782a639..2a44af499b51 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20261011
++20261012
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 4e3e4f86eb2b..44b3967b9253 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,41 @@
++2026-10-11  Robin Dapp  <robin.dapp@oss.qualcomm.com>
++
++	Backported from master:
++	2026-09-28  Robin Dapp  <robin.dapp@oss.qualcomm.com>
++
++	PR target/127553
++	* gcc.target/riscv/rvv/base/bug-9.c: Adjust test expectation.
++	* gcc.target/riscv/rvv/base/intrinsic_required_ext-1.c: Ditto.
++	* gcc.target/riscv/rvv/base/intrinsic_required_ext-10.c: Ditto.
++	* gcc.target/riscv/rvv/base/intrinsic_required_ext-2.c: Ditto.
++	* gcc.target/riscv/rvv/base/intrinsic_required_ext-3.c: Ditto.
++	* gcc.target/riscv/rvv/base/intrinsic_required_ext-4.c: Ditto.
++	* gcc.target/riscv/rvv/base/intrinsic_required_ext-5.c: Ditto.
++	* gcc.target/riscv/rvv/base/intrinsic_required_ext-6.c: Ditto.
++	* gcc.target/riscv/rvv/base/intrinsic_required_ext-7.c: Ditto.
++	* gcc.target/riscv/rvv/base/intrinsic_required_ext-8.c: Ditto.
++	* gcc.target/riscv/rvv/base/intrinsic_required_ext-9.c: Ditto.
++	* gcc.target/riscv/rvv/base/pr114988-1.c: Ditto.
++	* gcc.target/riscv/rvv/base/pr114988-2.c: Ditto.
++	* gcc.target/riscv/rvv/base/pr120436.c: Ditto.
++	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-17.c:
++	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-18.c:
++	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-19.c:
++	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-20.c:
++	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-21.c:
++	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-22.c:
++	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-23.c:
++	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-24.c:
++	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-25.c:
++	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-26.c:
++	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-27.c:
++	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-28.c:
++	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-29.c:
++	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-3.c:
++	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-7.c:
++	* gcc.target/riscv/rvv/base/target_attribute_v_with_intrinsic-8.c:
++	* gcc.target/riscv/pr127553.c: New test.
++
+ 2026-10-10  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:

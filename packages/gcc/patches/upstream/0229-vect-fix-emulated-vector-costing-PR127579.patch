@@ -1,0 +1,110 @@
+From 6cc92865896b5cfd4aff2afe5cee221454e2872f Mon Sep 17 00:00:00 2001
+From: Tamar Christina <tamar.christina@arm.com>
+Date: Thu, 24 Sep 2026 10:03:51 +0100
+Subject: [PATCH 229/385] vect: fix emulated vector costing [PR127579]
+
+The testcase
+
+char a;
+int b;
+void e() {
+  char *c = (char *)&b;
+  int d = 0;
+  for (; d < b; d++)
+    a += c[d];
+}
+
+ICEs with -O2 -mgeneral-regs-only  -march=armv9-a
+
+with a segfault in single cycle detection:
+
+internal compiler error: Segmentation fault
+//   446 | ff_layout_alloc_lseg(struct pnfs_layout_hdr *lh,
+//       | ^~~~~~~~~~~~~~~~~~~~
+// 0xf3fc23 internal_error(char const*, ...)
+// 	../../src/gcc/diagnostic-global-context.cc:787
+// 0x976543 crash_signal
+// 	../../src/gcc/toplev.cc:325
+// 0x1e43f74 info_for_reduction(_loop_vec_info*, _slp_tree*)
+// 	../../src/gcc/tree-vect-loop.cc:5060
+// 0x1a7946f aarch64_force_single_cycle
+// 	../../src/gcc/config/aarch64/aarch64.cc:18284
+
+This is because the slp_node is null and so looking
+up the reduction info fails.
+
+With -mgeneral-regs the SIMD reduction instructions
+become unavailable, so the vectorizer tries to emulate them.
+
+This enters a branch in vectorizable_operation where
+it looks like we forgot to update the costing code from
+using stmt_vinfo to the slp_node during the SLP only
+costing transition.  As such it uses the old interface which
+does not provide the required SLP node and we ICE.
+
+The fix is to use the slp_node instead of the stmt_info.
+
+gcc/ChangeLog:
+
+	PR tree-optimization/127579
+	* tree-vect-loop.cc (info_for_reduction): Add assert.
+	* tree-vect-stmts.cc (vectorizable_operation): Pass SLP node.
+
+gcc/testsuite/ChangeLog:
+
+	PR tree-optimization/127579
+	* gcc.target/aarch64/pr127579.c: New test.
+
+(cherry picked from commit 2b7ddfb841114b2783f0b3420fcb96e7687484d9)
+---
+ gcc/testsuite/gcc.target/aarch64/pr127579.c | 11 +++++++++++
+ gcc/tree-vect-loop.cc                       |  1 +
+ gcc/tree-vect-stmts.cc                      |  4 ++--
+ 3 files changed, 14 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.target/aarch64/pr127579.c
+
+diff --git a/gcc/testsuite/gcc.target/aarch64/pr127579.c b/gcc/testsuite/gcc.target/aarch64/pr127579.c
+new file mode 100644
+index 000000000000..1f9eb6af741c
+--- /dev/null
++++ b/gcc/testsuite/gcc.target/aarch64/pr127579.c
+@@ -0,0 +1,11 @@
++/* { dg-do compile } */
++/* { dg-additional-options "-O2 -mgeneral-regs-only -march=armv9-a" } */
++
++char a;
++int b;
++void e() {
++  char *c = (char *)&b;
++  int d = 0;
++  for (; d < b; d++)
++    a += c[d];
++}
+diff --git a/gcc/tree-vect-loop.cc b/gcc/tree-vect-loop.cc
+index 810126196dfa..3cd0aafe1eb0 100644
+--- a/gcc/tree-vect-loop.cc
++++ b/gcc/tree-vect-loop.cc
+@@ -5057,6 +5057,7 @@ get_initial_defs_for_reduction (loop_vec_info loop_vinfo,
+ vect_reduc_info
+ info_for_reduction (loop_vec_info loop_vinfo, slp_tree node)
+ {
++  gcc_assert (node);
+   if (node->cycle_info.id == -1)
+     return NULL;
+   return loop_vinfo->reduc_infos[node->cycle_info.id];
+diff --git a/gcc/tree-vect-stmts.cc b/gcc/tree-vect-stmts.cc
+index 34199449d169..1f3bdb167cc4 100644
+--- a/gcc/tree-vect-stmts.cc
++++ b/gcc/tree-vect-stmts.cc
+@@ -6872,9 +6872,9 @@ vectorizable_operation (vec_info *vinfo,
+ 	  if (n != 0)
+ 	    {
+ 	      /* We also need to materialize two large constants.  */
+-	      record_stmt_cost (cost_vec, 2, scalar_stmt, stmt_info,
++	      record_stmt_cost (cost_vec, 2, scalar_stmt, slp_node,
+ 				0, vect_prologue);
+-	      record_stmt_cost (cost_vec, n, scalar_stmt, stmt_info,
++	      record_stmt_cost (cost_vec, n, scalar_stmt, slp_node,
+ 				0, vect_body);
+ 	    }
+ 	}

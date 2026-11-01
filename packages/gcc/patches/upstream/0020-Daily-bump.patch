@@ -1,0 +1,51 @@
+From 643129fbd5a2bd227fa798ee066098cd5fe99290 Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Sun, 9 Aug 2026 00:20:46 +0000
+Subject: [PATCH 020/385] Daily bump.
+
+---
+ gcc/DATESTAMP           | 2 +-
+ gcc/fortran/ChangeLog   | 9 +++++++++
+ gcc/testsuite/ChangeLog | 8 ++++++++
+ 3 files changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index ac282fe95ef3..8cb42c2ba5a3 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260808
++20260809
+diff --git a/gcc/fortran/ChangeLog b/gcc/fortran/ChangeLog
+index 7d1f6e14c933..3503f486c84e 100644
+--- a/gcc/fortran/ChangeLog
++++ b/gcc/fortran/ChangeLog
+@@ -1,3 +1,12 @@
++2026-08-08  Paul Thomas  <pault@gcc.gnu.org>
++
++	Backported from master:
++	2026-05-23  Paul Thomas  <pault@gcc.gnu.org>
++
++	PR fortran/125263
++	* trans-expr.cc (gfc_trans_assignment_1): Pass scalar class to
++	derived type assignment expressions to gfc_trans_scalar_assign.
++
+ 2026-08-07  Paul Thomas  <pault@gcc.gnu.org>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 261a927679d9..fe8ea028d1db 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2026-08-08  Paul Thomas  <pault@gcc.gnu.org>
++
++	Backported from master:
++	2026-05-23  Paul Thomas  <pault@gcc.gnu.org>
++
++	PR fortran/125263
++	* gfortran.dg/pr125263.f90: New test.
++
+ 2026-08-07  Jakub Jelinek  <jakub@redhat.com>
+ 
+ 	Backported from master:

@@ -1,0 +1,53 @@
+From 5dbcb7cad056a409206393554ba98fae4fa99d81 Mon Sep 17 00:00:00 2001
+From: Pietro Monteiro <pietro@sociotechnical.xyz>
+Date: Thu, 20 Aug 2026 11:54:58 -0400
+Subject: [PATCH 070/385] libstdc++: Fix OpenBSD ctype_base masks
+
+Building on recent OpenBSD fails because the mask macros have been
+redefined.  Use the new macros if available.
+
+libstdc++-v3/ChangeLog:
+
+	* config/os/bsd/openbsd/ctype_base.h: Use _CTYPE prefixed
+	macros if available.
+
+Signed-off-by: Pietro Monteiro <pietro@sociotechnical.xyz>
+(cherry picked from commit 15419a00a2934258bed26ab75bc2f80a245ca7c3)
+---
+ libstdc++-v3/config/os/bsd/openbsd/ctype_base.h | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/libstdc++-v3/config/os/bsd/openbsd/ctype_base.h b/libstdc++-v3/config/os/bsd/openbsd/ctype_base.h
+index c86c77e60fc0..e1d982f81cd1 100644
+--- a/libstdc++-v3/config/os/bsd/openbsd/ctype_base.h
++++ b/libstdc++-v3/config/os/bsd/openbsd/ctype_base.h
+@@ -42,6 +42,21 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+     // on the mask type. Because of this, we don't use an enum.
+     typedef char		mask;
+ 
++#ifdef _CTYPE_S
++    // OpenBSD 7.5 uses this style of define.
++    static const mask upper	= _CTYPE_U;
++    static const mask lower	= _CTYPE_L;
++    static const mask alpha	= _CTYPE_U | _CTYPE_L;
++    static const mask digit	= _CTYPE_N;
++    static const mask xdigit	= _CTYPE_N | _CTYPE_X;
++    static const mask space	= _CTYPE_S;
++    static const mask print	= _CTYPE_P | _CTYPE_U | _CTYPE_L | _CTYPE_N | _CTYPE_B;
++    static const mask graph	= _CTYPE_P | _CTYPE_U | _CTYPE_L | _CTYPE_N;
++    static const mask cntrl	= _CTYPE_C;
++    static const mask punct	= _CTYPE_P;
++    static const mask alnum	= _CTYPE_U | _CTYPE_L | _CTYPE_N;
++#else
++    // Older versions use this style.
+     static const mask upper	= _U;
+     static const mask lower	= _L;
+     static const mask alpha	= _U | _L;
+@@ -53,6 +68,7 @@ _GLIBCXX_BEGIN_NAMESPACE_VERSION
+     static const mask cntrl	= _C;
+     static const mask punct	= _P;
+     static const mask alnum	= _U | _L | _N;
++#endif
+ #if __cplusplus >= 201103L
+     static const mask blank	= space;
+ #endif

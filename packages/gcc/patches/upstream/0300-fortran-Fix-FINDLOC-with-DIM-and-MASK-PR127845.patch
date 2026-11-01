@@ -1,0 +1,319 @@
+From 345870510d2b044d9ebc5bf6a086bc384f2ee9d5 Mon Sep 17 00:00:00 2001
+From: Harald Anlauf <anlauf@gmx.de>
+Date: Tue, 13 Oct 2026 22:52:52 +0200
+Subject: [PATCH 300/385] fortran: Fix FINDLOC with DIM and MASK [PR127845]
+
+The runtime library templates for FINDLOC did not advance properly
+through the MASK array argument when MASK and DIM are present.
+
+	PR fortran/127845
+
+libgfortran/ChangeLog:
+
+	* generated/findloc1_c10.c (mfindloc1_c10): Regenerate.
+	* generated/findloc1_c16.c (mfindloc1_c16): Likewise.
+	* generated/findloc1_c17.c (mfindloc1_c17): Likewise.
+	* generated/findloc1_c4.c (mfindloc1_c4): Likewise.
+	* generated/findloc1_c8.c (mfindloc1_c8): Likewise.
+	* generated/findloc1_i1.c (mfindloc1_i1): Likewise.
+	* generated/findloc1_i16.c (mfindloc1_i16): Likewise.
+	* generated/findloc1_i2.c (mfindloc1_i2): Likewise.
+	* generated/findloc1_i4.c (mfindloc1_i4): Likewise.
+	* generated/findloc1_i8.c (mfindloc1_i8): Likewise.
+	* generated/findloc1_r10.c (mfindloc1_r10): Likewise.
+	* generated/findloc1_r16.c (mfindloc1_r16): Likewise.
+	* generated/findloc1_r17.c (mfindloc1_r17): Likewise.
+	* generated/findloc1_r4.c (mfindloc1_r4): Likewise.
+	* generated/findloc1_r8.c (mfindloc1_r8): Likewise.
+	* generated/findloc1_s1.c (mfindloc1_s1): Likewise.
+	* generated/findloc1_s4.c (mfindloc1_s4): Likewise.
+	* m4/ifindloc1.m4: Properly advance through MASK array argument when
+	MASK and DIM are present.
+
+gcc/testsuite/ChangeLog:
+
+	* gfortran.dg/findloc_11.f90: New test.
+
+(cherry picked from commit 0a3124969d7cf120d26d7044deec17a7f23d169e)
+---
+ gcc/testsuite/gfortran.dg/findloc_11.f90 | 37 ++++++++++++++++++++++++
+ libgfortran/generated/findloc1_c10.c     |  1 +
+ libgfortran/generated/findloc1_c16.c     |  1 +
+ libgfortran/generated/findloc1_c17.c     |  1 +
+ libgfortran/generated/findloc1_c4.c      |  1 +
+ libgfortran/generated/findloc1_c8.c      |  1 +
+ libgfortran/generated/findloc1_i1.c      |  1 +
+ libgfortran/generated/findloc1_i16.c     |  1 +
+ libgfortran/generated/findloc1_i2.c      |  1 +
+ libgfortran/generated/findloc1_i4.c      |  1 +
+ libgfortran/generated/findloc1_i8.c      |  1 +
+ libgfortran/generated/findloc1_r10.c     |  1 +
+ libgfortran/generated/findloc1_r16.c     |  1 +
+ libgfortran/generated/findloc1_r17.c     |  1 +
+ libgfortran/generated/findloc1_r4.c      |  1 +
+ libgfortran/generated/findloc1_r8.c      |  1 +
+ libgfortran/generated/findloc1_s1.c      |  1 +
+ libgfortran/generated/findloc1_s4.c      |  1 +
+ libgfortran/m4/ifindloc1.m4              |  1 +
+ 19 files changed, 55 insertions(+)
+ create mode 100644 gcc/testsuite/gfortran.dg/findloc_11.f90
+
+diff --git a/gcc/testsuite/gfortran.dg/findloc_11.f90 b/gcc/testsuite/gfortran.dg/findloc_11.f90
+new file mode 100644
+index 000000000000..eaecbb070b7f
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/findloc_11.f90
+@@ -0,0 +1,37 @@
++! { dg-do run }
++!
++! PR fortran/127845 - FINDLOC with DIM and MASK
++!
++! Contributed by Federico Perini.
++
++program findloc_dim_mask
++  implicit none
++  real(8) :: x(2,3,2)
++  logical :: m(2,3,2)
++  integer :: i, j, k, l
++  integer :: r(2,3)
++
++  l = 0
++  do k = 1, 2; do j = 1, 3; do i = 1, 2
++     x(i,j,k) = real(mod(l*7,5)+1, 8); m(i,j,k) = mod(l,3) /= 1; l = l + 1
++  end do; end do; end do
++  r = findloc(x, 3.0d0, dim=3, mask=m)
++
++  if (any (r /= transpose (reshape ([2, 0, 0, 0, 0, 2], [3,2])))) then
++     do k = 1, 2
++        print '(a,i0,a,i0,a)', 'x(:,:,', k, ')          m(:,:,', k, ')'
++        do i = 1, 2
++           print '(3f4.1,6x,3l2)', x(i,:,k), m(i,:,k)
++        end do
++     end do
++     print '(a)', 'findloc(x, 3.0d0, dim=3, mask=m), a 2x3 array, got:'
++     do i = 1, 2
++        print '(4x,3i2)', r(i,:)
++     end do
++     print '(a)', '  expected:'
++     print '(4x,3i2)', 2, 0, 0
++     print '(4x,3i2)', 0, 0, 2
++     print '(a)', '  (x(2,3,2) = 3.0 and m(2,3,2) = T, so element (2,3) is 2)'
++     stop 1
++  end if
++end program findloc_dim_mask
+diff --git a/libgfortran/generated/findloc1_c10.c b/libgfortran/generated/findloc1_c10.c
+index d7cc8944b2cf..5afcf09827c0 100644
+--- a/libgfortran/generated/findloc1_c10.c
++++ b/libgfortran/generated/findloc1_c10.c
+@@ -372,6 +372,7 @@ mfindloc1_c10 (gfc_array_index_type * const restrict retarray,
+ 	    {
+ 	      count[n]++;
+ 	      base += sstride[n] * 1;
++	      mbase += mstride[n];
+ 	      dest += dstride[n];
+ 	    }
+ 	}
+diff --git a/libgfortran/generated/findloc1_c16.c b/libgfortran/generated/findloc1_c16.c
+index 66b8adaff066..4a8e962d7790 100644
+--- a/libgfortran/generated/findloc1_c16.c
++++ b/libgfortran/generated/findloc1_c16.c
+@@ -372,6 +372,7 @@ mfindloc1_c16 (gfc_array_index_type * const restrict retarray,
+ 	    {
+ 	      count[n]++;
+ 	      base += sstride[n] * 1;
++	      mbase += mstride[n];
+ 	      dest += dstride[n];
+ 	    }
+ 	}
+diff --git a/libgfortran/generated/findloc1_c17.c b/libgfortran/generated/findloc1_c17.c
+index 7c2fe6773a78..94a2a28b260a 100644
+--- a/libgfortran/generated/findloc1_c17.c
++++ b/libgfortran/generated/findloc1_c17.c
+@@ -372,6 +372,7 @@ mfindloc1_c17 (gfc_array_index_type * const restrict retarray,
+ 	    {
+ 	      count[n]++;
+ 	      base += sstride[n] * 1;
++	      mbase += mstride[n];
+ 	      dest += dstride[n];
+ 	    }
+ 	}
+diff --git a/libgfortran/generated/findloc1_c4.c b/libgfortran/generated/findloc1_c4.c
+index 482b3fdb1e2d..adf2167e322a 100644
+--- a/libgfortran/generated/findloc1_c4.c
++++ b/libgfortran/generated/findloc1_c4.c
+@@ -372,6 +372,7 @@ mfindloc1_c4 (gfc_array_index_type * const restrict retarray,
+ 	    {
+ 	      count[n]++;
+ 	      base += sstride[n] * 1;
++	      mbase += mstride[n];
+ 	      dest += dstride[n];
+ 	    }
+ 	}
+diff --git a/libgfortran/generated/findloc1_c8.c b/libgfortran/generated/findloc1_c8.c
+index fbc8d92e7d69..8bc59718b136 100644
+--- a/libgfortran/generated/findloc1_c8.c
++++ b/libgfortran/generated/findloc1_c8.c
+@@ -372,6 +372,7 @@ mfindloc1_c8 (gfc_array_index_type * const restrict retarray,
+ 	    {
+ 	      count[n]++;
+ 	      base += sstride[n] * 1;
++	      mbase += mstride[n];
+ 	      dest += dstride[n];
+ 	    }
+ 	}
+diff --git a/libgfortran/generated/findloc1_i1.c b/libgfortran/generated/findloc1_i1.c
+index 9f4dae25e32a..07c3a2a6587b 100644
+--- a/libgfortran/generated/findloc1_i1.c
++++ b/libgfortran/generated/findloc1_i1.c
+@@ -372,6 +372,7 @@ mfindloc1_i1 (gfc_array_index_type * const restrict retarray,
+ 	    {
+ 	      count[n]++;
+ 	      base += sstride[n] * 1;
++	      mbase += mstride[n];
+ 	      dest += dstride[n];
+ 	    }
+ 	}
+diff --git a/libgfortran/generated/findloc1_i16.c b/libgfortran/generated/findloc1_i16.c
+index aec991ad0361..053b50f5ad7d 100644
+--- a/libgfortran/generated/findloc1_i16.c
++++ b/libgfortran/generated/findloc1_i16.c
+@@ -372,6 +372,7 @@ mfindloc1_i16 (gfc_array_index_type * const restrict retarray,
+ 	    {
+ 	      count[n]++;
+ 	      base += sstride[n] * 1;
++	      mbase += mstride[n];
+ 	      dest += dstride[n];
+ 	    }
+ 	}
+diff --git a/libgfortran/generated/findloc1_i2.c b/libgfortran/generated/findloc1_i2.c
+index 94c85008dcef..7a945ff37c9a 100644
+--- a/libgfortran/generated/findloc1_i2.c
++++ b/libgfortran/generated/findloc1_i2.c
+@@ -372,6 +372,7 @@ mfindloc1_i2 (gfc_array_index_type * const restrict retarray,
+ 	    {
+ 	      count[n]++;
+ 	      base += sstride[n] * 1;
++	      mbase += mstride[n];
+ 	      dest += dstride[n];
+ 	    }
+ 	}
+diff --git a/libgfortran/generated/findloc1_i4.c b/libgfortran/generated/findloc1_i4.c
+index 638101f5ece4..1a60be9fec11 100644
+--- a/libgfortran/generated/findloc1_i4.c
++++ b/libgfortran/generated/findloc1_i4.c
+@@ -372,6 +372,7 @@ mfindloc1_i4 (gfc_array_index_type * const restrict retarray,
+ 	    {
+ 	      count[n]++;
+ 	      base += sstride[n] * 1;
++	      mbase += mstride[n];
+ 	      dest += dstride[n];
+ 	    }
+ 	}
+diff --git a/libgfortran/generated/findloc1_i8.c b/libgfortran/generated/findloc1_i8.c
+index 687aee1c0c60..1190721f681d 100644
+--- a/libgfortran/generated/findloc1_i8.c
++++ b/libgfortran/generated/findloc1_i8.c
+@@ -372,6 +372,7 @@ mfindloc1_i8 (gfc_array_index_type * const restrict retarray,
+ 	    {
+ 	      count[n]++;
+ 	      base += sstride[n] * 1;
++	      mbase += mstride[n];
+ 	      dest += dstride[n];
+ 	    }
+ 	}
+diff --git a/libgfortran/generated/findloc1_r10.c b/libgfortran/generated/findloc1_r10.c
+index f16163458afe..f4e244330087 100644
+--- a/libgfortran/generated/findloc1_r10.c
++++ b/libgfortran/generated/findloc1_r10.c
+@@ -372,6 +372,7 @@ mfindloc1_r10 (gfc_array_index_type * const restrict retarray,
+ 	    {
+ 	      count[n]++;
+ 	      base += sstride[n] * 1;
++	      mbase += mstride[n];
+ 	      dest += dstride[n];
+ 	    }
+ 	}
+diff --git a/libgfortran/generated/findloc1_r16.c b/libgfortran/generated/findloc1_r16.c
+index 973859180ef2..4509c0420ddf 100644
+--- a/libgfortran/generated/findloc1_r16.c
++++ b/libgfortran/generated/findloc1_r16.c
+@@ -372,6 +372,7 @@ mfindloc1_r16 (gfc_array_index_type * const restrict retarray,
+ 	    {
+ 	      count[n]++;
+ 	      base += sstride[n] * 1;
++	      mbase += mstride[n];
+ 	      dest += dstride[n];
+ 	    }
+ 	}
+diff --git a/libgfortran/generated/findloc1_r17.c b/libgfortran/generated/findloc1_r17.c
+index 107f04faaade..92a9b7cb903e 100644
+--- a/libgfortran/generated/findloc1_r17.c
++++ b/libgfortran/generated/findloc1_r17.c
+@@ -372,6 +372,7 @@ mfindloc1_r17 (gfc_array_index_type * const restrict retarray,
+ 	    {
+ 	      count[n]++;
+ 	      base += sstride[n] * 1;
++	      mbase += mstride[n];
+ 	      dest += dstride[n];
+ 	    }
+ 	}
+diff --git a/libgfortran/generated/findloc1_r4.c b/libgfortran/generated/findloc1_r4.c
+index 987a9f873c0b..56edde2c30cd 100644
+--- a/libgfortran/generated/findloc1_r4.c
++++ b/libgfortran/generated/findloc1_r4.c
+@@ -372,6 +372,7 @@ mfindloc1_r4 (gfc_array_index_type * const restrict retarray,
+ 	    {
+ 	      count[n]++;
+ 	      base += sstride[n] * 1;
++	      mbase += mstride[n];
+ 	      dest += dstride[n];
+ 	    }
+ 	}
+diff --git a/libgfortran/generated/findloc1_r8.c b/libgfortran/generated/findloc1_r8.c
+index a22039c62084..b9f19458b315 100644
+--- a/libgfortran/generated/findloc1_r8.c
++++ b/libgfortran/generated/findloc1_r8.c
+@@ -372,6 +372,7 @@ mfindloc1_r8 (gfc_array_index_type * const restrict retarray,
+ 	    {
+ 	      count[n]++;
+ 	      base += sstride[n] * 1;
++	      mbase += mstride[n];
+ 	      dest += dstride[n];
+ 	    }
+ 	}
+diff --git a/libgfortran/generated/findloc1_s1.c b/libgfortran/generated/findloc1_s1.c
+index 6dc8b8211848..8f2709d94e85 100644
+--- a/libgfortran/generated/findloc1_s1.c
++++ b/libgfortran/generated/findloc1_s1.c
+@@ -374,6 +374,7 @@ mfindloc1_s1 (gfc_array_index_type * const restrict retarray,
+ 	    {
+ 	      count[n]++;
+ 	      base += sstride[n] * len_array;
++	      mbase += mstride[n];
+ 	      dest += dstride[n];
+ 	    }
+ 	}
+diff --git a/libgfortran/generated/findloc1_s4.c b/libgfortran/generated/findloc1_s4.c
+index 364e9148dd7b..ce8b720ac01d 100644
+--- a/libgfortran/generated/findloc1_s4.c
++++ b/libgfortran/generated/findloc1_s4.c
+@@ -374,6 +374,7 @@ mfindloc1_s4 (gfc_array_index_type * const restrict retarray,
+ 	    {
+ 	      count[n]++;
+ 	      base += sstride[n] * len_array;
++	      mbase += mstride[n];
+ 	      dest += dstride[n];
+ 	    }
+ 	}
+diff --git a/libgfortran/m4/ifindloc1.m4 b/libgfortran/m4/ifindloc1.m4
+index 30ab5e7ad580..29962f081b87 100644
+--- a/libgfortran/m4/ifindloc1.m4
++++ b/libgfortran/m4/ifindloc1.m4
+@@ -354,6 +354,7 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+ 	    {
+ 	      count[n]++;
+ 	      base += sstride[n] * 'base_mult`;
++	      mbase += mstride[n];
+ 	      dest += dstride[n];
+ 	    }
+ 	}

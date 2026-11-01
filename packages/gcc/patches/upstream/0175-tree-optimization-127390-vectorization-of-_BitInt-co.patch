@@ -1,0 +1,76 @@
+From 157af9d1ea36bbece6f871bdbd7758471dfb4e8f Mon Sep 17 00:00:00 2001
+From: Richard Biener <rguenther@suse.de>
+Date: Tue, 15 Sep 2026 10:52:22 +0200
+Subject: [PATCH 175/385] tree-optimization/127390 - vectorization of _BitInt
+ comparisons
+
+We fail to reject vectorizing of comparisons of non-mode precision
+integer types.  Those need to be dealt with via bitfield lowering
+in ifcvt or pattern recognition.
+
+	PR tree-optimization/127390
+	* tree-vect-stmts.cc (vectorizable_comparison_1): Reject
+	bit-precision integer comparisons.
+
+	* gcc.dg/vect/vect-pr127390.c: New testcase.
+
+(cherry picked from commit faf5c056ca1826cffb5673fa3b445eb61a6bb7eb)
+---
+ gcc/testsuite/gcc.dg/vect/vect-pr127390.c | 29 +++++++++++++++++++++++
+ gcc/tree-vect-stmts.cc                    |  7 ++++++
+ 2 files changed, 36 insertions(+)
+ create mode 100644 gcc/testsuite/gcc.dg/vect/vect-pr127390.c
+
+diff --git a/gcc/testsuite/gcc.dg/vect/vect-pr127390.c b/gcc/testsuite/gcc.dg/vect/vect-pr127390.c
+new file mode 100644
+index 000000000000..05e0399ceba5
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/vect/vect-pr127390.c
+@@ -0,0 +1,29 @@
++/* { dg-additional-options "-O3" } */
++/* { dg-add-options vect_early_break } */
++/* { dg-require-effective-target vect_early_break_hw } */
++/* { dg-require-effective-target bitint } */
++
++#include <stdint.h>
++#include "tree-vect.h"
++
++typedef signed _BitInt(24) i24;
++int8_t m0[2];
++
++int __attribute__((noipa))
++foo (int16_t in2)
++{
++  int16_t x2;
++  int n = 0;
++  for (n = 0; n < 8; n++) {
++    if (((i24)(m0[1] ? m0[1] * 2 : 1) >= (i24)(x2 - 1))) break;
++  }
++  return n;
++}
++
++int main(void)
++{
++  check_vect ();
++  if (foo (-1))
++    __builtin_abort ();
++  return 0;
++}
+diff --git a/gcc/tree-vect-stmts.cc b/gcc/tree-vect-stmts.cc
+index 5a15952ea11d..34199449d169 100644
+--- a/gcc/tree-vect-stmts.cc
++++ b/gcc/tree-vect-stmts.cc
+@@ -12662,6 +12662,13 @@ vectorizable_comparison_1 (vec_info *vinfo, tree vectype,
+       && (VECTOR_BOOLEAN_TYPE_P (vectype1) ^ VECTOR_BOOLEAN_TYPE_P (vectype2)))
+     return false;
+ 
++  /* We cannot compare non-mode precision _BitInt types.  Unlike bool
++     or bit-precision INTEGER_TYPE the padding bit values are target
++     dependent and possibly undefined.  */
++  if (TREE_CODE (TREE_TYPE (rhs1)) == BITINT_TYPE
++      && !type_has_mode_precision_p (TREE_TYPE (rhs1)))
++    return false;
++
+   /* Boolean values may have another representation in vectors
+      and therefore we prefer bit operations over comparison for
+      them (which also works for scalar masks).  We store opcodes

@@ -1,0 +1,147 @@
+From 3bfe0866b640a3e06ba180fb6b328d25fb3942e0 Mon Sep 17 00:00:00 2001
+From: Christophe Lyon <christophe.lyon@arm.com>
+Date: Mon, 28 Sep 2026 13:19:23 +0000
+Subject: [PATCH 225/385] [testsuite, arm]: Remove useless dg-skip-if
+ directives
+
+These tests have useless dg-skip-if directives which can be replaced
+with the appropriate dg-require-effective-target and dg-add-options
+directives.
+
+This makes these tests go from UNSUPPORTED to PASS when running the
+testsuite with -march options.
+
+For gcc.target/arm/armv6-unaligned-load-ice.c, dg-add-options
+arm_arch_v6k did not match dg-require-effective-target
+arm_arch_v6k_thumb_ok.  Fix it, and remove -mthumb and
+-mfloat-abi=softfp from dg-options.
+
+gcc/testsuite/ChangeLog:
+
+	* gcc.target/arm/armv6-unaligned-load-ice.c: Remove dg-skip-if,
+	fix dg-options and dg-add-options.
+	* gcc.target/arm/attr-unaligned-load-ice.c: Remove dg-skip-if and
+	fix dg-options.
+	* gcc.target/arm/attr_arm-err.c: Remove dg-skip-if.
+	* gcc.target/arm/combine-cmp-shift.c: Remove dg-skip-if, useless
+	-mcpu=cortex-a8 and require arm_arch_v7a.
+	* gcc.target/arm/lob2.c: Remove dg-skip-if, and require
+	arm_arch_v8_1m_main.
+	* gcc.target/arm/lob5.c: Likewise.
+	* gcc.target/arm/pr50305.c: Remove dg-skip-if and require
+	arm_arch_v7a_arm.
+
+(cherry picked from commit 9d3366fcbeb27ffe74143e3ffb4b111ed21acce1)
+---
+ gcc/testsuite/gcc.target/arm/armv6-unaligned-load-ice.c | 6 ++----
+ gcc/testsuite/gcc.target/arm/attr-unaligned-load-ice.c  | 3 +--
+ gcc/testsuite/gcc.target/arm/attr_arm-err.c             | 1 -
+ gcc/testsuite/gcc.target/arm/combine-cmp-shift.c        | 5 +++--
+ gcc/testsuite/gcc.target/arm/lob2.c                     | 5 +++--
+ gcc/testsuite/gcc.target/arm/lob5.c                     | 5 +++--
+ gcc/testsuite/gcc.target/arm/pr50305.c                  | 5 +++--
+ 7 files changed, 15 insertions(+), 15 deletions(-)
+
+diff --git a/gcc/testsuite/gcc.target/arm/armv6-unaligned-load-ice.c b/gcc/testsuite/gcc.target/arm/armv6-unaligned-load-ice.c
+index 886a0129f85d..d61bb9ec386a 100644
+--- a/gcc/testsuite/gcc.target/arm/armv6-unaligned-load-ice.c
++++ b/gcc/testsuite/gcc.target/arm/armv6-unaligned-load-ice.c
+@@ -1,9 +1,7 @@
+ /* { dg-do compile } */
+-/* { dg-skip-if "avoid conflicting multilib options" { *-*-* } { "-march=*" } { "-march=armv6k" } } */
+-/* { dg-skip-if "avoid conflicting multilib options" { *-*-* } { "-marm" } { "" } } */
+ /* { dg-require-effective-target arm_arch_v6k_thumb_ok } */
+-/* { dg-options "-mthumb -Os -mfloat-abi=softfp" } */
+-/* { dg-add-options arm_arch_v6k } */
++/* { dg-options "-Os" } */
++/* { dg-add-options arm_arch_v6k_thumb } */
+ 
+ long
+ get_number (char *s, long size, int unsigned_p)
+diff --git a/gcc/testsuite/gcc.target/arm/attr-unaligned-load-ice.c b/gcc/testsuite/gcc.target/arm/attr-unaligned-load-ice.c
+index 2eeb5220545c..bae261a5e1d5 100644
+--- a/gcc/testsuite/gcc.target/arm/attr-unaligned-load-ice.c
++++ b/gcc/testsuite/gcc.target/arm/attr-unaligned-load-ice.c
+@@ -1,9 +1,8 @@
+ /* PR target/68617
+    Verify that unaligned_access is correctly with attribute target.  */
+ /* { dg-do compile } */
+-/* { dg-skip-if "avoid conflicting multilib options" { *-*-* } { "-march=*" } { "-march=armv6" } } */
+ /* { dg-require-effective-target arm_arch_v6_ok } */
+-/* { dg-options "-Os -mfloat-abi=softfp -mtp=soft" } */
++/* { dg-options "-Os -mtp=soft" } */
+ /* { dg-add-options arm_arch_v6 } */
+ 
+ long __attribute__((target("thumb")))
+diff --git a/gcc/testsuite/gcc.target/arm/attr_arm-err.c b/gcc/testsuite/gcc.target/arm/attr_arm-err.c
+index 67d572ab2f30..d6724e469040 100644
+--- a/gcc/testsuite/gcc.target/arm/attr_arm-err.c
++++ b/gcc/testsuite/gcc.target/arm/attr_arm-err.c
+@@ -1,6 +1,5 @@
+ /* Check that attribute target arm is rejected for M profile.  */
+ /* { dg-do compile } */
+-/* { dg-skip-if "avoid conflicting multilib options" { *-*-* } { "-march=*" } { "-march=armv6-m" } } */
+ /* { dg-require-effective-target arm_arch_v6m_ok } */
+ /* { dg-add-options arm_arch_v6m } */
+ 
+diff --git a/gcc/testsuite/gcc.target/arm/combine-cmp-shift.c b/gcc/testsuite/gcc.target/arm/combine-cmp-shift.c
+index 21d147840b80..ed35e89ef451 100644
+--- a/gcc/testsuite/gcc.target/arm/combine-cmp-shift.c
++++ b/gcc/testsuite/gcc.target/arm/combine-cmp-shift.c
+@@ -1,6 +1,7 @@
+-/* { dg-skip-if "incompatible options" { arm*-*-* } { "-march=*" } { "-march=armv7-a" } } */
+ /* { dg-skip-if "-mpure-code supports M-profile only" { *-*-* } { "-mpure-code" } } */
+-/* { dg-options "-O2 -mcpu=cortex-a8" }  */
++/* { dg-require-effective-target arm_arch_v7a_ok } */
++/* { dg-options "-O2" }  */
++/* { dg-add-options arm_arch_v7a } */
+ /* { dg-final { scan-assembler "cmp\tr\[0-9\]*, r\[0-9\]*, asr #31" } } */
+ 
+ typedef int SItype __attribute__ ((mode (SI)));
+diff --git a/gcc/testsuite/gcc.target/arm/lob2.c b/gcc/testsuite/gcc.target/arm/lob2.c
+index d174857b9268..1e13938e9f12 100644
+--- a/gcc/testsuite/gcc.target/arm/lob2.c
++++ b/gcc/testsuite/gcc.target/arm/lob2.c
+@@ -1,8 +1,9 @@
+ /* Check that GCC does not generate Armv8.1-M low over head loop instructions
+    if a non-inlineable function call takes place inside the loop.  */
+ /* { dg-do compile } */
+-/* { dg-skip-if "avoid conflicting multilib options" { *-*-* } { "-marm" "-mcpu=*" } } */
+-/* { dg-options "-march=armv8.1-m.main+fp -mthumb -O3 --save-temps" } */
++/* { dg-require-effective-target arm_arch_v8_1m_main_ok } */
++/* { dg-options "-O3 --save-temps" } */
++/* { dg-add-options arm_arch_v8_1m_main } */
+ #include <stdlib.h>
+ #include "lob.h"
+ 
+diff --git a/gcc/testsuite/gcc.target/arm/lob5.c b/gcc/testsuite/gcc.target/arm/lob5.c
+index df5383b4a262..eb2e36213ba2 100644
+--- a/gcc/testsuite/gcc.target/arm/lob5.c
++++ b/gcc/testsuite/gcc.target/arm/lob5.c
+@@ -2,8 +2,9 @@
+    instructions.  Innermost loop has no fixed number of iterations
+    therefore is not optimizable.  Outer loops are not optimized.  */
+ /* { dg-do compile } */
+-/* { dg-skip-if "avoid conflicting multilib options" { *-*-* } { "-marm" "-mcpu=*" } } */
+-/* { dg-options "-march=armv8.1-m.main+fp -mthumb -O3 --save-temps" } */
++/* { dg-require-effective-target arm_arch_v8_1m_main_ok } */
++/* { dg-options "-O3 --save-temps" } */
++/* { dg-add-options arm_arch_v8_1m_main } */
+ #include <stdlib.h>
+ #include "lob.h"
+ 
+diff --git a/gcc/testsuite/gcc.target/arm/pr50305.c b/gcc/testsuite/gcc.target/arm/pr50305.c
+index f93df9f4e7e0..499504121efc 100644
+--- a/gcc/testsuite/gcc.target/arm/pr50305.c
++++ b/gcc/testsuite/gcc.target/arm/pr50305.c
+@@ -1,7 +1,8 @@
+ /* { dg-do compile } */
+-/* { dg-skip-if "incompatible options" { arm*-*-* } { "-march=*" } { "-march=armv7-a" } } */
+ /* { dg-skip-if "-mpure-code supports M-profile only" { *-*-* } { "-mpure-code" } } */
+-/* { dg-options "-O2 -fno-omit-frame-pointer -marm -march=armv7-a -mfpu=vfp3" } */
++/* { dg-require-effective-target arm_arch_v7a_arm_ok } */
++/* { dg-options "-O2 -fno-omit-frame-pointer -mfpu=vfp3" } */
++/* { dg-add-options arm_arch_v7a_arm } */
+ 
+ struct event {
+  unsigned long long id;

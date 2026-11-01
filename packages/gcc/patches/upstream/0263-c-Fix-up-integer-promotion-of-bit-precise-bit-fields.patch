@@ -1,0 +1,158 @@
+From fc69bc3065c57b820eb3e7c4b10bcae2020b953d Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Wed, 16 Sep 2026 22:22:20 +0200
+Subject: [PATCH 263/385] c: Fix up integer promotion of bit-precise bit-fields
+ [PR127383]
+
+The following testcases are miscompiled when a bit-precise integer
+bit-field is explicitly cast to a non-cv-qualified bit-precise integer
+(of the same signedness) with precision of the bit-field width.
+We can then incorrectly apply an integer promotion of the bit-field
+to the corresponding bit-precise integer, even when it shouldn't be
+applied (because it is a cast rather than the bit-field itself).
+Regardless of the cv-qualifications, the TREE_TYPE of the FIELD_DECLs
+(and COMPONENT_REFs) is a cv-unqualified BITINT_TYPE.  We first call
+convert to that type in convert_lvalue_to_rvalue and that doesn't change
+anything.
+If there is an explicit cast to the same type as the TREE_TYPE of
+the COMPONENT_REF has, we usually wrap it into a NON_LVALUE_EXPR, because
+the COMPONENT_REF is usually an lvalue (but as can be seen in the testcases,
+not always).  So the second hunk makes sure to add NON_LVALUE_EXPR around
+the COMPONENT_REF even in the (cast) foo ().a cases to distinguish it
+from foo ().a.
+The second change is in default_conversion, for the promotion of bit-fields
+of bit-precise integer type we don't promote them if they are wrapped in
+some cast or NON_LVALUE_EXPR (the function normally uses STRIP_TYPE_NOPS).
+
+2026-09-16  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/127383
+	* c-typeck.cc (default_conversion): If orig_expr is different
+	from exp and exp is a bit-field of bit-precise integer type, call
+	perform_integral_promotions on orig_exp rather than exp.
+	(build_c_cast): Wrap in NON_LVALUE_EXPR not just lvalues, but
+	also non-lvalue bit-fields of bit-precise integer type.
+
+	* gcc.dg/torture/bitint-108.c: New test.
+	* gcc.dg/bitint-143.c: New test.
+
+Reviewed-by: Joseph Myers <josmyers@redhat.com>
+(cherry picked from commit d7fa48a8500bcfaa1cf4ae3f917c22aa6ec7c75f)
+---
+ gcc/c/c-typeck.cc                         | 19 +++++++++-
+ gcc/testsuite/gcc.dg/bitint-143.c         | 45 +++++++++++++++++++++++
+ gcc/testsuite/gcc.dg/torture/bitint-108.c | 16 ++++++++
+ 3 files changed, 78 insertions(+), 2 deletions(-)
+ create mode 100644 gcc/testsuite/gcc.dg/bitint-143.c
+ create mode 100644 gcc/testsuite/gcc.dg/torture/bitint-108.c
+
+diff --git a/gcc/c/c-typeck.cc b/gcc/c/c-typeck.cc
+index 253d5b5ca425..7e669c207524 100644
+--- a/gcc/c/c-typeck.cc
++++ b/gcc/c/c-typeck.cc
+@@ -2906,7 +2906,17 @@ default_conversion (tree exp)
+     return convert (promoted_type, exp);
+ 
+   if (INTEGRAL_TYPE_P (type))
+-    return perform_integral_promotions (exp);
++    {
++      /* Avoid performing integral promotion of bit-precise integer
++	 type bit-field to its corresponding bit-precise integer if
++	 orig_exp is a cast to it to its underlying type.  */
++      if (orig_exp != exp
++	  && TREE_CODE (exp) == COMPONENT_REF
++	  && DECL_C_BIT_FIELD (TREE_OPERAND (exp, 1))
++	  && BITINT_TYPE_P (DECL_BIT_FIELD_TYPE (TREE_OPERAND (exp, 1))))
++	return perform_integral_promotions (orig_exp);
++      return perform_integral_promotions (exp);
++    }
+ 
+   return exp;
+ }
+@@ -7646,7 +7656,12 @@ build_c_cast (location_t loc, tree type, tree expr)
+     }
+ 
+   /* Don't let a cast be an lvalue.  */
+-  if (lvalue_p (value))
++  if (lvalue_p (value)
++      /* Also, don't let a cast be a bit-field of a bit-precise integer type,
++	 otherwise it could be incorrectly subject of integer promotions.  */
++      || (TREE_CODE (value) == COMPONENT_REF
++	  && DECL_C_BIT_FIELD (TREE_OPERAND (value, 1))
++	  && BITINT_TYPE_P (DECL_BIT_FIELD_TYPE (TREE_OPERAND (value, 1)))))
+     value = non_lvalue_loc (loc, value);
+ 
+   /* Don't allow the results of casting to floating-point or complex
+diff --git a/gcc/testsuite/gcc.dg/bitint-143.c b/gcc/testsuite/gcc.dg/bitint-143.c
+new file mode 100644
+index 000000000000..eedddce2b221
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/bitint-143.c
+@@ -0,0 +1,45 @@
++/* PR c/127383 */
++/* { dg-do compile { target bitint } } */
++/* { dg-options "-std=c23" } */
++
++#define expr_has_type(e, t) _Generic (e, default : 0, t : 1)
++
++struct S { _BitInt(195) a : 193; const unsigned _BitInt(195) b : 193; volatile _BitInt(195) c : 193; const volatile unsigned _BitInt(195) d : 193; };
++struct S s;
++struct S foo ();
++static_assert (expr_has_type (+s.a, _BitInt(195)));
++static_assert (expr_has_type (+s.b, unsigned _BitInt(195)));
++static_assert (expr_has_type (+s.c, _BitInt(195)));
++static_assert (expr_has_type (+s.d, unsigned _BitInt(195)));
++static_assert (expr_has_type ((_BitInt(193)) s.a, _BitInt(193)));
++static_assert (expr_has_type ((unsigned _BitInt(193)) s.b, unsigned _BitInt(193)));
++static_assert (expr_has_type ((_BitInt(193)) s.c, _BitInt(193)));
++static_assert (expr_has_type ((unsigned _BitInt(193)) s.d, unsigned _BitInt(193)));
++static_assert (expr_has_type (+(_BitInt(193)) s.a, _BitInt(193)));
++static_assert (expr_has_type (+(unsigned _BitInt(193)) s.b, unsigned _BitInt(193)));
++static_assert (expr_has_type (+(_BitInt(193)) s.c, _BitInt(193)));
++static_assert (expr_has_type (+(unsigned _BitInt(193)) s.d, unsigned _BitInt(193)));
++static_assert (expr_has_type ((const _BitInt(193)) s.a, _BitInt(193)));
++static_assert (expr_has_type ((volatile unsigned _BitInt(193)) s.b, unsigned _BitInt(193)));
++static_assert (expr_has_type ((const volatile _BitInt(193)) s.c, _BitInt(193)));
++static_assert (expr_has_type ((const unsigned _BitInt(193)) s.d, unsigned _BitInt(193)));
++static_assert (expr_has_type (+(_BitInt(193)) s.a, _BitInt(193)));
++static_assert (expr_has_type (+(unsigned _BitInt(193)) s.b, unsigned _BitInt(193)));
++static_assert (expr_has_type (+(_BitInt(193)) s.c, _BitInt(193)));
++static_assert (expr_has_type (+(unsigned _BitInt(193)) s.d, unsigned _BitInt(193)));
++static_assert (expr_has_type (+foo ().a, _BitInt(195)));
++static_assert (expr_has_type (+foo ().b, unsigned _BitInt(195)));
++static_assert (expr_has_type (+foo ().c, _BitInt(195)));
++static_assert (expr_has_type (+foo ().d, unsigned _BitInt(195)));
++static_assert (expr_has_type ((_BitInt(193)) foo ().a, _BitInt(193)));
++static_assert (expr_has_type ((unsigned _BitInt(193)) foo ().b, unsigned _BitInt(193)));
++static_assert (expr_has_type ((_BitInt(193)) foo ().c, _BitInt(193)));
++static_assert (expr_has_type ((unsigned _BitInt(193)) foo ().d, unsigned _BitInt(193)));
++static_assert (expr_has_type (+(_BitInt(193)) foo ().a, _BitInt(193)));
++static_assert (expr_has_type (+(unsigned _BitInt(193)) foo ().b, unsigned _BitInt(193)));
++static_assert (expr_has_type (+(_BitInt(193)) foo ().c, _BitInt(193)));
++static_assert (expr_has_type (+(unsigned _BitInt(193)) foo ().d, unsigned _BitInt(193)));
++static_assert (expr_has_type ((const _BitInt(193)) foo ().a, _BitInt(193)));
++static_assert (expr_has_type ((volatile unsigned _BitInt(193)) foo ().b, unsigned _BitInt(193)));
++static_assert (expr_has_type ((const volatile _BitInt(193)) foo ().c, _BitInt(193)));
++static_assert (expr_has_type ((const unsigned _BitInt(193)) foo ().d, unsigned _BitInt(193)));
+diff --git a/gcc/testsuite/gcc.dg/torture/bitint-108.c b/gcc/testsuite/gcc.dg/torture/bitint-108.c
+new file mode 100644
+index 000000000000..19c9b3e046fc
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/bitint-108.c
+@@ -0,0 +1,16 @@
++/* PR c/127383 */
++/* { dg-do run { target bitint } } */
++
++#if __BITINT_MAXWIDTH__ >= 65
++struct { unsigned _BitInt(65) f : 63; } s;
++#endif
++
++int
++main ()
++{
++#if __SIZEOF_LONG_LONG__ * __CHAR_BIT__ == 64 && __BITINT_MAXWIDTH__ >= 65
++  unsigned long long w = ~(unsigned _BitInt(63)) s.f;
++  if (w != (-1ULL >> 1))
++    __builtin_abort ();
++#endif
++}

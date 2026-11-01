@@ -1,0 +1,100 @@
+From de85a6799f04e39645d8d41337fd278cd9c403bd Mon Sep 17 00:00:00 2001
+From: GCC Administrator <gccadmin@gcc.gnu.org>
+Date: Wed, 30 Sep 2026 07:08:42 +0000
+Subject: [PATCH 217/385] Daily bump.
+
+---
+ gcc/ChangeLog           |  5 +++++
+ gcc/DATESTAMP           |  2 +-
+ gcc/ada/ChangeLog       |  7 +++++++
+ gcc/cp/ChangeLog        |  8 ++++++++
+ gcc/testsuite/ChangeLog |  8 ++++++++
+ libstdc++-v3/ChangeLog  | 11 +++++++++++
+ 6 files changed, 40 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index d347087fbf85..9f0746692513 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,8 @@
++2026-09-29  Eric Botcazou  <ebotcazou@adacore.com>
++
++	* tree-ssa-forwprop.cc (optimize_agr_copyprop_1): Use the index of
++	the basic block of USE_STMT instead of STMT to purge EH edges.
++
+ 2026-09-26  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+ 
+ 	Backported from master:
+diff --git a/gcc/DATESTAMP b/gcc/DATESTAMP
+index b17e8c88fd89..f32eb3dd80fc 100644
+--- a/gcc/DATESTAMP
++++ b/gcc/DATESTAMP
+@@ -1 +1 @@
+-20260929
++20260930
+diff --git a/gcc/ada/ChangeLog b/gcc/ada/ChangeLog
+index 628f683992b9..23b5fbb52c43 100644
+--- a/gcc/ada/ChangeLog
++++ b/gcc/ada/ChangeLog
+@@ -1,3 +1,10 @@
++2026-09-29  Yang Yujie  <yangyujie@loongson.cn>
++
++	* libgnat/s-objrea.ads (Object_Arch): Add LOONGARCH.
++	* libgnat/s-objrea.adb (EM_LOONGARCH): New named number.
++	(ELF_Ops.Initialize): Deal with EM_LOONGARCH.
++	(Read_Address): Deal with LOONGARCH.
++
+ 2026-09-22  Eric Botcazou  <ebotcazou@adacore.com>
+ 
+ 	* exp_attr.adb (Expand_N_Attribute_Reference) <Attribute_Valid>:
+diff --git a/gcc/cp/ChangeLog b/gcc/cp/ChangeLog
+index 702b02820791..d1fe35f910d2 100644
+--- a/gcc/cp/ChangeLog
++++ b/gcc/cp/ChangeLog
+@@ -1,3 +1,11 @@
++2026-09-29  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2026-09-29  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/127643
++	* reflect.cc (class_members_of): Also skip templated clones.
++
+ 2026-09-05  Patrick Palka  <ppalka@redhat.com>
+ 
+ 	Backported from master:
+diff --git a/gcc/testsuite/ChangeLog b/gcc/testsuite/ChangeLog
+index 7a07998dcc98..3dcc00b44544 100644
+--- a/gcc/testsuite/ChangeLog
++++ b/gcc/testsuite/ChangeLog
+@@ -1,3 +1,11 @@
++2026-09-29  Marek Polacek  <polacek@redhat.com>
++
++	Backported from master:
++	2026-09-29  Marek Polacek  <polacek@redhat.com>
++
++	PR c++/127643
++	* g++.dg/reflect/members_of18.C: New test.
++
+ 2026-09-26  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+ 
+ 	Backported from master:
+diff --git a/libstdc++-v3/ChangeLog b/libstdc++-v3/ChangeLog
+index b5a88cf4d9a1..e75de1b92155 100644
+--- a/libstdc++-v3/ChangeLog
++++ b/libstdc++-v3/ChangeLog
+@@ -1,3 +1,14 @@
++2026-09-29  Jonathan Wakely  <jwakely@redhat.com>
++
++	Backported from master:
++	2026-09-29  Jonathan Wakely  <jwakely@redhat.com>
++
++	PR libstdc++/127656
++	* include/ext/pb_ds/detail/binary_heap_/erase_fn_imps.hpp
++	(erase_if): Update m_a_entries after reallocation.
++	* testsuite/ext/pb_ds/regression/priority_queues_erase_if.cc:
++	New test.
++
+ 2026-09-24  Jonathan Wakely  <jwakely@redhat.com>
+ 
+ 	Backported from master:

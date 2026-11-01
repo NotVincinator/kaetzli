@@ -1,0 +1,96 @@
+From 925574f378c7fb3403b7027f6ac7c783964d5ee4 Mon Sep 17 00:00:00 2001
+From: Jakub Jelinek <jakub@redhat.com>
+Date: Tue, 4 Aug 2026 10:34:01 +0200
+Subject: [PATCH 005/385] range-op-float: Remove inappropriate frange_drop_infs
+ call [PR126549]
+
+For integer to floating conversions I've added frange_drop_infs
+call into the handler.  Supposedly I thought that integers converted
+to floating point are never +-inf, but that is clearly not the case
+as the testcases show.  For _Float16 it can be +-inf very easily,
+as the finite range is just [-65504.0f16,65504.0f16], for others
+all one needs is a large enough _BitInt.
+
+The following patch just drops that call.  In the common cases,
++-inf will not appear in the range anyway, lb and ub will be usually
+finite.
+
+2026-08-04  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/126549
+	* range-op-float.cc (operator_cast::fold_range): Don't call
+	frange_drop_infs.
+
+	* gcc.dg/torture/pr126549.c: New test.
+	* gcc.dg/torture/bitint-107.c: New test.
+
+Reviewed-by: Aldy Hernandez <aldy@quesejoda.com>
+(cherry picked from commit 217df27883c450f3f098bd0d1dc1ea7d5dbe8ff8)
+---
+ gcc/range-op-float.cc                     |  1 -
+ gcc/testsuite/gcc.dg/torture/bitint-107.c | 18 ++++++++++++++++++
+ gcc/testsuite/gcc.dg/torture/pr126549.c   | 18 ++++++++++++++++++
+ 3 files changed, 36 insertions(+), 1 deletion(-)
+ create mode 100644 gcc/testsuite/gcc.dg/torture/bitint-107.c
+ create mode 100644 gcc/testsuite/gcc.dg/torture/pr126549.c
+
+diff --git a/gcc/range-op-float.cc b/gcc/range-op-float.cc
+index 821e55b325ff..e3633565680d 100644
+--- a/gcc/range-op-float.cc
++++ b/gcc/range-op-float.cc
+@@ -3139,7 +3139,6 @@ operator_cast::fold_range (frange &r, tree type, const irange &op1,
+ 	frange_nextafter (mode, ub, dconstinf);
+     }
+   r.set (type, lb, ub, nan_state (false));
+-  frange_drop_infs (r, type);
+   if (r.undefined_p ())
+     r.set_varying (type);
+   return true;
+diff --git a/gcc/testsuite/gcc.dg/torture/bitint-107.c b/gcc/testsuite/gcc.dg/torture/bitint-107.c
+new file mode 100644
+index 000000000000..93a37bafe316
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/bitint-107.c
+@@ -0,0 +1,18 @@
++/* PR tree-optimization/126549 */
++/* { dg-do run { target { float32 && bitint575 } } } */
++/* { dg-add-options float32 } */
++
++[[gnu::noipa]] int
++foo (unsigned _BitInt(133) a)
++{
++  unsigned _BitInt(133) u = a % 5444517870735015415413993718908291383300uwb;
++  _Float32 h = (_Float32) u;
++  return h > __FLT32_MAX__;
++}
++
++int
++main ()
++{
++  if (foo (5444517870735015415413993718908291383295uwb) != 1)
++    __builtin_abort ();
++}
+diff --git a/gcc/testsuite/gcc.dg/torture/pr126549.c b/gcc/testsuite/gcc.dg/torture/pr126549.c
+new file mode 100644
+index 000000000000..e87610a17179
+--- /dev/null
++++ b/gcc/testsuite/gcc.dg/torture/pr126549.c
+@@ -0,0 +1,18 @@
++/* PR tree-optimization/126549 */
++/* { dg-do run { target float16 } } */
++/* { dg-add-options float16 } */
++
++[[gnu::noipa]] int
++foo (unsigned a)
++{
++  unsigned u = a % 100001U;
++  _Float16 h = (_Float16) u;
++  return h > 65504.0f16;
++}
++
++int
++main ()
++{
++  if (foo (70000U) != 1)
++    __builtin_abort ();
++}

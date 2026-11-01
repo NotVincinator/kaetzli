@@ -1,0 +1,330 @@
+From 59b8926907f2a1a39493c8d2de881a2a2e242013 Mon Sep 17 00:00:00 2001
+From: Jerry DeLisle <jvdelisle@gcc.gnu.org>
+Date: Sat, 29 Aug 2026 09:52:16 -0700
+Subject: [PATCH 127/385] fortran: [PR127128] wrong code with DO CONCURRENT
+ type-spec index-name
+
+A type-spec in a DO CONCURRENT concurrent-header gives the index-name
+construct scope.  The front end implements this by creating a shadow
+variable and substituting it for the index-name throughout the construct
+body.  The hand-written walkers that perform the substitution covered
+only a subset of the expression and statement forms, so references left
+behind still pointed at the enclosing scope's variable.  The construct
+then indexed with an unrelated, often undefined, value.
+
+Replace the expression walker with a gfc_traverse_expr callback so that
+every expression form is covered, and extend the statement walker to the
+forms it was missing: the branch chains of IF and WHERE constructs, the
+allocate-objects of ALLOCATE and DEALLOCATE, and the case lists of
+SELECT TYPE and SELECT RANK.
+
+	PR fortran/127128
+
+gcc/fortran/ChangeLog:
+
+	* resolve.cc (replace_forall_var): New function.
+	(replace_in_expr_recursive): Traverse with gfc_traverse_expr
+	instead of walking the expression by hand.
+	(replace_in_code_recursive): Substitute in the whole branch chain
+	of IF and WHERE constructs, in the allocate-objects of ALLOCATE
+	and DEALLOCATE, and in SELECT TYPE and SELECT RANK case lists.
+
+gcc/testsuite/ChangeLog:
+
+	* gfortran.dg/do_concurrent_typespec_5.f90: New test.
+
+(cherry picked from commit c6625b9b13ab6369a2645ac838b38570d0e86571)
+---
+ gcc/fortran/resolve.cc                        | 106 ++++++-------
+ .../gfortran.dg/do_concurrent_typespec_5.f90  | 141 ++++++++++++++++++
+ 2 files changed, 189 insertions(+), 58 deletions(-)
+ create mode 100644 gcc/testsuite/gfortran.dg/do_concurrent_typespec_5.f90
+
+diff --git a/gcc/fortran/resolve.cc b/gcc/fortran/resolve.cc
+index 83426e98ba36..1667723c49ce 100644
+--- a/gcc/fortran/resolve.cc
++++ b/gcc/fortran/resolve.cc
+@@ -12621,74 +12621,42 @@ gfc_count_forall_iterators (gfc_code *code)
+    2) Check for shadow index-name(s) and update code block.
+    3) call gfc_resolve_forall_body to resolve the FORALL body.  */
+ 
+-/* Custom recursive expression walker that replaces symbols.
+-   Visits all expressions including array subscripts.  Also called from
+-   replace_in_code_recursive to handle ASSOCIATE selector expressions.  */
++/* Shadow variable that replace_forall_var substitutes in; set by
++   replace_in_expr_recursive before each traversal.  */
+ 
+-static void
+-replace_in_expr_recursive (gfc_expr *expr, gfc_symbol *old_sym, gfc_symtree *new_st)
+-{
+-  if (!expr)
+-    return;
++static gfc_symtree *forall_shadow_st;
+ 
+-  /* Check if this is a variable reference to replace */
++/* gfc_traverse_expr callback: point a reference to OLD_SYM at the
++   construct-scoped shadow variable.  */
++
++static bool
++replace_forall_var (gfc_expr *expr, gfc_symbol *old_sym,
++		    int *f ATTRIBUTE_UNUSED)
++{
+   if (expr->expr_type == EXPR_VARIABLE && expr->symtree->n.sym == old_sym)
+     {
+-      expr->symtree = new_st;
+-      expr->ts = new_st->n.sym->ts;
++      expr->symtree = forall_shadow_st;
++      expr->ts = forall_shadow_st->n.sym->ts;
+     }
+ 
+-  /* Walk through reference chain (array subscripts, substrings, etc.) */
+-  for (gfc_ref *ref = expr->ref; ref; ref = ref->next)
+-    {
+-      if (ref->type == REF_ARRAY)
+-	{
+-	  gfc_array_ref *ar = &ref->u.ar;
+-	  for (int i = 0; i < ar->dimen; i++)
+-	    {
+-	      replace_in_expr_recursive (ar->start[i], old_sym, new_st);
+-	      replace_in_expr_recursive (ar->end[i], old_sym, new_st);
+-	      replace_in_expr_recursive (ar->stride[i], old_sym, new_st);
+-	    }
+-	}
+-      else if (ref->type == REF_SUBSTRING)
+-	{
+-	  replace_in_expr_recursive (ref->u.ss.start, old_sym, new_st);
+-	  replace_in_expr_recursive (ref->u.ss.end, old_sym, new_st);
+-	}
+-    }
++  return false;
++}
+ 
+-  /* Walk through sub-expressions based on expression type */
+-  switch (expr->expr_type)
+-    {
+-    case EXPR_OP:
+-      replace_in_expr_recursive (expr->value.op.op1, old_sym, new_st);
+-      replace_in_expr_recursive (expr->value.op.op2, old_sym, new_st);
+-      break;
+ 
+-    case EXPR_FUNCTION:
+-      for (gfc_actual_arglist *a = expr->value.function.actual; a; a = a->next)
+-	replace_in_expr_recursive (a->expr, old_sym, new_st);
+-      break;
++/* Replace every reference to OLD_SYM in EXPR with NEW_ST.  Traversal is
++   left to gfc_traverse_expr so that all expression forms are covered;
++   character length type parameters are skipped since those belong to
++   declarations that may be shared outside the construct.  */
+ 
+-    case EXPR_ARRAY:
+-    case EXPR_STRUCTURE:
+-      for (gfc_constructor *c = gfc_constructor_first (expr->value.constructor);
+-	   c; c = gfc_constructor_next (c))
+-	{
+-	  replace_in_expr_recursive (c->expr, old_sym, new_st);
+-	  if (c->iterator)
+-	    {
+-	      replace_in_expr_recursive (c->iterator->start, old_sym, new_st);
+-	      replace_in_expr_recursive (c->iterator->end, old_sym, new_st);
+-	      replace_in_expr_recursive (c->iterator->step, old_sym, new_st);
+-	    }
+-	}
+-      break;
++static void
++replace_in_expr_recursive (gfc_expr *expr, gfc_symbol *old_sym,
++			   gfc_symtree *new_st)
++{
++  if (!expr)
++    return;
+ 
+-    default:
+-      break;
+-    }
++  forall_shadow_st = new_st;
++  gfc_traverse_expr (expr, old_sym, replace_forall_var, -1);
+ }
+ 
+ 
+@@ -12727,6 +12695,8 @@ replace_in_code_recursive (gfc_code *code, gfc_symbol *old_sym, gfc_symtree *new
+ 	  break;
+ 
+ 	case EXEC_SELECT:
++	case EXEC_SELECT_TYPE:
++	case EXEC_SELECT_RANK:
+ 	  for (gfc_code *b = c->block; b; b = b->block)
+ 	    {
+ 	      for (gfc_case *cp = b->ext.block.case_list; cp; cp = cp->next)
+@@ -12738,6 +12708,26 @@ replace_in_code_recursive (gfc_code *code, gfc_symbol *old_sym, gfc_symtree *new
+ 	    }
+ 	  break;
+ 
++	case EXEC_IF:
++	case EXEC_WHERE:
++	  /* Each block in the chain holds its condition or mask in EXPR1
++	     and its body in NEXT; the trailing ELSE/ELSEWHERE has no
++	     condition.  The generic recursion below only reaches the first
++	     branch, so walk the whole chain here.  */
++	  for (gfc_code *b = c->block; b; b = b->block)
++	    {
++	      replace_in_expr_recursive (b->expr1, old_sym, new_st);
++	      replace_in_code_recursive (b->next, old_sym, new_st);
++	    }
++	  break;
++
++	case EXEC_ALLOCATE:
++	case EXEC_DEALLOCATE:
++	  /* Bounds and lengths of the allocate-objects.  */
++	  for (gfc_alloc *al = c->ext.alloc.list; al; al = al->next)
++	    replace_in_expr_recursive (al->expr, old_sym, new_st);
++	  break;
++
+ 	case EXEC_FORALL:
+ 	case EXEC_DO_CONCURRENT:
+ 	  for (gfc_forall_iterator *fa = c->ext.concur.forall_iterator; fa; fa = fa->next)
+diff --git a/gcc/testsuite/gfortran.dg/do_concurrent_typespec_5.f90 b/gcc/testsuite/gfortran.dg/do_concurrent_typespec_5.f90
+new file mode 100644
+index 000000000000..99d70a9f432c
+--- /dev/null
++++ b/gcc/testsuite/gfortran.dg/do_concurrent_typespec_5.f90
+@@ -0,0 +1,141 @@
++! { dg-do run }
++!
++! PR 127128
++! A DO CONCURRENT type-spec gives the index-name construct scope, which
++! the front end implements by substituting a shadow variable through the
++! construct body.  The substitution walkers skipped several expression
++! and code forms, so a sibling construct reusing the index-name read the
++! earlier construct's uninitialised variable instead of its own index.
++
++module m
++  implicit none
++
++  type :: t
++   contains
++     procedure, nopass :: tbp_fun
++     procedure, nopass :: tbp_sub
++  end type
++
++  abstract interface
++     pure function ifc (x) result (r)
++       integer, intent(in) :: x
++       integer :: r
++     end function
++  end interface
++
++  type :: p_t
++     procedure(ifc), nopass, pointer :: p => null()
++  end type
++
++contains
++
++  pure function tbp_fun (x) result (r)
++    integer, intent(in) :: x
++    integer :: r
++    r = x
++  end function
++
++  pure subroutine tbp_sub (x, r)
++    integer, intent(in) :: x
++    integer, intent(out) :: r
++    r = x
++  end subroutine
++
++  pure function idty (x) result (r)
++    integer, intent(in) :: x
++    integer :: r
++    r = x
++  end function
++
++end module
++
++program do_concurrent_typespec_5
++  use m
++  implicit none
++
++  integer, parameter :: n = 5
++  integer :: a(n) = [1, 2, 3, 4, 5]
++  integer :: b(n,2) = 1
++  integer :: out(n), out2(n,2)
++  type(t) :: o
++  type(p_t) :: pp
++
++  pp%p => idty
++
++  ! The first construct types 'k'; every later one shadows it.
++  out = 0
++  do concurrent (integer :: k = 1:n)
++    out(k) = a(k)
++  end do
++  if (any (out /= a)) stop 1
++
++  ! Type-bound function reference (EXPR_COMPCALL).
++  out = 0
++  do concurrent (integer :: k = 1:n)
++    out(k) = o%tbp_fun (a(k))
++  end do
++  if (any (out /= a)) stop 2
++
++  ! Procedure-pointer component reference (EXPR_PPC).
++  out = 0
++  do concurrent (integer :: k = 1:n)
++    out(k) = pp%p (a(k))
++  end do
++  if (any (out /= a)) stop 3
++
++  ! CALL to a type-bound subroutine.
++  out = 0
++  do concurrent (integer :: k = 1:n)
++    call o%tbp_sub (a(k), out(k))
++  end do
++  if (any (out /= a)) stop 4
++
++  ! Condition of an IF statement.
++  out = 0
++  do concurrent (integer :: k = 1:n)
++    if (a(k) > 0) out(k) = a(k)
++  end do
++  if (any (out /= a)) stop 5
++
++  ! ELSE IF and ELSE branches.
++  out = 0
++  do concurrent (integer :: k = 1:n)
++    if (k > 100) then
++      out(k) = -1
++    else if (k > 50) then
++      out(k) = -2
++    else
++      out(k) = a(k)
++    end if
++  end do
++  if (any (out /= a)) stop 6
++
++  ! Bounds of an allocate-object.
++  out = 0
++  do concurrent (integer :: k = 1:n)
++    block
++      integer, allocatable :: tmp(:)
++      allocate (tmp(k))
++      out(k) = size (tmp)
++    end block
++  end do
++  if (any (out /= a)) stop 7
++
++  ! WHERE mask expression.
++  out2 = 0
++  do concurrent (integer :: k = 1:n)
++    where (b(k,:) > 0) out2(k,:) = b(k,:)
++  end do
++  if (any (out2 /= b)) stop 8
++
++  ! SELECT CASE body (already worked; guard against regression).
++  out = 0
++  do concurrent (integer :: k = 1:n)
++    select case (1)
++    case (1)
++      out(k) = a(k)
++    end select
++  end do
++  if (any (out /= a)) stop 9
++
++end program
