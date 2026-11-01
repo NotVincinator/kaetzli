@@ -9,7 +9,8 @@ Guides describe current behavior. Proposals describe work that is not implemente
 - [Patches](guides/patches.md): package patches, upstream patch series, and CVE fixes.
 - [Linking](guides/linking.md): runtime library compatibility and ELF checks.
 - [System extensions](guides/sysext.md): build and attach extensions.
-- [Debugging](guides/debugging.md): tools available in the base and debug extension.
+- [Debugging](guides/debugging.md): tools in the base and debug extension, expected boot
+  messages, and how login and SSH access work.
 
 ## Proposals
 

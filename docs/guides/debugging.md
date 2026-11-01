@@ -46,6 +46,48 @@ podman inspect <container>  # with the podman extension
 `/proc/<pid>/` exposes process status, limits, cgroups, mounts, file descriptors, and
 namespaces. `nsenter -t <pid> -a` enters a process's namespaces.
 
+## Expected boot messages
+
+A healthy boot is `running` with nothing at `err` in the journal, in about 3 seconds.
+These console lines appear on every QEMU boot and are harmless:
+
+| Message | Why |
+| --- | --- |
+| `x86/CPU: Model not found in latest microcode list` | Microcode is the host's job; a guest cannot load it. `vulnerabilities/old_microcode` reads `Not affected`. |
+| `Processor Platform Limit event detected, but not handled` | qemu's ACPI raises a frequency limit; `CONFIG_CPU_FREQ` is off, since a guest does not scale its CPUs. |
+| `fail to add MMCONFIG information` | qemu's default `pc` (i440fx) machine has no PCIe extended config space. Every device is conventional PCI or virtio. |
+| `tmp.mount: x-systemd.graceful-option=usrquota … suppressing` | systemd asks for `/tmp` quotas only if the kernel has them; `CONFIG_QUOTA` is off. `/tmp` is still `1777,nosuid,nodev`, capped at half of RAM. |
+
+To check the root rather than trust the log: `/sys/block/dm-*/dm/name` and `ro` show
+`root` and each extension as read-only verity devices, `systemd-sysext status` shows what
+is merged into `/usr`, and `test/verity.sh` shows a tampered image is refused. The image
+has no `dmsetup` or `veritysetup`.
+
+**Open:** in a guest, `spectre_v2` reports `BHI: Vulnerable` where the host reports `Not
+affected`. A guest kernel assumes it is affected by Branch History Injection, because a
+hypervisor can hide the hardware feature it would check. A bare `Vulnerable` means the
+software mitigation is not in effect; whether `CONFIG_MITIGATION_SPECTRE_BHI` is built in,
+and whether `spectre_bhi=on` changes the result, is still to be checked.
+
+## Login and SSH
+
+No account has a password (`/etc/shadow` is all `*`). Access comes from credentials that
+the VMM passes to each boot, not from the image:
+
+- **Console.** `login.noauth=yes` (`test/qemu-lib.sh`) lets util-linux `login` skip the
+  password check on the serial console and tty1. Only the getty units import it, so sshd
+  and `su` are unaffected. Whoever can reach the console already controls the VM: vm.sh
+  puts the console socket in a `0700` directory under `$XDG_RUNTIME_DIR`.
+- **SSH.** Keys only: `PasswordAuthentication no`, `KbdInteractiveAuthentication no`,
+  `PermitRootLogin prohibit-password`. root's only key is the per-boot credential
+  `ssh.authorized_keys.root`, so a boot without one has no root SSH login. `vm.sh ssh`
+  logs in as `user`, and as root only with `--root`. sudo is not an option, because the
+  image has no setuid files.
+- **Exposure.** sshd listens on every interface in the guest, which a general-purpose
+  machine or Kubernetes node needs. qemu's user networking forwards only
+  `127.0.0.1:2222` (the first free port) on the host, so nothing outside the host reaches
+  it.
+
 ## Tools in the debug extension
 
 ### strace
