@@ -1,0 +1,937 @@
+# ncurses 6.6 - patch 20260328 - Thomas E. Dickey
+#
+# ------------------------------------------------------------------------------
+#
+# Ncurses 6.6 is at
+#   https://invisible-island.net/archives/ncurses/
+#   https://invisible-mirror.net/archives/ncurses/
+#   https://ftp.gnu.org/gnu/ncurses/
+#
+# Patches for ncurses 6.6 can be found at
+#   https://invisible-island.net/archives/ncurses/6.6
+#   https://invisible-mirror.net/archives/ncurses/6.6
+#
+# ------------------------------------------------------------------------------
+# https://invisible-island.net/archives/ncurses/6.6/ncurses-6.6-20260328.patch.gz
+# patch by Thomas E. Dickey <dickey@invisible-island.net>
+# created  Sun Mar 29 00:42:41 UTC 2026
+# ------------------------------------------------------------------------------
+# NEWS                             |    8 +++++++-
+# README                           |    7 ++++---
+# VERSION                          |    2 +-
+# dist.mk                          |    4 ++--
+# ncurses/base/lib_getch.c         |   14 ++++++++------
+# ncurses/base/lib_mouse.c         |   25 ++++++++++++++++---------
+# ncurses/base/lib_newterm.c       |    8 ++++----
+# ncurses/base/lib_set_term.c      |    8 ++++----
+# ncurses/base/resizeterm.c        |    7 ++++---
+# ncurses/curses.priv.h            |   14 +++++++++++---
+# ncurses/modules                  |    7 ++++++-
+# ncurses/tinfo/lib_baudrate.c     |   14 +++++++-------
+# ncurses/tinfo/lib_kernel.c       |    8 ++++----
+# ncurses/tinfo/lib_napms.c        |    6 +++---
+# ncurses/tinfo/lib_setup.c        |    4 ++--
+# ncurses/tinfo/lib_ttyflags.c     |    8 ++------
+# ncurses/trace/lib_tracebits.c    |    8 ++++----
+# ncurses/tty/lib_twait.c          |   10 ++--------
+# package/debian-mingw/changelog   |    4 ++--
+# package/debian-mingw64/changelog |    4 ++--
+# package/debian/changelog         |    4 ++--
+# package/mingw-ncurses.nsi        |    4 ++--
+# package/mingw-ncurses.spec       |    6 +++---
+# package/ncurses.spec             |    6 +++---
+# package/ncursest.spec            |    6 +++---
+# test/ncurses.c                   |   20 ++++++++++++++++++--
+# test/test.priv.h                 |    6 +++---
+# 27 files changed, 129 insertions(+), 93 deletions(-)
+# ------------------------------------------------------------------------------
+Index: NEWS
+Prereq:  1.4437 
+--- ncurses-6.6-20260321+/NEWS	2026-03-21 22:01:58.000000000 +0000
++++ ncurses-6.6-20260328/NEWS	2026-03-28 23:01:38.000000000 +0000
+@@ -26,7 +26,7 @@
+ -- sale, use or other dealings in this Software without prior written        --
+ -- authorization.                                                            --
+ -------------------------------------------------------------------------------
+--- $Id: NEWS,v 1.4437 2026/03/21 22:01:58 tom Exp $
++-- $Id: NEWS,v 1.4440 2026/03/28 23:01:38 tom Exp $
+ -------------------------------------------------------------------------------
+ 
+ This is a log of changes that ncurses has gone through since Zeyd started
+@@ -46,6 +46,12 @@
+ Changes through 1.9.9e did not credit all contributions;
+ it is not possible to add this information.
+ 
++20260328
++	+ modify test/ncurses to close stdin when ^D is entered in the getch
++	  tests, to demonstrate error return.
++	+ adapt some ifdefs, etc., to reduce difference vs Juergen Pfeifer's
++	  fork.
++
+ 20260321
+ 	+ build-fix for --enable-fvisibility option vs C++ shared library
+ 	  (adapted from patch by Nicholas Vinson).
+Index: README
+Prereq:  1.31 
+--- ncurses-6.6-20260321+/README	2023-10-28 14:49:04.000000000 +0000
++++ ncurses-6.6-20260328/README	2026-03-28 11:30:59.000000000 +0000
+@@ -1,5 +1,5 @@
+ -------------------------------------------------------------------------------
+--- Copyright 2020-2021,2023 Thomas E. Dickey                                 --
++-- Copyright 2020-2023,2026 Thomas E. Dickey                                 --
+ -- Copyright 1998-2012,2018 Free Software Foundation, Inc.                   --
+ --                                                                           --
+ -- Permission is hereby granted, free of charge, to any person obtaining a   --
+@@ -26,7 +26,7 @@
+ -- sale, use or other dealings in this Software without prior written        --
+ -- authorization.                                                            --
+ -------------------------------------------------------------------------------
+--- $Id: README,v 1.31 2023/10/28 14:49:04 tom Exp $
++-- $Id: README,v 1.32 2026/03/28 11:30:59 tom Exp $
+ -------------------------------------------------------------------------------
+ 		README file for the ncurses package
+ 
+@@ -178,7 +178,8 @@
+ 
+ Juergen Pfeifer
+ 	The menu and form libraries, C++ bindings for ncurses, menus, forms
+-	and panels, as well as the Ada95 binding.  Ongoing support for panel.
++	and panels, as well as the Ada95 binding.  Ongoing support for panel
++	and the Windows port.
+ 
+ CONTRIBUTORS:
+ 
+Index: VERSION
+--- ncurses-6.6-20260321+/VERSION	2026-03-21 09:36:33.000000000 +0000
++++ ncurses-6.6-20260328/VERSION	2026-03-28 09:41:06.000000000 +0000
+@@ -1 +1 @@
+-5:0:10	6.6	20260321
++5:0:10	6.6	20260328
+Index: dist.mk
+Prereq:  1.1724 
+--- ncurses-6.6-20260321+/dist.mk	2026-03-21 09:36:33.000000000 +0000
++++ ncurses-6.6-20260328/dist.mk	2026-03-28 09:41:06.000000000 +0000
+@@ -26,7 +26,7 @@
+ # use or other dealings in this Software without prior written               #
+ # authorization.                                                             #
+ ##############################################################################
+-# $Id: dist.mk,v 1.1724 2026/03/21 09:36:33 tom Exp $
++# $Id: dist.mk,v 1.1725 2026/03/28 09:41:06 tom Exp $
+ # Makefile for creating ncurses distributions.
+ #
+ # This only needs to be used directly as a makefile by developers, but
+@@ -38,7 +38,7 @@
+ # These define the major/minor/patch versions of ncurses.
+ NCURSES_MAJOR = 6
+ NCURSES_MINOR = 6
+-NCURSES_PATCH = 20260321
++NCURSES_PATCH = 20260328
+ 
+ # We don't append the patch to the version, since this only applies to releases
+ VERSION = $(NCURSES_MAJOR).$(NCURSES_MINOR)
+Index: ncurses/base/lib_getch.c
+Prereq:  1.154 
+--- ncurses-6.6-20260321+/ncurses/base/lib_getch.c	2025-12-27 12:28:45.000000000 +0000
++++ ncurses-6.6-20260328/ncurses/base/lib_getch.c	2026-03-28 19:51:59.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2015,2016 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -44,7 +44,7 @@
+ #define NEED_KEY_EVENT
+ #include <curses.priv.h>
+ 
+-MODULE_ID("$Id: lib_getch.c,v 1.154 2025/12/27 12:28:45 tom Exp $")
++MODULE_ID("$Id: lib_getch.c,v 1.156 2026/03/28 19:51:59 tom Exp $")
+ 
+ #include <fifo_defs.h>
+ 
+@@ -162,7 +162,7 @@
+     } else
+ # endif
+     {
+-# if USE_NAMED_PIPES
++# if USE_TERM_DRIVER && USE_NAMED_PIPES
+ 	rc = _nc_console_testmouse(sp,
+ 				   _nc_console_handle(sp->_ifd),
+ 				   delay
+@@ -302,19 +302,19 @@
+ 	    n = CallDriver_1(sp, td_read, &buf);
+ 	ch = buf;
+ #else /* !USE_TERM_DRIVER */
+-#if USE_NAMED_PIPES
++#if USE_TERM_DRIVER && USE_NAMED_PIPES
+ 	int buf;
+ #endif
+ 	unsigned char c2 = 0;
+ 
+ 	_nc_set_read_thread(TRUE);
+-#if USE_NAMED_PIPES
++#if USE_TERM_DRIVER && USE_NAMED_PIPES
+ 	n = _nc_console_read(sp,
+ 			     _nc_console_handle(sp->_ifd),
+ 			     &buf);
+ 	c2 = buf;
+ #else
+-	n = (int) read(sp->_ifd, &c2, (size_t) 1);
++	n = (int) NC_READ(sp->_ifd, &c2, (size_t) 1);
+ #endif
+ 	_nc_set_read_thread(FALSE);
+ 	ch = c2;
+@@ -441,6 +441,7 @@
+     if (cooked_key_in_fifo()) {
+ 	recur_wrefresh(win);
+ 	*result = fifo_pull(sp);
++
+ 	returnCode(*result >= KEY_MIN ? KEY_CODE_YES : OK);
+     }
+ #ifdef NCURSES_WGETCH_EVENTS
+@@ -673,6 +674,7 @@
+ 		      EVENTLIST_2nd((_nc_eventlist *) 0));
+     if (code != ERR)
+ 	code = value;
++
+     returnCode(code);
+ }
+ 
+Index: ncurses/base/lib_mouse.c
+Prereq:  1.222 
+--- ncurses-6.6-20260321+/ncurses/base/lib_mouse.c	2026-03-07 11:41:32.000000000 +0000
++++ ncurses-6.6-20260328/ncurses/base/lib_mouse.c	2026-03-28 23:12:54.000000000 +0000
+@@ -84,7 +84,7 @@
+ #define CUR SP_TERMTYPE
+ #endif
+ 
+-MODULE_ID("$Id: lib_mouse.c,v 1.222 2026/03/07 11:41:32 tom Exp $")
++MODULE_ID("$Id: lib_mouse.c,v 1.224 2026/03/28 23:12:54 tom Exp $")
+ 
+ #include <tic.h>
+ 
+@@ -828,7 +828,7 @@
+ 	{
+ 	    char kbuf[3];
+ 
+-	    int i, res = read(M_FD(sp), &kbuf, 3);	/* Eat the prefix */
++	    int i, res = NC_READ(M_FD(sp), &kbuf, 3);	/* Eat the prefix */
+ 	    if (res != 3)
+ 		printf("Got %d chars instead of 3 for prefix.\n", res);
+ 	    for (i = 0; i < res; i++) {
+@@ -1117,14 +1117,16 @@
+     _nc_set_read_thread(TRUE);
+     for (grabbed = 0; grabbed < MAX_KBUF; grabbed += (size_t) res) {
+ 
+-	/* For VIO mouse we add extra bit 64 to disambiguate button-up. */
+-	res = (int) read(
+ #if USE_EMX_MOUSE
++	/* For VIO mouse we add extra bit 64 to disambiguate button-up. */
++	res = (int) NC_READ(
+ 			    (M_FD(sp) >= 0) ? M_FD(sp) : sp->_ifd,
++			    kbuf + grabbed, (size_t) (MAX_KBUF - (int) grabbed));
+ #else
++	res = (int) NC_READ(
+ 			    sp->_ifd,
+-#endif
+ 			    kbuf + grabbed, (size_t) (MAX_KBUF - (int) grabbed));
++#endif
+ 	if (res < 0)
+ 	    break;
+     }
+@@ -1166,13 +1168,15 @@
+     for (grabbed = 0; grabbed < limit;) {
+ 	int res;
+ 
+-	res = (int) read(
+ #if USE_EMX_MOUSE
++	res = (int) NC_READ(
+ 			    (M_FD(sp) >= 0) ? M_FD(sp) : sp->_ifd,
++			    (kbuf + grabbed), (size_t) 1);
+ #else
++	res = (int) NC_READ(
+ 			    sp->_ifd,
+-#endif
+ 			    (kbuf + grabbed), (size_t) 1);
++#endif
+ 	if (res < 0)
+ 	    break;
+ 	grabbed += (size_t) res;
+@@ -1244,13 +1248,15 @@
+     do {
+ 	int res;
+ 
+-	res = (int) read(
+ #if USE_EMX_MOUSE
++	res = (int) NC_READ(
+ 			    (M_FD(sp) >= 0) ? M_FD(sp) : sp->_ifd,
++			    (kbuf + grabbed), (size_t) 1);
+ #else
++	res = (int) NC_READ(
+ 			    sp->_ifd,
+-#endif
+ 			    (kbuf + grabbed), (size_t) 1);
++#endif
+ 	if (res < 0)
+ 	    break;
+ 	if ((grabbed + MAX_KBUF) >= (int) sizeof(kbuf)) {
+@@ -1894,6 +1900,7 @@
+ 	    SP_PARM->_mouse_read++;
+ 	    result = OK;
+ 	} else {
++	    TR(TRACE_IEVENT, ("getmouse: no valid event in queue"));
+ 	    /* Reset the provided event */
+ 	    aevent->bstate = 0;
+ 	    Invalidate(aevent);
+Index: ncurses/base/lib_newterm.c
+Prereq:  1.110 
+--- ncurses-6.6-20260321+/ncurses/base/lib_newterm.c	2025-12-27 12:28:45.000000000 +0000
++++ ncurses-6.6-20260328/ncurses/base/lib_newterm.c	2026-03-28 20:22:11.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -49,7 +49,7 @@
+ 
+ #include <tic.h>
+ 
+-MODULE_ID("$Id: lib_newterm.c,v 1.110 2025/12/27 12:28:45 tom Exp $")
++MODULE_ID("$Id: lib_newterm.c,v 1.111 2026/03/28 20:22:11 tom Exp $")
+ 
+ #if USE_TERM_DRIVER
+ #define NumLabels      InfoOf(SP_PARM).numlabels
+@@ -88,7 +88,7 @@
+ 	buf.c_oflag &= (unsigned) ~(ONLCR);
+ #elif HAVE_SGTTY_H
+ 	buf.sg_flags &= ~(ECHO | CRMOD);
+-#elif USE_NAMED_PIPES
++#elif USE_TERM_DRIVER && USE_NAMED_PIPES
+ 	buf.dwFlagIn = CONMODE_IN_DEFAULT;
+ 	buf.dwFlagOut = CONMODE_OUT_DEFAULT | VT_FLAG_OUT;
+ 	if (WINCONSOLE.isTermInfoConsole) {
+@@ -201,7 +201,7 @@
+     current = CURRENT_SCREEN;
+     its_term = (current ? current->_term : NULL);
+ 
+-#if USE_NAMED_PIPES
++#if USE_TERM_DRIVER && USE_NAMED_PIPES
+     _setmode(fileno(_ifp), _O_BINARY);
+     _setmode(fileno(_ofp), _O_BINARY);
+ #endif
+Index: ncurses/base/lib_set_term.c
+Prereq:  1.199 
+--- ncurses-6.6-20260321+/ncurses/base/lib_set_term.c	2025-12-27 12:28:45.000000000 +0000
++++ ncurses-6.6-20260328/ncurses/base/lib_set_term.c	2026-03-28 20:22:11.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -57,7 +57,7 @@
+ #undef CUR
+ #define CUR SP_TERMTYPE
+ 
+-MODULE_ID("$Id: lib_set_term.c,v 1.199 2025/12/27 12:28:45 tom Exp $")
++MODULE_ID("$Id: lib_set_term.c,v 1.200 2026/03/28 20:22:11 tom Exp $")
+ 
+ #if USE_TERM_DRIVER
+ #define MaxColors      InfoOf(sp).maxcolors
+@@ -427,7 +427,7 @@
+ #endif
+ 	T(("filter screensize %dx%d", slines, scolumns));
+     }
+-#if USE_NAMED_PIPES
++#if USE_TERM_DRIVER && USE_NAMED_PIPES
+     T(("setting output mode to binary"));
+     fflush(output);
+     _setmode(fileno(output), _O_BINARY);
+@@ -439,7 +439,7 @@
+     fflush(output);
+     sp->_ofd = output ? fileno(output) : -1;
+     sp->_ofp = output;
+-#if USE_NAMED_PIPES
++#if USE_TERM_DRIVER && USE_NAMED_PIPES
+     if (output)
+ 	_setmode(fileno(output), _O_BINARY);
+ #endif
+Index: ncurses/base/resizeterm.c
+Prereq:  1.61 
+--- ncurses-6.6-20260321+/ncurses/base/resizeterm.c	2025-12-27 12:28:45.000000000 +0000
++++ ncurses-6.6-20260328/ncurses/base/resizeterm.c	2026-03-28 20:32:51.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2020-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2020-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2015,2016 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -46,7 +46,7 @@
+ #define CUR SP_TERMTYPE
+ #endif
+ 
+-MODULE_ID("$Id: resizeterm.c,v 1.61 2025/12/27 12:28:45 tom Exp $")
++MODULE_ID("$Id: resizeterm.c,v 1.63 2026/03/28 20:32:51 tom Exp $")
+ 
+ /*
+  * If we're trying to be reentrant, do not want any local statics.
+@@ -487,7 +487,7 @@
+ 	    bool slk_visible = (SP_PARM != NULL
+ 				&& SP_PARM->_slk != NULL
+ 				&& !(SP_PARM->_slk->hidden));
+-
++	    T(("resizeterm: check slk"));
+ 	    if (slk_visible) {
+ 		slk_clear();
+ 	    }
+@@ -525,6 +525,7 @@
+ #endif
+ 	}
+ #if USE_SIGWINCH
++	T(("resizeterm: ungetch KEY_RESIZE"));
+ 	safe_ungetch(SP_PARM, KEY_RESIZE);	/* so application can know this */
+ #endif
+     }
+Index: ncurses/curses.priv.h
+Prereq:  1.745 
+--- ncurses-6.6-20260321+/ncurses/curses.priv.h	2026-03-01 19:51:59.000000000 +0000
++++ ncurses-6.6-20260328/ncurses/curses.priv.h	2026-03-28 19:24:13.000000000 +0000
+@@ -35,7 +35,7 @@
+  ****************************************************************************/
+ 
+ /*
+- * $Id: curses.priv.h,v 1.745 2026/03/01 19:51:59 tom Exp $
++ * $Id: curses.priv.h,v 1.746 2026/03/28 19:24:13 tom Exp $
+  *
+  *	curses.priv.h
+  *
+@@ -2601,14 +2601,22 @@
+ extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);
+ #endif
+ 
++#elif defined(_NC_WINDOWS_NATIVE)
++
+ #else
+ #error unsupported driver configuration
+ #endif /* USE_WIN32CON_DRIVER */
+ 
+ #if USE_TERM_DRIVER && defined(USE_WIN32CON_DRIVER)
+-#define NC_ISATTY(fd) (0 != _nc_console_isatty(fd))
++# define NC_ISATTY(fd) (0 != _nc_console_isatty(fd))
++# define NC_READ(fd, buf, count)	read(fd, buf, count)
+ #else
+-#define NC_ISATTY(fd) isatty(fd)
++# if defined(_NC_WINDOWS_NATIVE)
++#  define NC_READ(fd, buf, count)	WINCONPTY.read(fd,buf,count)
++# else
++#  define NC_READ(fd, buf, count)	read(fd, buf, count)
++# endif
++# define NC_ISATTY(fd)			isatty(fd)
+ #endif
+ 
+ /*
+Index: ncurses/modules
+Prereq:  1.134 
+--- ncurses-6.6-20260321+/ncurses/modules	2026-01-14 01:21:25.000000000 +0000
++++ ncurses-6.6-20260328/ncurses/modules	2026-03-28 10:58:05.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: modules,v 1.134 2026/01/14 01:21:25 tom Exp $
++# $Id: modules,v 1.135 2026/03/28 10:58:05 tom Exp $
+ ##############################################################################
+ # Copyright 2019-2025,2026 Thomas E. Dickey                                  #
+ # Copyright 1998-2013,2017 Free Software Foundation, Inc.                    #
+@@ -259,6 +259,11 @@
+ wcwidth		lib             $(win32con)	$(HEADER_DEPS)
+ win32_driver	lib             $(win32con)	$(HEADER_DEPS)
+ 
++# MinGW-W64 or Windows native, using ConPTY
++@ port_win32_conpty
++lib_win32conpty	lib		$(tinfo)	$(HEADER_DEPS)
++lib_win32util	lib		$(tinfo)	$(HEADER_DEPS)
++
+ @ port_tinfo
+ tinfo_driver	lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h
+ 
+Index: ncurses/tinfo/lib_baudrate.c
+Prereq:  1.50 
+--- ncurses-6.6-20260321+/ncurses/tinfo/lib_baudrate.c	2025-12-23 09:21:42.000000000 +0000
++++ ncurses-6.6-20260328/ncurses/tinfo/lib_baudrate.c	2026-03-28 20:22:11.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2020-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2020-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -84,7 +84,7 @@
+ #undef USE_OLD_TTY
+ #endif /* USE_OLD_TTY */
+ 
+-MODULE_ID("$Id: lib_baudrate.c,v 1.50 2025/12/23 09:21:42 tom Exp $")
++MODULE_ID("$Id: lib_baudrate.c,v 1.51 2026/03/28 20:22:11 tom Exp $")
+ 
+ /*
+  *	int
+@@ -99,7 +99,7 @@
+     int actual_speed;		/* the actual speed */
+ };
+ 
+-#if !defined(USE_WIN32CON_DRIVER)
++#if !defined(_NC_WINDOWS_NATIVE)
+ #define DATA(number) { B##number, number }
+ 
+ static struct speed const speeds[] =
+@@ -194,7 +194,7 @@
+ NCURSES_EXPORT(int)
+ _nc_baudrate(int OSpeed)
+ {
+-#if defined(USE_WIN32CON_DRIVER)
++#if defined(_NC_WINDOWS_NATIVE)
+     /* On Windows this is a noop */
+     (void) OSpeed;
+     return (OK);
+@@ -237,14 +237,14 @@
+ #endif
+     }
+     return (result);
+-#endif /* !USE_NAMED_PIPES */
++#endif /* !_NC_WINDOWS_NATIVE */
+ }
+ 
+ NCURSES_EXPORT(int)
+ _nc_ospeed(int BaudRate)
+ {
+     int result = 1;
+-#if defined(USE_WIN32CON_DRIVER)
++#if defined(_NC_WINDOWS_NATIVE)
+     (void) BaudRate;
+ #else
+     if (BaudRate >= 0) {
+@@ -257,7 +257,7 @@
+ 	    }
+ 	}
+     }
+-#endif
++#endif /* !_NC_WINDOWS_NATIVE */
+     return (result);
+ }
+ 
+Index: ncurses/tinfo/lib_kernel.c
+Prereq:  1.40 
+--- ncurses-6.6-20260321+/ncurses/tinfo/lib_kernel.c	2025-12-23 09:09:50.000000000 +0000
++++ ncurses-6.6-20260328/ncurses/tinfo/lib_kernel.c	2026-03-28 20:22:34.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2020-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2020-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2009,2010 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -49,7 +49,7 @@
+ 
+ #include <curses.priv.h>
+ 
+-MODULE_ID("$Id: lib_kernel.c,v 1.40 2025/12/23 09:09:50 tom Exp $")
++MODULE_ID("$Id: lib_kernel.c,v 1.41 2026/03/28 20:22:34 tom Exp $")
+ 
+ #ifdef TERMIOS
+ static int
+@@ -94,7 +94,7 @@
+ 	result = termp->Ottyb.c_cc[VERASE];
+ 	if (result == _nc_vdisable())
+ 	    result = ERR;
+-#elif defined(USE_WIN32CON_DRIVER)
++#elif defined(_NC_WINDOWS_NATIVE)
+ 	result = ERR;
+ #else
+ 	result = termp->Ottyb.sg_erase;
+@@ -131,7 +131,7 @@
+ 	result = termp->Ottyb.c_cc[VKILL];
+ 	if (result == _nc_vdisable())
+ 	    result = ERR;
+-#elif defined(USE_WIN32CON_DRIVER)
++#elif defined(_NC_WINDOWS_NATIVE)
+ 	result = ERR;
+ #else
+ 	result = termp->Ottyb.sg_kill;
+Index: ncurses/tinfo/lib_napms.c
+Prereq:  1.33 
+--- ncurses-6.6-20260321+/ncurses/tinfo/lib_napms.c	2025-12-27 12:33:34.000000000 +0000
++++ ncurses-6.6-20260328/ncurses/tinfo/lib_napms.c	2026-03-28 20:22:34.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2020-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2020-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2014,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -52,7 +52,7 @@
+ #endif
+ #endif
+ 
+-MODULE_ID("$Id: lib_napms.c,v 1.33 2025/12/27 12:33:34 tom Exp $")
++MODULE_ID("$Id: lib_napms.c,v 1.34 2026/03/28 20:22:34 tom Exp $")
+ 
+ NCURSES_EXPORT(int)
+ NCURSES_SP_NAME(napms) (NCURSES_SP_DCLx int ms)
+@@ -78,7 +78,7 @@
+ 	    request = remaining;
+ 	}
+     }
+-#elif defined(USE_WIN32CON_DRIVER)
++#elif defined(_NC_WINDOWS_NATIVE)
+     Sleep((DWORD) ms);
+ #else
+     _nc_timed_wait(NULL, 0, ms, (int *) 0 EVENTLIST_2nd(NULL));
+Index: ncurses/tinfo/lib_setup.c
+Prereq:  1.252 
+--- ncurses-6.6-20260321+/ncurses/tinfo/lib_setup.c	2025-12-27 12:33:34.000000000 +0000
++++ ncurses-6.6-20260328/ncurses/tinfo/lib_setup.c	2026-03-28 21:10:22.000000000 +0000
+@@ -49,7 +49,7 @@
+ #include <locale.h>
+ #endif
+ 
+-MODULE_ID("$Id: lib_setup.c,v 1.252 2025/12/27 12:33:34 tom Exp $")
++MODULE_ID("$Id: lib_setup.c,v 1.253 2026/03/28 21:10:22 tom Exp $")
+ 
+ /****************************************************************************
+  *
+@@ -1024,7 +1024,7 @@
+ 	    NCURSES_SP_NAME(baudrate) (NCURSES_SP_ARG);
+ 	}
+ 	code = OK;
+-#endif
++#endif /* USE_TERM_DRIVER */
+     }
+ 
+ #if USE_TERM_DRIVER
+Index: ncurses/tinfo/lib_ttyflags.c
+Prereq:  1.40 
+--- ncurses-6.6-20260321+/ncurses/tinfo/lib_ttyflags.c	2025-12-27 12:33:34.000000000 +0000
++++ ncurses-6.6-20260328/ncurses/tinfo/lib_ttyflags.c	2026-03-28 20:22:56.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2020-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2020-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -42,7 +42,7 @@
+ #define CUR SP_TERMTYPE
+ #endif
+ 
+-MODULE_ID("$Id: lib_ttyflags.c,v 1.40 2025/12/27 12:33:34 tom Exp $")
++MODULE_ID("$Id: lib_ttyflags.c,v 1.41 2026/03/28 20:22:56 tom Exp $")
+ 
+ NCURSES_EXPORT(int)
+ NCURSES_SP_NAME(_nc_get_tty_mode) (NCURSES_SP_DCLx TTY * buf)
+@@ -156,8 +156,6 @@
+ #ifdef TERMIOS
+ 	    if (termp->Ottyb.c_oflag & OFLAGS_TABS)
+ 		tab = back_tab = NULL;
+-#elif USE_NAMED_PIPES
+-	    /* noop */
+ #else
+ 	    if (termp->Ottyb.sg_flags & XTABS)
+ 		tab = back_tab = NULL;
+@@ -195,8 +193,6 @@
+ 	if (_nc_get_tty_mode(&termp->Nttyb) == OK) {
+ #ifdef TERMIOS
+ 	    termp->Nttyb.c_oflag &= (unsigned) (~OFLAGS_TABS);
+-#elif USE_NAMED_PIPES
+-	    /* noop */
+ #else
+ 	    termp->Nttyb.sg_flags &= (unsigned) (~XTABS);
+ #endif
+Index: ncurses/trace/lib_tracebits.c
+Prereq:  1.37 
+--- ncurses-6.6-20260321+/ncurses/trace/lib_tracebits.c	2025-12-23 09:23:38.000000000 +0000
++++ ncurses-6.6-20260328/ncurses/trace/lib_tracebits.c	2026-03-28 20:22:56.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2019-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2019-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2012,2015 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -35,7 +35,7 @@
+ 
+ #include <curses.priv.h>
+ 
+-MODULE_ID("$Id: lib_tracebits.c,v 1.37 2025/12/23 09:23:38 tom Exp $")
++MODULE_ID("$Id: lib_tracebits.c,v 1.38 2026/03/28 20:22:56 tom Exp $")
+ 
+ #if HAVE_SYS_TERMIO_H
+ #include <sys/termio.h>		/* needed for ISC */
+@@ -68,7 +68,7 @@
+ 
+ #ifdef TRACE
+ 
+-#if defined(USE_WIN32CON_DRIVER)
++#if defined(_NC_WINDOWS_NATIVE)
+ #define BITNAMELEN 36
+ #else
+ #define BITNAMELEN 8
+@@ -214,7 +214,7 @@
+ 	if (tty->c_lflag & ALLLOCAL)
+ 	    lookup_bits(buf, lflags, "lflags", tty->c_lflag);
+     }
+-#elif defined(USE_WIN32CON_DRIVER)
++#elif defined(_NC_WINDOWS_NATIVE)
+ #define DATA(name)        { name, { #name } }
+     static const BITNAMES dwFlagsOut[] =
+     {
+Index: ncurses/tty/lib_twait.c
+Prereq:  1.85 
+--- ncurses-6.6-20260321+/ncurses/tty/lib_twait.c	2025-03-01 17:07:19.000000000 +0000
++++ ncurses-6.6-20260328/ncurses/tty/lib_twait.c	2026-03-28 20:22:56.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2015,2016 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -76,7 +76,7 @@
+ #endif
+ #undef CUR
+ 
+-MODULE_ID("$Id: lib_twait.c,v 1.85 2025/03/01 17:07:19 tom Exp $")
++MODULE_ID("$Id: lib_twait.c,v 1.86 2026/03/28 20:22:56 tom Exp $")
+ 
+ /*
+  * Returns an elapsed time, in milliseconds (if possible).
+@@ -139,12 +139,6 @@
+ 
+ #if (USE_FUNC_POLL || HAVE_SELECT)
+ #  define MAYBE_UNUSED
+-#else
+-#  define MAYBE_UNUSED GCC_UNUSED
+-#endif
+-
+-#if (USE_FUNC_POLL || HAVE_SELECT)
+-#  define MAYBE_UNUSED
+ #else
+ #  define MAYBE_UNUSED GCC_UNUSED
+ #endif
+Index: package/debian-mingw/changelog
+--- ncurses-6.6-20260321+/package/debian-mingw/changelog	2026-03-21 09:36:33.000000000 +0000
++++ ncurses-6.6-20260328/package/debian-mingw/changelog	2026-03-28 09:41:06.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260321) unstable; urgency=low
++ncurses6td (6.6+20260328) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 21 Mar 2026 05:36:33 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Fri, 27 Mar 2026 18:27:43 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian-mingw64/changelog
+--- ncurses-6.6-20260321+/package/debian-mingw64/changelog	2026-03-21 09:36:33.000000000 +0000
++++ ncurses-6.6-20260328/package/debian-mingw64/changelog	2026-03-28 09:41:06.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260321) unstable; urgency=low
++ncurses6td (6.6+20260328) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 21 Mar 2026 05:36:33 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Fri, 27 Mar 2026 18:27:43 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian/changelog
+--- ncurses-6.6-20260321+/package/debian/changelog	2026-03-21 09:36:33.000000000 +0000
++++ ncurses-6.6-20260328/package/debian/changelog	2026-03-28 09:41:06.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260321) unstable; urgency=low
++ncurses6td (6.6+20260328) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 21 Mar 2026 05:36:33 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Fri, 27 Mar 2026 18:27:43 -0400
+ 
+ ncurses6 (5.9+20120608) unstable; urgency=low
+ 
+Index: package/mingw-ncurses.nsi
+Prereq:  1.754 
+--- ncurses-6.6-20260321+/package/mingw-ncurses.nsi	2026-03-21 09:36:33.000000000 +0000
++++ ncurses-6.6-20260328/package/mingw-ncurses.nsi	2026-03-28 09:41:06.000000000 +0000
+@@ -1,4 +1,4 @@
+-; $Id: mingw-ncurses.nsi,v 1.754 2026/03/21 09:36:33 tom Exp $
++; $Id: mingw-ncurses.nsi,v 1.755 2026/03/28 09:41:06 tom Exp $
+ 
+ ; TODO add examples
+ ; TODO bump ABI to 6
+@@ -10,7 +10,7 @@
+ !define VERSION_MAJOR "6"
+ !define VERSION_MINOR "6"
+ !define VERSION_YYYY  "2026"
+-!define VERSION_MMDD  "0321"
++!define VERSION_MMDD  "0328"
+ !define VERSION_PATCH ${VERSION_YYYY}${VERSION_MMDD}
+ 
+ !define MY_ABI   "5"
+Index: package/mingw-ncurses.spec
+--- ncurses-6.6-20260321+/package/mingw-ncurses.spec	2026-03-21 09:36:33.000000000 +0000
++++ ncurses-6.6-20260328/package/mingw-ncurses.spec	2026-03-28 09:41:06.000000000 +0000
+@@ -3,7 +3,7 @@
+ Summary: shared libraries for terminal handling
+ Name: mingw32-ncurses6
+ Version: 6.6
+-Release: 20260321
++Release: 20260328
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -144,8 +144,8 @@
+ 
+ %changelog
+ 
+-* Sat Mar 21 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260321
++* Sat Mar 28 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260328
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncurses.spec
+--- ncurses-6.6-20260321+/package/ncurses.spec	2026-03-21 09:36:33.000000000 +0000
++++ ncurses-6.6-20260328/package/ncurses.spec	2026-03-28 09:41:06.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: shared libraries for terminal handling
+ Name: ncurses6
+ Version: 6.6
+-Release: 20260321
++Release: 20260328
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -134,8 +134,8 @@
+ 
+ %changelog
+ 
+-* Sat Mar 21 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260321
++* Sat Mar 28 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260328
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncursest.spec
+--- ncurses-6.6-20260321+/package/ncursest.spec	2026-03-21 09:36:33.000000000 +0000
++++ ncurses-6.6-20260328/package/ncursest.spec	2026-03-28 09:41:06.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: Curses library with POSIX thread support.
+ Name: ncursest6
+ Version: 6.6
+-Release: 20260321
++Release: 20260328
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ Source: ncurses-%{version}-%{release}.tgz
+@@ -142,8 +142,8 @@
+ 
+ %changelog
+ 
+-* Sat Mar 21 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260321
++* Sat Mar 28 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260328
+ 
+ * Tue Dec 24 2019 Thomas Dickey
+ - drop custom CC_NORMAL warning flags because setting CFLAGS interferes with
+Index: test/ncurses.c
+Prereq:  1.550 
+--- ncurses-6.6-20260321+/test/ncurses.c	2025-11-01 20:12:49.000000000 +0000
++++ ncurses-6.6-20260328/test/ncurses.c	2026-03-28 23:02:07.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -41,7 +41,7 @@
+    Author: Eric S. Raymond <esr@snark.thyrsus.com> 1993
+            Thomas E. Dickey (beginning revision 1.27 in 1996).
+ 
+-$Id: ncurses.c,v 1.550 2025/11/01 20:12:49 tom Exp $
++$Id: ncurses.c,v 1.551 2026/03/28 23:02:07 tom Exp $
+ 
+ ***************************************************************************/
+ 
+@@ -215,9 +215,17 @@
+ 	if (_nc_tracing)
+ 	    Trace(("TOGGLE-TRACING ON"));
+     }
++    if (c == CTRL('D')) {
++	Trace(("FORCE EOF"));
++	close(0);		/* force an EOF-style error */
++	c = wgetch(win);
++    }
+ #else
+     c = wgetch(win);
+ #endif
++    if (c < 0) {
++	failed("wGetchar");
++    }
+     return c;
+ }
+ #define Getchar() wGetchar(stdscr)
+@@ -349,9 +357,17 @@
+ 	if (_nc_tracing)
+ 	    Trace(("TOGGLE-TRACING ON"));
+     }
++    if (c == OK && *result == CTRL('D')) {
++	Trace(("FORCE EOF"));
++	close(0);		/* force an EOF-style error */
++	c = wget_wch(win, result);
++    }
+ #else
+     c = wget_wch(win, result);
+ #endif
++    if (c < 0) {
++	failed("wGet_wchar");
++    }
+     return c;
+ }
+ #define Get_wchar(result) wGet_wchar(stdscr, result)
+Index: test/test.priv.h
+Prereq:  1.230 
+--- ncurses-6.6-20260321+/test/test.priv.h	2026-01-11 12:03:22.000000000 +0000
++++ ncurses-6.6-20260328/test/test.priv.h	2026-03-28 19:29:00.000000000 +0000
+@@ -30,7 +30,7 @@
+ /****************************************************************************
+  *  Author: Thomas E. Dickey                    1996-on                     *
+  ****************************************************************************/
+-/* $Id: test.priv.h,v 1.230 2026/01/11 12:03:22 tom Exp $ */
++/* $Id: test.priv.h,v 1.231 2026/03/28 19:29:00 tom Exp $ */
+ 
+ #ifndef __TEST_PRIV_H
+ #define __TEST_PRIV_H 1
+@@ -1114,7 +1114,7 @@
+ #define _NC_WINDOWS_NATIVE 1
+ #endif
+ 
+-#if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32CON_DRIVER)
++#if defined(_NC_WINDOWS_NATIVE)
+ 
+ #if defined(PDCURSES)
+ #ifdef WINVER
+@@ -1243,7 +1243,7 @@
+ #define InitAndCatch(init,handler) do { init; CATCHALL(handler); } while (0)
+ #endif
+ 
+-#if defined(_NC_WINDOWS_NATIVE) || defined(USE_WIN32CON_DRIVER)
++#if defined(_NC_WINDOWS_NATIVE)
+ #define SetupAlarm(opt)	(void)opt
+ #else
+ #define SetupAlarm(opt)	if (opt) alarm((unsigned)opt)

@@ -1,0 +1,618 @@
+# ncurses 6.6 - patch 20260620 - Thomas E. Dickey
+#
+# ------------------------------------------------------------------------------
+#
+# Ncurses 6.6 is at
+#   https://invisible-island.net/archives/ncurses/
+#   https://invisible-mirror.net/archives/ncurses/
+#   https://ftp.gnu.org/gnu/ncurses/
+#
+# Patches for ncurses 6.6 can be found at
+#   https://invisible-island.net/archives/ncurses/6.6
+#   https://invisible-mirror.net/archives/ncurses/6.6
+#
+# ------------------------------------------------------------------------------
+# https://invisible-island.net/archives/ncurses/6.6/ncurses-6.6-20260620.patch.gz
+# patch by Thomas E. Dickey <dickey@invisible-island.net>
+# created  Sun Jun 21 00:51:57 UTC 2026
+# ------------------------------------------------------------------------------
+# NEWS                             |   16 +++
+# VERSION                          |    2 
+# dist.mk                          |    4 
+# misc/terminfo.src                |  160 ++++++++++++++++++++-----------------
+# ncurses/tinfo/lib_termcap.c      |   17 +++
+# package/debian-mingw/changelog   |    4 
+# package/debian-mingw64/changelog |    4 
+# package/debian/changelog         |    4 
+# package/mingw-ncurses.nsi        |    4 
+# package/mingw-ncurses.spec       |    6 -
+# package/ncurses.spec             |    6 -
+# package/ncursest.spec            |    6 -
+# progs/dump_entry.c               |    9 +-
+# progs/tic.c                      |   10 +-
+# 14 files changed, 154 insertions(+), 98 deletions(-)
+# ------------------------------------------------------------------------------
+Index: NEWS
+Prereq:  1.4476 
+--- ncurses-6.6-20260613+/NEWS	2026-06-13 22:38:37.000000000 +0000
++++ ncurses-6.6-20260620/NEWS	2026-06-21 00:05:36.000000000 +0000
+@@ -26,7 +26,7 @@
+ -- sale, use or other dealings in this Software without prior written        --
+ -- authorization.                                                            --
+ -------------------------------------------------------------------------------
+--- $Id: NEWS,v 1.4476 2026/06/13 22:38:37 tom Exp $
++-- $Id: NEWS,v 1.4481 2026/06/21 00:05:36 tom Exp $
+ -------------------------------------------------------------------------------
+ 
+ This is a log of changes that ncurses has gone through since Zeyd started
+@@ -46,6 +46,20 @@
+ Changes through 1.9.9e did not credit all contributions;
+ it is not possible to add this information.
+ 
++20260620
++	+ add il1 to ibcs2 -TD
++	+ add ich1 to several entries, providing for support of non-curses
++	  applications via termcap only -TD
++	+ add ich/ich1 to teraterm2.3 based on ttsrcp23.zip source-code -TD
++	+ add ich/ich1 to x10term based on X.V10R4/xterm source-code -TD
++	+ add ich/ich1 to xterm-r6 based on source-code -TD
++	+ add ich/ich1 to mterm-ansi and decansi based on source-code -TD
++	+ add ich/ich1 to tek4025a, tek4105a, tek4106brl from manual -TD
++	+ modify infocmp, tic, and tgetent to omit ich1 (termcap "ic") while
++	  providing termcap data when smir/rmir (termcap "im/ei") are given.
++	+ reduce warning in tic regarding termcap applications which do not
++	  work with smir/rmir combined with ich1.
++
+ 20260613
+ 	+ add ich/ich1 to putty -TD
+ 	+ reorder %i's in some capabilities for better matching of blocks -TD
+Index: VERSION
+--- ncurses-6.6-20260613+/VERSION	2026-06-13 10:24:27.000000000 +0000
++++ ncurses-6.6-20260620/VERSION	2026-06-20 09:45:08.000000000 +0000
+@@ -1 +1 @@
+-5:0:10	6.6	20260613
++5:0:10	6.6	20260620
+Index: dist.mk
+Prereq:  1.1738 
+--- ncurses-6.6-20260613+/dist.mk	2026-06-13 10:24:27.000000000 +0000
++++ ncurses-6.6-20260620/dist.mk	2026-06-20 09:45:08.000000000 +0000
+@@ -26,7 +26,7 @@
+ # use or other dealings in this Software without prior written               #
+ # authorization.                                                             #
+ ##############################################################################
+-# $Id: dist.mk,v 1.1738 2026/06/13 10:24:27 tom Exp $
++# $Id: dist.mk,v 1.1739 2026/06/20 09:45:08 tom Exp $
+ # Makefile for creating ncurses distributions.
+ #
+ # This only needs to be used directly as a makefile by developers, but
+@@ -38,7 +38,7 @@
+ # These define the major/minor/patch versions of ncurses.
+ NCURSES_MAJOR = 6
+ NCURSES_MINOR = 6
+-NCURSES_PATCH = 20260613
++NCURSES_PATCH = 20260620
+ 
+ # We don't append the patch to the version, since this only applies to releases
+ VERSION = $(NCURSES_MAJOR).$(NCURSES_MINOR)
+Index: misc/terminfo.src
+--- ncurses-6.6-20260613+/misc/terminfo.src	2026-06-13 20:54:20.000000000 +0000
++++ ncurses-6.6-20260620/misc/terminfo.src	2026-06-20 23:02:58.000000000 +0000
+@@ -6,8 +6,8 @@
+ # Report bugs and new terminal descriptions to
+ #	bug-ncurses@gnu.org
+ #
+-#	$Revision: 1.1253 $
+-#	$Date: 2026/06/13 20:54:20 $
++#	$Revision: 1.1254 $
++#	$Date: 2026/06/20 23:02:58 $
+ #
+ # The original header is preserved below for reference.  It is noted that there
+ # is a "newer" version which differs in some cosmetic details (but actually
+@@ -514,9 +514,9 @@
+ 	cbt=\E[Z, clear=\Ec, cub1=\E[1D, cud1=\E[1B, cuf1=\E[1C,
+ 	cup=\E[%i%p1%d;%p2%dH, cuu1=\E[1A, dch=\E[%p1%dP,
+ 	dispc=\E=%p1%dg, ech=\E[%p1%dX, hts=\EH, ich=\E[%p1%d@,
+-	ich1=\E[@, il=\E[%p1%dL, rc=\E7, rmam=\E[?7l, sc=\E7,
+-	smam=\E[?7h, tbc=\E[g, use=ansi+local, use=ansi+rca2,
+-	use=ecma+index,
++	ich1=\E[@, il=\E[%p1%dL, il1=\E[L, rc=\E7, rmam=\E[?7l,
++	sc=\E7, smam=\E[?7h, tbc=\E[g, use=ansi+local,
++	use=ansi+rca2, use=ecma+index,
+ 
+ #### ANSI/ECMA-48 terminals and terminal emulators
+ #
+@@ -854,10 +854,10 @@
+ 	clear=\E[2J\E[H, cnorm=\Ee, cr=\r, cub1=^H, cud1=\EB,
+ 	cuf1=\EC, cuu1=\EA, dch1=\Ea, dim=\E[2m, dl=\E[%p1%dM,
+ 	dl1=\E[M, ed=\E[J, el=\E[K, el1=\E[1K, ht=^I, hts=\EH,
+-	ich=\E[%p1%d@, il1=\EL, ind=\n, is2=\E<\E)0, kdch1=^?,
+-	kf10=\EOY, kf11=\Ep, kf12=\Eq, kf13=\Er, kf14=\Es, kf15=\Et,
+-	kf16=\Eu, kf17=\Ev, kf18=\Ew, kf19=\Ex, kf20=\Ey, kf5=\EOT,
+-	kf6=\EOU, kf7=\EOV, kf8=\EOW, kf9=\EOX, khlp=\EH,
++	ich=\E[%p1%d@, ich1=\E[@, il1=\EL, ind=\n, is2=\E<\E)0,
++	kdch1=^?, kf10=\EOY, kf11=\Ep, kf12=\Eq, kf13=\Er, kf14=\Es,
++	kf15=\Et, kf16=\Eu, kf17=\Ev, kf18=\Ew, kf19=\Ex, kf20=\Ey,
++	kf5=\EOT, kf6=\EOU, kf7=\EOV, kf8=\EOW, kf9=\EOX, khlp=\EH,
+ 	khome=\E\EE, kich1=\EI, knp=\Eb, kpp=\E\Ea, kund=\EK,
+ 	ll=\E[24H, nel=\EE, oc=\E[30;47m, op=\E[30;47m, rev=\E[7m,
+ 	ri=\EM, rmacs=^O, rmcup=\E[?7h, rmir=\Ei, rmkx=\E[?1l\E>,
+@@ -4532,13 +4532,14 @@
+ 	blink=\E[5m, bold=\E[1m, clear=\E[H\E[J, cuf1=\E[C,
+ 	cup=\E[%i%p1%d;%p2%dH, cuu1=\E[A, dch=\E[%p1%dP,
+ 	dch1=\E[P, ech=\E[%p1%dX, ed=\E[J, el=\E[K, el1=\E[1K,
+-	flash=\E[?5h$<100/>\E[?5l, kf10=\E[21~, kf11=\E[23~,
+-	kf12=\E[24~, kf6=\E[17~, kf7=\E[18~, kf8=\E[19~,
+-	kf9=\E[20~, op=\E[100m, rev=\E[7m, ri=\EM, sgr0=\E[0m\017,
+-	smul=\E[4m, use=ecma+underline, use=ecma+standout,
+-	use=ansi+idl, use=ansi+rca2, use=vt100+enq,
+-	use=klone+color, use=vt220+cvis, use=vt220+vtedit,
+-	use=vt220+sfkeys, use=xterm+r5+lockeys, use=vt100,
++	flash=\E[?5h$<100/>\E[?5l, ich=\E[%p1%d@, ich1=\E[@,
++	kf10=\E[21~, kf11=\E[23~, kf12=\E[24~, kf6=\E[17~,
++	kf7=\E[18~, kf8=\E[19~, kf9=\E[20~, op=\E[100m, rev=\E[7m,
++	ri=\EM, sgr0=\E[0m\017, smul=\E[4m, use=ecma+underline,
++	use=ecma+standout, use=ansi+idl, use=ansi+rca2,
++	use=vt100+enq, use=klone+color, use=vt220+cvis,
++	use=vt220+vtedit, use=vt220+sfkeys,
++	use=xterm+r5+lockeys, use=vt100,
+ 
+ # Version 4.59 has regular VT100 line-drawing (so it is no longer necessary
+ # to choose a Windows OEM font).
+@@ -4988,13 +4989,13 @@
+ 	OTbs, am, km, mir, msgr, xenl, xon,
+ 	cols#80, it#8, lines#65,
+ 	bold=\E[1m, clear=\E[H\E[2J, csr=\E[%i%p1%d;%p2%dr,
+-	cub1=^H, cud1=\n, cuf1=\E[C, cuu1=\E[A, dch=\E[%p1%dP,
+-	dch1=\E[P, ed=\E[J, el=\E[K, ht=^I, ind=\n,
+-	is2=\E\E[m\E[?7h\E[?1;4l, kbs=^H, kcub1=\EOD, kcud1=\EOB,
+-	kcuf1=\EOC, kcuu1=\EOA, rev=\E[7m, ri=\EM, rmam=\E[?7l,
+-	rmir=\E[4l, rmkx=\E[?1l\E>, sgr0=\E[m, smam=\E[?7h,
+-	smir=\E[4h, smkx=\E[?1h\E=, use=ansi+cup, use=ansi+idl,
+-	use=ansi+sgrso, use=ansi+sgrul, use=vt100+pf1-pf4,
++	cub1=^H, cud1=\n, cuf1=\E[C, cuu1=\E[A, ed=\E[J, el=\E[K,
++	ht=^I, ind=\n, is2=\E\E[m\E[?7h\E[?1;4l, kbs=^H,
++	kcub1=\EOD, kcud1=\EOB, kcuf1=\EOC, kcuu1=\EOA, rev=\E[7m,
++	ri=\EM, rmam=\E[?7l, rmkx=\E[?1l\E>, sgr0=\E[m,
++	smam=\E[?7h, smkx=\E[?1h\E=, use=ansi+cup, use=ansi+idc,
++	use=ansi+idl, use=ansi+sgrso, use=ansi+sgrul,
++	use=vt100+pf1-pf4,
+ 
+ # csl is extension which clears the status line
+ x10term+sl|status-line for X10 xterm,
+@@ -5040,18 +5041,18 @@
+ 	cols#80, it#8, lines#24,
+ 	acsc=``aaffggiijjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+ 	bel=^G, bold=\E[1m, clear=\E[H\E[2J, cr=\r, cub1=^H, cud1=\n,
+-	dch=\E[%p1%dP, dch1=\E[P, enacs=\E)0, ht=^I, hts=\EH, ind=\n,
++	enacs=\E)0, ht=^I, hts=\EH, ind=\n,
+ 	is2=\E[m\E[?7h\E[4l\E>\E7\E[r\E[?1;3;4;6l\E8,
+ 	kcub1=\EOD, kcud1=\EOB, kcuf1=\EOC, kcuu1=\EOA, kmous=\E[M,
+-	meml=\El, memu=\Em, rev=\E[7m, ri=\EM, rmacs=^O, rmir=\E[4l,
++	meml=\El, memu=\Em, rev=\E[7m, ri=\EM, rmacs=^O,
+ 	rmkx=\E[?1l\E>,
+ 	rs2=\E[m\E[?7h\E[4l\E>\E7\E[r\E[?1;3;4;6l\E8,
+-	sgr0=\E[m, smacs=^N, smir=\E[4h, smkx=\E[?1h\E=, tbc=\E[3g,
++	sgr0=\E[m, smacs=^N, smkx=\E[?1h\E=, tbc=\E[3g,
+ 	use=xterm+alt47, use=ansi+csr, use=ansi+cup,
+-	use=ansi+erase, use=ansi+idl, use=ansi+local,
+-	use=ansi+sgrso, use=ansi+sgrul, use=vt220+vtedit,
+-	use=xterm+kbs, use=vt100+enq, use=vt220+sfkeys,
+-	use=xterm+r5+fkeys,
++	use=ansi+erase, use=ansi+idc, use=ansi+idl,
++	use=ansi+local, use=ansi+sgrso, use=ansi+sgrul,
++	use=vt220+vtedit, use=xterm+kbs, use=vt100+enq,
++	use=vt220+sfkeys, use=xterm+r5+fkeys,
+ 
+ xterm-old|antique xterm version,
+ 	use=xterm-r6,
+@@ -6960,7 +6961,7 @@
+ 	OTbs, bce, eo, mir, xenl, xon, XT,
+ 	blink=\E[5m, bold=\E[1m, clear=\E[H\E[2J, cub1=^H, cud1=\n,
+ 	cup=\E[%i%p1%d;%p2%dH, ed=\E[J, el=\E[K, el1=\E[1K,
+-	flash=\E[?5h$<100/>\E[?5l, ich=\E[%p1%d@,
++	flash=\E[?5h$<100/>\E[?5l, ich=\E[%p1%d@, ich1=\E[@,
+ 	is1=\E[?47l\E=\E[?1l,
+ 	is2=\E[r\E[m\E[2J\E[H\E[?7h\E[?1;3;4;6l\E[4l,
+ 	kcbt=\E[Z, kmous=\E[M, rev=\E[7m, ri=\EM, rmir=\E[4l,
+@@ -7417,15 +7418,15 @@
+ 	am, bw, mir, msgr,
+ 	it#8,
+ 	acsc=``aaffggiijjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+-	bel=^G, cr=\r, dch=\E[%p1%dP, dim=\E[2m, ech=\E[%p1%dX,
+-	hpa=\E[%i%p1%d`, ht=^I, ich1=, ind=\E[S, is2=\E)0\017,
+-	kbs=^H, nel=\EE, ri=\E[T, rmacs=^O,
++	bel=^G, cr=\r, dim=\E[2m, ech=\E[%p1%dX, hpa=\E[%i%p1%d`,
++	ht=^I, ind=\E[S, is2=\E)0\017, kbs=^H, nel=\EE, ri=\E[T,
++	rmacs=^O,
+ 	sgr=\E[0%?%p6%t;1%;%?%p2%t;4%;%?%p1%p3%|%t;7%;%?%p4%t;5%;%?
+ 	    %p5%t;2%;%?%p7%t;8%;m%?%p9%t\016%e\017%;,
+-	sgr0=\E[m\017, smacs=^N, vpa=\E[%i%p1%dd,
+-	use=ecma+underline, use=ecma+standout, use=ansi+cup,
+-	use=ansi+erase, use=ansi+idc1, use=ansi+idl,
+-	use=ansi+local, use=ansi+sgrbold, use=ecma+index,
++	sgr0=\E[m\017, smacs=^N, use=ecma+underline,
++	use=ecma+standout, use=ansi+cup, use=ansi+erase,
++	use=ansi+idc, use=ansi+idl, use=ansi+local,
++	use=ansi+rca2, use=ansi+sgrbold, use=ecma+index,
+ 
+ # mterm normally sets $TERM to "mterm"
+ mterm|mouse-sun|Der Mouse term,
+@@ -7442,18 +7443,17 @@
+ 	am, mir, msgr, xenl,
+ 	colors#8, it#8, pairs#64,
+ 	acsc=``aaffggiijjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+-	bel=^G, cr=\r, dch=\E[%p1%dP, dim=\E[2m, ech=\E[%p1%dX,
+-	enacs=\E(B\E)0, hpa=\E[%i%p1%d`, ht=^I, ich1=, ind=\E[S,
+-	is2=\E)0\E[r\017, kbs=^H, kcub1=\EOD, kcud1=\EOB,
+-	kcuf1=\EOC, kcuu1=\EOA, nel=\EE, op=\E[0m, ri=\E[T, rmacs=^O,
+-	rmam=\E[?7l, rmkx=\E[?1l\E>, setab=\E[4%p1%dm,
+-	setaf=\E[3%p1%dm,
++	bel=^G, cr=\r, dim=\E[2m, ech=\E[%p1%dX, enacs=\E(B\E)0,
++	hpa=\E[%i%p1%d`, ht=^I, ind=\E[S, is2=\E)0\E[r\017, kbs=^H,
++	kcub1=\EOD, kcud1=\EOB, kcuf1=\EOC, kcuu1=\EOA, nel=\EE,
++	op=\E[0m, ri=\E[T, rmacs=^O, rmam=\E[?7l, rmkx=\E[?1l\E>,
++	setab=\E[4%p1%dm, setaf=\E[3%p1%dm,
+ 	sgr=\E[0%?%p6%t;1%;%?%p2%t;4%;%?%p1%p3%|%t;7%;%?%p4%t;5%;%?
+ 	    %p5%t;2%;%?%p7%t;8%;m%?%p9%t\016%e\017%;,
+ 	sgr0=\E[m\017, smacs=^N, smam=\E[?7h, smkx=\E[?1h\E=,
+-	vpa=\E[%i%p1%dd, use=ecma+underline, use=ecma+standout,
+-	use=ansi+cpr, use=ansi+csr, use=ansi+cup, use=ansi+erase,
+-	use=ansi+idc1, use=ansi+idl, use=ansi+local,
++	use=ecma+underline, use=ecma+standout, use=ansi+cpr,
++	use=ansi+csr, use=ansi+cup, use=ansi+erase, use=ansi+idc,
++	use=ansi+idl, use=ansi+local, use=ansi+rca2,
+ 	use=ansi+sgrbold, use=vt220+vtedit, use=ecma+index,
+ 	use=vt220+cvis, use=vt220+sfkeys, use=xterm+r5+fkeys,
+ 
+@@ -20727,6 +20727,10 @@
+ # Delays not specified; use "stty ixon -ixany" to enable DC3/DC1 flow control!
+ # (tek4025a: removed obsolete ":xx:". This may mean the tek4025a entry won't
+ # work any more. -- esr)
++#
++# Reference
++# https://www.bitsavers.org/pdf/tektronix/402x
++#	070-4172-00_4025A_Computer_Display_Terminal_Programmers_Reference_Dec_1981.pdf
+ tek4025a|Tektronix 4025A,
+ 	OTbs, OTpt, am, bw, da, db, xon,
+ 	cols#80, it#8, lines#34,
+@@ -20736,7 +20740,8 @@
+ 	cuu=\035up %p1%d;, cuu1=^K, dch=\035dch %p1%d;,
+ 	dch1=\035dch;, dl=\035dli %p1%d;, dl1=\035dli;,
+ 	el=\035dch 80;, hpa=\r\035rig %p1%d;, ht=^I,
+-	il1=\013\035ili;, ind=\n, indn=\035dow %p1%d;,
++	ich=\035ich %p1%d;, ich1=\035ich;, il1=\013\035ili;,
++	ind=\n, indn=\035dow %p1%d;,
+ 	rs2=!com\s29\035del\s0\035rss\st\035buf\035buf\sn\035cle
+ 	    \035dis\035dup\035ech\sr\035eol\035era\sg\035for\sn
+ 	    \035pad\s203\035pad\s209\035sno\sn\035sto\s9\s17\s25
+@@ -20808,27 +20813,29 @@
+ # delays are specified; use "stty ixon -ixany" to enable DC3/DC1 flow control!
+ # "IC" cannot be used in combination with "im" & "ei".
+ # "tek4105a" is just a guess:
++#
++# Reference:
++# https://www.bitsavers.org/pdf/tektronix/410x
++#	070-4526-01_4105_PgmrRef_Sep83.pdf
+ tek4105a|Tektronix 4105 (BRL),
+ 	OTbs, OTpt, msgr, xon,
+ 	OTkn#8, cols#80, lines#30, vt#3,
+ 	acsc=, bel=^G, blink=\E[5m, bold=\E[1m,
+ 	civis=\E%!0\ETD00\E%!1, cnorm=\E%!0\ETD10\E%!1, cr=\r,
+ 	cub1=^H, cud1=\n, cuu1=\EM, cvvis=\E%!0\ETD70\E%!1,
+-	dch=\E[%p1%dP, dch1=\E[P, ech=\E[%p1%dX, ind=\n, is2=\E%!1,
+-	kbs=^H, kcub1=\EOD, kcud1=\EOB, kcuf1=\EOC, kcuu1=\EOA,
+-	kf0=\EOA, kf1=\EOB, kf2=\EOC, kf3=\EOD, kf4=\EOP, kf5=\EOQ,
+-	kf6=\EOR, kf7=\EOS, lf0=F1, lf1=F2, lf2=F3, lf3=F4, lf4=F5,
+-	lf5=F6, lf6=F8, ll=\E[30;H, nel=\EE, rev=\E[7m, ri=\EM,
+-	rmacs=^O, rmcup=\E%!0\ELBH=\E%!1, rmir=\E[4l,
+-	rmkx=\E[?1l\E>,
++	ech=\E[%p1%dX, ind=\n, is2=\E%!1, kbs=^H, kcub1=\EOD,
++	kcud1=\EOB, kcuf1=\EOC, kcuu1=\EOA, kf0=\EOA, kf1=\EOB,
++	kf2=\EOC, kf3=\EOD, kf4=\EOP, kf5=\EOQ, kf6=\EOR, kf7=\EOS,
++	lf0=F1, lf1=F2, lf2=F3, lf3=F4, lf4=F5, lf5=F6, lf6=F8,
++	ll=\E[30;H, nel=\EE, rev=\E[7m, ri=\EM, rmacs=^O,
++	rmcup=\E%!0\ELBH=\E%!1, rmkx=\E[?1l\E>,
+ 	rs2=\030\E%!0\EKC\E\014\EKR0\EKF0\ENM0\ELBH=\ETF8000010F40
+ 	    \ELI100\ELLA>\ELM0\EKE0\ENF1\EKS0\END0\E%!1\Ec\E[?3;5l
+ 	    \E[?7;8h\E[r\E[m\E>,
+-	sgr0=\E[m, smacs=^N, smcup=\E[?6l, smir=\E[4h,
+-	smkx=\E[?1h\E=, use=ansi+csr, use=ansi+cup,
+-	use=ansi+erase, use=ansi+idl, use=ansi+inittabs,
+-	use=ansi+local, use=ansi+sgrso, use=ansi+sgrul,
+-	use=ecma+index,
++	sgr0=\E[m, smacs=^N, smcup=\E[?6l, smkx=\E[?1h\E=,
++	use=ansi+csr, use=ansi+cup, use=ansi+erase, use=ansi+idc,
++	use=ansi+idl, use=ansi+inittabs, use=ansi+local,
++	use=ansi+sgrso, use=ansi+sgrul, use=ecma+index,
+ 
+ # Tektronix 4106/4107/4109 from BRL
+ # The following setup modes are assumed for normal operation:
+@@ -20851,25 +20858,28 @@
+ # and factory color maps.  After setting these modes, save them with NVSAVE.  No
+ # delays are specified; use "stty ixon -ixany" to enable DC3/DC1 flow control!
+ # "IC" cannot be used in combination with "im" & "ei".
++#
++# Reference:
++# https://www.bitsavers.org/pdf/tektronix/410x
++#	070-4892-02_4106_4107_4109_CX_Reference_Guide_198506.pdf
+ tek4106brl|tek4107brl|tek4109brl|Tektronix 4106 4107 or 4109,
+ 	msgr, xon,
+ 	cols#80, lines#32, vt#3,
+ 	acsc=, bel=^G, blink=\E[5m, bold=\E[1m,
+ 	civis=\E%!0\ETD00\E%!1, cnorm=\E%!0\ETD10\E%!1, cr=\r,
+ 	cub1=^H, cud1=\n, cuu1=\EM, cvvis=\E%!0\ETD70\E%!1,
+-	dch=\E[%p1%dP, dch1=\E[P, ech=\E[%p1%dX, ind=\n, is2=\E%!1,
+-	kbs=^H, kcub1=\EOD, kcud1=\EOB, kcuf1=\EOC, kcuu1=\EOA,
+-	kf0=\EOA, kf1=\EOB, kf2=\EOC, kf3=\EOD, kf4=\EOP, kf5=\EOQ,
+-	kf6=\EOR, kf7=\EOS, lf0=F1, lf1=F2, lf2=F3, lf3=F4, lf4=F5,
+-	lf5=F6, lf6=F8, ll=\E[32;H, nel=\EE, rev=\E[7m, ri=\EM,
+-	rmacs=^O, rmcup=\E%!0\ELBH=\E%!1, rmir=\E[4l,
+-	rmkx=\E[?1l\E>, rmso=\E[m,
++	ech=\E[%p1%dX, ind=\n, is2=\E%!1, kbs=^H, kcub1=\EOD,
++	kcud1=\EOB, kcuf1=\EOC, kcuu1=\EOA, kf0=\EOA, kf1=\EOB,
++	kf2=\EOC, kf3=\EOD, kf4=\EOP, kf5=\EOQ, kf6=\EOR, kf7=\EOS,
++	lf0=F1, lf1=F2, lf2=F3, lf3=F4, lf4=F5, lf5=F6, lf6=F8,
++	ll=\E[32;H, nel=\EE, rev=\E[7m, ri=\EM, rmacs=^O,
++	rmcup=\E%!0\ELBH=\E%!1, rmkx=\E[?1l\E>, rmso=\E[m,
+ 	rs1=\030\E%!0\EKC\E\014\EKR0\EKF0\ENM0\ELBH=\ETF8000010F40
+ 	    \ELI100\ELLB0\ELM0\EKE0\ENF1\EKS0\END0\ERE0\E%!1\Ec\E[?3
+ 	    ;5l\E[?7;8h\E[r\E[m\E>,
+-	sgr0=\E[m, smacs=^N, smcup=\E[?6l, smir=\E[4h,
+-	smkx=\E[?1h\E=, smso=\E[7;42m, use=ansi+csr,
+-	use=ansi+cup, use=ansi+erase, use=ansi+idl,
++	sgr0=\E[m, smacs=^N, smcup=\E[?6l, smkx=\E[?1h\E=,
++	smso=\E[7;42m, use=ansi+csr, use=ansi+cup,
++	use=ansi+erase, use=ansi+idc, use=ansi+idl,
+ 	use=ansi+inittabs, use=ansi+local, use=ansi+sgrul,
+ 	use=ecma+index,
+ 
+@@ -28369,4 +28379,14 @@
+ #	+ change %2d and %3d to %02d and %03d to match original termcaps -TD
+ #	+ reduce unnecessary %2d and %3d to just %d -TD
+ #
++# 2026-02-20
++#	+ add il1 to ibcs2 -TD
++#	+ add ich1 to several entries, providing for support of non-curses
++#	  applications via termcap only -TD
++#	+ add ich/ich1 to teraterm2.3 based on ttsrcp23.zip source-code -TD
++#	+ add ich/ich1 to x10term based on X.V10R4/xterm source-code -TD
++#	+ add ich/ich1 to xterm-r6 based on source-code -TD
++#	+ add ich/ich1 to mterm-ansi and decansi based on source-code -TD
++#	+ add ich/ich1 to tek4025a, tek4105a, tek4106brl from manual -TD
++#
+ ######## SHANTIH!  SHANTIH!  SHANTIH!
+Index: ncurses/tinfo/lib_termcap.c
+Prereq:  1.97 
+--- ncurses-6.6-20260613+/ncurses/tinfo/lib_termcap.c	2026-05-30 22:10:47.000000000 +0000
++++ ncurses-6.6-20260620/ncurses/tinfo/lib_termcap.c	2026-06-20 13:13:01.000000000 +0000
+@@ -49,7 +49,7 @@
+ #define CUR SP_TERMTYPE
+ #endif
+ 
+-MODULE_ID("$Id: lib_termcap.c,v 1.97 2026/05/30 22:10:47 tom Exp $")
++MODULE_ID("$Id: lib_termcap.c,v 1.98 2026/06/20 13:13:01 tom Exp $")
+ 
+ NCURSES_EXPORT_VAR(char *) UP = NULL;
+ NCURSES_EXPORT_VAR(char *) BC = NULL;
+@@ -166,6 +166,7 @@
+     FIX_SGR0 = NULL;		/* don't free it - application may still use */
+ 
+     if (rc == 1) {
++	TERMTYPE2 *tp = &TerminalType(TerminalOf(SP_PARM));
+ 
+ 	if (cursor_left)
+ 	    if ((backspaces_with_bs = (char) !strcmp(cursor_left, "\b")) == 0)
+@@ -179,8 +180,7 @@
+ 	if (backspace_if_not_bs != NULL)
+ 	    BC = backspace_if_not_bs;
+ 
+-	if ((FIX_SGR0 = _nc_trim_sgr0(&TerminalType(TerminalOf(SP_PARM))))
+-	    != NULL) {
++	if ((FIX_SGR0 = _nc_trim_sgr0(tp)) != NULL) {
+ 	    if (!strcmp(FIX_SGR0, exit_attribute_mode)) {
+ 		if (FIX_SGR0 != exit_attribute_mode) {
+ 		    free(FIX_SGR0);
+@@ -188,6 +188,17 @@
+ 		FIX_SGR0 = NULL;
+ 	    }
+ 	}
++	/*
++	 * Some standard applications (e.g., vi) and some non-curses
++	 * applications (e.g., jove) get confused if we have both ich1 and
++	 * smir/rmir.  Let's be nice and prevent that confusion.
++	 */
++	if (VALID_STRING(insert_character) &&
++	    VALID_STRING(enter_insert_mode) &&
++	    VALID_STRING(exit_insert_mode)) {
++	    insert_character = NULL;
++	}
++
+ 	LAST_BUF = bufp;
+ 	LAST_USE = TRUE;
+ 
+Index: package/debian-mingw/changelog
+--- ncurses-6.6-20260613+/package/debian-mingw/changelog	2026-06-13 10:24:27.000000000 +0000
++++ ncurses-6.6-20260620/package/debian-mingw/changelog	2026-06-20 09:45:08.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260613) unstable; urgency=low
++ncurses6td (6.6+20260620) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 13 Jun 2026 06:24:27 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 20 Jun 2026 05:45:08 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian-mingw64/changelog
+--- ncurses-6.6-20260613+/package/debian-mingw64/changelog	2026-06-13 10:24:27.000000000 +0000
++++ ncurses-6.6-20260620/package/debian-mingw64/changelog	2026-06-20 09:45:08.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260613) unstable; urgency=low
++ncurses6td (6.6+20260620) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 13 Jun 2026 06:24:27 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 20 Jun 2026 05:45:08 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian/changelog
+--- ncurses-6.6-20260613+/package/debian/changelog	2026-06-13 10:24:27.000000000 +0000
++++ ncurses-6.6-20260620/package/debian/changelog	2026-06-20 09:45:08.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260613) unstable; urgency=low
++ncurses6td (6.6+20260620) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 13 Jun 2026 06:24:27 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 20 Jun 2026 05:45:08 -0400
+ 
+ ncurses6 (5.9+20120608) unstable; urgency=low
+ 
+Index: package/mingw-ncurses.nsi
+Prereq:  1.768 
+--- ncurses-6.6-20260613+/package/mingw-ncurses.nsi	2026-06-13 10:24:27.000000000 +0000
++++ ncurses-6.6-20260620/package/mingw-ncurses.nsi	2026-06-20 09:45:08.000000000 +0000
+@@ -1,4 +1,4 @@
+-; $Id: mingw-ncurses.nsi,v 1.768 2026/06/13 10:24:27 tom Exp $
++; $Id: mingw-ncurses.nsi,v 1.769 2026/06/20 09:45:08 tom Exp $
+ 
+ ; TODO add examples
+ ; TODO bump ABI to 6
+@@ -10,7 +10,7 @@
+ !define VERSION_MAJOR "6"
+ !define VERSION_MINOR "6"
+ !define VERSION_YYYY  "2026"
+-!define VERSION_MMDD  "0613"
++!define VERSION_MMDD  "0620"
+ !define VERSION_PATCH ${VERSION_YYYY}${VERSION_MMDD}
+ 
+ !define MY_ABI   "5"
+Index: package/mingw-ncurses.spec
+--- ncurses-6.6-20260613+/package/mingw-ncurses.spec	2026-06-13 10:24:27.000000000 +0000
++++ ncurses-6.6-20260620/package/mingw-ncurses.spec	2026-06-20 09:45:08.000000000 +0000
+@@ -3,7 +3,7 @@
+ Summary: shared libraries for terminal handling
+ Name: mingw32-ncurses6
+ Version: 6.6
+-Release: 20260613
++Release: 20260620
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -144,8 +144,8 @@
+ 
+ %changelog
+ 
+-* Sat Jun 13 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260613
++* Sat Jun 20 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260620
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncurses.spec
+--- ncurses-6.6-20260613+/package/ncurses.spec	2026-06-13 10:24:27.000000000 +0000
++++ ncurses-6.6-20260620/package/ncurses.spec	2026-06-20 09:45:08.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: shared libraries for terminal handling
+ Name: ncurses6
+ Version: 6.6
+-Release: 20260613
++Release: 20260620
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -134,8 +134,8 @@
+ 
+ %changelog
+ 
+-* Sat Jun 13 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260613
++* Sat Jun 20 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260620
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncursest.spec
+--- ncurses-6.6-20260613+/package/ncursest.spec	2026-06-13 10:24:27.000000000 +0000
++++ ncurses-6.6-20260620/package/ncursest.spec	2026-06-20 09:45:08.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: Curses library with POSIX thread support.
+ Name: ncursest6
+ Version: 6.6
+-Release: 20260613
++Release: 20260620
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ Source: ncurses-%{version}-%{release}.tgz
+@@ -142,8 +142,8 @@
+ 
+ %changelog
+ 
+-* Sat Jun 13 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260613
++* Sat Jun 20 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260620
+ 
+ * Tue Dec 24 2019 Thomas Dickey
+ - drop custom CC_NORMAL warning flags because setting CFLAGS interferes with
+Index: progs/dump_entry.c
+Prereq:  1.202 
+--- ncurses-6.6-20260613+/progs/dump_entry.c	2026-06-06 09:59:40.000000000 +0000
++++ ncurses-6.6-20260620/progs/dump_entry.c	2026-06-20 16:50:30.000000000 +0000
+@@ -40,7 +40,7 @@
+ #include <termsort.h>		/* this C file is generated */
+ #include <parametrized.h>	/* so is this */
+ 
+-MODULE_ID("$Id: dump_entry.c,v 1.202 2026/06/06 09:59:40 tom Exp $")
++MODULE_ID("$Id: dump_entry.c,v 1.203 2026/06/20 16:50:30 tom Exp $")
+ 
+ #define DISCARD(string) string = ABSENT_STRING
+ #define PRINTF (void) printf
+@@ -1772,6 +1772,13 @@
+ set_obsolete_termcaps(TERMTYPE2 *tp)
+ {
+ #include "capdefaults.c"
++    /*
++     * Adjust the entry to match results via tgetent.
++     */
++    if (VALID_STRING(insert_character) &&
++	VALID_STRING(enter_insert_mode) &&
++	VALID_STRING(exit_insert_mode))
++	insert_character = NULL;
+ }
+ 
+ /*
+Index: progs/tic.c
+Prereq:  1.343 
+--- ncurses-6.6-20260613+/progs/tic.c	2026-06-06 09:59:40.000000000 +0000
++++ ncurses-6.6-20260620/progs/tic.c	2026-06-20 16:26:52.000000000 +0000
+@@ -49,7 +49,7 @@
+ #include <parametrized.h>
+ #include <transform.h>
+ 
+-MODULE_ID("$Id: tic.c,v 1.343 2026/06/06 09:59:40 tom Exp $")
++MODULE_ID("$Id: tic.c,v 1.346 2026/06/20 16:26:52 tom Exp $")
+ 
+ #define STDIN_NAME "<stdin>"
+ 
+@@ -3374,9 +3374,13 @@
+      * applications (e.g., jove) get confused if we have both ich1 and
+      * smir/rmir.  Let's be nice and warn about that, too, even though
+      * ncurses handles it.
++     *
++     * Since only termcap applications are affected, limit the warning, e.g.,
++     * using -v1 or -vv options for terminfo, and -v for termcap sources.
+      */
+-    if ((PRESENT(enter_insert_mode) || PRESENT(exit_insert_mode))
+-	&& PRESENT(insert_character)) {
++    if (((debug_level > 1) || (_nc_syntax == SYN_TERMCAP)) &&
++	((PRESENT(enter_insert_mode) || PRESENT(exit_insert_mode)) &&
++	 PRESENT(insert_character))) {
+ 	_nc_warning("non-curses applications may be confused by ich1 with smir/rmir");
+     }
+ 

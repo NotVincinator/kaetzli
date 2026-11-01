@@ -1,0 +1,641 @@
+# ncurses 6.6 - patch 20260307 - Thomas E. Dickey
+#
+# ------------------------------------------------------------------------------
+#
+# Ncurses 6.6 is at
+#   https://invisible-island.net/archives/ncurses/
+#   https://invisible-mirror.net/archives/ncurses/
+#   https://ftp.gnu.org/gnu/ncurses/
+#
+# Patches for ncurses 6.6 can be found at
+#   https://invisible-island.net/archives/ncurses/6.6
+#   https://invisible-mirror.net/archives/ncurses/6.6
+#
+# ------------------------------------------------------------------------------
+# https://invisible-island.net/archives/ncurses/6.6/ncurses-6.6-20260307.patch.gz
+# patch by Thomas E. Dickey <dickey@invisible-island.net>
+# created  Sun Mar  8 00:35:42 UTC 2026
+# ------------------------------------------------------------------------------
+# NEWS                             |   11 +++++++++--
+# VERSION                          |    2 +-
+# dist.mk                          |    4 ++--
+# ncurses/base/lib_mouse.c         |    5 ++++-
+# ncurses/tinfo/comp_parse.c       |    6 ++++--
+# ncurses/tinfo/doalloc.c          |    6 +++---
+# ncurses/tinfo/read_entry.c       |    9 ++-------
+# ncurses/tinfo/read_termcap.c     |    6 +++---
+# ncurses/tinfo/write_entry.c      |    7 ++++---
+# ncurses/trace/lib_trace.c        |    5 ++---
+# ncurses/tty/lib_mvcur.c          |   13 +++++++------
+# ncurses/win32con/wcwidth.c       |    6 ++++--
+# package/debian-mingw/changelog   |    4 ++--
+# package/debian-mingw64/changelog |    4 ++--
+# package/debian/changelog         |    4 ++--
+# package/mingw-ncurses.nsi        |    4 ++--
+# package/mingw-ncurses.spec       |    6 +++---
+# package/ncurses.spec             |    6 +++---
+# package/ncursest.spec            |    6 +++---
+# progs/dump_entry.c               |   12 +++++-------
+# progs/infocmp.c                  |    4 ++--
+# progs/progs.priv.h               |    4 +++-
+# progs/tic.c                      |   18 +++++++++++++++++-
+# 23 files changed, 89 insertions(+), 63 deletions(-)
+# ------------------------------------------------------------------------------
+Index: NEWS
+Prereq:  1.4427 
+--- ncurses-6.6-20260301+/NEWS	2026-03-01 23:20:55.000000000 +0000
++++ ncurses-6.6-20260307/NEWS	2026-03-07 23:35:58.000000000 +0000
+@@ -26,7 +26,7 @@
+ -- sale, use or other dealings in this Software without prior written        --
+ -- authorization.                                                            --
+ -------------------------------------------------------------------------------
+--- $Id: NEWS,v 1.4427 2026/03/01 23:20:55 tom Exp $
++-- $Id: NEWS,v 1.4430 2026/03/07 23:35:58 tom Exp $
+ -------------------------------------------------------------------------------
+ 
+ This is a log of changes that ncurses has gone through since Zeyd started
+@@ -46,6 +46,13 @@
+ Changes through 1.9.9e did not credit all contributions;
+ it is not possible to add this information.
+ 
++20260307
++	+ add tic checks for pairs of user-caps strings which are listed in
++	  Caps-ncurses.
++	+ fix a few gcc warnings.
++	+ fix inconsistent checks for expanding special characters with infocmp
++	  -L option (report by Stephane Chazelas).
++
+ 20260301
+ 	+ modify mouse parsing to handle events with no delay between button
+ 	  press and release (report by Vincent Lefevre).
+@@ -2165,7 +2172,7 @@
+ 	> additional changes for building with Visual Studio C++ and msys2
+ 	  (patches by "Maarten Anonymous"):
+ 	+ adjust headers/declarations to provide for "dllimport" vs "dllexport"
+-	  declarations when constructing DLLs, to worko with Visual Studio C++.
++	  declarations when constructing DLLs, to work with Visual Studio C++.
+ 
+ 20200627
+ 	+ build-fixes for gnat 10.1.1, whose gnatmake drops integration with
+Index: VERSION
+--- ncurses-6.6-20260301+/VERSION	2026-03-01 23:08:48.000000000 +0000
++++ ncurses-6.6-20260307/VERSION	2026-03-07 11:27:33.000000000 +0000
+@@ -1 +1 @@
+-5:0:10	6.6	20260301
++5:0:10	6.6	20260307
+Index: dist.mk
+Prereq:  1.1721 
+--- ncurses-6.6-20260301+/dist.mk	2026-03-01 23:08:48.000000000 +0000
++++ ncurses-6.6-20260307/dist.mk	2026-03-07 11:27:33.000000000 +0000
+@@ -26,7 +26,7 @@
+ # use or other dealings in this Software without prior written               #
+ # authorization.                                                             #
+ ##############################################################################
+-# $Id: dist.mk,v 1.1721 2026/03/01 23:08:48 tom Exp $
++# $Id: dist.mk,v 1.1722 2026/03/07 11:27:33 tom Exp $
+ # Makefile for creating ncurses distributions.
+ #
+ # This only needs to be used directly as a makefile by developers, but
+@@ -38,7 +38,7 @@
+ # These define the major/minor/patch versions of ncurses.
+ NCURSES_MAJOR = 6
+ NCURSES_MINOR = 6
+-NCURSES_PATCH = 20260301
++NCURSES_PATCH = 20260307
+ 
+ # We don't append the patch to the version, since this only applies to releases
+ VERSION = $(NCURSES_MAJOR).$(NCURSES_MINOR)
+Index: ncurses/base/lib_mouse.c
+Prereq:  1.221 
+--- ncurses-6.6-20260301+/ncurses/base/lib_mouse.c	2026-03-01 21:45:32.000000000 +0000
++++ ncurses-6.6-20260307/ncurses/base/lib_mouse.c	2026-03-07 11:41:32.000000000 +0000
+@@ -84,7 +84,7 @@
+ #define CUR SP_TERMTYPE
+ #endif
+ 
+-MODULE_ID("$Id: lib_mouse.c,v 1.221 2026/03/01 21:45:32 tom Exp $")
++MODULE_ID("$Id: lib_mouse.c,v 1.222 2026/03/07 11:41:32 tom Exp $")
+ 
+ #include <tic.h>
+ 
+@@ -171,8 +171,11 @@
+ 
+ #define ValidEvent(ep) ((ep)->id != INVALID_EVENT)
+ #define Invalidate(ep) (ep)->id = INVALID_EVENT
++
++#ifdef TRACE
+ static const MEVENT invalid_event =
+ {INVALID_EVENT, 0, 0, 0, 0};
++#endif
+ 
+ #if USE_GPM_SUPPORT
+ 
+Index: ncurses/tinfo/comp_parse.c
+Prereq:  1.142 
+--- ncurses-6.6-20260301+/ncurses/tinfo/comp_parse.c	2025-12-31 11:46:54.000000000 +0000
++++ ncurses-6.6-20260307/ncurses/tinfo/comp_parse.c	2026-03-07 11:42:23.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -48,7 +48,7 @@
+ 
+ #include <tic.h>
+ 
+-MODULE_ID("$Id: comp_parse.c,v 1.142 2025/12/31 11:46:54 tom Exp $")
++MODULE_ID("$Id: comp_parse.c,v 1.143 2026/03/07 11:42:23 tom Exp $")
+ 
+ static void sanity_check2(TERMTYPE2 *, bool);
+ NCURSES_IMPEXP void (NCURSES_API *_nc_check_termtype2) (TERMTYPE2 *, bool) = sanity_check2;
+@@ -276,6 +276,8 @@
+ #ifdef TRACE
+     else if (!immediate)
+ 	DEBUG(2, ("no entries parsed"));
++#else
++    (void) immediate;
+ #endif
+ 
+     _nc_suppress_warnings = oldsuppress;
+Index: ncurses/tinfo/doalloc.c
+Prereq:  1.15 
+--- ncurses-6.6-20260301+/ncurses/tinfo/doalloc.c	2024-12-07 20:05:08.000000000 +0000
++++ ncurses-6.6-20260307/ncurses/tinfo/doalloc.c	2026-03-07 20:42:12.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2020-2021,2024 Thomas E. Dickey                                *
++ * Copyright 2020-2024,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2002,2012 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -40,9 +40,9 @@
+ 
+ #include <curses.priv.h>
+ 
+-MODULE_ID("$Id: doalloc.c,v 1.15 2024/12/07 20:05:08 tom Exp $")
++MODULE_ID("$Id: doalloc.c,v 1.16 2026/03/07 20:42:12 tom Exp $")
+ 
+-void *
++NCURSES_EXPORT(void *)
+ _nc_doalloc(void *oldp, size_t amount)
+ {
+     void *newp;
+Index: ncurses/tinfo/read_entry.c
+Prereq:  1.175 
+--- ncurses-6.6-20260301+/ncurses/tinfo/read_entry.c	2025-01-11 23:52:18.000000000 +0000
++++ ncurses-6.6-20260307/ncurses/tinfo/read_entry.c	2026-03-07 17:49:54.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -42,7 +42,7 @@
+ 
+ #include <tic.h>
+ 
+-MODULE_ID("$Id: read_entry.c,v 1.175 2025/01/11 23:52:18 tom Exp $")
++MODULE_ID("$Id: read_entry.c,v 1.176 2026/03/07 17:49:54 tom Exp $")
+ 
+ #define MyNumber(n) (short) LOW_MSB(n)
+ 
+@@ -517,13 +517,8 @@
+ 				    _nc_visbuf(ptr->Strings[i + STRCOUNT])));
+ 	    }
+ 	    TR(TRACE_DATABASE, ("Check table-size: %d/%d", check, ext_str_usage));
+-#if 0
+-	    /*
+-	     * Phasing in a proper check will be done "later".
+-	     */
+ 	    if (check != ext_str_usage)
+ 		returnDB(TGETENT_NO);
+-#endif
+ 	}
+ 
+ 	if (need) {
+Index: ncurses/tinfo/read_termcap.c
+Prereq:  1.107 
+--- ncurses-6.6-20260301+/ncurses/tinfo/read_termcap.c	2025-12-25 18:20:22.000000000 +0000
++++ ncurses-6.6-20260307/ncurses/tinfo/read_termcap.c	2026-03-06 09:06:26.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2023,2025 Thomas E. Dickey                                *
++ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -57,7 +57,7 @@
+ #include <sys/types.h>
+ #include <tic.h>
+ 
+-MODULE_ID("$Id: read_termcap.c,v 1.107 2025/12/25 18:20:22 tom Exp $")
++MODULE_ID("$Id: read_termcap.c,v 1.108 2026/03/06 09:06:26 tom Exp $")
+ 
+ #if !PURE_TERMINFO
+ 
+@@ -920,7 +920,7 @@
+ 	if ((the_source = strdup(temp)) != NULL)
+ 	    *sourcename = the_source;
+ #else
+-        if ((the_source = strdup(pathvec[i])) != NULL)
++	if ((the_source = strdup(pathvec[i])) != NULL)
+ 	    *sourcename = the_source;
+ #endif
+     }
+Index: ncurses/tinfo/write_entry.c
+Prereq:  1.144 
+--- ncurses-6.6-20260301+/ncurses/tinfo/write_entry.c	2025-12-28 00:33:30.000000000 +0000
++++ ncurses-6.6-20260307/ncurses/tinfo/write_entry.c	2026-03-06 09:06:49.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -42,7 +42,7 @@
+ 
+ #include <tic.h>
+ 
+-MODULE_ID("$Id: write_entry.c,v 1.144 2025/12/28 00:33:30 tom Exp $")
++MODULE_ID("$Id: write_entry.c,v 1.145 2026/03/06 09:06:49 tom Exp $")
+ 
+ #if 1
+ #define TRACE_OUT(p) DEBUG(2, p)
+@@ -132,7 +132,8 @@
+     const char *s = NULL;
+ 
+     if (code == 0 || (s = (strchr) (dirnames, code)) == NULL) {
+-	_nc_err_abort("Illegal terminfo subdirectory \"" LEAF_FMT "\"", UChar(code));
++	_nc_err_abort("Illegal terminfo subdirectory \"" LEAF_FMT "\"",
++		      UChar(code));
+     } else if (!verified[s - dirnames]) {
+ 	char dir[sizeof(LEAF_FMT)];
+ 	_nc_SPRINTF(dir, _nc_SLIMIT(sizeof(dir)) LEAF_FMT, UChar(code));
+Index: ncurses/trace/lib_trace.c
+Prereq:  1.109 
+--- ncurses-6.6-20260301+/ncurses/trace/lib_trace.c	2024-12-07 21:02:00.000000000 +0000
++++ ncurses-6.6-20260307/ncurses/trace/lib_trace.c	2026-03-07 18:00:16.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2023,2024 Thomas E. Dickey                                *
++ * Copyright 2018-2024,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -48,7 +48,7 @@
+ 
+ #include <ctype.h>
+ 
+-MODULE_ID("$Id: lib_trace.c,v 1.109 2024/12/07 21:02:00 tom Exp $")
++MODULE_ID("$Id: lib_trace.c,v 1.110 2026/03/07 18:00:16 tom Exp $")
+ 
+ NCURSES_EXPORT_VAR(unsigned) _nc_tracing = 0; /* always define this */
+ 
+@@ -181,7 +181,6 @@
+ 	    }
+ 	}
+ 	SPECIAL_MASK(TRACE_MAXIMUM);
+-	else
+ 	SPECIAL_MASK(TRACE_ORDINARY);
+ 
+ 	if (tracelevel > TRACE_MAXIMUM) {
+Index: ncurses/tty/lib_mvcur.c
+Prereq:  1.168 
+--- ncurses-6.6-20260301+/ncurses/tty/lib_mvcur.c	2026-01-13 08:43:39.000000000 +0000
++++ ncurses-6.6-20260307/ncurses/tty/lib_mvcur.c	2026-03-06 09:08:25.000000000 +0000
+@@ -160,7 +160,7 @@
+ #define CUR SP_TERMTYPE
+ #endif
+ 
+-MODULE_ID("$Id: lib_mvcur.c,v 1.168 2026/01/13 08:43:39 tom Exp $")
++MODULE_ID("$Id: lib_mvcur.c,v 1.169 2026/03/06 09:08:25 tom Exp $")
+ 
+ #define WANT_CHAR(sp, y, x) NewScreen(sp)->_line[y].text[x]	/* desired state */
+ 
+@@ -184,10 +184,10 @@
+ 
+ /* these override lib_tputs.c */
+ static int
+-NCURSES_SP_NAME(TestTPUTS)(NCURSES_SP_DCLx
+-			   const char *string,
+-			   int affcnt GCC_UNUSED,
+-			   NCURSES_SP_OUTC outc)
++NCURSES_SP_NAME(TestTPUTS) (NCURSES_SP_DCLx
++			    const char *string,
++			    int affcnt GCC_UNUSED,
++			    NCURSES_SP_OUTC outc)
+ /* stub tputs() that dumps sequences in a visible form */
+ {
+     (void) SP_PARM;
+@@ -1374,7 +1374,8 @@
+ 		 * transmission both. Transmission time is an estimate
+ 		 * assuming 9 bits/char, 8 bits + 1 stop bit.
+ 		 */
+-		double totalest = cumtime + (double) xmits * 9 * 1e6 / speeds[i];
++		double totalest = (cumtime
++				   + (double) xmits * 9 * 1e6 / speeds[i]);
+ 
+ 		/*
+ 		 * Per-character optimization overhead in character transmits
+Index: ncurses/win32con/wcwidth.c
+Prereq:  1.6 
+--- ncurses-6.6-20260301+/ncurses/win32con/wcwidth.c	2026-01-03 11:43:50.000000000 +0000
++++ ncurses-6.6-20260307/ncurses/win32con/wcwidth.c	2026-03-06 23:28:40.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2020-2024,2026 Thomas E. Dickey                                 
++ * Copyright 2020-2024,2026 Thomas E. Dickey
+  * Copyright 2010 Free Software Foundation, Inc.                            *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -28,7 +28,7 @@
+  ****************************************************************************/
+ #include <curses.priv.h>
+ 
+-MODULE_ID("$Id: wcwidth.c,v 1.6 2026/01/03 11:43:50 tom Exp $")
++MODULE_ID("$Id: wcwidth.c,v 1.8 2026/03/06 23:28:40 tom Exp $")
+ 
+ #if USE_WIDEC_SUPPORT
+ #define mk_wcwidth(ucs)          _nc_wcwidth(ucs)
+@@ -45,12 +45,14 @@
+     ,WcEmojiFullwidth = 4	/* Emojis are fullwidth */
+ } WcModes;
+ 
++/* *INDENT-OFF* */
+ NCURSES_EXPORT(int) mk_wcwidth_init(int);
+ NCURSES_EXPORT(int) mk_wcwidth(uint32_t);
+ NCURSES_EXPORT(int) mk_wcswidth(const uint32_t *, size_t);
+ NCURSES_EXPORT(int) mk_wcwidth_cjk(uint32_t);
+ NCURSES_EXPORT(int) mk_wcswidth_cjk(const uint32_t *, size_t);
+ NCURSES_EXPORT(int) mk_is_emoji(wchar_t ucs);
++/* *INDENT-ON* */
+ 
+ #include <wcwidth.h>
+ #else
+Index: package/debian-mingw/changelog
+--- ncurses-6.6-20260301+/package/debian-mingw/changelog	2026-03-01 23:08:48.000000000 +0000
++++ ncurses-6.6-20260307/package/debian-mingw/changelog	2026-03-04 21:22:00.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260301) unstable; urgency=low
++ncurses6td (6.6+20260307) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sun, 01 Mar 2026 18:08:48 -0500
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Wed, 04 Mar 2026 16:22:00 -0500
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian-mingw64/changelog
+--- ncurses-6.6-20260301+/package/debian-mingw64/changelog	2026-03-01 23:08:48.000000000 +0000
++++ ncurses-6.6-20260307/package/debian-mingw64/changelog	2026-03-04 21:22:00.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260301) unstable; urgency=low
++ncurses6td (6.6+20260307) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sun, 01 Mar 2026 18:08:48 -0500
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Wed, 04 Mar 2026 16:22:00 -0500
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian/changelog
+--- ncurses-6.6-20260301+/package/debian/changelog	2026-03-01 23:08:48.000000000 +0000
++++ ncurses-6.6-20260307/package/debian/changelog	2026-03-04 21:22:00.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260301) unstable; urgency=low
++ncurses6td (6.6+20260307) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sun, 01 Mar 2026 18:08:48 -0500
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Wed, 04 Mar 2026 16:22:00 -0500
+ 
+ ncurses6 (5.9+20120608) unstable; urgency=low
+ 
+Index: package/mingw-ncurses.nsi
+Prereq:  1.751 
+--- ncurses-6.6-20260301+/package/mingw-ncurses.nsi	2026-03-01 23:08:48.000000000 +0000
++++ ncurses-6.6-20260307/package/mingw-ncurses.nsi	2026-03-04 21:22:00.000000000 +0000
+@@ -1,4 +1,4 @@
+-; $Id: mingw-ncurses.nsi,v 1.751 2026/03/01 23:08:48 tom Exp $
++; $Id: mingw-ncurses.nsi,v 1.752 2026/03/04 21:22:00 tom Exp $
+ 
+ ; TODO add examples
+ ; TODO bump ABI to 6
+@@ -10,7 +10,7 @@
+ !define VERSION_MAJOR "6"
+ !define VERSION_MINOR "6"
+ !define VERSION_YYYY  "2026"
+-!define VERSION_MMDD  "0301"
++!define VERSION_MMDD  "0307"
+ !define VERSION_PATCH ${VERSION_YYYY}${VERSION_MMDD}
+ 
+ !define MY_ABI   "5"
+Index: package/mingw-ncurses.spec
+--- ncurses-6.6-20260301+/package/mingw-ncurses.spec	2026-03-01 23:08:48.000000000 +0000
++++ ncurses-6.6-20260307/package/mingw-ncurses.spec	2026-03-04 21:22:00.000000000 +0000
+@@ -3,7 +3,7 @@
+ Summary: shared libraries for terminal handling
+ Name: mingw32-ncurses6
+ Version: 6.6
+-Release: 20260301
++Release: 20260307
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -144,8 +144,8 @@
+ 
+ %changelog
+ 
+-* Sun Mar 01 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260301
++* Wed Mar 04 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260307
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncurses.spec
+--- ncurses-6.6-20260301+/package/ncurses.spec	2026-03-01 23:08:48.000000000 +0000
++++ ncurses-6.6-20260307/package/ncurses.spec	2026-03-04 21:22:00.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: shared libraries for terminal handling
+ Name: ncurses6
+ Version: 6.6
+-Release: 20260301
++Release: 20260307
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -134,8 +134,8 @@
+ 
+ %changelog
+ 
+-* Sun Mar 01 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260301
++* Wed Mar 04 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260307
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncursest.spec
+--- ncurses-6.6-20260301+/package/ncursest.spec	2026-03-01 23:08:48.000000000 +0000
++++ ncurses-6.6-20260307/package/ncursest.spec	2026-03-04 21:22:00.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: Curses library with POSIX thread support.
+ Name: ncursest6
+ Version: 6.6
+-Release: 20260301
++Release: 20260307
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ Source: ncurses-%{version}-%{release}.tgz
+@@ -142,8 +142,8 @@
+ 
+ %changelog
+ 
+-* Sun Mar 01 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260301
++* Wed Mar 04 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260307
+ 
+ * Tue Dec 24 2019 Thomas Dickey
+ - drop custom CC_NORMAL warning flags because setting CFLAGS interferes with
+Index: progs/dump_entry.c
+Prereq:  1.200 
+--- ncurses-6.6-20260301+/progs/dump_entry.c	2026-02-07 13:27:57.000000000 +0000
++++ ncurses-6.6-20260307/progs/dump_entry.c	2026-03-04 21:16:25.000000000 +0000
+@@ -40,7 +40,7 @@
+ #include <termsort.h>		/* this C file is generated */
+ #include <parametrized.h>	/* so is this */
+ 
+-MODULE_ID("$Id: dump_entry.c,v 1.200 2026/02/07 13:27:57 tom Exp $")
++MODULE_ID("$Id: dump_entry.c,v 1.201 2026/03/04 21:16:25 tom Exp $")
+ 
+ #define DISCARD(string) string = ABSENT_STRING
+ #define PRINTF (void) printf
+@@ -95,7 +95,7 @@
+ #define OBSOLETE(n) (n[0] == 'O' && n[1] == 'T')
+ #endif
+ 
+-#define isObsolete(f,n) ((f == F_TERMINFO || f == F_VARIABLE) && (sortmode != S_VARIABLE) && OBSOLETE(n))
++#define isObsolete(f,n) (isTerminfo(f) && (sortmode != S_VARIABLE) && OBSOLETE(n))
+ 
+ #if NCURSES_XNAMES
+ #define BoolIndirect(j) ((j >= BOOLCOUNT) ? (j) : ((sortmode == S_NOSORT) ? j : bool_indirect[j]))
+@@ -1167,14 +1167,12 @@
+ 		len += (int) strlen(capability) + 1;
+ 	    } else {
+ 		char *src = _nc_tic_expand(capability,
+-					   outform == F_TERMINFO, numbers);
++					   isTerminfo(outform), numbers);
+ 
+ 		strcpy_DYN(&tmpbuf, NULL);
+ 		strcpy_DYN(&tmpbuf, name);
+ 		strcpy_DYN(&tmpbuf, "=");
+-		if (pretty
+-		    && (outform == F_TERMINFO
+-			|| outform == F_VARIABLE)) {
++		if (pretty && isTerminfo(outform)) {
+ 		    fmt_complex(tterm, name, src, 1);
+ 		} else {
+ 		    strcpy_DYN(&tmpbuf, src);
+@@ -1228,7 +1226,7 @@
+ 
+ 	    if (box_ok) {
+ 		char *tmp = _nc_tic_expand(boxchars,
+-					   (outform == F_TERMINFO),
++					   isTerminfo(outform),
+ 					   numbers);
+ 		_nc_STRCPY(buffer, "box1=", sizeof(buffer));
+ 		while (*tmp != '\0') {
+Index: progs/infocmp.c
+Prereq:  1.179 
+--- ncurses-6.6-20260301+/progs/infocmp.c	2026-02-07 22:18:36.000000000 +0000
++++ ncurses-6.6-20260307/progs/infocmp.c	2026-03-04 21:16:45.000000000 +0000
+@@ -43,7 +43,7 @@
+ 
+ #include <dump_entry.h>
+ 
+-MODULE_ID("$Id: infocmp.c,v 1.179 2026/02/07 22:18:36 tom Exp $")
++MODULE_ID("$Id: infocmp.c,v 1.180 2026/03/04 21:16:45 tom Exp $")
+ 
+ #ifndef ACTUAL_TIC
+ #define ACTUAL_TIC "tic"
+@@ -349,7 +349,7 @@
+     return (TRUE);
+ }
+ 
+-#define TIC_EXPAND(result) _nc_tic_expand(result, outform==F_TERMINFO, numbers)
++#define TIC_EXPAND(result) _nc_tic_expand(result, isTerminfo(outform), numbers)
+ 
+ static void
+ print_uses(const ENTRY * ep, FILE *fp)
+Index: progs/progs.priv.h
+Prereq:  1.64 
+--- ncurses-6.6-20260301+/progs/progs.priv.h	2026-02-07 13:27:57.000000000 +0000
++++ ncurses-6.6-20260307/progs/progs.priv.h	2026-03-04 21:16:25.000000000 +0000
+@@ -31,7 +31,7 @@
+  *  Author: Thomas E. Dickey                    1997-on                     *
+  ****************************************************************************/
+ /*
+- * $Id: progs.priv.h,v 1.64 2026/02/07 13:27:57 tom Exp $
++ * $Id: progs.priv.h,v 1.65 2026/03/04 21:16:25 tom Exp $
+  *
+  *	progs.priv.h
+  *
+@@ -136,4 +136,6 @@
+ #define CUR ((TERMTYPE *)(cur_term))->
+ #endif
+ 
++#define isTerminfo(f)   ((f) == F_TERMINFO || (f) == F_VARIABLE)
++
+ #endif /* PROGS_PRIV_H */
+Index: progs/tic.c
+Prereq:  1.338 
+--- ncurses-6.6-20260301+/progs/tic.c	2026-02-07 22:22:45.000000000 +0000
++++ ncurses-6.6-20260307/progs/tic.c	2026-03-07 23:34:12.000000000 +0000
+@@ -49,7 +49,7 @@
+ #include <parametrized.h>
+ #include <transform.h>
+ 
+-MODULE_ID("$Id: tic.c,v 1.338 2026/02/07 22:22:45 tom Exp $")
++MODULE_ID("$Id: tic.c,v 1.339 2026/03/07 23:34:12 tom Exp $")
+ 
+ #define STDIN_NAME "<stdin>"
+ 
+@@ -3191,6 +3191,13 @@
+ #define check_user_6789(tp)	/* nothing */
+ #endif
+ 
++#define PAIRED_USER_STRS(set, reset) \
++	do {  \
++	    char *set = tigetstr(#set);  \
++	    char *reset = tigetstr(#reset);  \
++	    PAIRED(set,reset);  \
++	} while (0)
++
+ /* other sanity-checks (things that we don't want in the normal
+  * logic that reads a terminfo entry)
+  */
+@@ -3352,6 +3359,15 @@
+ 	      ("cannot write to lower-right"));
+     }
+ #endif
++    /*
++     * These are defined in Caps-ncurses
++     */
++    PAIRED_USER_STRS(Smol, Rmol);
++    PAIRED_USER_STRS(smxx, rmxx);
++    PAIRED_USER_STRS(BE, BD);
++    PAIRED_USER_STRS(PS, PE);
++    PAIRED_USER_STRS(RV, rv);
++    PAIRED_USER_STRS(XR, xr);
+ 
+     /*
+      * Some standard applications (e.g., vi) and some non-curses

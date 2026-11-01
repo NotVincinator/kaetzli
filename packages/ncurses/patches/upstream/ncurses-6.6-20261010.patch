@@ -1,0 +1,1181 @@
+# ncurses 6.6 - patch 20261010 - Thomas E. Dickey
+#
+# ------------------------------------------------------------------------------
+#
+# Ncurses 6.6 is at
+#   https://invisible-island.net/archives/ncurses/
+#   https://invisible-mirror.net/archives/ncurses/
+#   https://ftp.gnu.org/gnu/ncurses/
+#
+# Patches for ncurses 6.6 can be found at
+#   https://invisible-island.net/archives/ncurses/6.6
+#   https://invisible-mirror.net/archives/ncurses/6.6
+#
+# ------------------------------------------------------------------------------
+# https://invisible-island.net/archives/ncurses/6.6/ncurses-6.6-20261010.patch.gz
+# patch by Thomas E. Dickey <dickey@invisible-island.net>
+# created  Sun Oct 11 00:18:57 UTC 2026
+# ------------------------------------------------------------------------------
+# NEWS                             |    6 +
+# VERSION                          |    2 
+# dist.mk                          |    4 
+# doc/html/man/curs_mouse.3x.html  |  169 +++++++++++++++++++++----------------
+# doc/html/man/ncurses.3x.html     |    2 
+# doc/html/man/terminfo.5.html     |   28 +++---
+# man/curs_mouse.3x                |   34 ++++++-
+# man/terminfo.head                |    6 -
+# man/terminfo.tail                |   10 +-
+# ncurses/base/lib_mouse.c         |   64 ++++++++------
+# ncurses/trace/lib_tracemse.c     |    7 -
+# package/debian-mingw/changelog   |    4 
+# package/debian-mingw64/changelog |    4 
+# package/debian/changelog         |    4 
+# package/mingw-ncurses.nsi        |    4 
+# package/mingw-ncurses.spec       |    6 -
+# package/ncurses.spec             |    6 -
+# package/ncursest.spec            |    6 -
+# test/test_mouse.c                |  131 +++++++++++++++++++++++++++-
+# 19 files changed, 346 insertions(+), 151 deletions(-)
+# ------------------------------------------------------------------------------
+Index: NEWS
+Prereq:  1.4541 
+--- ncurses-6.6-20260926+/NEWS	2026-09-26 20:42:13.000000000 +0000
++++ ncurses-6.6-20261010/NEWS	2026-10-10 21:30:43.000000000 +0000
+@@ -26,7 +26,7 @@
+ -- sale, use or other dealings in this Software without prior written        --
+ -- authorization.                                                            --
+ -------------------------------------------------------------------------------
+--- $Id: NEWS,v 1.4541 2026/09/26 20:42:13 tom Exp $
++-- $Id: NEWS,v 1.4543 2026/10/10 21:30:43 tom Exp $
+ -------------------------------------------------------------------------------
+ 
+ This is a log of changes that ncurses has gone through since Zeyd started
+@@ -46,6 +46,10 @@
+ Changes through 1.9.9e did not credit all contributions;
+ it is not possible to add this information.
+ 
++20261010
++	+ modify test/test_mouse.c to demonstrate mouse_get(), mouse_test() and
++	  mouse_mask().
++
+ 20260926
+ 	+ in-progress work to add new mouse functions mouse_get(),
+ 	  mouse_test(), and mouse_mask(), as well as mousetest().
+Index: VERSION
+--- ncurses-6.6-20260926+/VERSION	2026-09-26 09:27:25.000000000 +0000
++++ ncurses-6.6-20261010/VERSION	2026-10-10 09:43:24.000000000 +0000
+@@ -1 +1 @@
+-5:0:10	6.6	20260926
++5:0:10	6.6	20261010
+Index: dist.mk
+Prereq:  1.1754 
+--- ncurses-6.6-20260926+/dist.mk	2026-09-26 09:27:25.000000000 +0000
++++ ncurses-6.6-20261010/dist.mk	2026-10-10 09:43:24.000000000 +0000
+@@ -26,7 +26,7 @@
+ # use or other dealings in this Software without prior written               #
+ # authorization.                                                             #
+ ##############################################################################
+-# $Id: dist.mk,v 1.1754 2026/09/26 09:27:25 tom Exp $
++# $Id: dist.mk,v 1.1755 2026/10/10 09:43:24 tom Exp $
+ # Makefile for creating ncurses distributions.
+ #
+ # This only needs to be used directly as a makefile by developers, but
+@@ -38,7 +38,7 @@
+ # These define the major/minor/patch versions of ncurses.
+ NCURSES_MAJOR = 6
+ NCURSES_MINOR = 6
+-NCURSES_PATCH = 20260926
++NCURSES_PATCH = 20261010
+ 
+ # We don't append the patch to the version, since this only applies to releases
+ VERSION = $(NCURSES_MAJOR).$(NCURSES_MINOR)
+Index: doc/html/man/curs_mouse.3x.html
+--- ncurses-6.6-20260926+/doc/html/man/curs_mouse.3x.html	2026-09-19 21:42:43.000000000 +0000
++++ ncurses-6.6-20261010/doc/html/man/curs_mouse.3x.html	2026-10-10 22:21:41.000000000 +0000
+@@ -28,27 +28,27 @@
+   * sale, use or other dealings in this Software without prior written       *
+   * authorization.                                                           *
+   ****************************************************************************
+-  * @Id: curs_mouse.3x,v 1.136 2026/09/19 21:38:50 tom Exp @
++  * @Id: curs_mouse.3x,v 1.137 2026/10/10 22:19:32 tom Exp @
+ -->
+ <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+ <HTML>
+ <HEAD>
+ <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+ <meta name="generator" content="Manpage converted by man2html - see https://invisible-island.net/scripts/readme.html#others_scripts">
+-<TITLE>curs_mouse 3x 2026-09-19 ncurses 6.6 Library calls</TITLE>
++<TITLE>curs_mouse 3x 2026-10-10 ncurses 6.6 Library calls</TITLE>
+ <link rel="author" href="mailto:bug-ncurses@gnu.org">
+ 
+ </HEAD>
+ <BODY>
+-<H1 class="no-header">curs_mouse 3x 2026-09-19 ncurses 6.6 Library calls</H1>
++<H1 class="no-header">curs_mouse 3x 2026-10-10 ncurses 6.6 Library calls</H1>
+ <PRE>
+ <STRONG><A HREF="curs_mouse.3x.html">curs_mouse(3x)</A></STRONG>                   Library calls                  <STRONG><A HREF="curs_mouse.3x.html">curs_mouse(3x)</A></STRONG>
+ 
+ 
+ </PRE><H2><a name="h2-NAME">NAME</a></H2><PRE>
+-       <STRONG>has_mouse</STRONG>,  <STRONG>getmouse</STRONG>,  <STRONG>ungetmouse</STRONG>,  <STRONG>mousemask</STRONG>,  <STRONG>wenclose</STRONG>,  <STRONG>mouse_trafo</STRONG>,
+-       <STRONG>wmouse_trafo</STRONG>, <STRONG>mouseinterval</STRONG>, <STRONG>mmask_t</STRONG>, <STRONG>MEVENT</STRONG>  -  get  mouse  events  in
+-       <EM>ncurses</EM>
++       <STRONG>has_mouse</STRONG>,  <STRONG>mousemask</STRONG>,  <STRONG>getmouse</STRONG>,  <STRONG>ungetmouse</STRONG>,  <STRONG>mouse_mask</STRONG>,  <STRONG>mouse_get</STRONG>,
++       <STRONG>mouse_test</STRONG>,   <STRONG>wenclose</STRONG>,   <STRONG>mouse_trafo</STRONG>,   <STRONG>wmouse_trafo</STRONG>,   <STRONG>mouseinterval</STRONG>,
++       <STRONG>mmask_t</STRONG>, <STRONG>MEVENT</STRONG> - get mouse events in <EM>ncurses</EM>
+ 
+ 
+ </PRE><H2><a name="h2-SYNOPSIS">SYNOPSIS</a></H2><PRE>
+@@ -71,6 +71,10 @@
+        <STRONG>int</STRONG> <STRONG>getmouse(MEVENT</STRONG> <STRONG>*</STRONG> <EM>event</EM><STRONG>);</STRONG>
+        <STRONG>int</STRONG> <STRONG>ungetmouse(MEVENT</STRONG> <STRONG>*</STRONG> <EM>event</EM><STRONG>);</STRONG>
+ 
++       <STRONG>mmask_t</STRONG> <STRONG>mouse_mask(int</STRONG> <EM>button</EM><STRONG>,</STRONG> <STRONG>mmask_t</STRONG> <EM>new-mask</EM><STRONG>,</STRONG> <STRONG>mmask_t</STRONG> <STRONG>*</STRONG> <EM>old-mask</EM><STRONG>);</STRONG>
++       <STRONG>int</STRONG> <STRONG>mouse_get(int</STRONG> <EM>button</EM><STRONG>,</STRONG> <STRONG>MEVENT</STRONG> <STRONG>*</STRONG> <EM>event</EM><STRONG>);</STRONG>
++       <STRONG>int</STRONG> <STRONG>mouse_test(int</STRONG> <EM>button</EM><STRONG>,</STRONG> <STRONG>MEVENT</STRONG> <STRONG>*</STRONG> <EM>event</EM><STRONG>);</STRONG>
++
+        <STRONG>bool</STRONG> <STRONG>wenclose(const</STRONG> <STRONG>WINDOW</STRONG> <STRONG>*</STRONG> <EM>win</EM><STRONG>,</STRONG> <STRONG>int</STRONG> <EM>y</EM><STRONG>,</STRONG> <STRONG>int</STRONG> <EM>x</EM><STRONG>);</STRONG>
+ 
+        <STRONG>bool</STRONG> <STRONG>mouse_trafo(int</STRONG> <STRONG>*</STRONG> <EM>pY</EM><STRONG>,</STRONG> <STRONG>int</STRONG> <STRONG>*</STRONG> <EM>pX</EM><STRONG>,</STRONG> <STRONG>bool</STRONG> <EM>to-screen</EM><STRONG>);</STRONG>
+@@ -128,6 +132,12 @@
+        device-dependent.
+ 
+ 
++</PRE><H3><a name="h3-mouse_mask">mouse_mask</a></H3><PRE>
++       Use <STRONG>mouse_mask</STRONG> to set or query only the part of the mouse  mask  for  a
++       single  button.   The mask returned in the <EM>old-mask</EM> will be encoded for
++       button 1.
++
++
+ </PRE><H3><a name="h3-Mouse-Events">Mouse Events</a></H3><PRE>
+        Several mouse  event  types  may  be  selected;  construct  a  mask  by
+        logically "or"-ing their values.
+@@ -186,69 +196,81 @@
+        call retrieves the next older event from the queue.
+ 
+ 
++</PRE><H3><a name="h3-mouse_get">mouse_get</a></H3><PRE>
++       Use  <STRONG>mouse_get</STRONG>  to  consume the current mouse event, returning <STRONG>OK</STRONG> if it
++       was activated by the specified button.  The button  state  returned  in
++       the <EM>event</EM> will be encoded for button 1.
++
++
++</PRE><H3><a name="h3-mouse_test">mouse_test</a></H3><PRE>
++       Use <STRONG>mouse_test</STRONG> to check the current mouse event, returning <STRONG>OK</STRONG> if it was
++       activated  by  the  specified button.  The button state returned in the
++       <EM>event</EM> will be encoded for button 1.
++
++
+ </PRE><H3><a name="h3-ungetmouse">ungetmouse</a></H3><PRE>
+-       <STRONG>ungetmouse</STRONG>  behaves  analogously to <STRONG><A HREF="curs_util.3x.html">ungetch(3x)</A></STRONG>.  It pushes a <STRONG>KEY_MOUSE</STRONG>
+-       event onto the screen's input queue, and <EM>event</EM>  onto  the  mouse  event
++       <STRONG>ungetmouse</STRONG> behaves analogously to <STRONG><A HREF="curs_util.3x.html">ungetch(3x)</A></STRONG>.  It pushes  a  <STRONG>KEY_MOUSE</STRONG>
++       event  onto  the  screen's  input queue, and <EM>event</EM> onto the mouse event
+        queue.
+ 
+ 
+ </PRE><H3><a name="h3-wenclose">wenclose</a></H3><PRE>
+        <STRONG>wenclose</STRONG> returns <STRONG>TRUE</STRONG> if the pair of screen-relative coordinates (<EM>y</EM>, <EM>x</EM>)
+-       is  enclosed by the given window <EM>win</EM>, and <STRONG>FALSE</STRONG> otherwise.  If <EM>win</EM> is a
++       is enclosed by the given window <EM>win</EM>, and <STRONG>FALSE</STRONG> otherwise.  If <EM>win</EM> is  a
+        pad, <STRONG>wenclose</STRONG> uses its most recent screen coordinates as specified in a
+        <STRONG><A HREF="curs_pad.3x.html">prefresh(3x)</A></STRONG> or <STRONG><A HREF="curs_pad.3x.html">pnoutrefresh(3x)</A></STRONG> call.
+ 
+-       <STRONG>wenclose</STRONG> is useful for determining what subset of the screen's  windows
+-       encloses  the location of a mouse event; it is otherwise independent of
++       <STRONG>wenclose</STRONG>  is useful for determining what subset of the screen's windows
++       encloses the location of a mouse event; it is otherwise independent  of
+        the <EM>ncurses</EM> mouse API.
+ 
+ 
+ </PRE><H3><a name="h3-wmouse_trafo">wmouse_trafo</a></H3><PRE>
+-       <STRONG>wmouse_trafo</STRONG> transforms the given pair of coordinate pointers (<EM>pY</EM>,  <EM>pX</EM>)
+-       from  a  <EM>win</EM>-relative  basis to a screen-relative one or <EM>vice</EM> <EM>versa</EM>, as
+-       <EM>to-screen</EM> is <STRONG>TRUE</STRONG> or <STRONG>FALSE</STRONG>, respectively.  <STRONG>stdscr</STRONG>-relative  coordinates
++       <STRONG>wmouse_trafo</STRONG>  transforms the given pair of coordinate pointers (<EM>pY</EM>, <EM>pX</EM>)
++       from a <EM>win</EM>-relative basis to a screen-relative one or  <EM>vice</EM>  <EM>versa</EM>,  as
++       <EM>to-screen</EM>  is <STRONG>TRUE</STRONG> or <STRONG>FALSE</STRONG>, respectively.  <STRONG>stdscr</STRONG>-relative coordinates
+        are  not  always  identical  to  screen  coordinates:  <EM>curses</EM>  supports
+-       reservation of  screen  lines  at  the  top  and/or  bottom  for  other
++       reservation  of  screen  lines  at  the  top  and/or  bottom  for other
+        purposes; see <STRONG><A HREF="curs_kernel.3x.html">ripoffline(3x)</A></STRONG> and <STRONG><A HREF="curs_slk.3x.html">slk_init(3x)</A></STRONG>.
+ 
+-       If  <EM>to-screen</EM>  <EM>is</EM>  <STRONG>TRUE</STRONG> and the pointers (<EM>pY</EM>, <EM>pX</EM>) reference coordinates
++       If <EM>to-screen</EM> <EM>is</EM> <STRONG>TRUE</STRONG> and the pointers (<EM>pY</EM>,  <EM>pX</EM>)  reference  coordinates
+        inside <EM>win</EM>, <EM>ncurses</EM> updates their values to <STRONG>stdscr</STRONG>-relative coordinates
+        and returns <STRONG>TRUE</STRONG>.  If either <EM>pY</EM> or <EM>pX</EM> is a null pointer, or (<EM>pY</EM>, <EM>pX</EM>) is
+        not inside <EM>win</EM>, <STRONG>wmouse_trafo</STRONG> returns <STRONG>FALSE</STRONG>.
+ 
+-       If <EM>to-screen</EM> <EM>is</EM> <STRONG>FALSE</STRONG> and the pointers (<EM>pY</EM>, <EM>pX</EM>)  reference  coordinates
++       If  <EM>to-screen</EM>  <EM>is</EM> <STRONG>FALSE</STRONG> and the pointers (<EM>pY</EM>, <EM>pX</EM>) reference coordinates
+        inside <STRONG>stdscr</STRONG>, <EM>ncurses</EM> updates their values to <EM>win</EM>-relative coordinates
+        and returns <STRONG>TRUE</STRONG>.  If either <EM>pY</EM> or <EM>pX</EM> is a null pointer, or (<EM>pY</EM>, <EM>pX</EM>) is
+        not inside <STRONG>stdscr</STRONG>, <STRONG>wmouse_trafo</STRONG> returns <STRONG>FALSE</STRONG>.
+ 
+-       <STRONG>wmouse_trafo</STRONG>  is  useful  for  performing coordinate transforms between
++       <STRONG>wmouse_trafo</STRONG> is useful for  performing  coordinate  transforms  between
+        windows; it is otherwise independent of the <EM>ncurses</EM> mouse API.
+ 
+ 
+ </PRE><H3><a name="h3-mouse_trafo">mouse_trafo</a></H3><PRE>
+-       <STRONG>mouse_trafo</STRONG> applies the <STRONG>wmouse_trafo</STRONG>  translation  to  <STRONG>stdscr</STRONG>.   If  no
+-       screen  lines  are  reserved by <STRONG><A HREF="curs_kernel.3x.html">ripoffline(3x)</A></STRONG> or <STRONG><A HREF="curs_slk.3x.html">slk_init(3x)</A></STRONG>, this is
++       <STRONG>mouse_trafo</STRONG>  applies  the  <STRONG>wmouse_trafo</STRONG>  translation  to <STRONG>stdscr</STRONG>.  If no
++       screen lines are reserved by <STRONG><A HREF="curs_kernel.3x.html">ripoffline(3x)</A></STRONG> or  <STRONG><A HREF="curs_slk.3x.html">slk_init(3x)</A></STRONG>,  this  is
+        the identity transformation.
+ 
+ 
+ </PRE><H3><a name="h3-mouseinterval">mouseinterval</a></H3><PRE>
+-       <STRONG>mouseinterval</STRONG> sets the maximum time (in thousandths of a  second)  that
+-       can  elapse between press and release events for them to be <EM>resolved</EM> as
+-       (combined into) a <EM>click</EM>.  An application might interpret  button  press
++       <STRONG>mouseinterval</STRONG>  sets  the maximum time (in thousandths of a second) that
++       can elapse between press and release events for them to be <EM>resolved</EM>  as
++       (combined  into)  a <EM>click</EM>.  An application might interpret button press
+        and release events separated by more than the mouse interval as a "long
+        press", or, with motion, as a "drag".
+ 
+        When <EM>ncurses</EM> detects a mouse event, it awaits further input activity up
+-       to  this interval, and then checks for a subsequent mouse event that is
+-       combinable with the first event.  If the timeout expires without  input
+-       activity,  then  no  click resolution occurs.  Calling <STRONG>mouseinterval(0)</STRONG>
++       to this interval, and then checks for a subsequent mouse event that  is
++       combinable  with the first event.  If the timeout expires without input
++       activity, then no click resolution  occurs.   Calling  <STRONG>mouseinterval(0)</STRONG>
+        disables click resolution.
+ 
+-       <STRONG>mouseinterval</STRONG>   returns   the    previous    interval    value.     Use
++       <STRONG>mouseinterval</STRONG>    returns    the    previous    interval   value.    Use
+        <STRONG>mouseinterval(-1)</STRONG> to obtain the interval without altering it.
+ 
+        The  mouse  interval  is  set  to  one  sixth  of  a  second  when  the
+-       corresponding  screen  is  initialized,   e.g.,   in   <STRONG><A HREF="curs_initscr.3x.html">initscr(3x)</A></STRONG>   or
++       corresponding   screen   is   initialized,   e.g.,  in  <STRONG><A HREF="curs_initscr.3x.html">initscr(3x)</A></STRONG>  or
+        <STRONG><A HREF="curs_terminfo.3x.html">setupterm(3x)</A></STRONG>.
+ 
+ 
+@@ -272,16 +294,16 @@
+ 
+        <STRONG>mousemask</STRONG> returns the mask of reportable events.
+ 
+-       <STRONG>mouseinterval</STRONG>  returns the previous interval value, unless the terminal
+-       was not initialized.  In that case, it  returns  the  maximum  interval
++       <STRONG>mouseinterval</STRONG> returns the previous interval value, unless the  terminal
++       was  not  initialized.   In  that case, it returns the maximum interval
+        value (166).
+ 
+ 
+ </PRE><H2><a name="h2-NOTES">NOTES</a></H2><PRE>
+-       The   order   of  the  <STRONG>MEVENT</STRONG>  structure  members  is  not  guaranteed.
++       The  order  of  the  <STRONG>MEVENT</STRONG>  structure  members  is   not   guaranteed.
+        Additional fields may be added to the structure in the future.
+ 
+-       Under <EM>ncurses</EM>, these calls are implemented using either <EM>xterm</EM>'s  built-
++       Under  <EM>ncurses</EM>, these calls are implemented using either <EM>xterm</EM>'s built-
+        in mouse-tracking API or platform-specific drivers including
+ 
+           <STRONG>o</STRONG>   Alessandro Rubini's gpm server
+@@ -290,12 +312,12 @@
+ 
+           <STRONG>o</STRONG>   OS/2 EMX
+ 
+-       If  you  are  using  an unsupported configuration, mouse events are not
++       If you are using an unsupported configuration,  mouse  events  are  not
+        visible to <EM>ncurses</EM> (and the <STRONG>mousemask</STRONG> function always returns <STRONG>0</STRONG>).
+ 
+-       If the  terminal  type  possesses  the  (nonstandard)  <EM>terminfo</EM>  string
+-       capability  <STRONG>XM</STRONG>,  <EM>ncurses</EM>'s <EM>xterm</EM> mouse driver uses it when initializing
+-       the terminal for mouse operation.  The default, if  <STRONG>XM</STRONG>  is  not  found,
++       If  the  terminal  type  possesses  the  (nonstandard)  <EM>terminfo</EM> string
++       capability <STRONG>XM</STRONG>, <EM>ncurses</EM>'s <EM>xterm</EM> mouse driver uses it  when  initializing
++       the  terminal  for  mouse  operation.  The default, if <STRONG>XM</STRONG> is not found,
+        corresponds to private mode 1000 of <EM>xterm</EM>.
+ 
+           \E[?1000%?%p1%{1}%=%th%el%;
+@@ -304,47 +326,47 @@
+ 
+           \E[?1006;1000%?%p1%{1}%=%th%el%;
+ 
+-       The  <EM>id</EM>  member  of the mouse event structure is not presently used; no
+-       terminal type or operating system interface supports  reporting  events
+-       from  distinguishable  pointing  devices.  If you synthesize an <EM>MEVENT</EM>,
++       The <EM>id</EM> member of the mouse event structure is not  presently  used;  no
++       terminal  type  or operating system interface supports reporting events
++       from distinguishable pointing devices.  If you  synthesize  an  <EM>MEVENT</EM>,
+        use an <EM>id</EM> of 0.
+ 
+        The <EM>z</EM> member of the mouse event structure is not presently used.  It is
+-       intended for use with touch screens (which may  be  pressure-sensitive)
++       intended  for  use with touch screens (which may be pressure-sensitive)
+        or with 3D-mice/trackballs/power gloves.
+ 
+-       The  <STRONG>ALL_MOUSE_EVENTS</STRONG>  class  does  not  include <STRONG>REPORT_MOUSE_POSITION</STRONG>.
+-       They are distinct.  For example, in <EM>xterm</EM>,  wheel/scrolling  mice  send
+-       position  reports  as  a  sequence of presses of buttons 4 or 5 without
++       The <STRONG>ALL_MOUSE_EVENTS</STRONG>  class  does  not  include  <STRONG>REPORT_MOUSE_POSITION</STRONG>.
++       They  are  distinct.   For example, in <EM>xterm</EM>, wheel/scrolling mice send
++       position reports as a sequence of presses of buttons  4  or  5  without
+        matching button-releases.
+ 
+ 
+ </PRE><H2><a name="h2-EXTENSIONS">EXTENSIONS</a></H2><PRE>
+-       These functions are <EM>ncurses</EM> extensions,  and  are  not  found  in  SVr4
+-       <EM>curses</EM>,  4.4BSD  <EM>curses</EM>,  or  any other previous <EM>curses</EM> implementation.
+-       (SVr4 <EM>curses</EM> did have a <EM>getmouse</EM> function, which took no  argument  and
++       These  functions  are  <EM>ncurses</EM>  extensions,  and  are not found in SVr4
++       <EM>curses</EM>, 4.4BSD <EM>curses</EM>, or any  other  previous  <EM>curses</EM>  implementation.
++       (SVr4  <EM>curses</EM>  did have a <EM>getmouse</EM> function, which took no argument and
+        returned an <EM>unsigned</EM> <EM>long</EM>.)
+ 
+ 
+ </PRE><H2><a name="h2-PORTABILITY">PORTABILITY</a></H2><PRE>
+        Applications employing the <EM>ncurses</EM> mouse extension should condition its
+-       use  on the visibility of the <STRONG>NCURSES_MOUSE_VERSION</STRONG> preprocessor macro.
+-       When the interface changes, the  macro's  value  increments.   Multiple
+-       versions   are  available  when  <EM>ncurses</EM>  is  configured;  see  section
++       use on the visibility of the <STRONG>NCURSES_MOUSE_VERSION</STRONG> preprocessor  macro.
++       When  the  interface  changes,  the macro's value increments.  Multiple
++       versions  are  available  when  <EM>ncurses</EM>  is  configured;  see   section
+        "ALTERNATE CONFIGURATIONS" of <STRONG><A HREF="ncurses.3x.html">ncurses(3x)</A></STRONG>.  The following values may be
+        specified.
+ 
+           <STRONG>1</STRONG>  has definitions for reserved events.  The mask uses 28 bits.
+ 
+-          <STRONG>2</STRONG>  adds definitions  for  button  5,  removes  the  definitions  for
++          <STRONG>2</STRONG>  adds  definitions  for  button  5,  removes  the  definitions for
+              reserved events.  The mask uses 29 bits.
+ 
+ 
+ </PRE><H2><a name="h2-HISTORY">HISTORY</a></H2><PRE>
+-       SVr4  (1989)  added  mouse  support  to its variant of <STRONG>xterm(1)</STRONG>.  It is
++       SVr4 (1989) added mouse support to its  variant  of  <STRONG>xterm(1)</STRONG>.   It  is
+        mentioned in a few places, with little supporting documentation.
+ 
+-       <STRONG>o</STRONG>   Its "libcurses"  manual  page  lists  functions  for  this  feature
++       <STRONG>o</STRONG>   Its  "libcurses"  manual  page  lists  functions  for  this feature
+            prototyped in <EM>curses.h</EM>.
+ 
+                extern int mouse_set(long int);
+@@ -363,46 +385,46 @@
+                <STRONG>mouse_info</STRONG>      <STRONG>minfo</STRONG>   <STRONG>Mi</STRONG>   Mouse status information
+                <STRONG>req_mouse_pos</STRONG>   <STRONG>reqmp</STRONG>   <STRONG>RQ</STRONG>   Request mouse position report
+ 
+-       <STRONG>o</STRONG>   The  interface  made assumptions (as does <EM>ncurses</EM>) about the escape
++       <STRONG>o</STRONG>   The interface made assumptions (as does <EM>ncurses</EM>) about  the  escape
+            sequences sent to and received from the terminal.
+ 
+-           For instance, the SVr4 <EM>curses</EM> library  used  the  <STRONG>get_mouse</STRONG>  (<STRONG>getm</STRONG>)
++           For  instance,  the  SVr4  <EM>curses</EM> library used the <STRONG>get_mouse</STRONG> (<STRONG>getm</STRONG>)
+            capability to tell the terminal which mouse button events it should
+-           send,  passing the mouse-button bit mask to the terminal.  Also, it
+-           could ask the terminal where the mouse was using the  <STRONG>req_mouse_pos</STRONG>
++           send, passing the mouse-button bit mask to the terminal.  Also,  it
++           could  ask the terminal where the mouse was using the <STRONG>req_mouse_pos</STRONG>
+            (<STRONG>reqmp</STRONG>) capability.
+ 
+-           Those  features  required a terminal program that had been modified
++           Those features required a terminal program that had  been  modified
+            to work with SVr4 <EM>curses</EM>.  They were not part of the X Consortium's
+            <EM>xterm</EM>.
+ 
+-       When developing the <EM>xterm</EM> mouse support for <EM>ncurses</EM> in September  1995,
+-       Eric  Raymond  was  uninterested in using the same interface due to its
++       When  developing the <EM>xterm</EM> mouse support for <EM>ncurses</EM> in September 1995,
++       Eric Raymond was uninterested in using the same interface  due  to  its
+        lack of documentation.  Later, in 1998, Mark Hesseling provided support
+-       in <EM>PDCurses</EM> 2.3 using the SVr4 interface.  <EM>PDCurses</EM>, however, does  not
+-       use  video  terminals,  making  it  unnecessary  to  be concerned about
++       in  <EM>PDCurses</EM> 2.3 using the SVr4 interface.  <EM>PDCurses</EM>, however, does not
++       use video terminals,  making  it  unnecessary  to  be  concerned  about
+        compatibility with the escape sequences.
+ 
+ 
+ </PRE><H2><a name="h2-BUGS">BUGS</a></H2><PRE>
+        Mouse events from <EM>xterm</EM> are <EM>not</EM> ignored in canonical ("cooked") mode if
+-       they have been enabled by <STRONG>mousemask</STRONG>.  Instead, the <EM>xterm</EM>  mouse  report
++       they  have  been enabled by <STRONG>mousemask</STRONG>.  Instead, the <EM>xterm</EM> mouse report
+        sequence appears in the string read.
+ 
+-       An  <EM>ncurses</EM>  window  must  enable <STRONG><A HREF="curs_inopts.3x.html">keypad(3x)</A></STRONG> to correctly receive mouse
+-       event reports from <EM>xterm</EM> since they are  encoded  like  function  keys.
++       An <EM>ncurses</EM> window must enable <STRONG><A HREF="curs_inopts.3x.html">keypad(3x)</A></STRONG>  to  correctly  receive  mouse
++       event  reports  from  <EM>xterm</EM>  since they are encoded like function keys.
+        Set the terminal's <EM>terminfo</EM> capability <STRONG>key_mouse</STRONG> (<STRONG>kmous</STRONG>) to "\E[M" (the
+-       beginning  of  the response from <EM>xterm</EM> for mouse clicks).  Other values
+-       of <STRONG>key_mouse</STRONG> are permitted under the same  assumption  --  that  is,  a
+-       mouse  report  begins  with  the  value of the <STRONG>key_mouse</STRONG> (<STRONG>kmous</STRONG>) string
++       beginning of the response from <EM>xterm</EM> for mouse clicks).   Other  values
++       of  <STRONG>key_mouse</STRONG>  are  permitted  under  the same assumption -- that is, a
++       mouse report begins with the value  of  the  <STRONG>key_mouse</STRONG>  (<STRONG>kmous</STRONG>)  string
+        capability.
+ 
+        Because there are no standard response sequences that serve to identify
+-       terminals supporting the <EM>xterm</EM> mouse protocol, <EM>ncurses</EM> assumes that  if
+-       <STRONG>key_mouse</STRONG>  (<STRONG>kmous</STRONG>)  is  defined  in the terminal description, or if the
+-       terminal type's primary name or aliases  contain  the  string  "xterm",
++       terminals  supporting the <EM>xterm</EM> mouse protocol, <EM>ncurses</EM> assumes that if
++       <STRONG>key_mouse</STRONG> (<STRONG>kmous</STRONG>) is defined in the terminal  description,  or  if  the
++       terminal  type's  primary  name  or aliases contain the string "xterm",
+        then the terminal may send mouse events.  <EM>ncurses</EM> checks the <STRONG>kmous</STRONG> cap-
+-       code  first,  allowing  use of newer <EM>xterm</EM> mouse protocols, such as its
++       code first, allowing use of newer <EM>xterm</EM> mouse protocols,  such  as  its
+        private mode 1006.
+ 
+ 
+@@ -410,7 +432,7 @@
+        <STRONG><A HREF="ncurses.3x.html">curses(3x)</A></STRONG>,     <STRONG><A HREF="curs_inopts.3x.html">curs_inopts(3x)</A></STRONG>,     <STRONG><A HREF="curs_kernel.3x.html">curs_kernel(3x)</A></STRONG>,     <STRONG><A HREF="curs_pad.3x.html">curs_pad(3x)</A></STRONG>,
+        <STRONG><A HREF="curs_slk.3x.html">curs_slk(3x)</A></STRONG>, <STRONG><A HREF="curs_variables.3x.html">curs_variables(3x)</A></STRONG>
+ 
+-ncurses 6.6                       2026-09-19                    <STRONG><A HREF="curs_mouse.3x.html">curs_mouse(3x)</A></STRONG>
++ncurses 6.6                       2026-10-10                    <STRONG><A HREF="curs_mouse.3x.html">curs_mouse(3x)</A></STRONG>
+ </PRE>
+ <div class="nav">
+ <ul>
+@@ -420,8 +442,11 @@
+ <ul>
+ <li><a href="#h3-has_mouse">has_mouse</a></li>
+ <li><a href="#h3-mousemask">mousemask</a></li>
++<li><a href="#h3-mouse_mask">mouse_mask</a></li>
+ <li><a href="#h3-Mouse-Events">Mouse Events</a></li>
+ <li><a href="#h3-getmouse">getmouse</a></li>
++<li><a href="#h3-mouse_get">mouse_get</a></li>
++<li><a href="#h3-mouse_test">mouse_test</a></li>
+ <li><a href="#h3-ungetmouse">ungetmouse</a></li>
+ <li><a href="#h3-wenclose">wenclose</a></li>
+ <li><a href="#h3-wmouse_trafo">wmouse_trafo</a></li>
+Index: doc/html/man/ncurses.3x.html
+--- ncurses-6.6-20260926+/doc/html/man/ncurses.3x.html	2026-09-19 21:42:46.000000000 +0000
++++ ncurses-6.6-20261010/doc/html/man/ncurses.3x.html	2026-10-10 22:21:44.000000000 +0000
+@@ -59,7 +59,7 @@
+        displays with output optimized to  minimize  screen  updates.   <EM>ncurses</EM>
+        replaces the <EM>curses</EM> libraries from System V Release 4 Unix ("SVr4") and
+        4.4BSD  Unix,  the  development  of  which  ceased  in the 1990s.  This
+-       document describes <EM>ncurses</EM> version 6.6 (patch 20260919).
++       document describes <EM>ncurses</EM> version 6.6 (patch 20261010).
+ 
+        <EM>ncurses</EM> permits control of the terminal screen's contents;  abstraction
+        and  subdivision thereof with <EM>windows</EM> and <EM>pads</EM>; acquisition of keyboard
+Index: doc/html/man/terminfo.5.html
+--- ncurses-6.6-20260926+/doc/html/man/terminfo.5.html	2026-09-19 21:42:46.000000000 +0000
++++ ncurses-6.6-20261010/doc/html/man/terminfo.5.html	2026-10-10 22:21:44.000000000 +0000
+@@ -35,19 +35,19 @@
+   * sale, use or other dealings in this Software without prior written       *
+   * authorization.                                                           *
+   ****************************************************************************
+-  * @Id: terminfo.head,v 1.74 2026/09/19 21:37:14 tom Exp @
++  * @Id: terminfo.head,v 1.75 2026/10/10 21:54:31 tom Exp @
+ -->
+ <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+ <HTML>
+ <HEAD>
+ <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+ <meta name="generator" content="Manpage converted by man2html - see https://invisible-island.net/scripts/readme.html#others_scripts">
+-<TITLE>terminfo 5 2026-09-19 ncurses 6.6 File formats</TITLE>
++<TITLE>terminfo 5 2026-10-10 ncurses 6.6 File formats</TITLE>
+ <link rel="author" href="mailto:bug-ncurses@gnu.org">
+ 
+ </HEAD>
+ <BODY>
+-<H1 class="no-header">terminfo 5 2026-09-19 ncurses 6.6 File formats</H1>
++<H1 class="no-header">terminfo 5 2026-10-10 ncurses 6.6 File formats</H1>
+ <PRE>
+ <STRONG><A HREF="terminfo.5.html">terminfo(5)</A></STRONG>                      File formats                      <STRONG><A HREF="terminfo.5.html">terminfo(5)</A></STRONG>
+ 
+@@ -73,11 +73,11 @@
+        For  example,  ANSI X3.64, ECMA-48, and ISO 6429 standardize the <EM>escape</EM>
+        <EM>sequences</EM> that configure and direct  the  operation  of  character-cell
+        video   terminals   in   numerous   respects.   It  furthermore  offers
+-       <EM>initialization</EM> and <EM>reset</EM> parameters as well  as  <EM>padding,</EM>  a  means  of
++       <EM>initialization</EM> and <EM>reset</EM> parameters as well  as  <EM>padding</EM>,  a  means  of
+        adapting  the  transmission  of  operations  to  latencies  that may be
+        observed in the terminal when carrying them out.
+ 
+-       This document describes <EM>ncurses</EM> version 6.6 (patch 20260919).
++       This document describes <EM>ncurses</EM> version 6.6 (patch 20261010).
+ 
+ 
+ </PRE><H3><a name="h3-terminfo-Entry-Syntax"><EM>terminfo</EM> Entry Syntax</a></H3><PRE>
+@@ -1850,10 +1850,10 @@
+ 
+        The keys in the final group above correspond to  those  on  a  nine-key
+        directional  keypad  that are not orthogonal arrow keys; see subsection
+-       "Key Codes`*('' of <STRONG><A HREF="curs_getch.3x.html">getch(3x)</A></STRONG>.
++       "Key Codes" of <STRONG><A HREF="curs_getch.3x.html">getch(3x)</A></STRONG>.
+ 
+        Other Model M keys, such as  Caps  Lock,  Print  Screen,  Scroll  Lock,
+-       Pause/Break,  and  Num  Lock,  and later innovations like "Windows`*(''
++       Pause/Break,  and  Num  Lock,  and  later  innovations  like  "Windows"
+        modifiers,  Menu,  and  media  control  keys  (Play,  Eject)  are   not
+        necessarily  exposed  to the operating system's terminal driver, or may
+        be intercepted by the graphical  windowing  environment  and  not  made
+@@ -1918,7 +1918,7 @@
+ 
+        <STRONG>o</STRONG>   If  the  terminal  has  hardware  tab stops that are set at every <EM>n</EM>
+            character cells when the terminal is powered up, specify <EM>n</EM>  as  the
+-           value of the the numeric capability <STRONG>init_tabs</STRONG> (<STRONG>it</STRONG>).
++           value of the numeric capability <STRONG>init_tabs</STRONG> (<STRONG>it</STRONG>).
+ 
+            The  <STRONG>tset</STRONG>  and  "<STRONG>tput</STRONG>  <STRONG>init</STRONG>" commands interpret the presence of the
+            <STRONG>init_tabs</STRONG>  (<STRONG>it</STRONG>)  capability  as  implying  that  the  terminal   is
+@@ -2193,11 +2193,11 @@
+            <STRONG><A HREF="curs_refresh.3x.html">refresh(3x)</A></STRONG> functions prefer the <STRONG>setaf</STRONG> and  <STRONG>setab</STRONG>  capabilities  if
+            they are defined.
+ 
+-       All  of  the  foregoing capabilities capabilities take a single numeric
+-       argument each.  Argument values 0-7 of <STRONG>setaf</STRONG>  and  <STRONG>setab</STRONG>  are  portably
+-       defined  as  follows.   (The  middle  column  is the symbolic "#define"
+-       available in <EM>curses.h</EM>.)  The terminal is free to map these as it likes,
+-       but the RGB values indicate their usual color channel assignments.
++       All  of the foregoing capabilities take a single numeric argument each.
++       Argument values 0-7 of <STRONG>setaf</STRONG> and <STRONG>setab</STRONG> are portably defined as follows.
++       (The middle column is the symbolic "#define"  available  in  <EM>curses.h</EM>.)
++       The  terminal  is  free  to  map  these as it likes, but the RGB values
++       indicate their usual color channel assignments.
+ 
+                     <STRONG>Color</STRONG>      <STRONG>#define</STRONG>       <STRONG>Value</STRONG>        <STRONG>RGB</STRONG>
+                    ------------------------------------------------
+@@ -2470,7 +2470,7 @@
+        <STRONG><A HREF="curs_terminfo.3x.html">curs_terminfo(3x)</A></STRONG>, <STRONG><A HREF="curs_variables.3x.html">curs_variables(3x)</A></STRONG>,  <STRONG>printf(3)</STRONG>,  <STRONG><A HREF="term_variables.3x.html">term_variables(3x)</A></STRONG>,
+        <STRONG><A HREF="term.5.html">term(5)</A></STRONG>, <STRONG><A HREF="user_caps.5.html">user_caps(5)</A></STRONG>
+ 
+-ncurses 6.6                       2026-09-19                       <STRONG><A HREF="terminfo.5.html">terminfo(5)</A></STRONG>
++ncurses 6.6                       2026-10-10                       <STRONG><A HREF="terminfo.5.html">terminfo(5)</A></STRONG>
+ </PRE>
+ <div class="nav">
+ <ul>
+Index: man/curs_mouse.3x
+Prereq:  1.136 
+--- ncurses-6.6-20260926+/man/curs_mouse.3x	2026-09-19 21:38:50.000000000 +0000
++++ ncurses-6.6-20261010/man/curs_mouse.3x	2026-10-10 22:19:32.000000000 +0000
+@@ -28,8 +28,8 @@
+ .\" authorization.                                                           *
+ .\"***************************************************************************
+ .\"
+-.\" $Id: curs_mouse.3x,v 1.136 2026/09/19 21:38:50 tom Exp $
+-.TH curs_mouse 3X 2026-09-19 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "Library calls"
++.\" $Id: curs_mouse.3x,v 1.137 2026/10/10 22:19:32 tom Exp $
++.TH curs_mouse 3X 2026-10-10 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "Library calls"
+ .ie \n(.g \{\
+ .ds `` \(lq
+ .ds '' \(rq
+@@ -47,9 +47,12 @@
+ ..
+ .SH NAME
+ \fB\%has_mouse\fP,
++\fB\%mousemask\fP,
+ \fB\%getmouse\fP,
+ \fB\%ungetmouse\fP,
+-\fB\%mousemask\fP,
++\fB\%mouse_mask\fP,
++\fB\%mouse_get\fP,
++\fB\%mouse_test\fP,
+ \fB\%wenclose\fP,
+ \fB\%mouse_trafo\fP,
+ \fB\%wmouse_trafo\fP,
+@@ -78,6 +81,10 @@
+ \fBint getmouse(MEVENT * \fIevent\fP);
+ \fBint ungetmouse(MEVENT * \fIevent\fP);
+ .PP
++\fBmmask_t mouse_mask(int \fIbutton\fP, mmask_t \fInew-mask\fP, mmask_t * \fIold-mask\fP);
++\fBint mouse_get(int \fIbutton\fP, MEVENT * \fIevent\fP);
++\fBint mouse_test(int \fIbutton\fP, MEVENT * \fIevent\fP);
++.PP
+ \fBbool wenclose(const WINDOW * \fIwin\fP, int \fIy\fP, int \fIx\fP);
+ .PP
+ \fBbool mouse_trafo(int * \fIpY\fP, int * \fIpX\fP, bool \fIto-screen\fP);
+@@ -169,6 +176,11 @@
+ setting a zero mouse mask may turn off the mouse cursor;
+ setting a nonzero mask may turn it on.
+ Whether this happens is device-dependent.
++.SS mouse_mask
++Use
++.B \%mouse_mask
++to set or query only the part of the mouse mask for a single button.
++The mask returned in the \fIold-mask\fP will be encoded for button 1.
+ .SS "Mouse Events"
+ Several mouse event types may be selected;
+ construct a mask by logically \*(``or\*(''-ing their values.
+@@ -246,6 +258,22 @@
+ A subsequent
+ .B \%getmouse
+ call retrieves the next older event from the queue.
++.SS mouse_get
++Use
++.B \%mouse_get
++to consume the current mouse event,
++returning
++.B OK
++if it was activated by the specified button.
++The button state returned in the \fIevent\fP will be encoded for button 1.
++.SS mouse_test
++Use
++.B \%mouse_test
++to check the current mouse event,
++returning
++.B OK
++if it was activated by the specified button.
++The button state returned in the \fIevent\fP will be encoded for button 1.
+ .SS ungetmouse
+ .B \%ungetmouse
+ behaves analogously to \fB\%ungetch\fP(3X).
+Index: man/terminfo.head
+Prereq:  1.74 
+--- ncurses-6.6-20260926+/man/terminfo.head	2026-09-19 21:37:14.000000000 +0000
++++ ncurses-6.6-20261010/man/terminfo.head	2026-10-10 21:54:31.000000000 +0000
+@@ -27,8 +27,8 @@
+ .\" authorization.                                                           *
+ .\"***************************************************************************
+ .\"
+-.\" $Id: terminfo.head,v 1.74 2026/09/19 21:37:14 tom Exp $
+-.TH terminfo 5 2026-09-19 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "File formats"
++.\" $Id: terminfo.head,v 1.75 2026/10/10 21:54:31 tom Exp $
++.TH terminfo 5 2026-10-10 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "File formats"
+ .ie \n(.g \{\
+ .ds `` \(lq
+ .ds '' \(rq
+@@ -97,7 +97,7 @@
+ .I reset
+ parameters
+ as well as
+-.I padding,
++.IR padding ","
+ a means of adapting the transmission of operations
+ to latencies that may be observed in the terminal
+ when carrying them out.
+Index: man/terminfo.tail
+Prereq:  1.173 
+--- ncurses-6.6-20260926+/man/terminfo.tail	2026-09-19 21:33:53.000000000 +0000
++++ ncurses-6.6-20261010/man/terminfo.tail	2026-10-10 22:03:45.000000000 +0000
+@@ -27,7 +27,7 @@
+ .\" authorization.                                                           *
+ .\"***************************************************************************
+ .\"
+-.\" $Id: terminfo.tail,v 1.173 2026/09/19 21:33:53 Branden.Robinson Exp $
++.\" $Id: terminfo.tail,v 1.177 2026/10/10 22:03:45 tom Exp $
+ .ps +1
+ .SS "User-Defined Capabilities"
+ .
+@@ -1351,7 +1351,7 @@
+ .PP
+ The keys in the final group above correspond to those
+ on a nine-key directional keypad that are not orthogonal arrow keys;
+-see subsection \*(``Key Codes`*('' of \fB\%getch\fP(3X).
++see subsection \*(``Key Codes\*('' of \fB\%getch\fP(3X).
+ .PP
+ Other Model M keys,
+ such as
+@@ -1362,7 +1362,7 @@
+ and
+ Num Lock,
+ and later innovations like
+-\*(``Windows`*('' modifiers,
++\*(``Windows\*('' modifiers,
+ Menu,
+ and media control keys
+ (Play,
+@@ -1463,7 +1463,7 @@
+ character cells when the terminal is powered up,
+ specify
+ .I n
+-as the value of the the numeric capability
++as the value of the numeric capability
+ .B \%init_tabs
+ .RB ( it )\c
+ \&.
+@@ -1912,7 +1912,7 @@
+ .B \%setab
+ capabilities if they are defined.
+ .PP
+-All of the foregoing capabilities capabilities
++All of the foregoing capabilities
+ take a single numeric argument each.
+ Argument values 0-7 of
+ .B \%setaf
+Index: ncurses/base/lib_mouse.c
+Prereq:  1.256 
+--- ncurses-6.6-20260926+/ncurses/base/lib_mouse.c	2026-09-26 22:57:37.000000000 +0000
++++ ncurses-6.6-20261010/ncurses/base/lib_mouse.c	2026-10-10 23:42:24.000000000 +0000
+@@ -84,7 +84,7 @@
+ #define CUR SP_TERMTYPE
+ #endif
+ 
+-MODULE_ID("$Id: lib_mouse.c,v 1.256 2026/09/26 22:57:37 tom Exp $")
++MODULE_ID("$Id: lib_mouse.c,v 1.261 2026/10/10 23:42:24 tom Exp $")
+ 
+ #include <tic.h>
+ 
+@@ -153,9 +153,9 @@
+ #define	MASK_TRIPLE_CLICK(x)	(mmask_t) NCURSES_MOUSE_MASK(x, NCURSES_TRIPLE_CLICKED)
+ 
+ #if NCURSES_MOUSE_VERSION > 1
+-#define EXTRACT_MOUSE_MASK(b,m) ((mmask_t)(m) >> (((b) - 1) * 5))
++#define EXTRACT_MOUSE_MASK(b,m) ((mmask_t)(0x1f & (m) >> (((b) - 1) * 5)))
+ #else
+-#define EXTRACT_MOUSE_MASK(b,m) ((mmask_t)(m) >> (((b) - 1) * 6))
++#define EXTRACT_MOUSE_MASK(b,m) ((mmask_t)(0x3f & (m) >> (((b) - 1) * 6)))
+ #endif
+ 
+ #if NCURSES_MAX_BUTTON == 4
+@@ -254,12 +254,16 @@
+ 
+     _tracef("%s", tag);
+ 
+-    for (ep = FirstEV(sp); ep <= LastEV(sp); ep++)
+-	_tracef("mouse event queue slot %ld = %s",
+-		(long) IndexEV(sp, ep),
++    for (ep = FirstEV(sp); ep <= LastEV(sp); ep++) {
++	long slot = (long) IndexEV(sp, ep);
++	_tracef("mouse event queue slot %ld = %s%s%s",
++		slot,
+ 		ValidEvent(ep)
+ 		? _nc_tracemouse(sp, ep)
+-		: _nc_tracemouse(sp, &invalid_event));
++		: _nc_tracemouse(sp, &invalid_event),
++		slot == sp->_mouse_read ? " <-- read" : "",
++		slot == sp->_mouse_write ? " <-- write" : "");
++    }
+ }
+ #endif
+ 
+@@ -2013,8 +2017,9 @@
+ 			  (long) IndexEV(SP_PARM, readp),
+ 			  _nc_tracemouse(SP_PARM, readp)));
+ 
+-	/* copy the event we find there */
++	/* copy the event we find there, reducing the bits in its state */
+ 	*aevent = *readp;
++	aevent->bstate = EXTRACT_MOUSE_MASK(button, readp->bstate);
+ 
+ 	Invalidate(readp);	/* so the queue slot becomes free */
+ 	SP_PARM->_mouse_read++;
+@@ -2072,24 +2077,26 @@
+ NCURSES_SP_NAME(mouse_test)(NCURSES_SP_DCLx int button, MEVENT * aevent)
+ {
+     int result = ERR;
+-    const MEVENT *readp;
+ 
+-    T((T_CALLED("mouse_test(%p,%p)"), (void *) SP_PARM, (void *) aevent));
++    T((T_CALLED("mouse_test(%p,%d,%p)"), (void *) SP_PARM, button, (void *) aevent));
+ 
+     if (aevent == NULL) {
+ 	;
+-    } else if ((readp = _nc_get_mouse(SP_PARM, button)) != NULL &&
+-	       _nc_is_button(SP_PARM, button, readp)) {
+-	TR(TRACE_IEVENT, ("mouse_test: slot %ld event %s",
+-			  (long) IndexEV(SP_PARM, readp),
+-			  _nc_tracemouse(SP_PARM, readp)));
++    } else if (_nc_has_mouse(SP_PARM)) {
++	MEVENT *readp;
+ 
+-	/* copy the event we find there */
+-	*aevent = *readp;
+-	result = OK;
+-    } else {
+-	TR(TRACE_IEVENT, ("mouse_test: no valid event in queue"));
+-	_nc_invalidate_event(aevent);
++	if (SP_PARM->_mouse_read != SP_PARM->_mouse_write) {
++	    readp = EventAt(SP_PARM, SP_PARM->_mouse_read);
++	    if (ValidEvent(readp) && _nc_is_button(SP_PARM, button, readp)) {
++		TR(TRACE_IEVENT, ("mouse_test: slot %ld event %s",
++				  (long) IndexEV(SP_PARM, readp),
++				  _nc_tracemouse(SP_PARM, readp)));
++
++		/* copy the event we find there */
++		*aevent = *readp;
++		result = OK;
++	    }
++	}
+     }
+     returnCode(result);
+ }
+@@ -2210,13 +2217,16 @@
+ {
+     mmask_t result = 0;
+ 
+-    T((T_CALLED("mouse_mask(%p,%#lx,%p)"),
++    T((T_CALLED("mouse_mask(%p,%d,%#lx,%p)"),
+        (void *) SP_PARM,
++       button,
+        (unsigned long) newmask,
+        (void *) oldmask));
+ 
+     if (SP_PARM != NULL) {
+-	if (button > 0) {
++	if (button > NCURSES_MAX_BUTTON || button < 0) {
++	    T(("out of range"));
++	} else if (button > 0) {
+ 	    mmask_t maskall = ~NCURSES_MOUSE_MASK(button, BUTTON_BITS);
+ 
+ 	    if (oldmask != NULL)
+@@ -2225,8 +2235,11 @@
+ 	    newmask &= BUTTON_BITS;
+ 	    newmask = ((SP_PARM->_mouse_mask & maskall)
+ 		       | NCURSES_MOUSE_MASK(button, newmask));
++	    /* set/get button bits as if it were button-1 */
+ 	    result = NCURSES_SP_NAME(mousemask)(NCURSES_SP_ARGx newmask, NULL);
++	    result = EXTRACT_MOUSE_MASK(button, result);
+ 	} else {
++	    /* set/get non-button bits */
+ 	    result = NCURSES_SP_NAME(mousemask)(NCURSES_SP_ARGx newmask, oldmask);
+ 	}
+     }
+@@ -2239,6 +2252,11 @@
+ {
+     return NCURSES_SP_NAME(mousemask)(CURRENT_SCREEN, newmask, oldmask);
+ }
++NCURSES_EXPORT(mmask_t)
++mouse_mask(int button, mmask_t newmask, mmask_t * oldmask)
++{
++    return NCURSES_SP_NAME(mouse_mask)(CURRENT_SCREEN, button, newmask, oldmask);
++}
+ #endif
+ 
+ /**** Other ***************************************************************/
+Index: ncurses/trace/lib_tracemse.c
+Prereq:  1.26 
+--- ncurses-6.6-20260926+/ncurses/trace/lib_tracemse.c	2026-08-31 23:56:06.000000000 +0000
++++ ncurses-6.6-20261010/ncurses/trace/lib_tracemse.c	2026-10-10 18:07:15.000000000 +0000
+@@ -39,7 +39,7 @@
+ 
+ #include <curses.priv.h>
+ 
+-MODULE_ID("$Id: lib_tracemse.c,v 1.26 2026/08/31 23:56:06 tom Exp $")
++MODULE_ID("$Id: lib_tracemse.c,v 1.27 2026/10/10 18:07:15 tom Exp $")
+ 
+ #ifdef TRACE
+ 
+@@ -57,7 +57,7 @@
+ 	char my_button[10]; \
+ 	size_t n = strlen(my_buffer); \
+ 	sprintf(my_button, "-%d", button); \
+-	if (n && (my_buffer[n-1] != '{')) \
++	if (n && (my_buffer[n-1] != L_BRACE)) \
+ 	_nc_STRCAT(my_buffer, ", ", sizeof(my_buffer)); \
+ 	_nc_STRCAT(my_buffer, show, sizeof(my_buffer)); \
+ 	_nc_STRCAT(my_buffer, my_button, sizeof(my_buffer)); \
+@@ -66,11 +66,12 @@
+ #define SHOW(name, show) \
+     if ((code & name) == name) { \
+ 	size_t n = strlen(my_buffer); \
+-	if (n && (my_buffer[n-1] != '{')) \
++	if (n && (my_buffer[n-1] != L_BRACE)) \
+ 	_nc_STRCAT(my_buffer, ", ", sizeof(my_buffer)); \
+ 	_nc_STRCAT(my_buffer, show, sizeof(my_buffer)); \
+     }
+ 
++    *my_buffer = '\0';
+     for (button = 1; button <= MAX_BUTTON; ++button) {
+ 	SHOW_BUTTON(NCURSES_BUTTON_PRESSED, "press");
+ 	SHOW_BUTTON(NCURSES_BUTTON_RELEASED, "release");
+Index: package/debian-mingw/changelog
+--- ncurses-6.6-20260926+/package/debian-mingw/changelog	2026-09-26 09:27:25.000000000 +0000
++++ ncurses-6.6-20261010/package/debian-mingw/changelog	2026-10-10 09:43:24.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260926) unstable; urgency=low
++ncurses6td (6.6+20261010) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 26 Sep 2026 05:27:25 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 10 Oct 2026 05:43:24 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian-mingw64/changelog
+--- ncurses-6.6-20260926+/package/debian-mingw64/changelog	2026-09-26 09:27:25.000000000 +0000
++++ ncurses-6.6-20261010/package/debian-mingw64/changelog	2026-10-10 09:43:24.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260926) unstable; urgency=low
++ncurses6td (6.6+20261010) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 26 Sep 2026 05:27:25 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 10 Oct 2026 05:43:24 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian/changelog
+--- ncurses-6.6-20260926+/package/debian/changelog	2026-09-26 09:27:25.000000000 +0000
++++ ncurses-6.6-20261010/package/debian/changelog	2026-10-10 09:43:24.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260926) unstable; urgency=low
++ncurses6td (6.6+20261010) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 26 Sep 2026 05:27:25 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 10 Oct 2026 05:43:24 -0400
+ 
+ ncurses6 (5.9+20120608) unstable; urgency=low
+ 
+Index: package/mingw-ncurses.nsi
+Prereq:  1.784 
+--- ncurses-6.6-20260926+/package/mingw-ncurses.nsi	2026-09-26 09:27:25.000000000 +0000
++++ ncurses-6.6-20261010/package/mingw-ncurses.nsi	2026-10-10 09:43:24.000000000 +0000
+@@ -1,4 +1,4 @@
+-; $Id: mingw-ncurses.nsi,v 1.784 2026/09/26 09:27:25 tom Exp $
++; $Id: mingw-ncurses.nsi,v 1.785 2026/10/10 09:43:24 tom Exp $
+ 
+ ; TODO add examples
+ ; TODO bump ABI to 6
+@@ -10,7 +10,7 @@
+ !define VERSION_MAJOR "6"
+ !define VERSION_MINOR "6"
+ !define VERSION_YYYY  "2026"
+-!define VERSION_MMDD  "0926"
++!define VERSION_MMDD  "1010"
+ !define VERSION_PATCH ${VERSION_YYYY}${VERSION_MMDD}
+ 
+ !define MY_ABI   "5"
+Index: package/mingw-ncurses.spec
+--- ncurses-6.6-20260926+/package/mingw-ncurses.spec	2026-09-26 09:27:25.000000000 +0000
++++ ncurses-6.6-20261010/package/mingw-ncurses.spec	2026-10-10 09:43:24.000000000 +0000
+@@ -3,7 +3,7 @@
+ Summary: shared libraries for terminal handling
+ Name: mingw32-ncurses6
+ Version: 6.6
+-Release: 20260926
++Release: 20261010
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -144,8 +144,8 @@
+ 
+ %changelog
+ 
+-* Sat Sep 26 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260926
++* Sat Oct 10 2026 Thomas E. Dickey
++- testing ncurses 6.6-20261010
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncurses.spec
+--- ncurses-6.6-20260926+/package/ncurses.spec	2026-09-26 09:27:25.000000000 +0000
++++ ncurses-6.6-20261010/package/ncurses.spec	2026-10-10 09:43:24.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: shared libraries for terminal handling
+ Name: ncurses6
+ Version: 6.6
+-Release: 20260926
++Release: 20261010
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -134,8 +134,8 @@
+ 
+ %changelog
+ 
+-* Sat Sep 26 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260926
++* Sat Oct 10 2026 Thomas E. Dickey
++- testing ncurses 6.6-20261010
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncursest.spec
+--- ncurses-6.6-20260926+/package/ncursest.spec	2026-09-26 09:27:25.000000000 +0000
++++ ncurses-6.6-20261010/package/ncursest.spec	2026-10-10 09:43:24.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: Curses library with POSIX thread support.
+ Name: ncursest6
+ Version: 6.6
+-Release: 20260926
++Release: 20261010
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ Source: ncurses-%{version}-%{release}.tgz
+@@ -142,8 +142,8 @@
+ 
+ %changelog
+ 
+-* Sat Sep 26 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260926
++* Sat Oct 10 2026 Thomas E. Dickey
++- testing ncurses 6.6-20261010
+ 
+ * Tue Dec 24 2019 Thomas Dickey
+ - drop custom CC_NORMAL warning flags because setting CFLAGS interferes with
+Index: test/test_mouse.c
+Prereq:  1.48 
+--- ncurses-6.6-20260926+/test/test_mouse.c	2026-09-05 21:31:48.000000000 +0000
++++ ncurses-6.6-20261010/test/test_mouse.c	2026-10-10 21:47:43.000000000 +0000
+@@ -27,7 +27,7 @@
+  * authorization.                                                           *
+  ****************************************************************************/
+ /*
+- * $Id: test_mouse.c,v 1.48 2026/09/05 21:31:48 tom Exp $
++ * $Id: test_mouse.c,v 1.51 2026/10/10 21:47:43 tom Exp $
+  *
+  * Author: Leonid S Usov
+  *
+@@ -38,6 +38,12 @@
+ 
+ #if defined(NCURSES_MOUSE_VERSION) && !defined(_NC_WINDOWS_NATIVE)
+ 
++#if NCURSES_VERSION_PATCH > 20260926
++#define USE_PER_BUTTON 1
++#else
++#define USE_PER_BUTTON 0
++#endif
++
+ static int logoffset = 0;
+ 
+ static void
+@@ -226,6 +232,105 @@
+     endwin();
+ }
+ 
++#if USE_PER_BUTTON
++static void
++button_loop(char *my_environ, int interval)
++{
++    MEVENT event;
++    int num_buttons = 0;
++    int btn;
++
++    signal(SIGINT, onsig);
++    initscr();
++    noecho();
++    cbreak();			/* Line buffering disabled; pass everything */
++    nonl();
++    keypad(stdscr, TRUE);
++
++    /* determine the number of buttons (internal may support more than mask) */
++    for (btn = 0; btn < 12; ++btn) {
++	mmask_t my_mask;
++	(void) mouse_mask(btn, ALL_MOUSE_EVENTS, &my_mask);
++	if (mouse_mask(btn, ALL_MOUSE_EVENTS, &my_mask) == 0) {
++	    break;
++	}
++	num_buttons = btn;
++    }
++
++    mouseinterval(interval);
++
++    logw("Ctrl-c to quit (%d buttons)", num_buttons);
++    logw("--------------");
++    if (my_environ)
++	logw("%s", my_environ);
++    logoffset = getcury(stdscr);
++
++    while (1) {
++	int c = getch();
++	int rc;
++
++	switch (c) {
++	case KEY_MOUSE:
++	    rc = ERR;
++	    for (btn = num_buttons; btn >= 0; --btn) {
++		if (mouse_test(btn, &event) == OK) {
++		    rc = mouse_get(btn, &event);
++		    break;
++		}
++	    }
++	    if (rc == OK) {
++		const mmask_t btn_mask = (NCURSES_BUTTON_RELEASED |
++					  NCURSES_BUTTON_PRESSED |
++					  NCURSES_BUTTON_CLICKED |
++					  NCURSES_DOUBLE_CLICKED |
++					  NCURSES_TRIPLE_CLICKED);
++		mmask_t this_event = event.bstate;
++		if (btn != 0) {
++		    mmask_t this_btn = (mmask_t) (this_event
++						  & NCURSES_MOUSE_MASK(1, btn_mask));
++		    if (this_btn == 0)
++			continue;
++		    logw(HexFormat " button %2d%s%s%s%s%s%s @%3d,%3d%s%s%s",
++			 (unsigned long) this_btn,
++			 btn,
++			 ShowQ(1, BUTTON_RELEASED),
++			 ShowQ(1, BUTTON_PRESSED),
++			 ShowQ(1, BUTTON_CLICKED),
++			 ShowQ(1, DOUBLE_CLICKED),
++			 ShowQ(1, TRIPLE_CLICKED),
++			 ShowP(),
++			 event.y, event.x,
++			 ShowM(SHIFT),
++			 ShowM(CTRL),
++			 ShowM(ALT));
++		} else {
++		    /*
++		     * A position report need not have a button associated with
++		     * it.  The modifiers probably are unused.
++		     */
++		    logw(HexFormat "%s @%3d,%3d%s%s%s",
++			 (unsigned long) this_event,
++			 ShowP(),
++			 event.y, event.x,
++			 ShowM(SHIFT),
++			 ShowM(CTRL),
++			 ShowM(ALT));
++		}
++	    }
++	    break;
++	case ERR:
++	case '\003':
++	    goto end;
++	default:
++	    logw("got another char: 0x%x", UChar(c));
++	}
++	refresh();
++    }
++  end:
++    endwin();
++}
++#endif /* USE_PER_BUTTON */
++
+ static void
+ usage(int ok)
+ {
+@@ -241,8 +346,11 @@
+ 	,""
+ 	,USAGE_COMMON
+ 	,"Options:"
+-	," -r       show raw input stream, injecting a new line before every ESC"
++#if USE_PER_BUTTON
++	," -b       use button-level API, e.g., mouse_get rather than getmouse"
++#endif
+ 	," -i NUM   set mouse interval to NUM; default is 0 (no double-clicks)"
++	," -r       show raw input stream, injecting a new line before every ESC"
+ 	," -T TERM  override $TERM"
+     };
+     unsigned n;
+@@ -264,9 +372,17 @@
+     size_t my_len;
+     char *my_environ = NULL;
+     const char *term_format = "TERM=%s";
++#if USE_PER_BUTTON
++    bool per_button = FALSE;
++#endif
+ 
+-    while ((ch = getopt(argc, argv, OPTS_COMMON "i:rT:")) != -1) {
++    while ((ch = getopt(argc, argv, OPTS_COMMON "bi:rT:")) != -1) {
+ 	switch (ch) {
++#if USE_PER_BUTTON
++	case 'b':
++	    per_button = TRUE;
++	    break;
++#endif
+ 	case 'i':
+ 	    interval = atoi(optarg);
+ 	    break;
+@@ -291,11 +407,14 @@
+ 	ExitProgram(EXIT_FAILURE);
+     }
+ 
+-    if (rawmode) {
++    if (rawmode)
+ 	raw_loop();
+-    } else {
++#if USE_PER_BUTTON
++    else if (per_button)
++	button_loop(my_environ, interval);
++#endif
++    else
+ 	cooked_loop(my_environ, interval);
+-    }
+ 
+     ExitProgram(EXIT_SUCCESS);
+ }

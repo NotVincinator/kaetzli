@@ -1,0 +1,1203 @@
+# ncurses 6.6 - patch 20260627 - Thomas E. Dickey
+#
+# ------------------------------------------------------------------------------
+#
+# Ncurses 6.6 is at
+#   https://invisible-island.net/archives/ncurses/
+#   https://invisible-mirror.net/archives/ncurses/
+#   https://ftp.gnu.org/gnu/ncurses/
+#
+# Patches for ncurses 6.6 can be found at
+#   https://invisible-island.net/archives/ncurses/6.6
+#   https://invisible-mirror.net/archives/ncurses/6.6
+#
+# ------------------------------------------------------------------------------
+# https://invisible-island.net/archives/ncurses/6.6/ncurses-6.6-20260627.patch.gz
+# patch by Thomas E. Dickey <dickey@invisible-island.net>
+# created  Sun Jun 28 00:50:07 UTC 2026
+# ------------------------------------------------------------------------------
+# NEWS                             |   16 +++++
+# VERSION                          |    2 
+# aclocal.m4                       |   17 +++++-
+# c++/Makefile.in                  |    8 ++
+# configure                        |   71 +++++++++++++++++++------
+# configure.in                     |   28 +++++++++-
+# dist.mk                          |    4 -
+# form/Makefile.in                 |    8 ++
+# menu/Makefile.in                 |    8 ++
+# misc/Makefile.in                 |   21 ++-----
+# misc/terminfo.src                |  102 ++++++++++++++++++++++++++++---------
+# ncurses/Makefile.in              |    6 +-
+# ncurses/term.priv.h              |    6 +-
+# ncurses/tinfo/comp_expand.c      |    4 -
+# ncurses/tinfo/lib_setup.c        |    6 +-
+# package/debian-mingw/changelog   |    4 -
+# package/debian-mingw64/changelog |    4 -
+# package/debian/changelog         |    4 -
+# package/mingw-ncurses.nsi        |    4 -
+# package/mingw-ncurses.spec       |    6 +-
+# package/ncurses.spec             |    6 +-
+# package/ncursest.spec            |    6 +-
+# panel/Makefile.in                |    8 ++
+# 23 files changed, 252 insertions(+), 97 deletions(-)
+# ------------------------------------------------------------------------------
+Index: NEWS
+Prereq:  1.4481 
+--- ncurses-6.6-20260620+/NEWS	2026-06-21 00:05:36.000000000 +0000
++++ ncurses-6.6-20260627/NEWS	2026-06-27 23:06:41.000000000 +0000
+@@ -26,7 +26,7 @@
+ -- sale, use or other dealings in this Software without prior written        --
+ -- authorization.                                                            --
+ -------------------------------------------------------------------------------
+--- $Id: NEWS,v 1.4481 2026/06/21 00:05:36 tom Exp $
++-- $Id: NEWS,v 1.4485 2026/06/27 23:06:41 tom Exp $
+ -------------------------------------------------------------------------------
+ 
+ This is a log of changes that ncurses has gone through since Zeyd started
+@@ -46,6 +46,20 @@
+ Changes through 1.9.9e did not credit all contributions;
+ it is not possible to add this information.
+ 
++20260627
++	+ add a makefile symbol for the names of the installed libraries to
++	  simplify parallel build of more than one configuration (patch by
++	  Luca Fancellu).
++	+ change misc/Makefile to eliminate "pc-files" stamp target (report
++	  by Luca Fancellu).
++	+ change internal type for file-descriptor to int, eliminate cast
++	  (report by Antonio Nino Diaz).
++	+ add xon to several entries, based on manuals and product
++	  descriptions -TD
++	+ revise adm36, based on manual -TD
++	+ add u6, u7, kdch1 to vp3a+ based on manual -TD
++	+ add u6, u7, home, cbt to adm20 based on manual -TD
++
+ 20260620
+ 	+ add il1 to ibcs2 -TD
+ 	+ add ich1 to several entries, providing for support of non-curses
+Index: VERSION
+--- ncurses-6.6-20260620+/VERSION	2026-06-20 09:45:08.000000000 +0000
++++ ncurses-6.6-20260627/VERSION	2026-06-27 09:25:24.000000000 +0000
+@@ -1 +1 @@
+-5:0:10	6.6	20260620
++5:0:10	6.6	20260627
+Index: aclocal.m4
+Prereq:  1.1161 
+--- ncurses-6.6-20260620+/aclocal.m4	2026-06-06 09:54:13.000000000 +0000
++++ ncurses-6.6-20260627/aclocal.m4	2026-06-27 23:09:22.000000000 +0000
+@@ -29,7 +29,7 @@
+ dnl
+ dnl Author: Thomas E. Dickey 1995-on
+ dnl
+-dnl $Id: aclocal.m4,v 1.1161 2026/06/06 09:54:13 tom Exp $
++dnl $Id: aclocal.m4,v 1.1163 2026/06/27 23:09:22 tom Exp $
+ dnl Macros used in NCURSES auto-configuration script.
+ dnl
+ dnl These macros are maintained separately from NCURSES.  The copyright on
+@@ -4787,7 +4787,7 @@
+ 	AC_SUBST(LIB_PREFIX)
+ ])dnl
+ dnl ---------------------------------------------------------------------------
+-dnl CF_LIB_RULES version: 103 updated: 2025/11/11 20:09:36
++dnl CF_LIB_RULES version: 104 updated: 2026/06/27 19:08:14
+ dnl ------------
+ dnl Append definitions and rules for the given models to the subdirectory
+ dnl Makefiles, and the recursion rule for the top-level Makefile.  If the
+@@ -4842,6 +4842,7 @@
+ 
+ 		SHARED_LIB=
+ 		Libs_To_Make=
++		Libs_To_Install=
+ 		cf_awk_program=
+ 		if test -n "${cf_cv_abi_default}" && test "x${cf_cv_abi_default}" != "x5"
+ 		then
+@@ -4955,12 +4956,18 @@
+ 			fi
+ 			cf_add_lib="../lib/${cf_prefix}${cf_libname}${cf_suffix}"
+ 			Libs_To_Make="$Libs_To_Make $cf_add_lib"
++			if test "$cf_item" = shared && test "$cf_dir" != c++
++			then
++				cf_add_inst='$(LIBDIR)'"/${cf_prefix}${cf_libname}${cf_suffix}"
++				Libs_To_Install="$Libs_To_Install $cf_add_inst"
++			fi
+ 		done
+ 
+ 		if test "$cf_dir" = ncurses ; then
+ 			cf_subsets="$LIB_SUBSETS"
+ 			cf_r_parts="$cf_subsets"
+ 			cf_liblist="$Libs_To_Make"
++			cf_instlist="$Libs_To_Install"
+ 
+ 			while test -n "$cf_r_parts"
+ 			do
+@@ -4971,9 +4978,11 @@
+ 					case "$cf_l_parts" in
+ 					(*termlib*)
+ 						cf_add_lib=`echo "$cf_liblist" |sed -e s%${LIB_NAME}${ABI_SUFFIX}%${TINFO_LIB_SUFFIX}%g`
++						cf_add_inst=`echo "$cf_instlist" |sed -e s%${LIB_NAME}${ABI_SUFFIX}%${TINFO_LIB_SUFFIX}%g`
+ 						;;
+ 					(*ticlib*)
+ 						cf_add_lib=`echo "$cf_liblist" |sed -e s%${LIB_NAME}${ABI_SUFFIX}%${TICS_LIB_SUFFIX}%g`
++						cf_add_inst=`echo "$cf_instlist" |sed -e s%${LIB_NAME}${ABI_SUFFIX}%${TICS_LIB_SUFFIX}%g`
+ 						;;
+ 					(*)
+ 						break
+@@ -4982,6 +4991,9 @@
+ 					if test -n "$cf_add_lib"; then
+ 						Libs_To_Make="$cf_add_lib $Libs_To_Make"
+ 					fi
++					if test -n "$cf_add_inst"; then
++						Libs_To_Install="$cf_add_inst $Libs_To_Install"
++					fi
+ 				else
+ 					break
+ 				fi
+@@ -5018,6 +5030,7 @@
+ 		fi
+ 
+ 		sed -e "s%@Libs_To_Make@%$Libs_To_Make%" \
++		    -e "s%@Libs_To_Install@%$Libs_To_Install%" \
+ 		    -e "s%@SHARED_LIB@%$SHARED_LIB%" \
+ 			"$cf_dir/Makefile" >$cf_dir/Makefile.out
+ 		mv "$cf_dir/Makefile.out" "$cf_dir/Makefile"
+Index: c++/Makefile.in
+Prereq:  1.139 
+--- ncurses-6.6-20260620+/c++/Makefile.in	2025-10-18 13:33:46.000000000 +0000
++++ ncurses-6.6-20260627/c++/Makefile.in	2026-06-27 23:04:29.000000000 +0000
+@@ -1,6 +1,6 @@
+-# $Id: Makefile.in,v 1.139 2025/10/18 13:33:46 tom Exp $
++# $Id: Makefile.in,v 1.141 2026/06/27 23:04:29 tom Exp $
+ ##############################################################################
+-# Copyright 2018-2024,2025 Thomas E. Dickey                                  #
++# Copyright 2018-2025,2026 Thomas E. Dickey                                  #
+ # Copyright 1998-2015,2016 Free Software Foundation, Inc.                    #
+ #                                                                            #
+ # Permission is hereby granted, free of charge, to any person obtaining a    #
+@@ -129,6 +129,7 @@
+ LIBNAME		= @LIB_PREFIX@$(LIBROOT)@CXX_LIB_SUFFIX@
+ 
+ LIBRARIES	= @Libs_To_Make@
++INSTALL_LIBS	= @Libs_To_Install@
+ 
+ LINT		= @LINT@
+ LINT_OPTS	= @LINT_OPTS@
+@@ -184,6 +185,9 @@
+ all \
+ libs ::		$(AUTO_SRC) $(LIBRARIES)
+ 
++install \
++install.libs :: $(INSTALL_LIBS)
++
+ @MAKE_TESTS@all ::		demo$x
+ 
+ depend :
+Index: configure
+--- ncurses-6.6-20260620+/configure	2026-06-06 09:54:35.000000000 +0000
++++ ncurses-6.6-20260627/configure	2026-06-27 22:51:36.000000000 +0000
+@@ -1,5 +1,5 @@
+ #! /bin/sh
+-# From configure.in Revision: 1.833 .
++# From configure.in Revision: 1.836 .
+ # Guess values for system-dependent variables and create Makefiles.
+ # Generated by Autoconf 2.52.20260412.
+ #
+@@ -30119,6 +30119,29 @@
+ 
+ LD_SEARCHPATH=`echo "$cf_cv_ld_searchpath"|sed -e 's/ /|/g'`
+ 
++PC_FILES=
++for cf_pc_root in \
++	"${LIB_NAME}${USE_ARG_SUFFIX}" \
++	"${TINFO_ARG_SUFFIX}" \
++	"${TICS_NAME}${USE_ARG_SUFFIX}" \
++	"${PANEL_NAME}${USE_ARG_SUFFIX}" \
++	"${MENU_NAME}${USE_ARG_SUFFIX}" \
++	"${FORM_NAME}${USE_ARG_SUFFIX}" \
++	"${CXX_NAME}${USE_ARG_SUFFIX}"
++do
++	cf_pc_file="${cf_pc_root}${PC_MODULE_SUFFIX}".pc
++	cf_found=
++	for cf_pc_used in $PC_FILES
++	do
++		if test "$cf_pc_used" = "$cf_pc_file"
++		then
++			cf_found=$cf_pc_used
++			break
++		fi
++	done
++	test -z "$cf_found" && PC_FILES="$PC_FILES $cf_pc_file"
++done
++
+ ac_config_files="$ac_config_files include/MKterm.h.awk include/curses.head:include/curses.h.in include/ncurses_dll.h include/nc_win32.h include/termcap.h include/unctrl.h man/MKterminfo.tmp:man/MKterminfo.sh man/man_db.renames $SUB_MAKEFILES Makefile"
+ 
+ ac_config_commands="$ac_config_commands default"
+@@ -30204,7 +30227,7 @@
+ : "${CONFIG_STATUS=./config.status}"
+ ac_clean_files_save=$ac_clean_files
+ ac_clean_files="$ac_clean_files $CONFIG_STATUS"
+-{ echo "$as_me:30207: creating $CONFIG_STATUS" >&5
++{ echo "$as_me:30230: creating $CONFIG_STATUS" >&5
+ echo "$as_me: creating $CONFIG_STATUS" >&6;}
+ cat >"$CONFIG_STATUS" <<_ACEOF
+ #! $SHELL
+@@ -30385,7 +30408,7 @@
+     echo "$ac_cs_version"; exit 0 ;;
+   --he | --h)
+     # Conflict between --help and --header
+-    { { echo "$as_me:30388: error: ambiguous option: $1
++    { { echo "$as_me:30411: error: ambiguous option: $1
+ Try \`$0 --help' for more information." >&5
+ echo "$as_me: error: ambiguous option: $1
+ Try \`$0 --help' for more information." >&2;}
+@@ -30404,7 +30427,7 @@
+     ac_need_defaults=false;;
+ 
+   # This is an error.
+-  -*) { { echo "$as_me:30407: error: unrecognized option: $1
++  -*) { { echo "$as_me:30430: error: unrecognized option: $1
+ Try \`$0 --help' for more information." >&5
+ echo "$as_me: error: unrecognized option: $1
+ Try \`$0 --help' for more information." >&2;}
+@@ -30538,7 +30561,7 @@
+   "Makefile" ) CONFIG_FILES="$CONFIG_FILES Makefile" ;;
+   "default" ) CONFIG_COMMANDS="$CONFIG_COMMANDS default" ;;
+   "include/ncurses_cfg.h" ) CONFIG_HEADERS="$CONFIG_HEADERS include/ncurses_cfg.h:include/ncurses_cfg.hin" ;;
+-  *) { { echo "$as_me:30541: error: invalid argument: $ac_config_target" >&5
++  *) { { echo "$as_me:30564: error: invalid argument: $ac_config_target" >&5
+ echo "$as_me: error: invalid argument: $ac_config_target" >&2;}
+    { (exit 1); exit 1; }; };;
+   esac
+@@ -30940,6 +30963,7 @@
+ s,@PRIVATE_LIBS@,$PRIVATE_LIBS,;t t
+ s,@NO_SHARED@,$NO_SHARED,;t t
+ s,@LD_SEARCHPATH@,$LD_SEARCHPATH,;t t
++s,@PC_FILES@,$PC_FILES,;t t
+ CEOF
+ 
+ EOF
+@@ -31072,7 +31096,7 @@
+   esac
+ 
+   if test x"$ac_file" != x-; then
+-    { echo "$as_me:31075: creating $ac_file" >&5
++    { echo "$as_me:31099: creating $ac_file" >&5
+ echo "$as_me: creating $ac_file" >&6;}
+     rm -f "$ac_file"
+   fi
+@@ -31090,7 +31114,7 @@
+       -) echo "$tmp"/stdin ;;
+       [\\/$]*)
+          # Absolute (can't be DOS-style, as IFS=:)
+-         test -f "$f" || { { echo "$as_me:31093: error: cannot find input file: $f" >&5
++         test -f "$f" || { { echo "$as_me:31117: error: cannot find input file: $f" >&5
+ echo "$as_me: error: cannot find input file: $f" >&2;}
+    { (exit 1); exit 1; }; }
+          echo "$f";;
+@@ -31103,7 +31127,7 @@
+            echo "$srcdir/$f"
+          else
+            # /dev/null tree
+-           { { echo "$as_me:31106: error: cannot find input file: $f" >&5
++           { { echo "$as_me:31130: error: cannot find input file: $f" >&5
+ echo "$as_me: error: cannot find input file: $f" >&2;}
+    { (exit 1); exit 1; }; }
+          fi;;
+@@ -31119,7 +31143,7 @@
+       if test -n "$ac_seen"; then
+         ac_used=`grep '@datarootdir@' "$ac_item"`
+         if test -z "$ac_used"; then
+-          { echo "$as_me:31122: WARNING: datarootdir was used implicitly but not set:
++          { echo "$as_me:31146: WARNING: datarootdir was used implicitly but not set:
+ $ac_seen" >&5
+ echo "$as_me: WARNING: datarootdir was used implicitly but not set:
+ $ac_seen" >&2;}
+@@ -31128,7 +31152,7 @@
+       fi
+       ac_seen=`grep '${datarootdir}' "$ac_item"`
+       if test -n "$ac_seen"; then
+-        { echo "$as_me:31131: WARNING: datarootdir was used explicitly but not set:
++        { echo "$as_me:31155: WARNING: datarootdir was used explicitly but not set:
+ $ac_seen" >&5
+ echo "$as_me: WARNING: datarootdir was used explicitly but not set:
+ $ac_seen" >&2;}
+@@ -31173,7 +31197,7 @@
+             ac_init=`$EGREP '[ 	]*'$ac_name'[ 	]*=' "$ac_file"`
+             if test -z "$ac_init"; then
+               ac_seen=`echo "$ac_seen" |sed -e 's,^,'"$ac_file"':,'`
+-              { echo "$as_me:31176: WARNING: Variable $ac_name is used but was not set:
++              { echo "$as_me:31200: WARNING: Variable $ac_name is used but was not set:
+ $ac_seen" >&5
+ echo "$as_me: WARNING: Variable $ac_name is used but was not set:
+ $ac_seen" >&2;}
+@@ -31184,7 +31208,7 @@
+     $EGREP -n '@[A-Z_][A-Z_0-9]+@' "$ac_file" >>"$tmp"/out
+     if test -s "$tmp"/out; then
+       ac_seen=`sed -e 's,^,'"$ac_file"':,' < "$tmp"/out`
+-      { echo "$as_me:31187: WARNING: Some variables may not be substituted:
++      { echo "$as_me:31211: WARNING: Some variables may not be substituted:
+ $ac_seen" >&5
+ echo "$as_me: WARNING: Some variables may not be substituted:
+ $ac_seen" >&2;}
+@@ -31233,7 +31257,7 @@
+   * )   ac_file_in=$ac_file.in ;;
+   esac
+ 
+-  test x"$ac_file" != x- && { echo "$as_me:31236: creating $ac_file" >&5
++  test x"$ac_file" != x- && { echo "$as_me:31260: creating $ac_file" >&5
+ echo "$as_me: creating $ac_file" >&6;}
+ 
+   # First look for the input files in the build tree, otherwise in the
+@@ -31244,7 +31268,7 @@
+       -) echo "$tmp"/stdin ;;
+       [\\/$]*)
+          # Absolute (can't be DOS-style, as IFS=:)
+-         test -f "$f" || { { echo "$as_me:31247: error: cannot find input file: $f" >&5
++         test -f "$f" || { { echo "$as_me:31271: error: cannot find input file: $f" >&5
+ echo "$as_me: error: cannot find input file: $f" >&2;}
+    { (exit 1); exit 1; }; }
+          echo $f;;
+@@ -31257,7 +31281,7 @@
+            echo "$srcdir/$f"
+          else
+            # /dev/null tree
+-           { { echo "$as_me:31260: error: cannot find input file: $f" >&5
++           { { echo "$as_me:31284: error: cannot find input file: $f" >&5
+ echo "$as_me: error: cannot find input file: $f" >&2;}
+    { (exit 1); exit 1; }; }
+          fi;;
+@@ -31315,7 +31339,7 @@
+   rm -f "$tmp"/in
+   if test x"$ac_file" != x-; then
+     if cmp -s "$ac_file" "$tmp/config.h" 2>/dev/null; then
+-      { echo "$as_me:31318: $ac_file is unchanged" >&5
++      { echo "$as_me:31342: $ac_file is unchanged" >&5
+ echo "$as_me: $ac_file is unchanged" >&6;}
+     else
+       ac_dir=`$as_expr X"$ac_file" : 'X\(.*[^/]\)//*[^/][^/]*/*$' \| \
+@@ -31413,6 +31437,7 @@
+ 
+ 		SHARED_LIB=
+ 		Libs_To_Make=
++		Libs_To_Install=
+ 		cf_awk_program=
+ 		if test -n "${cf_cv_abi_default}" && test "x${cf_cv_abi_default}" != "x5"
+ 		then
+@@ -31615,12 +31640,18 @@
+ 			fi
+ 			cf_add_lib="../lib/${cf_prefix}${cf_libname}${cf_suffix}"
+ 			Libs_To_Make="$Libs_To_Make $cf_add_lib"
++			if test "$cf_item" = shared && test "$cf_dir" != c++
++			then
++				cf_add_inst='$(LIBDIR)'"/${cf_prefix}${cf_libname}${cf_suffix}"
++				Libs_To_Install="$Libs_To_Install $cf_add_inst"
++			fi
+ 		done
+ 
+ 		if test "$cf_dir" = ncurses ; then
+ 			cf_subsets="$LIB_SUBSETS"
+ 			cf_r_parts="$cf_subsets"
+ 			cf_liblist="$Libs_To_Make"
++			cf_instlist="$Libs_To_Install"
+ 
+ 			while test -n "$cf_r_parts"
+ 			do
+@@ -31631,9 +31662,11 @@
+ 					case "$cf_l_parts" in
+ 					(*termlib*)
+ 						cf_add_lib=`echo "$cf_liblist" |sed -e s%${LIB_NAME}${ABI_SUFFIX}%${TINFO_LIB_SUFFIX}%g`
++						cf_add_inst=`echo "$cf_instlist" |sed -e s%${LIB_NAME}${ABI_SUFFIX}%${TINFO_LIB_SUFFIX}%g`
+ 						;;
+ 					(*ticlib*)
+ 						cf_add_lib=`echo "$cf_liblist" |sed -e s%${LIB_NAME}${ABI_SUFFIX}%${TICS_LIB_SUFFIX}%g`
++						cf_add_inst=`echo "$cf_instlist" |sed -e s%${LIB_NAME}${ABI_SUFFIX}%${TICS_LIB_SUFFIX}%g`
+ 						;;
+ 					(*)
+ 						break
+@@ -31642,6 +31675,9 @@
+ 					if test -n "$cf_add_lib"; then
+ 						Libs_To_Make="$cf_add_lib $Libs_To_Make"
+ 					fi
++					if test -n "$cf_add_inst"; then
++						Libs_To_Install="$cf_add_inst $Libs_To_Install"
++					fi
+ 				else
+ 					break
+ 				fi
+@@ -31678,6 +31714,7 @@
+ 		fi
+ 
+ 		sed -e "s%@Libs_To_Make@%$Libs_To_Make%" \
++		    -e "s%@Libs_To_Install@%$Libs_To_Install%" \
+ 		    -e "s%@SHARED_LIB@%$SHARED_LIB%" \
+ 			"$cf_dir/Makefile" >$cf_dir/Makefile.out
+ 		mv "$cf_dir/Makefile.out" "$cf_dir/Makefile"
+@@ -31702,7 +31739,7 @@
+ 				(cygdll|msysdll|mingw|msvcdll)
+ 					test "x$with_shared_cxx" = xno && test -n "$verbose" && echo "	overriding CXX_MODEL to SHARED" 1>&6
+ 
+-echo "${as_me:-configure}:31705: testing overriding CXX_MODEL to SHARED ..." 1>&5
++echo "${as_me:-configure}:31742: testing overriding CXX_MODEL to SHARED ..." 1>&5
+ 
+ 					with_shared_cxx=yes
+ 					;;
+Index: configure.in
+Prereq:  1.833 
+--- ncurses-6.6-20260620+/configure.in	2026-05-30 19:20:26.000000000 +0000
++++ ncurses-6.6-20260627/configure.in	2026-06-27 22:48:53.000000000 +0000
+@@ -29,7 +29,7 @@
+ dnl
+ dnl Author: Thomas E. Dickey 1995-on
+ dnl
+-dnl $Id: configure.in,v 1.833 2026/05/30 19:20:26 tom Exp $
++dnl $Id: configure.in,v 1.836 2026/06/27 22:48:53 tom Exp $
+ dnl Process this file with autoconf to produce a configure script.
+ dnl
+ dnl For additional information, see
+@@ -38,7 +38,7 @@
+ dnl
+ dnl ---------------------------------------------------------------------------
+ AC_PREREQ(2.52.20210101)
+-AC_REVISION($Revision: 1.833 $)
++AC_REVISION($Revision: 1.836 $)
+ AC_INIT
+ AC_CONFIG_SRCDIR([ncurses/base/lib_initscr.c])
+ AC_CONFIG_HEADERS([include/ncurses_cfg.h:include/ncurses_cfg.hin])
+@@ -2599,6 +2599,30 @@
+ # This is used for the *-config script and *.pc data files.
+ CF_LD_SEARCHPATH
+ 
++PC_FILES=
++for cf_pc_root in \
++	"${LIB_NAME}${USE_ARG_SUFFIX}" \
++	"${TINFO_ARG_SUFFIX}" \
++	"${TICS_NAME}${USE_ARG_SUFFIX}" \
++	"${PANEL_NAME}${USE_ARG_SUFFIX}" \
++	"${MENU_NAME}${USE_ARG_SUFFIX}" \
++	"${FORM_NAME}${USE_ARG_SUFFIX}" \
++	"${CXX_NAME}${USE_ARG_SUFFIX}"
++do
++	cf_pc_file="${cf_pc_root}${PC_MODULE_SUFFIX}".pc
++	cf_found=
++	for cf_pc_used in $PC_FILES
++	do
++		if test "$cf_pc_used" = "$cf_pc_file"
++		then
++			cf_found=$cf_pc_used
++			break
++		fi
++	done
++	test -z "$cf_found" && PC_FILES="$PC_FILES $cf_pc_file"
++done
++AC_SUBST(PC_FILES)
++
+ AC_CONFIG_FILES([\
+ 	include/MKterm.h.awk \
+ 	include/curses.head:include/curses.h.in \
+Index: dist.mk
+Prereq:  1.1739 
+--- ncurses-6.6-20260620+/dist.mk	2026-06-20 09:45:08.000000000 +0000
++++ ncurses-6.6-20260627/dist.mk	2026-06-27 09:25:24.000000000 +0000
+@@ -26,7 +26,7 @@
+ # use or other dealings in this Software without prior written               #
+ # authorization.                                                             #
+ ##############################################################################
+-# $Id: dist.mk,v 1.1739 2026/06/20 09:45:08 tom Exp $
++# $Id: dist.mk,v 1.1740 2026/06/27 09:25:24 tom Exp $
+ # Makefile for creating ncurses distributions.
+ #
+ # This only needs to be used directly as a makefile by developers, but
+@@ -38,7 +38,7 @@
+ # These define the major/minor/patch versions of ncurses.
+ NCURSES_MAJOR = 6
+ NCURSES_MINOR = 6
+-NCURSES_PATCH = 20260620
++NCURSES_PATCH = 20260627
+ 
+ # We don't append the patch to the version, since this only applies to releases
+ VERSION = $(NCURSES_MAJOR).$(NCURSES_MINOR)
+Index: form/Makefile.in
+Prereq:  1.78 
+--- ncurses-6.6-20260620+/form/Makefile.in	2025-10-25 17:58:52.000000000 +0000
++++ ncurses-6.6-20260627/form/Makefile.in	2026-06-27 23:04:29.000000000 +0000
+@@ -1,6 +1,6 @@
+-# $Id: Makefile.in,v 1.78 2025/10/25 17:58:52 tom Exp $
++# $Id: Makefile.in,v 1.80 2026/06/27 23:04:29 tom Exp $
+ ##############################################################################
+-# Copyright 2020-2024,2025 Thomas E. Dickey                                  #
++# Copyright 2020-2025,2026 Thomas E. Dickey                                  #
+ # Copyright 1998-2015,2018 Free Software Foundation, Inc.                    #
+ #                                                                            #
+ # Permission is hereby granted, free of charge, to any person obtaining a    #
+@@ -130,6 +130,7 @@
+ RANLIB		= @LIB_PREP@
+ 
+ LIBRARIES	= @Libs_To_Make@
++INSTALL_LIBS	= @Libs_To_Install@
+ 
+ LINT		= @LINT@
+ LINT_OPTS	= @LINT_OPTS@
+@@ -156,6 +157,9 @@
+ libs \
+ install ::	$(AUTO_SRC) $(LIBRARIES)
+ 
++install \
++install.libs :: $(INSTALL_LIBS)
++
+ check ::
+ 	@echo "no unit-test implemented"
+ 
+Index: menu/Makefile.in
+Prereq:  1.76 
+--- ncurses-6.6-20260620+/menu/Makefile.in	2025-10-25 17:59:51.000000000 +0000
++++ ncurses-6.6-20260627/menu/Makefile.in	2026-06-27 23:04:29.000000000 +0000
+@@ -1,6 +1,6 @@
+-# $Id: Makefile.in,v 1.76 2025/10/25 17:59:51 tom Exp $
++# $Id: Makefile.in,v 1.78 2026/06/27 23:04:29 tom Exp $
+ ##############################################################################
+-# Copyright 2020-2024,2025 Thomas E. Dickey                                  #
++# Copyright 2020-2025,2026 Thomas E. Dickey                                  #
+ # Copyright 1998-2015,2018 Free Software Foundation, Inc.                    #
+ #                                                                            #
+ # Permission is hereby granted, free of charge, to any person obtaining a    #
+@@ -130,6 +130,7 @@
+ RANLIB		= @LIB_PREP@
+ 
+ LIBRARIES	= @Libs_To_Make@
++INSTALL_LIBS	= @Libs_To_Install@
+ 
+ LINT		= @LINT@
+ LINT_OPTS	= @LINT_OPTS@
+@@ -158,6 +159,9 @@
+ libs \
+ install ::	$(AUTO_SRC) $(LIBRARIES)
+ 
++install \
++install.libs :: $(INSTALL_LIBS)
++
+ check ::
+ 	@echo "no unit-test implemented"
+ 
+Index: misc/Makefile.in
+Prereq:  1.88 
+--- ncurses-6.6-20260620+/misc/Makefile.in	2025-12-25 22:26:15.000000000 +0000
++++ ncurses-6.6-20260627/misc/Makefile.in	2026-06-28 00:10:26.000000000 +0000
+@@ -1,6 +1,6 @@
+-# $Id: Makefile.in,v 1.88 2025/12/25 22:26:15 tom Exp $
++# $Id: Makefile.in,v 1.91 2026/06/28 00:10:26 tom Exp $
+ ##############################################################################
+-# Copyright 2018-2024,2025 Thomas E. Dickey                                  #
++# Copyright 2018-2025,2026 Thomas E. Dickey                                  #
+ # Copyright 1998-2016,2017 Free Software Foundation, Inc.                    #
+ #                                                                            #
+ # Permission is hereby granted, free of charge, to any person obtaining a    #
+@@ -140,20 +140,13 @@
+ 	$(INSTALL_SCRIPT) ncurses-config $(BINDIR)/$(NCURSES_CONFIG)
+ 
+ # Make a list of the files that gen-pkgconfig might create:
+-@MAKE_PC_FILES@PC_FILES = \
+-@MAKE_PC_FILES@	@LIB_NAME@@USE_ARG_SUFFIX@@PC_MODULE_SUFFIX@.pc \
+-@MAKE_PC_FILES@	@TINFO_ARG_SUFFIX@@PC_MODULE_SUFFIX@.pc \
+-@MAKE_PC_FILES@	@TICS_NAME@@USE_ARG_SUFFIX@@PC_MODULE_SUFFIX@.pc \
+-@MAKE_PC_FILES@	@PANEL_NAME@@USE_ARG_SUFFIX@@PC_MODULE_SUFFIX@.pc \
+-@MAKE_PC_FILES@	@MENU_NAME@@USE_ARG_SUFFIX@@PC_MODULE_SUFFIX@.pc \
+-@MAKE_PC_FILES@	@FORM_NAME@@USE_ARG_SUFFIX@@PC_MODULE_SUFFIX@.pc \
+-@MAKE_PC_FILES@	@CXX_NAME@@USE_ARG_SUFFIX@@PC_MODULE_SUFFIX@.pc
++@MAKE_PC_FILES@PC_FILES = @PC_FILES@
+ 
+ # some packagers prefer to be able to construct pc-files on servers where
+ # pkg-config is not installed.  Work around that by creating the library
+ # directory during this rule:
+ @MAKE_PC_FILES@install \
+-@MAKE_PC_FILES@install.libs :: pc-files
++@MAKE_PC_FILES@install.libs :: sources
+ @MAKE_PC_FILES@	@$(SHELL) -c 'case "x$(PKG_CONFIG_LIBDIR)" in \
+ @MAKE_PC_FILES@		x@GLOB_FULLPATH_POSIX@|x@GLOB_FULLPATH_OTHER@) \
+ @MAKE_PC_FILES@			mkdir -p $(INSTALL_CONFIG); \
+@@ -169,10 +162,8 @@
+ @MAKE_PC_FILES@		esac'
+ 
+ @MAKE_PC_FILES@all \
+-@MAKE_PC_FILES@sources :: pc-files
+-@MAKE_PC_FILES@pc-files :
++@MAKE_PC_FILES@sources :: gen-pkgconfig
+ @MAKE_PC_FILES@	$(SHELL) ./gen-pkgconfig
+-@MAKE_PC_FILES@	-touch $@
+ 
+ terminfo.tmp : run_tic.sed $(source)
+ 	echo '** adjusting tabset paths'
+@@ -218,7 +209,7 @@
+ mostlyclean :
+ @MAKE_DATABASE@	-rm -f terminfo.tmp
+ @MAKE_DATABASE@	-rm -f run_tic.sed
+-@MAKE_PC_FILES@	-rm -f pc-files $(PC_FILES)
++@MAKE_PC_FILES@	-rm -f $(PC_FILES)
+ 	-rm -f core tags TAGS *~ *.bak *.ln *.atac trace
+ 
+ clean :: mostlyclean
+Index: misc/terminfo.src
+--- ncurses-6.6-20260620+/misc/terminfo.src	2026-06-20 23:02:58.000000000 +0000
++++ ncurses-6.6-20260627/misc/terminfo.src	2026-06-27 20:11:18.000000000 +0000
+@@ -6,8 +6,8 @@
+ # Report bugs and new terminal descriptions to
+ #	bug-ncurses@gnu.org
+ #
+-#	$Revision: 1.1254 $
+-#	$Date: 2026/06/20 23:02:58 $
++#	$Revision: 1.1256 $
++#	$Date: 2026/06/27 20:11:18 $
+ #
+ # The original header is preserved below for reference.  It is noted that there
+ # is a "newer" version which differs in some cosmetic details (but actually
+@@ -2913,7 +2913,7 @@
+ # From: Adam Thompson <athompso@pangea.ca> Sept 10 1995
+ # (vt320: uncommented <fsl> --esr)
+ vt320|vt300|DEC VT320 7 bit terminal,
+-	am, mir, msgr, xenl,
++	am, mir, msgr, xenl, xon,
+ 	cols#80, lines#24, wsl#80,
+ 	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+ 	bel=^G, blink=\E[5m, bold=\E[1m, clear=\E[H\E[2J, cr=\r,
+@@ -6166,7 +6166,7 @@
+ # variant of xterm which is apparently no longer supported, but are interesting
+ # because they illustrate SVr4 curses mouse controls - T.Dickey
+ xtermm|xterm terminal emulator (monochrome),
+-	OTbs, am, km, mir, msgr, xenl,
++	OTbs, am, km, mir, msgr, xenl, xon,
+ 	btns#3, cols#80, it#8, lines#24,
+ 	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+ 	bel=^G, blink@, bold=\E[1m, clear=\E[H\E[2J, cr=\r, cud1=\n,
+@@ -11201,6 +11201,11 @@
+ # hanging in the air. (Thanks to Eric Fischer, <eric@fudge.uchicago.edu>,
+ # for clearing up this point.)
+ 
++# Supports full/half duplex, manual does not mention xon/xoff
++#
++# Reference:
++# https://www.bitsavers.org/pdf/learSiegler/ADM_1
++#	ADM-1_Reference_Manual.pdf
+ adm1a|adm1|LSI adm1a,
+ 	am,
+ 	cols#80, lines#24,
+@@ -11231,6 +11236,9 @@
+ # socket, you may be out of luck.
+ #
+ # (adm3a: some capabilities merged in from BRl entry -- esr)
++#
++# Reference:
++# https://vt100.net/lsi/adm3a-um.pdf
+ adm3a|LSI adm3a,
+ 	OTbs, am,
+ 	cols#80, lines#24,
+@@ -11327,14 +11335,19 @@
+ 	kf7=^A7\r, kf8=^A8\r, kf9=^A9\r, rmir=\Er, smir=\Eq, tbc=\E0,
+ 	use=adm+sgr,
+ # (adm20: removed obsolete ":kn#7:" -- esr)
++#
++# Reference:
++#	https://terminals-wiki.org/wiki/index.php/Morrow_MDT20
++#	http://dunfield.classiccmp.org//morrow/mdadm20.pdf
++#	https://www.atarimagazines.com/creative/v10n5/28_The_Morrow_Micro_Decision.php
+ adm20|Lear Siegler adm20,
+ 	OTbs, am,
+ 	cols#80, it#8, lines#24,
+ 	bel=^G, cbt=\EI, clear=^Z, cr=\r, cub1=^H, cuf1=^L,
+-	cup=\E=%i%p2%{31}%+%c%p1%{31}%+%c, cuu1=^K, dch1=\EW,
+-	dl1=\ER, ed=\EY, el=\ET, home=^^, ht=^I, ich1=\EQ, il1=\EE,
++	cup=\E=%p2%{32}%+%c%p1%{32}%+%c, cuu1=^K, dch1=\EW,
++	dl1=\ER, ed=\EY, el=\ET, home=^_, ht=^I, ich1=\EQ, il1=\EE,
+ 	kf1=^A, kf2=^B, kf3=^W, kf4=^D, kf5=^E, kf6=^X, kf7=^Z, rmso=\E(,
+-	sgr0=\E(, smso=\E),
++	sgr0=\E(, smso=\E), u6=%p2%{32}%+%c%p1%{32}%+%c, u7=\E?,
+ adm21|Lear Siegler adm21,
+ 	xmc#1,
+ 	dch1=\EW, dl1=\ER$<30*>, ed=\EY, el=\ET, ich1=\EQ,
+@@ -11511,12 +11524,23 @@
+ adm31-old|o31|old adm31,
+ 	rmul@, smso=\EG4, smul@, use=adm31,
+ # LSI ADM-36 from Col. George L. Sicherman <gloria!colonel> via BRL
++#
++# Reference:
++# https://www.bitsavers.org/pdf/learSiegler/ADM_36
++#	DP2360382F_ADM_36_Users_Manual_Apr82.pdf
+ adm36|LSI ADM36,
+-	OTbs, OTpt,
++	OTbs, OTpt, xon,
+ 	OTkn#4,
++	csr=\E[%i%p1%d;%p2%dr, dch=\E[%p1%dP, dch1=\E[P,
+ 	if=/usr/share/tabset/vt100,
+-	is2=\E<\E>\E[6;?2;?7;?8h\E[4;20;?1;?3;?4;?5;?6;?18;?19l, use=vt100+4bsd,
++	is2=\E<\E>\E[6;?2;?7;?8h\E[4;20;?1;?3;?4;?5;?6;?18;?19l,
++	nel=\EE, rc=\E8, rmir=\E[4l, sc=\E7, smir=\E[4h,
++	use=ansi+idl, use=decid+cpr, use=vt100+4bsd,
+ # (adm42: removed obsolete ":ma=^K^P:" -- esr)
++#
++# Reference:
++# https://www.bitsavers.org/pdf/learSiegler/ADM_42
++#	ADM-42_UsersMan_Feb80.pdf
+ adm42|LSI adm42,
+ 	OTbs, am,
+ 	cols#80, lines#24,
+@@ -12868,7 +12892,7 @@
+ # in it.
+ # (vi300: added <rmam>/<smam> based on init string -- esr)
+ vi300|Visual 300 ANSI x3.64,
+-	am, bw, mir, xenl,
++	am, bw, mir, xenl, xon,
+ 	cols#80, lines#24,
+ 	bel=^G, cbt=\E[Z, clear=\E[H\E[2J, cr=\r, cub1=^H,
+ 	dch1=\E[P$<40>, ed=\E[J, el=\E[K, ht=^I, ind=\n,
+@@ -12917,7 +12941,7 @@
+ 	clear=\030\E[H\E[2J, use=vi300,
+ 
+ vi603|visual603|Visual 603,
+-	hs, mir,
++	hs, mir, xon,
+ 	blink=\E[5m, bold=\E[1m, clear=\E[H\E[J,
+ 	csr=\E[%i%p1%d;%p2%dr, cuf1=\E[C,
+ 	cup=\E[%i%p1%d;%p2%dH, cuu1=\E[A, dch1=\E[P,
+@@ -13239,7 +13263,7 @@
+ # (wy60: we use \E{ rather than ^^ for home (both are documented) to avoid
+ # a bug reported by Robert Dunn, <rcdii@inlink.com> -- esr)
+ wy60|wyse60|Wyse 60,
+-	am, bw, km, mc5i, mir, msgr,
++	am, bw, km, mc5i, mir, msgr, xon,
+ 	cols#80, lh#1, lines#24, lw#8, nlab#8,
+ 	acsc=+/\,.0[a2fxgqh1ihjYk?lZm@nEqDtCu4vAwBx3yszr{c~~,
+ 	bel=^G, blink=\EG2, cbt=\EI, civis=\E`0, clear=\E+$<100>,
+@@ -13368,7 +13392,7 @@
+ # not, so smir and rmir are commented out as well.
+ # From: Francesco Potorti` <F.Potorti@cnuce.cnr.it>, 24 Aug 1998
+ wy99-ansi|Wyse WY-99GT in ANSI mode (int'l PC keyboard),
+-	am, km, mir, msgr, xenl,
++	am, km, mir, msgr, xenl, xon,
+ 	cols#80, it#8, lines#25, vt#3,
+ 	acsc=``aaffggjjkkllmmnnooqqssttuuvvwwxx{{||}}~~,
+ 	bel=^G, cbt=\E[Z, clear=\E[H\E[J$<200>, cr=\r,
+@@ -13474,7 +13498,7 @@
+ # (wy160: we use \E{ rather than ^^ for home (both are documented) to avoid
+ # a bug reported by Robert Dunn, <rcdii@inlink.com> -- esr)
+ wy160|wyse160|Wyse 160,
+-	am, bw, km, mc5i, mir, msgr,
++	am, bw, km, mc5i, mir, msgr, xon,
+ 	cols#80, lh#1, lines#24, lw#8, nlab#8, wsl#38,
+ 	acsc=+/\,.0[a2fxgqh1ihjYk?lZm@nEqDtCu4vAwBx3yszr{c~~,
+ 	bel=^G, blink=\EG2, cbt=\EI, civis=\E`0, clear=\E+$<30>,
+@@ -13761,7 +13785,7 @@
+ # lines 25  columns 80
+ #
+ wy325|wyse325|Wyse epc,
+-	am, bw, mc5i, mir,
++	am, bw, mc5i, mir, xon,
+ 	cols#80, lh#1, lines#24, lw#8, nlab#8, pb#9601,
+ 	acsc=+/\,.0[a2fxgqh1ihjYk?lZm@nEqDtCu4vAwBx3yszr{c~~,
+ 	bel=^G, blink=\EG2, cbt=\EI, civis=\E`0, clear=\E+$<50>,
+@@ -15718,7 +15742,7 @@
+ # From: Richard Bascove <atd!dsd!rcb@ucbvax.berkeley.edu>
+ # (ampex210: removed obsolete ":kn#10:" -- esr)
+ ampex210|a210|Ampex a210,
+-	OTbs, am, hs, xenl,
++	OTbs, am, hs, xenl, xon,
+ 	cols#80, it#8, lines#24, xmc#1,
+ 	cbt=\EI, clear=\E*, cub1=^H, cuf1=^L,
+ 	cup=\E=%p1%{32}%+%c%p2%{32}%+%c, cuu1=^K, dch1=\EW,
+@@ -15733,8 +15757,15 @@
+ # (ampex219: I added <rmam>/<smam> based on the init string, added <cvvis>
+ # from ampex219w, added <cnorm>=\E[?3l, irresistibly suggested by <cvvis>,
+ # and moved the padding to be *after* the caps -- esr)
++#
++# The service manual's summary resembles VT220, but mentions only "Ampex 219",
++# as well as VT131, VT100/VT102, VT52 and WY-75 emulations.
++#
++# Reference:
++# http://bitsavers.informatik.uni-stuttgart.de/pdf/ampex/terminal/Ampex_230_plus
++#	3515021-01_Ampex_230_219_Service_Manual_198506.pdf
+ ampex219|ampex-219|amp219|Ampex with automargins,
+-	hs, xenl,
++	hs, xenl, xon,
+ 	cols#80, it#8, lines#24,
+ 	bel=^G, blink=\E[5m$<2>, bold=\E[1m$<2>, cbt=\E[Z,
+ 	clear=\E[H\E[2J$<50>, cnorm=\E[?3l, cr=\r,
+@@ -16259,6 +16290,10 @@
+ # Underlined Half Intensity
+ #    Blinking                     c	0143
+ # Video suppress                  D	0104
++#
++# Reference:
++# https://blog.hjf.com.ar/wp-content/uploads/2024/10
++# ADDS-ViewPoint-3A-Plus-Users-Manual.pdf
+ vp3a+|viewpoint3a+|ADDS Viewpoint 3a+,
+ 	am, bw,
+ 	cols#80, it#8, lines#24,
+@@ -16266,12 +16301,16 @@
+ 	cub1=^H, cud1=\n, cuf1=^L,
+ 	cup=\E=%p1%{32}%+%c%p2%{32}%+%c, cuu1=^K, dim=\E0A\E),
+ 	ed=\EY$<80>, el=\ET, home=^^, ht=^I, ind=\n, invis=\E0D\E),
+-	kbs=^H, kcub1=^H, kcud1=\n, kcuf1=^L, kcuu1=^K, khome=^^,
+-	nel=\r\n, rev=\E0P\E), rmso=\E(,
++	kbs=^H, kcub1=^H, kcud1=\n, kcuf1=^L, kcuu1=^K, kdch1=^?,
++	khome=^^, nel=\r\n, rev=\E0P\E), rmso=\E(,
+ 	sgr=%?%p1%p2%|%p3%|%p4%|%p5%|%p7%|%t\E0%{64}%?%p1%t%{17}%|%;
+ 	    %?%p2%t%{32}%|%;%?%p3%t%{16}%|%;%?%p4%t%{2}%|%;%?%p5%t
+ 	    %{1}%|%;%c%?%p7%tD%;\E)%e\E(%;,
+ 	sgr0=\E(, smso=\E0Q\E), smul=\E0`\E),
++	u6=%p1%{32}%+%c%p2%{32}%+%c\r, u7=\E?,
++# Reference:
++# https://www.bitsavers.org/pdf/adds/ADDS_Viewpoint_60
++#	518-32300_ADDS_Viewpoint_60_User_Manual_Nov83.pdf
+ vp60|viewpoint60|addsvp60|ADDS Viewpoint60,
+ 	use=regent40,
+ #
+@@ -22440,6 +22479,9 @@
+ # paints lines in on the bottom line of the screen, so you get
+ # this big white gap.
+ 
++# Reference:
++# https://www.bitsavers.org/pdf/bbn/bitgraph
++#	BitGraph_Users_Manual_Ver_3.2_May83.pdf
+ bitgraph|bg2.0nv|bg3.10nv|BBN BitGraph 2.0 or later (normal video),
+ 	flash=\E[?5h$<200/>\E[?5l, is2=\E>\E[?5l\E[?7h,
+ 	use=bg2.0,
+@@ -22447,7 +22489,7 @@
+ 	flash=\E[?5l$<200/>\E[?5h, is2=\E>\E[?5h\E[?7h,
+ 	use=bg2.0,
+ bg2.0|bg3.10|BBN BitGraph 2.0 or later (no init),
+-	OTbs, xenl,
++	OTbs, xenl, xon,
+ 	cols#85, lines#64,
+ 	bel=^G, clear=\E[H\E[J$<150>, cr=\r, cub1=^H,
+ 	cup=\E[%i%p1%d;%p2%dH, dl1=\E[M$<2*>, ed=\E[J$<150>,
+@@ -22465,6 +22507,7 @@
+ 	use=bg1.25,
+ # (bg1.25: I added <rmam>/<smam> based on the init string -- esr)
+ bg1.25|BBN BitGraph 1.25,
++	xon,
+ 	cols#85, lines#64,
+ 	bel=^G, clear=\E[H\E[J$<150>, cr=\r, cub1=^H,
+ 	cup=\E[%i%p1%d;%p2%dH, dl1=\E[M$<2*>, ed=\E[J$<150>,
+@@ -23125,7 +23168,12 @@
+ 	u8=\E/[HJ], use=vt52+keypad, use=vt50, use=vt52+arrows,
+ 
+ # (vt61: there's a BSD termcap that claims <dl1=\EPd>, <il1=\EPf.> <kbs=^H>)
++#
++# Reference:
++# https://bitsavers.org/pdf/dec/terminal/vt61
++#	EK-VT61-OP-001_VT61_Users_Manual_Aug77.pdf
+ vt61|vt-61|vt61.5|DEC VT61,
++	xon,
+ 	cols#80, lines#24,
+ 	bel=^G, clear=\EH\EJ$<120>, cr=\r$<20>, cub1=^H, cud1=\n,
+ 	cuf1=\EC$<20>, cup=\EY%p1%{32}%+%c%p2%{32}%+%c$<20>,
+@@ -23942,12 +23990,13 @@
+ #
+ # According to
+ # https://ub.fnwi.uva.nl/computermuseum/tab13215g.html
++# https://www.1000bit.it/ad/bro/tab/TAB132-15G.pdf
+ #	This monochrome graphics terminal of TAB Products, California, is a DEC
+ #	VT52/VT100/VT132 compatible alphanumeric terminal (TAB 132/15),
+ #	factory-fitted with additional hardware for Tektronix 4010 emulation.
+ #	Also the terminal understands a selection of Tektronix 4027 commands.
+ tab132|tab|tab132-15|tab 132/15,
+-	da, db,
++	da, db, xon,
+ 	OTdN@, lm#96,
+ 	cup=\E[%i%p1%d;%p2%dH, dch1=\E[P,
+ 	is2=\E[?7h\E[?3l\E[?5l, rmir=\E[4l, rmkx@, smir=\E[4h,
+@@ -24884,7 +24933,7 @@
+ 	knp=\Eh, kpp=\Eg, rev=\ET, ri=\ES, rmacs=\EG, rmso=\EX,
+ 	sgr0=\EX, smacs=\EF, smso=\ET, use=vt52-basic,
+ env230|envision230|envision 230 graphics terminal,
+-	xenl@,
++	xenl@, xon,
+ 	enacs@, mc0=\E[0i, mc4=\E[4i, mc5=\E[5i, rmacs@,
+ 	sgr=\E[0%?%p1%t;7%;%?%p2%t;4%;%?%p3%t;7%;%?%p4%t;5%;%?%p6%t;
+ 	    1%;m$<2>,
+@@ -28379,7 +28428,7 @@
+ #	+ change %2d and %3d to %02d and %03d to match original termcaps -TD
+ #	+ reduce unnecessary %2d and %3d to just %d -TD
+ #
+-# 2026-02-20
++# 2026-06-20
+ #	+ add il1 to ibcs2 -TD
+ #	+ add ich1 to several entries, providing for support of non-curses
+ #	  applications via termcap only -TD
+@@ -28389,4 +28438,11 @@
+ #	+ add ich/ich1 to mterm-ansi and decansi based on source-code -TD
+ #	+ add ich/ich1 to tek4025a, tek4105a, tek4106brl from manual -TD
+ #
++# 2026-06-27
++#	+ add xon to several entries, based on manuals and product
++#	  descriptions -TD
++#	+ revise adm36, based on manual -TD
++#	+ add u6, u7, kdch1 to vp3a+ based on manual -TD
++#	+ add u6, u7, home, cbt to adm20 based on manual -TD
++#
+ ######## SHANTIH!  SHANTIH!  SHANTIH!
+Index: ncurses/Makefile.in
+Prereq:  1.198 
+--- ncurses-6.6-20260620+/ncurses/Makefile.in	2026-01-14 08:52:45.000000000 +0000
++++ ncurses-6.6-20260627/ncurses/Makefile.in	2026-06-27 23:04:29.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: Makefile.in,v 1.198 2026/01/14 08:52:45 tom Exp $
++# $Id: Makefile.in,v 1.200 2026/06/27 23:04:29 tom Exp $
+ ##############################################################################
+ # Copyright 2018-2025,2026 Thomas E. Dickey                                  #
+ # Copyright 1998-2017,2018 Free Software Foundation, Inc.                    #
+@@ -150,6 +150,7 @@
+ RANLIB		= @LIB_PREP@
+ 
+ LIBRARIES	= @Libs_To_Make@
++INSTALL_LIBS	= @Libs_To_Install@
+ 
+ LINT		= @LINT@
+ LINT_OPTS	= @LINT_OPTS@
+@@ -239,6 +240,9 @@
+ 
+ @CHECK_BUILD@all libs ::	report_offsets$(BUILD_EXEEXT)
+ 
++install \
++install.libs :: $(INSTALL_LIBS)
++
+ sources:	$(AUTO_SRC)
+ 
+ $(BINDIR) \
+Index: ncurses/term.priv.h
+Prereq:  1.14 
+--- ncurses-6.6-20260620+/ncurses/term.priv.h	2025-12-27 12:41:23.000000000 +0000
++++ ncurses-6.6-20260627/ncurses/term.priv.h	2026-06-27 20:43:58.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2021-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2021-2025,2026 Thomas E. Dickey                                *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+  * copy of this software and associated documentation files (the            *
+@@ -27,7 +27,7 @@
+  ****************************************************************************/
+ 
+ /*
+- * $Id: term.priv.h,v 1.14 2025/12/27 12:41:23 tom Exp $
++ * $Id: term.priv.h,v 1.15 2026/06/27 20:43:58 tom Exp $
+  *
+  *	term.priv.h
+  *
+@@ -140,7 +140,7 @@
+  */
+ typedef struct term {			/* describe an actual terminal */
+ 	TERMTYPE	type;		/* terminal type description */
+-	short		Filedes;	/* file description being written to */
++	int		Filedes;	/* file description being written to */
+ 	TTY		Ottyb;		/* original state of the terminal */
+ 	TTY		Nttyb;		/* current state of the terminal */
+ 	int		_baudrate;	/* used to compute padding */
+Index: ncurses/tinfo/comp_expand.c
+Prereq:  1.38 
+--- ncurses-6.6-20260620+/ncurses/tinfo/comp_expand.c	2026-06-06 18:49:12.000000000 +0000
++++ ncurses-6.6-20260627/ncurses/tinfo/comp_expand.c	2026-06-27 20:43:58.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2020-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2020-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -36,7 +36,7 @@
+ #include <ctype.h>
+ #include <tic.h>
+ 
+-MODULE_ID("$Id: comp_expand.c,v 1.38 2026/06/06 18:49:12 tom Exp $")
++MODULE_ID("$Id: comp_expand.c,v 1.39 2026/06/27 20:43:58 tom Exp $")
+ 
+ #if 0
+ #define DEBUG_THIS(p) DEBUG(9, p)
+Index: ncurses/tinfo/lib_setup.c
+Prereq:  1.255 
+--- ncurses-6.6-20260620+/ncurses/tinfo/lib_setup.c	2026-05-30 21:17:40.000000000 +0000
++++ ncurses-6.6-20260627/ncurses/tinfo/lib_setup.c	2026-06-27 20:42:09.000000000 +0000
+@@ -49,7 +49,7 @@
+ #include <locale.h>
+ #endif
+ 
+-MODULE_ID("$Id: lib_setup.c,v 1.255 2026/05/30 21:17:40 tom Exp $")
++MODULE_ID("$Id: lib_setup.c,v 1.256 2026/06/27 20:42:09 tom Exp $")
+ 
+ /****************************************************************************
+  *
+@@ -954,7 +954,7 @@
+ 	 * _nc_get_driver() will call td_CanHandle() for each driver, and win_driver
+ 	 * needs file descriptor to do the test, so set it before calling.
+ 	 */
+-	termp->Filedes = (short) Filedes;
++	termp->Filedes = Filedes;
+ 	TCB = (TERMINAL_CONTROL_BLOCK *) termp;
+ 	code = _nc_globals.term_driver(TCB, myname, errret);
+ 	if (code == OK) {
+@@ -1004,7 +1004,7 @@
+ 	save_ttytype(termp);
+ #endif
+ 
+-	termp->Filedes = (short) Filedes;
++	termp->Filedes = Filedes;
+ 	termp->_termname = strdup(myname);
+ 
+ 	set_curterm(termp);
+Index: package/debian-mingw/changelog
+--- ncurses-6.6-20260620+/package/debian-mingw/changelog	2026-06-20 09:45:08.000000000 +0000
++++ ncurses-6.6-20260627/package/debian-mingw/changelog	2026-06-27 09:25:24.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260620) unstable; urgency=low
++ncurses6td (6.6+20260627) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 20 Jun 2026 05:45:08 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 27 Jun 2026 05:25:24 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian-mingw64/changelog
+--- ncurses-6.6-20260620+/package/debian-mingw64/changelog	2026-06-20 09:45:08.000000000 +0000
++++ ncurses-6.6-20260627/package/debian-mingw64/changelog	2026-06-27 09:25:24.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260620) unstable; urgency=low
++ncurses6td (6.6+20260627) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 20 Jun 2026 05:45:08 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 27 Jun 2026 05:25:24 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian/changelog
+--- ncurses-6.6-20260620+/package/debian/changelog	2026-06-20 09:45:08.000000000 +0000
++++ ncurses-6.6-20260627/package/debian/changelog	2026-06-27 09:25:24.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260620) unstable; urgency=low
++ncurses6td (6.6+20260627) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 20 Jun 2026 05:45:08 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 27 Jun 2026 05:25:24 -0400
+ 
+ ncurses6 (5.9+20120608) unstable; urgency=low
+ 
+Index: package/mingw-ncurses.nsi
+Prereq:  1.769 
+--- ncurses-6.6-20260620+/package/mingw-ncurses.nsi	2026-06-20 09:45:08.000000000 +0000
++++ ncurses-6.6-20260627/package/mingw-ncurses.nsi	2026-06-27 09:25:24.000000000 +0000
+@@ -1,4 +1,4 @@
+-; $Id: mingw-ncurses.nsi,v 1.769 2026/06/20 09:45:08 tom Exp $
++; $Id: mingw-ncurses.nsi,v 1.770 2026/06/27 09:25:24 tom Exp $
+ 
+ ; TODO add examples
+ ; TODO bump ABI to 6
+@@ -10,7 +10,7 @@
+ !define VERSION_MAJOR "6"
+ !define VERSION_MINOR "6"
+ !define VERSION_YYYY  "2026"
+-!define VERSION_MMDD  "0620"
++!define VERSION_MMDD  "0627"
+ !define VERSION_PATCH ${VERSION_YYYY}${VERSION_MMDD}
+ 
+ !define MY_ABI   "5"
+Index: package/mingw-ncurses.spec
+--- ncurses-6.6-20260620+/package/mingw-ncurses.spec	2026-06-20 09:45:08.000000000 +0000
++++ ncurses-6.6-20260627/package/mingw-ncurses.spec	2026-06-27 09:25:24.000000000 +0000
+@@ -3,7 +3,7 @@
+ Summary: shared libraries for terminal handling
+ Name: mingw32-ncurses6
+ Version: 6.6
+-Release: 20260620
++Release: 20260627
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -144,8 +144,8 @@
+ 
+ %changelog
+ 
+-* Sat Jun 20 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260620
++* Sat Jun 27 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260627
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncurses.spec
+--- ncurses-6.6-20260620+/package/ncurses.spec	2026-06-20 09:45:08.000000000 +0000
++++ ncurses-6.6-20260627/package/ncurses.spec	2026-06-27 09:25:24.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: shared libraries for terminal handling
+ Name: ncurses6
+ Version: 6.6
+-Release: 20260620
++Release: 20260627
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -134,8 +134,8 @@
+ 
+ %changelog
+ 
+-* Sat Jun 20 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260620
++* Sat Jun 27 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260627
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncursest.spec
+--- ncurses-6.6-20260620+/package/ncursest.spec	2026-06-20 09:45:08.000000000 +0000
++++ ncurses-6.6-20260627/package/ncursest.spec	2026-06-27 09:25:24.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: Curses library with POSIX thread support.
+ Name: ncursest6
+ Version: 6.6
+-Release: 20260620
++Release: 20260627
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ Source: ncurses-%{version}-%{release}.tgz
+@@ -142,8 +142,8 @@
+ 
+ %changelog
+ 
+-* Sat Jun 20 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260620
++* Sat Jun 27 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260627
+ 
+ * Tue Dec 24 2019 Thomas Dickey
+ - drop custom CC_NORMAL warning flags because setting CFLAGS interferes with
+Index: panel/Makefile.in
+Prereq:  1.81 
+--- ncurses-6.6-20260620+/panel/Makefile.in	2025-10-25 18:00:30.000000000 +0000
++++ ncurses-6.6-20260627/panel/Makefile.in	2026-06-27 23:04:29.000000000 +0000
+@@ -1,6 +1,6 @@
+-# $Id: Makefile.in,v 1.81 2025/10/25 18:00:30 tom Exp $
++# $Id: Makefile.in,v 1.83 2026/06/27 23:04:29 tom Exp $
+ ##############################################################################
+-# Copyright 2020-2024,2025 Thomas E. Dickey                                  #
++# Copyright 2020-2025,2026 Thomas E. Dickey                                  #
+ # Copyright 1998-2015,2018 Free Software Foundation, Inc.                    #
+ #                                                                            #
+ # Permission is hereby granted, free of charge, to any person obtaining a    #
+@@ -132,6 +132,7 @@
+ RANLIB		= @LIB_PREP@
+ 
+ LIBRARIES	= @Libs_To_Make@
++INSTALL_LIBS	= @Libs_To_Install@
+ 
+ LINT		= @LINT@
+ LINT_OPTS	= @LINT_OPTS@
+@@ -158,6 +159,9 @@
+ libs \
+ install ::	$(AUTO_SRC) $(LIBRARIES)
+ 
++install \
++install.libs :: $(INSTALL_LIBS)
++
+ check ::
+ 	@echo "no unit-test implemented"
+ 

@@ -1,0 +1,563 @@
+# ncurses 6.6 - patch 20260808 - Thomas E. Dickey
+#
+# ------------------------------------------------------------------------------
+#
+# Ncurses 6.6 is at
+#   https://invisible-island.net/archives/ncurses/
+#   https://invisible-mirror.net/archives/ncurses/
+#   https://ftp.gnu.org/gnu/ncurses/
+#
+# Patches for ncurses 6.6 can be found at
+#   https://invisible-island.net/archives/ncurses/6.6
+#   https://invisible-mirror.net/archives/ncurses/6.6
+#
+# ------------------------------------------------------------------------------
+# https://invisible-island.net/archives/ncurses/6.6/ncurses-6.6-20260808.patch.gz
+# patch by Thomas E. Dickey <dickey@invisible-island.net>
+# created  Sun Aug  9 01:03:35 UTC 2026
+# ------------------------------------------------------------------------------
+# NEWS                             |   12 +++-
+# VERSION                          |    2 
+# dist.mk                          |    4 -
+# form/fld_dup.c                   |    9 ++-
+# ncurses/base/lib_set_term.c      |    4 -
+# ncurses/base/lib_winch.c         |    4 -
+# package/debian-mingw/changelog   |    4 -
+# package/debian-mingw64/changelog |    4 -
+# package/debian/changelog         |    4 -
+# package/mingw-ncurses.nsi        |    4 -
+# package/mingw-ncurses.spec       |    6 +-
+# package/ncurses.spec             |    6 +-
+# package/ncursest.spec            |    6 +-
+# test/dup_field.c                 |  111 ++++++++++++++++++++++++++-----------
+# test/tracemunch                  |   20 ++++--
+# 15 files changed, 132 insertions(+), 68 deletions(-)
+# ------------------------------------------------------------------------------
+Index: NEWS
+Prereq:  1.4503 
+--- ncurses-6.6-20260801+/NEWS	2026-08-01 22:43:24.000000000 +0000
++++ ncurses-6.6-20260808/NEWS	2026-08-08 23:52:30.000000000 +0000
+@@ -26,7 +26,7 @@
+ -- sale, use or other dealings in this Software without prior written        --
+ -- authorization.                                                            --
+ -------------------------------------------------------------------------------
+--- $Id: NEWS,v 1.4503 2026/08/01 22:43:24 tom Exp $
++-- $Id: NEWS,v 1.4505 2026/08/08 23:52:30 tom Exp $
+ -------------------------------------------------------------------------------
+ 
+ This is a log of changes that ncurses has gone through since Zeyd started
+@@ -46,6 +46,16 @@
+ Changes through 1.9.9e did not credit all contributions;
+ it is not possible to add this information.
+ 
++20260808
++	+ various improvements/fixes to test/dup_field.c
++	+ correct a check for FORM* in test/tracemunch
++	+ correct an ifdef in delscreen when using --enable-reentrant (report
++	  by Vassili Courzakis).
++	+ modify dup_field to allocate buffers needed for wide-character
++	  configuration of dup_field (report by Serhiy Storchaka).
++	+ correct masking of wide characters into chtype in winch (report by
++	  Serhiy Storchaka).
++
+ 20260801
+ 	+ use ansi+csr in aaa+dec -TD
+ 	+ use ansi+idc in hurd, tw100, vt420 -TD
+Index: VERSION
+--- ncurses-6.6-20260801+/VERSION	2026-08-01 09:18:46.000000000 +0000
++++ ncurses-6.6-20260808/VERSION	2026-08-08 09:15:55.000000000 +0000
+@@ -1 +1 @@
+-5:0:10	6.6	20260801
++5:0:10	6.6	20260808
+Index: dist.mk
+Prereq:  1.1745 
+--- ncurses-6.6-20260801+/dist.mk	2026-08-01 09:18:46.000000000 +0000
++++ ncurses-6.6-20260808/dist.mk	2026-08-08 09:15:55.000000000 +0000
+@@ -26,7 +26,7 @@
+ # use or other dealings in this Software without prior written               #
+ # authorization.                                                             #
+ ##############################################################################
+-# $Id: dist.mk,v 1.1745 2026/08/01 09:18:46 tom Exp $
++# $Id: dist.mk,v 1.1746 2026/08/08 09:15:55 tom Exp $
+ # Makefile for creating ncurses distributions.
+ #
+ # This only needs to be used directly as a makefile by developers, but
+@@ -38,7 +38,7 @@
+ # These define the major/minor/patch versions of ncurses.
+ NCURSES_MAJOR = 6
+ NCURSES_MINOR = 6
+-NCURSES_PATCH = 20260801
++NCURSES_PATCH = 20260808
+ 
+ # We don't append the patch to the version, since this only applies to releases
+ VERSION = $(NCURSES_MAJOR).$(NCURSES_MINOR)
+Index: form/fld_dup.c
+Prereq:  1.19 
+--- ncurses-6.6-20260801+/form/fld_dup.c	2024-11-30 21:40:55.000000000 +0000
++++ ncurses-6.6-20260808/form/fld_dup.c	2026-08-08 17:49:00.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2020,2024 Thomas E. Dickey                                     *
++ * Copyright 2020-2024,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2010,2012 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -33,7 +33,7 @@
+ 
+ #include "form.priv.h"
+ 
+-MODULE_ID("$Id: fld_dup.c,v 1.19 2024/11/30 21:40:55 tom Exp $")
++MODULE_ID("$Id: fld_dup.c,v 1.20 2026/08/08 17:49:00 tom Exp $")
+ 
+ /*---------------------------------------------------------------------------
+ |   Facility      :  libnform
+@@ -78,6 +78,11 @@
+       New_Field->opts = field->opts;
+       New_Field->usrptr = field->usrptr;
+ 
++#if USE_WIDEC_SUPPORT
++      New_Field->working = newpad(1, Buffer_Length(New_Field) + 1);
++      New_Field->expanded = typeCalloc(char *, 1 + field->nbuf);
++#endif
++
+       if (_nc_Copy_Type(New_Field, field))
+ 	{
+ 	  size_t len;
+Index: ncurses/base/lib_set_term.c
+Prereq:  1.206 
+--- ncurses-6.6-20260801+/ncurses/base/lib_set_term.c	2026-07-03 16:57:04.000000000 +0000
++++ ncurses-6.6-20260808/ncurses/base/lib_set_term.c	2026-08-08 23:42:56.000000000 +0000
+@@ -57,7 +57,7 @@
+ #undef CUR
+ #define CUR SP_TERMTYPE
+ 
+-MODULE_ID("$Id: lib_set_term.c,v 1.206 2026/07/03 16:57:04 tom Exp $")
++MODULE_ID("$Id: lib_set_term.c,v 1.207 2026/08/08 23:42:56 tom Exp $")
+ 
+ #if USE_TERM_DRIVER
+ #define MaxColors      InfoOf(sp).maxcolors
+@@ -245,7 +245,7 @@
+ 	    SetWacsMap(NULL);
+ #endif
+ 	    _nc_set_screen(NULL);
+-#if USE_WIDEC_SUPPORT
++#if USE_WIDEC_SUPPORT && !USE_REENTRANT
+ 	    if (SP == NULL) {
+ 		FreeIfNeeded(_nc_wacs);
+ 		_nc_wacs = NULL;
+Index: ncurses/base/lib_winch.c
+Prereq:  1.14 
+--- ncurses-6.6-20260801+/ncurses/base/lib_winch.c	2026-07-25 22:49:10.000000000 +0000
++++ ncurses-6.6-20260808/ncurses/base/lib_winch.c	2026-08-08 10:54:43.000000000 +0000
+@@ -40,7 +40,7 @@
+ 
+ #include <curses.priv.h>
+ 
+-MODULE_ID("$Id: lib_winch.c,v 1.14 2026/07/25 22:49:10 tom Exp $")
++MODULE_ID("$Id: lib_winch.c,v 1.15 2026/08/08 10:54:43 tom Exp $")
+ 
+ NCURSES_EXPORT(chtype)
+ winch(WINDOW *win)
+@@ -83,7 +83,7 @@
+ 	} else
+ #endif
+ 	{
+-	    result = ((chtype) CharOf(*cell) | AttrOf(*cell));
++	    result = ((chtype) UChar(CharOf(*cell)) | AttrOf(*cell));
+ 	}
+     }
+     returnChtype(result);
+Index: package/debian-mingw/changelog
+--- ncurses-6.6-20260801+/package/debian-mingw/changelog	2026-08-01 09:18:46.000000000 +0000
++++ ncurses-6.6-20260808/package/debian-mingw/changelog	2026-08-08 09:15:55.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260801) unstable; urgency=low
++ncurses6td (6.6+20260808) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 01 Aug 2026 05:18:46 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 08 Aug 2026 05:15:55 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian-mingw64/changelog
+--- ncurses-6.6-20260801+/package/debian-mingw64/changelog	2026-08-01 09:18:46.000000000 +0000
++++ ncurses-6.6-20260808/package/debian-mingw64/changelog	2026-08-08 09:15:55.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260801) unstable; urgency=low
++ncurses6td (6.6+20260808) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 01 Aug 2026 05:18:46 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 08 Aug 2026 05:15:55 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian/changelog
+--- ncurses-6.6-20260801+/package/debian/changelog	2026-08-01 09:18:46.000000000 +0000
++++ ncurses-6.6-20260808/package/debian/changelog	2026-08-08 09:15:55.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260801) unstable; urgency=low
++ncurses6td (6.6+20260808) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 01 Aug 2026 05:18:46 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 08 Aug 2026 05:15:55 -0400
+ 
+ ncurses6 (5.9+20120608) unstable; urgency=low
+ 
+Index: package/mingw-ncurses.nsi
+Prereq:  1.775 
+--- ncurses-6.6-20260801+/package/mingw-ncurses.nsi	2026-08-01 09:18:46.000000000 +0000
++++ ncurses-6.6-20260808/package/mingw-ncurses.nsi	2026-08-08 09:15:55.000000000 +0000
+@@ -1,4 +1,4 @@
+-; $Id: mingw-ncurses.nsi,v 1.775 2026/08/01 09:18:46 tom Exp $
++; $Id: mingw-ncurses.nsi,v 1.776 2026/08/08 09:15:55 tom Exp $
+ 
+ ; TODO add examples
+ ; TODO bump ABI to 6
+@@ -10,7 +10,7 @@
+ !define VERSION_MAJOR "6"
+ !define VERSION_MINOR "6"
+ !define VERSION_YYYY  "2026"
+-!define VERSION_MMDD  "0801"
++!define VERSION_MMDD  "0808"
+ !define VERSION_PATCH ${VERSION_YYYY}${VERSION_MMDD}
+ 
+ !define MY_ABI   "5"
+Index: package/mingw-ncurses.spec
+--- ncurses-6.6-20260801+/package/mingw-ncurses.spec	2026-08-01 09:18:46.000000000 +0000
++++ ncurses-6.6-20260808/package/mingw-ncurses.spec	2026-08-08 09:15:55.000000000 +0000
+@@ -3,7 +3,7 @@
+ Summary: shared libraries for terminal handling
+ Name: mingw32-ncurses6
+ Version: 6.6
+-Release: 20260801
++Release: 20260808
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -144,8 +144,8 @@
+ 
+ %changelog
+ 
+-* Sat Aug 01 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260801
++* Sat Aug 08 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260808
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncurses.spec
+--- ncurses-6.6-20260801+/package/ncurses.spec	2026-08-01 09:18:46.000000000 +0000
++++ ncurses-6.6-20260808/package/ncurses.spec	2026-08-08 09:15:55.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: shared libraries for terminal handling
+ Name: ncurses6
+ Version: 6.6
+-Release: 20260801
++Release: 20260808
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -134,8 +134,8 @@
+ 
+ %changelog
+ 
+-* Sat Aug 01 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260801
++* Sat Aug 08 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260808
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncursest.spec
+--- ncurses-6.6-20260801+/package/ncursest.spec	2026-08-01 09:18:46.000000000 +0000
++++ ncurses-6.6-20260808/package/ncursest.spec	2026-08-08 09:15:55.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: Curses library with POSIX thread support.
+ Name: ncursest6
+ Version: 6.6
+-Release: 20260801
++Release: 20260808
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ Source: ncurses-%{version}-%{release}.tgz
+@@ -142,8 +142,8 @@
+ 
+ %changelog
+ 
+-* Sat Aug 01 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260801
++* Sat Aug 08 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260808
+ 
+ * Tue Dec 24 2019 Thomas Dickey
+ - drop custom CC_NORMAL warning flags because setting CFLAGS interferes with
+Index: test/dup_field.c
+Prereq:  1.15 
+--- ncurses-6.6-20260801+/test/dup_field.c	2026-06-06 09:59:40.000000000 +0000
++++ ncurses-6.6-20260808/test/dup_field.c	2026-08-08 23:35:51.000000000 +0000
+@@ -26,7 +26,7 @@
+  * authorization.                                                           *
+  ****************************************************************************/
+ /*
+- * $Id: dup_field.c,v 1.15 2026/06/06 09:59:40 tom Exp $
++ * $Id: dup_field.c,v 1.22 2026/08/08 23:35:51 tom Exp $
+  *
+  * Demonstrate dup_field().
+  */
+@@ -41,8 +41,14 @@
+ #define DO_DEMO	CTRL('F')	/* actual key for toggling demo-mode */
+ #define MY_DEMO	EDIT_FIELD('f')	/* internal request-code */
+ 
++#define MAX_FIELDS 100
++
+ static char empty[] = "";
+-static FIELD *all_fields[100];
++static FIELD *all_fields[MAX_FIELDS];
++static bool is_editing[MAX_FIELDS];
++static bool was_copied[MAX_FIELDS];
++static unsigned num_fields;
++static FIELD **last_list;
+ /* *INDENT-OFF* */
+ static struct {
+     int code;
+@@ -113,7 +119,7 @@
+     }
+ }
+ 
+-static FIELD *
++static void
+ make_label(const char *label, int frow, int fcol)
+ {
+     FIELD *f = new_field(1, (int) strlen(label), frow, fcol, 0, 0);
+@@ -121,20 +127,22 @@
+     if (f) {
+ 	set_field_buffer(f, 0, label);
+ 	set_field_opts(f, (int) ((unsigned) field_opts(f) & (unsigned) ~O_ACTIVE));
++	all_fields[num_fields++] = f;
+     }
+-    return (f);
+ }
+ 
+-static FIELD *
++static void
+ make_field(int frow, int fcol, int rows, int cols)
+ {
+     FIELD *f = new_field(rows, cols, frow, fcol, 0, 1);
+ 
+     if (f) {
++	set_field_type(f, TYPE_ALPHA, 1);
+ 	set_field_back(f, A_UNDERLINE);
+ 	init_edit_field(f, empty);
++	is_editing[num_fields] = TRUE;
++	all_fields[num_fields++] = f;
+     }
+-    return (f);
+ }
+ 
+ static void
+@@ -272,7 +280,7 @@
+ static FIELD **
+ copy_fields(FIELD **source, FIELD *extra, size_t length)
+ {
+-    FIELD **target = typeCalloc(FIELD *, length + 1);
++    FIELD **target = typeCalloc(FIELD *, length + 2);	/* add one plus NULL */
+     memcpy(target, source, length * sizeof(FIELD *));
+     target[length] = extra;
+     return target;
+@@ -284,16 +292,53 @@
+     int count = field_count(form);
+     FIELD *my_field = current_field(form);
+     FIELD **old_fields = form_fields(form);
++    int n;
++    bool copied = FALSE;
++    int last_row = LINES;
++    const int SKIP = 8;
++
++    if (my_field == NULL) {
++	beep();
++    } else {
++	int rows, cols, frow, fcol, nrow, nbuf;
++	if (field_info(my_field,
++		       &rows, &cols,
++		       &frow, &fcol,
++		       &nrow, &nbuf) == E_OK) {
++	    last_row = rows + frow + SKIP;
++	}
++
++	for (n = 0; n < count; ++n) {
++	    if (my_field == all_fields[n]) {
++		copied = was_copied[n];
++		was_copied[n] = TRUE;
++		break;
++	    }
++	}
++    }
+ 
+-    if (count > 0 && old_fields != NULL && my_field != NULL) {
+-	FIELD **new_fields = copy_fields(old_fields,
+-					 dup_field(my_field,
+-						   form_field_row(my_field)
+-						   + 1,
+-						   form_field_col(my_field)),
+-					 (size_t) count);
+-	if (new_fields != NULL)
+-	    set_form_fields(form, new_fields);
++    if (copied || last_row >= LINES) {
++	beep();
++    } else if (count > 0 && old_fields != NULL) {
++	FIELD *add_field = dup_field(my_field,
++				     form_field_row(my_field)
++				     + SKIP,
++				     form_field_col(my_field));
++	if (add_field != NULL) {
++	    FIELD **new_fields = copy_fields(old_fields,
++					     add_field,
++					     (size_t) count);
++	    all_fields[num_fields++] = add_field;
++	    all_fields[num_fields] = NULL;
++	    if (new_fields != NULL) {
++		unpost_form(form);
++		set_form_fields(form, new_fields);
++		post_form(form);
++		free(last_list);
++		last_list = new_fields;
++	    }
++	}
++	set_current_field(form, my_field);
+     }
+ }
+ 
+@@ -309,7 +354,10 @@
+ 	my_help_edit_field();
+ 	break;
+     case MY_DEMO:
+-	do_demo(form);
++	if (num_fields < MAX_FIELDS - 2)
++	    do_demo(form);
++	else
++	    beep();
+ 	break;
+     default:
+ 	beep();
+@@ -323,33 +371,28 @@
+ {
+     FORM *form;
+     int c;
+-    unsigned n = 0;
+     const char *fname;
+ 
+     /* describe the form */
+-    all_fields[n++] = make_label("Sample Form", 0, 15);
++    make_label("Sample Form", 0, 15);
+ 
+     fname = "Last Name";
+-    all_fields[n++] = make_label(fname, 2, 0);
+-    all_fields[n++] = make_field(3, 0, 1, 18);
+-    set_field_type(all_fields[n - 1], TYPE_ALPHA, 1);
++    make_label(fname, 2, 0);
++    make_field(3, 0, 1, 18);
+ 
+     fname = "First Name";
+-    all_fields[n++] = make_label(fname, 2, 20);
+-    all_fields[n++] = make_field(3, 20, 1, 12);
+-    set_field_type(all_fields[n - 1], TYPE_ALPHA, 1);
++    make_label(fname, 2, 20);
++    make_field(3, 20, 1, 12);
+ 
+     fname = "Middle Name";
+-    all_fields[n++] = make_label(fname, 2, 34);
+-    all_fields[n++] = make_field(3, 34, 1, 12);
+-    set_field_type(all_fields[n - 1], TYPE_ALPHA, 1);
++    make_label(fname, 2, 34);
++    make_field(3, 34, 1, 12);
+ 
+     fname = "Comments";
+-    all_fields[n++] = make_label(fname, 5, 0);
+-    all_fields[n++] = make_field(6, 0, 4, 46);
+-    init_edit_field(all_fields[n - 1], empty);
++    make_label(fname, 5, 0);
++    make_field(6, 0, 4, 46);
+ 
+-    all_fields[n] = (FIELD *) 0;
++    all_fields[num_fields] = (FIELD *) 0;
+ 
+     if ((form = new_form(all_fields)) != NULL) {
+ 	int finished = 0;
+@@ -374,9 +417,11 @@
+ 	free_form(form);
+     }
+     for (c = 0; all_fields[c] != NULL; c++) {
+-	free_edit_field(all_fields[c]);
++	if (is_editing[c])
++	    free_edit_field(all_fields[c]);
+ 	free_field(all_fields[c]);
+     }
++    free(last_list);
+     noraw();
+     nl();
+ }
+Index: test/tracemunch
+Prereq:  1.41 
+--- ncurses-6.6-20260801+/test/tracemunch	2021-09-04 10:31:03.000000000 +0000
++++ ncurses-6.6-20260808/test/tracemunch	2026-08-08 17:09:30.000000000 +0000
+@@ -1,7 +1,7 @@
+ #!/usr/bin/env perl
+-# $Id: tracemunch,v 1.41 2021/09/04 10:31:03 tom Exp $
++# $Id: tracemunch,v 1.42 2026/08/08 17:09:30 tom Exp $
+ ##############################################################################
+-# Copyright 2018-2020,2021 Thomas E. Dickey                                  #
++# Copyright 2018-2021,2026 Thomas E. Dickey                                  #
+ # Copyright 1998-2005,2017 Free Software Foundation, Inc.                    #
+ #                                                                            #
+ # Permission is hereby granted, free of charge, to any person obtaining a    #
+@@ -70,9 +70,9 @@
+ our $tTERMINAL = 3;    # TERMINAL*
+ our $tPANEL    = 4;    # PANEL*
+ our $tFIELD    = 5;    # FIELD*
+-our $tFORM     = 5;    # FORM*
+-our $tMENU     = 6;    # MENU*
+-our $tITEM     = 7;    # ITEM*
++our $tFORM     = 6;    # FORM*
++our $tMENU     = 7;    # MENU*
++our $tITEM     = 8;    # ITEM*
+ 
+ our %known_p1_types = (
+     $tSCREEN   => "SCREEN*",
+@@ -670,6 +670,10 @@
+ 
+                     # ignore
+                 }
++                elsif ( $type == $tFORM and $addr =~ /^[^(]+\(form\d+[,)]/ ) {
++
++                    # ignore
++                }
+                 else {
+                     printf "OOPS - expected type \"%s\", skipping\n>>$addr\n",
+                       $known_p1_types{$type};
+@@ -744,7 +748,7 @@
+                 $_ =~ s/^[^:]*://;
+             }
+ 
+-            # Transform window pointer addresses to make it easier to compare logs
++          # Transform window pointer addresses to make it easier to compare logs
+             $awaiting = "curscr" if ( $_ =~ /creating curscr/ );
+             $awaiting = "newscr" if ( $_ =~ /creating newscr/ );
+             $awaiting = "stdscr" if ( $_ =~ /creating stdscr/ );
+@@ -803,9 +807,9 @@
+                 $try_addr{$2} = ++$try_nums unless defined $try_addr{$2};
+             }
+             elsif ( $_ =~ /^(\+ )*_nc_alloc_screen_sp 0x([[:xdigit:]]+)/ ) {
+-                $addr = "0x$2";
++                $addr            = "0x$2";
+                 $scr_addr{$addr} = ++$scr_nums unless ( $scr_addr{$addr} );
+-                $awaiting = "";
++                $awaiting        = "";
+             }
+             elsif ( $_ =~ /^(\+ )*return }0x([[:xdigit:]]+)/ ) {
+                 $addr = "0x$2";

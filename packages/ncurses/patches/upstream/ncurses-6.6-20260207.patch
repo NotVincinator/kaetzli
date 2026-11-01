@@ -1,0 +1,1358 @@
+# ncurses 6.6 - patch 20260207 - Thomas E. Dickey
+#
+# ------------------------------------------------------------------------------
+#
+# Ncurses 6.6 is at
+#   https://invisible-island.net/archives/ncurses/
+#   https://invisible-mirror.net/archives/ncurses/
+#   https://ftp.gnu.org/gnu/ncurses/
+#
+# Patches for ncurses 6.6 can be found at
+#   https://invisible-island.net/archives/ncurses/6.6
+#   https://invisible-mirror.net/archives/ncurses/6.6
+#
+# ------------------------------------------------------------------------------
+# https://invisible-island.net/archives/ncurses/6.6/ncurses-6.6-20260207.patch.gz
+# patch by Thomas E. Dickey <dickey@invisible-island.net>
+# created  Sun Feb  8 00:16:38 UTC 2026
+# ------------------------------------------------------------------------------
+# NEWS                             |    9 +
+# VERSION                          |    2 
+# dist.mk                          |    4 
+# doc/html/man/infocmp.1m.html     |  217 +++++++++++++++++++--------------
+# doc/html/man/ncurses.3x.html     |    2 
+# doc/html/man/terminfo.5.html     |    2 
+# man/infocmp.1m                   |   65 +++++++--
+# misc/terminfo.src                |   18 +-
+# package/debian-mingw/changelog   |    4 
+# package/debian-mingw64/changelog |    4 
+# package/debian/changelog         |    4 
+# package/mingw-ncurses.nsi        |    4 
+# package/mingw-ncurses.spec       |    6 
+# package/ncurses.spec             |    6 
+# package/ncursest.spec            |    6 
+# progs/dump_entry.c               |    6 
+# progs/infocmp.c                  |  241 +++++++++++++++++++++++--------------
+# progs/progs.priv.h               |    6 
+# progs/tic.c                      |   24 +--
+# 19 files changed, 391 insertions(+), 239 deletions(-)
+# ------------------------------------------------------------------------------
+Index: NEWS
+Prereq:  1.4416 
+--- ncurses-6.6-20260131+/NEWS	2026-01-31 21:41:20.000000000 +0000
++++ ncurses-6.6-20260207/NEWS	2026-02-07 22:08:22.000000000 +0000
+@@ -26,7 +26,7 @@
+ -- sale, use or other dealings in this Software without prior written        --
+ -- authorization.                                                            --
+ -------------------------------------------------------------------------------
+--- $Id: NEWS,v 1.4416 2026/01/31 21:41:20 tom Exp $
++-- $Id: NEWS,v 1.4418 2026/02/07 22:08:22 tom Exp $
+ -------------------------------------------------------------------------------
+ 
+ This is a log of changes that ncurses has gone through since Zeyd started
+@@ -46,6 +46,13 @@
+ Changes through 1.9.9e did not credit all contributions;
+ it is not possible to add this information.
+ 
++20260207
++	+ improve infocmp "-i" option, to make it easier to see unrecognized
++	  escape sequences in initialization strings, as well as extending the
++	  tables.
++	+ correct DECKPNM in vt220 is2 (Aaro Koskinen)
++	+ correct DECSTR in some Wyse terminfo entries -TD
++
+ 20260131
+ 	+ add putty+3keys -TD
+ 	+ add dim to putty -TD
+Index: VERSION
+--- ncurses-6.6-20260131+/VERSION	2026-01-31 10:19:27.000000000 +0000
++++ ncurses-6.6-20260207/VERSION	2026-02-07 11:02:03.000000000 +0000
+@@ -1 +1 @@
+-5:0:10	6.6	20260131
++5:0:10	6.6	20260207
+Index: dist.mk
+Prereq:  1.1716 
+--- ncurses-6.6-20260131+/dist.mk	2026-01-31 10:19:27.000000000 +0000
++++ ncurses-6.6-20260207/dist.mk	2026-02-07 11:02:03.000000000 +0000
+@@ -26,7 +26,7 @@
+ # use or other dealings in this Software without prior written               #
+ # authorization.                                                             #
+ ##############################################################################
+-# $Id: dist.mk,v 1.1716 2026/01/31 10:19:27 tom Exp $
++# $Id: dist.mk,v 1.1717 2026/02/07 11:02:03 tom Exp $
+ # Makefile for creating ncurses distributions.
+ #
+ # This only needs to be used directly as a makefile by developers, but
+@@ -38,7 +38,7 @@
+ # These define the major/minor/patch versions of ncurses.
+ NCURSES_MAJOR = 6
+ NCURSES_MINOR = 6
+-NCURSES_PATCH = 20260131
++NCURSES_PATCH = 20260207
+ 
+ # We don't append the patch to the version, since this only applies to releases
+ VERSION = $(NCURSES_MAJOR).$(NCURSES_MINOR)
+Index: doc/html/man/infocmp.1m.html
+--- ncurses-6.6-20260131+/doc/html/man/infocmp.1m.html	2025-12-30 23:24:01.000000000 +0000
++++ ncurses-6.6-20260207/doc/html/man/infocmp.1m.html	2026-02-07 22:12:22.000000000 +0000
+@@ -1,7 +1,7 @@
+ <!--
+   * t
+   ****************************************************************************
+-  * Copyright 2018-2024,2025 Thomas E. Dickey                                *
++  * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+   * Copyright 1998-2017,2018 Free Software Foundation, Inc.                  *
+   *                                                                          *
+   * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -28,19 +28,19 @@
+   * sale, use or other dealings in this Software without prior written       *
+   * authorization.                                                           *
+   ****************************************************************************
+-  * @Id: infocmp.1m,v 1.128 2025/11/12 00:52:57 tom Exp @
++  * @Id: infocmp.1m,v 1.129 2026/02/07 22:02:29 tom Exp @
+ -->
+ <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+ <HTML>
+ <HEAD>
+ <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+ <meta name="generator" content="Manpage converted by man2html - see https://invisible-island.net/scripts/readme.html#others_scripts">
+-<TITLE>infocmp 1m 2025-11-11 ncurses 6.6 User commands</TITLE>
++<TITLE>infocmp 1m 2026-02-07 ncurses 6.6 User commands</TITLE>
+ <link rel="author" href="mailto:bug-ncurses@gnu.org">
+ 
+ </HEAD>
+ <BODY>
+-<H1 class="no-header">infocmp 1m 2025-11-11 ncurses 6.6 User commands</H1>
++<H1 class="no-header">infocmp 1m 2026-02-07 ncurses 6.6 User commands</H1>
+ <PRE>
+ <STRONG><A HREF="infocmp.1m.html">infocmp(1m)</A></STRONG>                      User commands                     <STRONG><A HREF="infocmp.1m.html">infocmp(1m)</A></STRONG>
+ 
+@@ -296,52 +296,85 @@
+             as starting/stopping keymap mode (<STRONG>smkx</STRONG>, <STRONG>rmkx</STRONG>).
+ 
+             For each string, the code tries to  analyze  it  into  actions  in
+-            terms  of  the  other capabilities in the entry, certain X3.64/ISO
+-            6429/ECMA-48 capabilities, and certain DEC VT-series private modes
+-            (the set of recognized special sequences  has  been  selected  for
+-            completeness  over  the  existing terminfo database).  Each report
+-            line consists of the capability name,  followed  by  a  colon  and
+-            space,  followed by a printable expansion of the capability string
+-            with  sections  matching  recognized   actions   translated   into
++            terms of
++
++            <STRONG>o</STRONG>   the other capabilities in the entry,
++
++            <STRONG>o</STRONG>   certain X3.64/ISO 6429/ECMA-48 capabilities,
++
++            <STRONG>o</STRONG>   certain DEC VT-series private modes, and
++
++            <STRONG>o</STRONG>   certain XTerm control sequences.
++
++            The  set  of  recognized  special  sequences has been selected for
++            completeness over the existing  terminfo  database.   Each  report
++            line  consists  of  the  capability  name, followed by a colon and
++            space, followed by a printable expansion of the capability  string
++            with   sections   matching   recognized  actions  translated  into
+             {}-bracketed descriptions.
+ 
+-            Here is a list of the DEC/ANSI special sequences recognized:
++            Here is a list of the special sequences recognized:
+ 
+-                      Action        Meaning
+-                      -----------------------------------------
+-                      RIS           full reset
+-                      SC            save cursor
+-                      RC            restore cursor
+-                      LL            home-down
+-                      RSR           reset scroll region
+-                      -----------------------------------------
+-                      DECSTR        soft reset (VT320)
+-                      S7C1T         7-bit controls (VT220)
+-                      -----------------------------------------
+-                      ISO DEC G0    enable DEC graphics for G0
+-                      ISO UK G0     enable UK chars for G0
+-                      ISO US G0     enable US chars for G0
+-                      ISO DEC G1    enable DEC graphics for G1
+-                      ISO UK G1     enable UK chars for G1
+-                      ISO US G1     enable US chars for G1
+-                      -----------------------------------------
+-                      DECPAM        application keypad mode
+-                      DECPNM        normal keypad mode
+-                      DECANSI       enter ANSI mode
+-                      -----------------------------------------
+-                      ECMA[+-]AM    keyboard action mode
+-                      ECMA[+-]IRM   insert replace mode
+-                      ECMA[+-]SRM   send receive mode
+-                      ECMA[+-]LNM   linefeed mode
+-                      -----------------------------------------
+-                      DEC[+-]CKM    application cursor keys
+-                      DEC[+-]ANM    set VT52 mode
+-                      DEC[+-]COLM   132-column mode
+-                      DEC[+-]SCLM   smooth scroll
+-                      DEC[+-]SCNM   reverse video mode
+-                      DEC[+-]OM     origin mode
+-                      DEC[+-]AWM    wraparound mode
+-                      DEC[+-]ARM    auto-repeat mode
++               Action           Meaning
++               -------------------------------------------------------
++               ED               clear screen
++               ED2              clear page
++               HOME             move cursor to home
++               HTS              horizontal tag set
++               LL               home-down
++               NEL              next line
++               RC               restore cursor
++               RI               reverse index
++               RIS              full reset
++               RSR              reset scroll region
++               SC               save cursor
++               SGR0             reset video attributes
++               SI               shift-in
++               SO               shift-out
++               -------------------------------------------------------
++               DECSCL           set conformance level (VT220)
++               DECSTR           soft reset (VT320)
++               S7C1T            7-bit controls (VT220)
++               S8C1T            8-bit controls (VT220)
++               -------------------------------------------------------
++               ISO DEC G0       enable DEC graphics for G0
++               ISO UK G0        enable UK chars for G0
++               ISO US G0        enable US chars for G0
++               ISO DEC G1       enable DEC graphics for G1
++               ISO UK G1        enable UK chars for G1
++               ISO US G1        enable US chars for G1
++               -------------------------------------------------------
++               DECPAM           application keypad mode
++               DECPNM           normal keypad mode
++               DECANSI          enter ANSI mode
++               -------------------------------------------------------
++               ECMA[+-]GATM     guarded area transfer mode
++               ECMA[+-]AM       keyboard action mode
++               ECMA[+-]CRM      control representation mode
++               ECMA[+-]IRM      insert replace mode
++               ECMA[+-]STRM     status report transfer mode
++               ECMA[+-]ERM      erasure mode
++               ECMA[+-]SRM      send receive mode
++               ECMA[+-]FEAM     format effector action mode
++               ECMA[+-]LNM      linefeed mode
++               -------------------------------------------------------
++               DEC[+-]CKM       application cursor keys
++               DEC[+-]ANM       set VT52 mode
++               DEC[+-]COLM      132-column mode
++               DEC[+-]SCLM      smooth scroll
++               DEC[+-]SCNM      reverse video mode
++               DEC[+-]OM        origin mode
++               DEC[+-]AWM       wraparound mode
++               DEC[+-]ARM       auto-repeat mode
++               DEC[+-]TCEM      text cursor enable
++               DEC[+-]NRCM      national replacement character mode
++               DEC[+-]BKM       backarrow key mode
++               DEC[+-]X11mSE    X11 mouse (XTerm)
++               DEC[+-]META      meta/eightBitInput (XTerm)
++               DEC[+-]ALTSCRN   alternate screen (XTerm)
++               -------------------------------------------------------
++               push title       save icon and window title (XTerm)
++               pop title        restore icon and window title (XTerm)
+ 
+        It also recognizes a SGR action corresponding to ANSI/ISO 6429/ECMA Set
+        Graphics Rendition, with the values NORMAL, BOLD, UNDERLINE, BLINK, and
+@@ -351,15 +384,15 @@
+ 
+               <STRONG>o</STRONG>   "-" (turn off).
+ 
+-              An  SGR0  designates  an empty highlight sequence (equivalent to
++              An SGR0 designates an empty highlight  sequence  (equivalent  to
+               {SGR:NORMAL}).
+ 
+        <STRONG>-l</STRONG>   Set output format to terminfo.
+ 
+        <STRONG>-p</STRONG>   Ignore padding specifications when comparing strings.
+ 
+-       <STRONG>-Q</STRONG> <EM>n</EM> Rather than show source  in  terminfo  (text)  format,  print  the
+-            compiled  (binary) format in hexadecimal or base64 form, depending
++       <STRONG>-Q</STRONG> <EM>n</EM> Rather  than  show  source  in  terminfo  (text) format, print the
++            compiled (binary) format in hexadecimal or base64 form,  depending
+             on the option's value:
+ 
+                1  hexadecimal
+@@ -368,39 +401,39 @@
+ 
+                3  hexadecimal and base64
+ 
+-            For example, this prints the compiled terminfo value as  a  string
++            For  example,  this prints the compiled terminfo value as a string
+             which could be assigned to the <EM>TERMINFO</EM> environment variable:
+ 
+                 infocmp -0 -q -Q2
+ 
+        <STRONG>-q</STRONG>   This makes the output a little shorter:
+ 
+-            <STRONG>o</STRONG>   Make  the  comparison listing shorter by omitting subheadings,
++            <STRONG>o</STRONG>   Make the comparison listing shorter by  omitting  subheadings,
+                 and using "-" for absent capabilities, "@" for canceled rather
+                 than "NULL".
+ 
+-            <STRONG>o</STRONG>   However,  show  differences  between   absent   and   canceled
++            <STRONG>o</STRONG>   However,   show   differences   between  absent  and  canceled
+                 capabilities.
+ 
+             <STRONG>o</STRONG>   Omit the "Reconstructed from" comment for source listings.
+ 
+        <STRONG>-R</STRONG><EM>subset</EM>
+-            Restrict  output  to  a given subset.  This option is for use with
+-            archaic versions of terminfo like those on SVr1, Ultrix, or  HP-UX
+-            that  do not support the full set of SVR4/XSI Curses terminfo; and
+-            variants such as AIX that have their own  extensions  incompatible
++            Restrict output to a given subset.  This option is  for  use  with
++            archaic  versions of terminfo like those on SVr1, Ultrix, or HP-UX
++            that do not support the full set of SVR4/XSI Curses terminfo;  and
++            variants  such  as AIX that have their own extensions incompatible
+             with SVr4/XSI.
+ 
+-            <STRONG>o</STRONG>   Available  terminfo  subsets  are  "SVr1", "Ultrix", "HP", and
++            <STRONG>o</STRONG>   Available terminfo subsets are  "SVr1",  "Ultrix",  "HP",  and
+                 "AIX"; see <STRONG><A HREF="terminfo.5.html">terminfo(5)</A></STRONG> for details.
+ 
+-            <STRONG>o</STRONG>   You can also  choose  the  subset  "BSD"  which  selects  only
++            <STRONG>o</STRONG>   You  can  also  choose  the  subset  "BSD"  which selects only
+                 capabilities with termcap equivalents recognized by 4.4BSD.
+ 
+-            <STRONG>o</STRONG>   If  you  select  any  other value for <STRONG>-R</STRONG>, it is the same as no
++            <STRONG>o</STRONG>   If you select any other value for <STRONG>-R</STRONG>, it is  the  same  as  no
+                 subset, i.e., all capabilities are used.
+ 
+-            A few options override the subset selected with <STRONG>-R</STRONG>,  if  they  are
++            A  few  options  override the subset selected with <STRONG>-R</STRONG>, if they are
+             processed later in the command parameters:
+ 
+             <STRONG>-C</STRONG>   sets the "BSD" subset as a side effect.
+@@ -410,10 +443,10 @@
+             <STRONG>-r</STRONG>   sets the subset to all capabilities.
+ 
+        <STRONG>-s</STRONG> <EM>[d|i|l|c]</EM>
+-            The  <STRONG>-s</STRONG>  option sorts the fields within each type according to the
++            The <STRONG>-s</STRONG> option sorts the fields within each type according  to  the
+             argument below:
+ 
+-            <STRONG>d</STRONG>    leave fields in  the  order  that  they  are  stored  in  the
++            <STRONG>d</STRONG>    leave  fields  in  the  order  that  they  are  stored in the
+                  <EM>terminfo</EM> database.
+ 
+             <STRONG>i</STRONG>    sort by <EM>terminfo</EM> name.
+@@ -422,45 +455,45 @@
+ 
+             <STRONG>c</STRONG>    sort by the <EM>termcap</EM> name.
+ 
+-            If  the  <STRONG>-s</STRONG>  option  is  not given, the fields printed out will be
+-            sorted alphabetically by  the  <STRONG>terminfo</STRONG>  name  within  each  type,
+-            except  in  the  case of the <STRONG>-C</STRONG> or the <STRONG>-L</STRONG> options, which cause the
+-            sorting to be done by the <STRONG>termcap</STRONG> name  or  the  long  C  variable
++            If the <STRONG>-s</STRONG> option is not given, the  fields  printed  out  will  be
++            sorted  alphabetically  by  the  <STRONG>terminfo</STRONG>  name  within each type,
++            except in the case of the <STRONG>-C</STRONG> or the <STRONG>-L</STRONG> options,  which  cause  the
++            sorting  to  be  done  by  the <STRONG>termcap</STRONG> name or the long C variable
+             name, respectively.
+ 
+-       <STRONG>-T</STRONG>   eliminates  size-restrictions  on  the  generated  text.   This is
++       <STRONG>-T</STRONG>   eliminates size-restrictions  on  the  generated  text.   This  is
+             mainly  useful  for  testing  and  analysis,  since  the  compiled
+             descriptions  are  limited  (e.g.,  1023  for  termcap,  4096  for
+             terminfo).
+ 
+-       <STRONG>-t</STRONG>   tells <STRONG>tic</STRONG> to discard commented-out  capabilities.   Normally  when
+-            translating  from terminfo to termcap, untranslatable capabilities
++       <STRONG>-t</STRONG>   tells  <STRONG>tic</STRONG>  to  discard commented-out capabilities.  Normally when
++            translating from terminfo to termcap, untranslatable  capabilities
+             are commented-out.
+ 
+-       <STRONG>-U</STRONG>   tells <STRONG>infocmp</STRONG> to not  post-process  the  data  after  parsing  the
++       <STRONG>-U</STRONG>   tells  <STRONG>infocmp</STRONG>  to  not  post-process  the  data after parsing the
+             source  file.   This  feature  helps  when  comparing  the  actual
+-            contents of two source files, since  it  excludes  the  inferences
++            contents  of  two  source  files, since it excludes the inferences
+             that <STRONG>infocmp</STRONG> makes to fill in missing data.
+ 
+        <STRONG>-V</STRONG>   reports the version of <EM>ncurses</EM> which was used in this program, and
+             exits.
+ 
+-       <STRONG>-v</STRONG> <EM>n</EM> prints  out  tracing  information on standard error as the program
++       <STRONG>-v</STRONG> <EM>n</EM> prints out tracing information on standard error  as  the  program
+             runs.
+ 
+-            The optional parameter <EM>n</EM> is a number  from  1  to  10,  inclusive,
++            The  optional  parameter  <EM>n</EM>  is  a number from 1 to 10, inclusive,
+             indicating the desired level of detail of information.  If <EM>ncurses</EM>
+-            is  built  without  tracing  support,  the  optional  parameter is
++            is built  without  tracing  support,  the  optional  parameter  is
+             ignored.
+ 
+-       <STRONG>-W</STRONG>   By itself, the <STRONG>-w</STRONG>  option  will  not  force  long  strings  to  be
++       <STRONG>-W</STRONG>   By  itself,  the  <STRONG>-w</STRONG>  option  will  not  force  long strings to be
+             wrapped.  Use the <STRONG>-W</STRONG> option to do this.
+ 
+        <STRONG>-w</STRONG> <EM>width</EM>
+             changes the output to <EM>width</EM> characters.
+ 
+        <STRONG>-x</STRONG>   print information for user-defined capabilities (see <STRONG><A HREF="user_caps.5.html">user_caps(5)</A></STRONG>.
+-            These  are  extensions  to  the  terminfo  repertoire which can be
++            These are extensions to  the  terminfo  repertoire  which  can  be
+             loaded using the <STRONG>-x</STRONG> option of <STRONG>tic</STRONG>.
+ 
+ 
+@@ -475,42 +508,42 @@
+ 
+ 
+ </PRE><H2><a name="h2-PORTABILITY">PORTABILITY</a></H2><PRE>
+-       X/Open Curses Issue 7 (2009) specifies <EM>infocmp</EM>.  It  does  not  mention
++       X/Open  Curses  Issue 7  (2009) specifies <EM>infocmp</EM>.  It does not mention
+        options for producing descriptions in <EM>termcap</EM> format.
+ 
+-       SVr4   <EM>infocmp</EM>   does  not  distinguish  between  absent  and  canceled
+-       capabilities.  It furthermore reports missing integer  capabilities  as
+-       <STRONG>-1</STRONG>  (its  internal  representation).  <EM>ncurses</EM> shows these as "NULL" for
++       SVr4  <EM>infocmp</EM>  does  not  distinguish  between  absent   and   canceled
++       capabilities.   It  furthermore reports missing integer capabilities as
++       <STRONG>-1</STRONG> (its internal representation).  <EM>ncurses</EM> shows these  as  "NULL"  for
+        consistency with missing string capabilities.
+ 
+-       The <STRONG>-r</STRONG> option of  <EM>ncurses</EM>  <EM>infocmp</EM>  uses  SVr4's  notion  of  "termcap"
++       The  <STRONG>-r</STRONG>  option  of  <EM>ncurses</EM>  <EM>infocmp</EM>  uses  SVr4's notion of "termcap"
+        capabilities.  BSD <EM>curses</EM> had a more restricted set.  To see only those
+        present in 4.4BSD, use "<STRONG>-r</STRONG> <STRONG>-RBSD</STRONG>".
+ 
+ 
+ </PRE><H2><a name="h2-HISTORY">HISTORY</a></H2><PRE>
+-       Although  System  V  Release  2  provided a terminfo library, it had no
++       Although System V Release 2 provided a  terminfo  library,  it  had  no
+        documented tool for decompiling the terminal descriptions.  Tony Hansen
+        (AT&amp;T) wrote the first <STRONG>infocmp</STRONG> in early 1984, for System V Release 3.
+ 
+-       Eric Raymond  used  the  AT&amp;T  documentation  in  1995  to  provide  an
+-       equivalent  <STRONG>infocmp</STRONG>  for  <EM>ncurses</EM>.   In  addition,  he  added a few new
++       Eric  Raymond  used  the  AT&amp;T  documentation  in  1995  to  provide an
++       equivalent <STRONG>infocmp</STRONG> for <EM>ncurses</EM>.   In  addition,  he  added  a  few  new
+        features such as:
+ 
+-       <STRONG>o</STRONG>   the  <STRONG>-e</STRONG>  option,  to  support   <EM>fallback</EM>   (compiled-in)   terminal
++       <STRONG>o</STRONG>   the   <STRONG>-e</STRONG>   option,   to  support  <EM>fallback</EM>  (compiled-in)  terminal
+            descriptions
+ 
+        <STRONG>o</STRONG>   the <STRONG>-i</STRONG> option, to help with analysis
+ 
+-       Later,  Thomas  Dickey added the <STRONG>-x</STRONG> (user-defined capabilities) option,
+-       and the  <STRONG>-E</STRONG>  option  to  support  fallback  entries  with  user-defined
++       Later, Thomas Dickey added the <STRONG>-x</STRONG> (user-defined  capabilities)  option,
++       and  the  <STRONG>-E</STRONG>  option  to  support  fallback  entries  with user-defined
+        capabilities.
+ 
+        For a complete list, see the <EM>EXTENSIONS</EM> section.
+ 
+-       In  2010,  Roy  Marples  provided an <STRONG>infocmp</STRONG> program for NetBSD.  It is
+-       less capable than the SVr4 or <EM>ncurses</EM>  versions  (e.g.,  it  lacks  the
+-       sorting  options  documented in X/Open), but does include the <STRONG>-x</STRONG> option
++       In 2010, Roy Marples provided an <STRONG>infocmp</STRONG> program  for  NetBSD.   It  is
++       less  capable  than  the  SVr4  or <EM>ncurses</EM> versions (e.g., it lacks the
++       sorting options documented in X/Open), but does include the  <STRONG>-x</STRONG>  option
+        adapted from <EM>ncurses</EM>.
+ 
+ 
+@@ -529,7 +562,7 @@
+ 
+        https://invisible-island.net/ncurses/tctest.html
+ 
+-ncurses 6.6                       2025-11-11                       <STRONG><A HREF="infocmp.1m.html">infocmp(1m)</A></STRONG>
++ncurses 6.6                       2026-02-07                       <STRONG><A HREF="infocmp.1m.html">infocmp(1m)</A></STRONG>
+ </PRE>
+ <div class="nav">
+ <ul>
+Index: doc/html/man/ncurses.3x.html
+--- ncurses-6.6-20260131+/doc/html/man/ncurses.3x.html	2026-01-18 00:55:51.000000000 +0000
++++ ncurses-6.6-20260207/doc/html/man/ncurses.3x.html	2026-02-07 22:12:23.000000000 +0000
+@@ -59,7 +59,7 @@
+        displays with output optimized to  minimize  screen  updates.   <EM>ncurses</EM>
+        replaces the <EM>curses</EM> libraries from System V Release 4 Unix ("SVr4") and
+        4.4BSD  Unix,  the  development  of  which  ceased  in the 1990s.  This
+-       document describes <EM>ncurses</EM> version 6.6 (patch 20260117).
++       document describes <EM>ncurses</EM> version 6.6 (patch 20260207).
+ 
+        <EM>ncurses</EM> permits control of the terminal screen's contents;  abstraction
+        and  subdivision thereof with <EM>windows</EM> and <EM>pads</EM>; acquisition of keyboard
+Index: doc/html/man/terminfo.5.html
+--- ncurses-6.6-20260131+/doc/html/man/terminfo.5.html	2026-01-18 00:55:51.000000000 +0000
++++ ncurses-6.6-20260207/doc/html/man/terminfo.5.html	2026-02-07 22:12:23.000000000 +0000
+@@ -72,7 +72,7 @@
+        have, by specifying how to perform screen operations, and by specifying
+        padding requirements and initialization sequences.
+ 
+-       This document describes <EM>ncurses</EM> version 6.6 (patch 20260117).
++       This document describes <EM>ncurses</EM> version 6.6 (patch 20260207).
+ 
+ 
+ </PRE><H3><a name="h3-terminfo-Entry-Syntax"><EM>terminfo</EM> Entry Syntax</a></H3><PRE>
+Index: man/infocmp.1m
+Prereq:  1.128 
+--- ncurses-6.6-20260131+/man/infocmp.1m	2025-11-12 00:52:57.000000000 +0000
++++ ncurses-6.6-20260207/man/infocmp.1m	2026-02-07 22:02:29.000000000 +0000
+@@ -1,6 +1,6 @@
+ '\" t
+ .\"***************************************************************************
+-.\" Copyright 2018-2024,2025 Thomas E. Dickey                                *
++.\" Copyright 2018-2025,2026 Thomas E. Dickey                                *
+ .\" Copyright 1998-2017,2018 Free Software Foundation, Inc.                  *
+ .\"                                                                          *
+ .\" Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -28,8 +28,8 @@
+ .\" authorization.                                                           *
+ .\"***************************************************************************
+ .\"
+-.\" $Id: infocmp.1m,v 1.128 2025/11/12 00:52:57 tom Exp $
+-.TH @INFOCMP@ 1M 2025-11-11 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "User commands"
++.\" $Id: infocmp.1m,v 1.129 2026/02/07 22:02:29 tom Exp $
++.TH @INFOCMP@ 1M 2026-02-07 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "User commands"
+ .ie \n(.g \{\
+ .ds `` \(lq
+ .ds '' \(rq
+@@ -448,32 +448,53 @@
+ (\fBsmcup\fP, \fBrmcup\fP) as well as starting/stopping keymap mode
+ (\fBsmkx\fP, \fBrmkx\fP).
+ .IP
+-For each string, the
+-code tries to analyze it into actions in terms of the other capabilities in the
+-entry, certain X3.64/ISO 6429/ECMA\-48 capabilities, and certain DEC VT-series
+-private modes (the set of recognized special sequences has been selected for
+-completeness over the existing terminfo database).
++For each string,
++the code tries to analyze it into actions in terms of
++.RS
++.bP
++the other capabilities in the entry,
++.bP
++certain X3.64/ISO 6429/ECMA\-48 capabilities,
++.bP
++certain DEC VT-series private modes, and
++.bP
++certain XTerm control sequences.
++.RE
++.IP
++The set of recognized special sequences has been selected for
++completeness over the existing terminfo database.
+ Each report line consists
+-of the capability name, followed by a colon and space, followed by a printable
+-expansion of the capability string with sections matching recognized actions
++of the capability name, followed by a colon and space,
++followed by a printable expansion of the capability string
++with sections matching recognized actions
+ translated into {}-bracketed descriptions.
+ .IP
+-Here is a list of the DEC/ANSI
+-special sequences recognized:
++Here is a list of the special sequences recognized:
+ .PP
+ .TS
+ center;
+ L L.
+ Action	Meaning
+ _
+-RIS	full reset
+-SC	save cursor
+-RC	restore cursor
++ED	clear screen
++ED2	clear page
++HOME	move cursor to home
++HTS	horizontal tag set
+ LL	home-down
++NEL	next line
++RC	restore cursor
++RI	reverse index
++RIS	full reset
+ RSR	reset scroll region
++SC	save cursor
++SGR0	reset video attributes
++SI	shift-in
++SO	shift-out
+ _
++DECSCL	set conformance level (VT220)
+ DECSTR	soft reset (VT320)
+ S7C1T	7-bit controls (VT220)
++S8C1T	8-bit controls (VT220)
+ _
+ ISO DEC G0	enable DEC graphics for G0
+ ISO UK G0	enable UK chars for G0
+@@ -486,9 +507,14 @@
+ DECPNM	normal keypad mode
+ DECANSI	enter ANSI mode
+ _
++ECMA[+\-]GATM	guarded area transfer mode
+ ECMA[+\-]AM	keyboard action mode
++ECMA[+\-]CRM	control representation mode
+ ECMA[+\-]IRM	insert replace mode
++ECMA[+\-]STRM	status report transfer mode
++ECMA[+\-]ERM	erasure mode
+ ECMA[+\-]SRM	send receive mode
++ECMA[+\-]FEAM	format effector action mode
+ ECMA[+\-]LNM	linefeed mode
+ _
+ DEC[+\-]CKM	application cursor keys
+@@ -499,6 +525,15 @@
+ DEC[+\-]OM	origin mode
+ DEC[+\-]AWM	wraparound mode
+ DEC[+\-]ARM	auto-repeat mode
++DEC[+\-]TCEM	text cursor enable
++DEC[+\-]NRCM	national replacement character mode
++DEC[+\-]BKM	backarrow key mode
++DEC[+\-]X11MSE	X11 mouse (XTerm)
++DEC[+\-]META	meta/eightBitInput (XTerm)
++DEC[+\-]ALTSCRN	alternate screen (XTerm)
++_
++push title	save icon and window title (XTerm)
++pop title	restore icon and window title (XTerm)
+ .TE
+ .sp
+ It also recognizes a SGR action corresponding to ANSI/ISO 6429/ECMA Set
+Index: misc/terminfo.src
+--- ncurses-6.6-20260131+/misc/terminfo.src	2026-01-31 21:33:33.000000000 +0000
++++ ncurses-6.6-20260207/misc/terminfo.src	2026-02-07 21:14:29.000000000 +0000
+@@ -6,8 +6,8 @@
+ # Report bugs and new terminal descriptions to
+ #	bug-ncurses@gnu.org
+ #
+-#	$Revision: 1.1221 $
+-#	$Date: 2026/01/31 21:33:33 $
++#	$Revision: 1.1223 $
++#	$Date: 2026/02/07 21:14:29 $
+ #
+ # The original header is preserved below for reference.  It is noted that there
+ # is a "newer" version which differs in some cosmetic details (but actually
+@@ -2731,7 +2731,7 @@
+ 	dch=\E[%p1%dP, dch1=\E[P, ech=\E[%p1%dX, el1=\E[1K,
+ 	enacs=\E)0, flash=\E[?5h$<200/>\E[?5l, ht=^I, hts=\EH,
+ 	ich=\E[%p1%d@, if=/usr/share/tabset/vt100, ind=\ED,
+-	is2=\E[?7h\E[>\E[?1l\E F\E[?4l, kbs=^H, kcub1=\E[D,
++	is2=\E[?7h\E>\E[?1l\E F\E[?4l, kbs=^H, kcub1=\E[D,
+ 	kcud1=\E[B, kcuf1=\E[C, kcuu1=\E[A, kf13=\E[25~,
+ 	kf14=\E[26~, kf17=\E[31~, kf18=\E[32~, kf19=\E[33~,
+ 	kf20=\E[34~, khlp=\E[28~, krdo=\E[29~, lf1=pf1, lf2=pf2,
+@@ -13378,7 +13378,7 @@
+ 	knp=\E[6~, kpp=\E[5~, kprt=\E[?5i, kslt=\E[4~, mc0=\E[0i,
+ 	rc=\E8, rev=\E[1t\E[7m, ri=\EM$<2>, rmacs=^O, rmam=\E[?7l,
+ 	rmir=\E[4l, rmkx=\E>, rmso=\E[m, rmul=\E[m,
+-	rs1=\E[13l\E[3l\E!p, rs2=\E[35h\E[?3l$<80>, rs3=\E[?5l,
++	rs1=\E[13l\E[3l\E[!p, rs2=\E[35h\E[?3l$<80>, rs3=\E[?5l,
+ 	sc=\E7,
+ 	sgr=%?%p5%t\E[0t%;%?%p3%p1%|%t\E[1t%;%?%p2%t\E[2t%;%?%p4%t
+ 	    \E[3t%;%?%p1%p2%p3%p4%p5%|%|%|%|%t\E[7m%e\E[m%;%?%p9%t
+@@ -13439,7 +13439,7 @@
+ 	is2=\E[2;4;20;30l\E[?1;4;10;16l\E[12h\E[?7;8;25h$<16>,
+ 	is3=\E>\E(B\E)0\017\E[m, khlp=\E[28~, khome=\E[26~,
+ 	lf1=PF1, lf2=PF2, lf3=PF3, lf4=PF4, mc0=\E[0i, ri=\EM$<3>,
+-	rmam=\E[?7l, rmir=\E[4l, rmkx=\E>, rs1=\E[13l\E[3l\E!p,
++	rmam=\E[?7l, rmir=\E[4l, rmkx=\E>, rs1=\E[13l\E[3l\E[!p,
+ 	rs2=\E[35h\E[?3l$<70>, rs3=\E[?5l,
+ 	sgr=\E[0%?%p2%t;4%;%?%p3%p1%|%t;7%;%?%p4%t;5%;%?%p5%t;2%;%?
+ 	    %p6%t;1%;%?%p7%t;8%;m%?%p9%t\016%e\017%;,
+@@ -13494,7 +13494,7 @@
+ 	kf9=\23320~, kfnd=\2331~, khlp=\23328~, khome=\23326~,
+ 	kich1=\2332~, knp=\2336~, kpp=\2335~, kslt=\2334~, lf1=PF1,
+ 	lf2=PF2, lf3=PF3, lf4=PF4, mc0=\E[0i, ri=\EM$<3>,
+-	rmam=\E[?7l, rmir=\E[4l, rmkx=\E>, rs1=\E[13l\E[3l\E!p,
++	rmam=\E[?7l, rmir=\E[4l, rmkx=\E>, rs1=\E[13l\E[3l\E[!p,
+ 	rs2=\E[35h\E[?3l$<70>, rs3=\E[?5l,
+ 	sgr=\E[0%?%p2%t;4%;%?%p3%p1%|%t;7%;%?%p4%t;5%;%?%p5%t;2%;%?
+ 	    %p6%t;1%;%?%p7%t;8%;+m%?%p9%t\016%e\017%;,
+@@ -13710,7 +13710,7 @@
+ 	   \E[66;5;51w\E[66;6;61w\E[66;7;64w,
+ 	op=\E[m, ri=\EM$<2>, rmacs=^O, rmam=\E[?7l, rmclk=\E[31l,
+ 	rmcup=\E[ R, rmir=\E[4l, rmkx=\E>,
+-	rs1=\E[13l\E[3l\E!p\E[?4i, rs2=\E[35h\E[?3l$<8>,
++	rs1=\E[13l\E[3l\E[!p\E[?4i, rs2=\E[35h\E[?3l$<8>,
+ 	rs3=\E[?5l, setb=\E[62;%p1%dw, setf=\E[61;%p1%dw,
+ 	sgr=\E[0%?%p2%t;4%;%?%p3%p1%|%t;7%;%?%p4%t;5%;%?%p5%t;2%;%?
+ 	    %p6%t;1%;%?%p7%t;8%;m%?%p9%t\016%e\017%;,
+@@ -28119,4 +28119,8 @@
+ #	+ add xterm+3keys -TD
+ #	+ add note explaining origin of ecma+overline -TD
+ #
++# 2026-02-07
++#	+ correct DECKPNM in vt220 is2 (Aaro Koskinen)
++#	+ correct DECSTR in some Wyse terminfo entries -TD
++#
+ ######## SHANTIH!  SHANTIH!  SHANTIH!
+Index: package/debian-mingw/changelog
+--- ncurses-6.6-20260131+/package/debian-mingw/changelog	2026-01-31 10:19:27.000000000 +0000
++++ ncurses-6.6-20260207/package/debian-mingw/changelog	2026-02-07 11:02:03.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260131) unstable; urgency=low
++ncurses6td (6.6+20260207) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 31 Jan 2026 05:19:27 -0500
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 07 Feb 2026 06:02:03 -0500
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian-mingw64/changelog
+--- ncurses-6.6-20260131+/package/debian-mingw64/changelog	2026-01-31 10:19:27.000000000 +0000
++++ ncurses-6.6-20260207/package/debian-mingw64/changelog	2026-02-07 11:02:03.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260131) unstable; urgency=low
++ncurses6td (6.6+20260207) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 31 Jan 2026 05:19:27 -0500
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 07 Feb 2026 06:02:03 -0500
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian/changelog
+--- ncurses-6.6-20260131+/package/debian/changelog	2026-01-31 10:19:27.000000000 +0000
++++ ncurses-6.6-20260207/package/debian/changelog	2026-02-07 11:02:03.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260131) unstable; urgency=low
++ncurses6td (6.6+20260207) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 31 Jan 2026 05:19:27 -0500
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 07 Feb 2026 06:02:03 -0500
+ 
+ ncurses6 (5.9+20120608) unstable; urgency=low
+ 
+Index: package/mingw-ncurses.nsi
+Prereq:  1.746 
+--- ncurses-6.6-20260131+/package/mingw-ncurses.nsi	2026-01-31 10:19:27.000000000 +0000
++++ ncurses-6.6-20260207/package/mingw-ncurses.nsi	2026-02-07 11:02:03.000000000 +0000
+@@ -1,4 +1,4 @@
+-; $Id: mingw-ncurses.nsi,v 1.746 2026/01/31 10:19:27 tom Exp $
++; $Id: mingw-ncurses.nsi,v 1.747 2026/02/07 11:02:03 tom Exp $
+ 
+ ; TODO add examples
+ ; TODO bump ABI to 6
+@@ -10,7 +10,7 @@
+ !define VERSION_MAJOR "6"
+ !define VERSION_MINOR "6"
+ !define VERSION_YYYY  "2026"
+-!define VERSION_MMDD  "0131"
++!define VERSION_MMDD  "0207"
+ !define VERSION_PATCH ${VERSION_YYYY}${VERSION_MMDD}
+ 
+ !define MY_ABI   "5"
+Index: package/mingw-ncurses.spec
+--- ncurses-6.6-20260131+/package/mingw-ncurses.spec	2026-01-31 10:19:27.000000000 +0000
++++ ncurses-6.6-20260207/package/mingw-ncurses.spec	2026-02-07 11:02:03.000000000 +0000
+@@ -3,7 +3,7 @@
+ Summary: shared libraries for terminal handling
+ Name: mingw32-ncurses6
+ Version: 6.6
+-Release: 20260131
++Release: 20260207
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -144,8 +144,8 @@
+ 
+ %changelog
+ 
+-* Sat Jan 31 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260131
++* Sat Feb 07 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260207
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncurses.spec
+--- ncurses-6.6-20260131+/package/ncurses.spec	2026-01-31 10:19:27.000000000 +0000
++++ ncurses-6.6-20260207/package/ncurses.spec	2026-02-07 11:02:03.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: shared libraries for terminal handling
+ Name: ncurses6
+ Version: 6.6
+-Release: 20260131
++Release: 20260207
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -134,8 +134,8 @@
+ 
+ %changelog
+ 
+-* Sat Jan 31 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260131
++* Sat Feb 07 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260207
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncursest.spec
+--- ncurses-6.6-20260131+/package/ncursest.spec	2026-01-31 10:19:27.000000000 +0000
++++ ncurses-6.6-20260207/package/ncursest.spec	2026-02-07 11:02:03.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: Curses library with POSIX thread support.
+ Name: ncursest6
+ Version: 6.6
+-Release: 20260131
++Release: 20260207
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ Source: ncurses-%{version}-%{release}.tgz
+@@ -142,8 +142,8 @@
+ 
+ %changelog
+ 
+-* Sat Jan 31 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260131
++* Sat Feb 07 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260207
+ 
+ * Tue Dec 24 2019 Thomas Dickey
+ - drop custom CC_NORMAL warning flags because setting CFLAGS interferes with
+Index: progs/dump_entry.c
+Prereq:  1.199 
+--- ncurses-6.6-20260131+/progs/dump_entry.c	2025-02-08 21:53:40.000000000 +0000
++++ ncurses-6.6-20260207/progs/dump_entry.c	2026-02-07 13:27:57.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -40,7 +40,7 @@
+ #include <termsort.h>		/* this C file is generated */
+ #include <parametrized.h>	/* so is this */
+ 
+-MODULE_ID("$Id: dump_entry.c,v 1.199 2025/02/08 21:53:40 tom Exp $")
++MODULE_ID("$Id: dump_entry.c,v 1.200 2026/02/07 13:27:57 tom Exp $")
+ 
+ #define DISCARD(string) string = ABSENT_STRING
+ #define PRINTF (void) printf
+@@ -1115,7 +1115,7 @@
+ 		char *srccap = _nc_tic_expand(capability, TRUE, numbers);
+ 		int params = ((i < (int) SIZEOF(parametrized))
+ 			      ? parametrized[i]
+-			      : ((*srccap == 'k')
++			      : (is_fkey(srccap)
+ 				 ? 0
+ 				 : has_params(srccap, FALSE)));
+ 		const char *cv = _nc_infotocap(name, srccap, params);
+Index: progs/infocmp.c
+Prereq:  1.177 
+--- ncurses-6.6-20260131+/progs/infocmp.c	2025-12-27 22:18:10.000000000 +0000
++++ ncurses-6.6-20260207/progs/infocmp.c	2026-02-07 22:18:36.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2020-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2020-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -43,7 +43,7 @@
+ 
+ #include <dump_entry.h>
+ 
+-MODULE_ID("$Id: infocmp.c,v 1.177 2025/12/27 22:18:10 tom Exp $")
++MODULE_ID("$Id: infocmp.c,v 1.179 2026/02/07 22:18:36 tom Exp $")
+ 
+ #ifndef ACTUAL_TIC
+ #define ACTUAL_TIC "tic"
+@@ -694,44 +694,63 @@
+ #define DATAX()        DATA("", "")
+ 
+ typedef struct {
+-    const char from[8];
++    const char from[12];
+     const char to[12];
+ } assoc;
+ 
++/* *INDENT-OFF* */
+ static const assoc std_caps[] =
+ {
+-    /* these are specified by X.364 and iBCS2 */
+-    DATA("\033c", "RIS"),	/* full reset */
+-    DATA("\0337", "SC"),	/* save cursor */
+-    DATA("\0338", "RC"),	/* restore cursor */
+-    DATA("\033[r", "RSR"),	/* not an X.364 mnemonic */
+-    DATA("\033[m", "SGR0"),	/* not an X.364 mnemonic */
+-    DATA("\033[2J", "ED2"),	/* clear page */
++    DATA("\016",    "SI"),		/* shift-in */
++    DATA("\017",    "SO"),		/* shift-out */
++    DATA("\033[H",  "HOME"),		/* move cursor to home */
++    DATA("\033[J",  "ED"),		/* clear screen */
++    DATA("\033E",   "NEL"),		/* next line */
++    DATA("\033H",   "HTS"),		/* horizontal tab set */
++    DATA("\033M",   "RI"),		/* reverse index */
++
++    /* these are specified by X3.64 and iBCS2 */
++    DATA("\033c",   "RIS"),		/* full reset */
++    DATA("\0337",   "SC"),		/* save cursor */
++    DATA("\0338",   "RC"),		/* restore cursor */
++    DATA("\033[r",  "RSR"),		/* not an X3.64 mnemonic */
++    DATA("\033[m",  "SGR0"),		/* not an X3.64 mnemonic */
++    DATA("\033[2J", "ED2"),		/* clear page */
+ 
+     /* this group is specified by ISO 2022 */
+-    DATA("\033(0", "ISO DEC G0"),	/* enable DEC graphics for G0 */
+-    DATA("\033(A", "ISO UK G0"),	/* enable UK chars for G0 */
+-    DATA("\033(B", "ISO US G0"),	/* enable US chars for G0 */
+-    DATA("\033)0", "ISO DEC G1"),	/* enable DEC graphics for G1 */
+-    DATA("\033)A", "ISO UK G1"),	/* enable UK chars for G1 */
+-    DATA("\033)B", "ISO US G1"),	/* enable US chars for G1 */
++    DATA("\033(0",  "ISO DEC G0"),	/* enable DEC graphics for G0 */
++    DATA("\033(A",  "ISO UK G0"),	/* enable UK chars for G0 */
++    DATA("\033(B",  "ISO US G0"),	/* enable US chars for G0 */
++    DATA("\033)0",  "ISO DEC G1"),	/* enable DEC graphics for G1 */
++    DATA("\033)A",  "ISO UK G1"),	/* enable UK chars for G1 */
++    DATA("\033)B",  "ISO US G1"),	/* enable US chars for G1 */
+ 
+     /* these are DEC private controls widely supported by emulators */
+-    DATA("\033=", "DECPAM"),	/* application keypad mode */
+-    DATA("\033>", "DECPNM"),	/* normal keypad mode */
+-    DATA("\033<", "DECANSI"),	/* enter ANSI mode */
+-    DATA("\033[!p", "DECSTR"),	/* soft reset */
+-    DATA("\033 F", "S7C1T"),	/* 7-bit controls */
+-
++    DATA("\033=",   "DECPAM"),		/* application keypad mode */
++    DATA("\033>",   "DECPNM"),		/* normal keypad mode */
++    DATA("\033<",   "DECANSI"),		/* enter ANSI mode */
++    DATA("\033[!p", "DECSTR"),		/* soft reset */
++    DATA("\033 F",  "S7C1T"),		/* 7-bit controls */
++    DATA("\033 G",  "S8C1T"),		/* 8-bit controls */
++
++    /* these are XTerm controls widely supported by emulators */
++    DATA("\033[22;0;0t",  "push title"),
++    DATA("\033[23;0;0t",  "pop title"),
+     DATAX()
+ };
++/* *INDENT-ON* */
+ 
+ static const assoc std_modes[] =
+ /* ECMA \E[ ... [hl] modes recognized by many emulators */
+ {
++    DATA("1", "GATM"),		/* guarded area transfer mode */
+     DATA("2", "AM"),		/* keyboard action mode */
++    DATA("3", "CRM"),		/* control representation mode */
+     DATA("4", "IRM"),		/* insert/replace mode */
++    DATA("5", "STRM"),		/* status report transfer mode */
++    DATA("6", "ERM"),		/* erasure mode */
+     DATA("12", "SRM"),		/* send/receive mode */
++    DATA("13", "FEAM"),		/* format effector action mode */
+     DATA("20", "LNM"),		/* linefeed mode */
+     DATAX()
+ };
+@@ -747,6 +766,12 @@
+     DATA("6", "OM"),		/* origin mode */
+     DATA("7", "AWM"),		/* wraparound mode */
+     DATA("8", "ARM"),		/* auto-repeat mode */
++    DATA("25", "TCEM"),		/* text cursor enable */
++    DATA("47", "NRCM"),		/* national replacement character mode */
++    DATA("67", "BKM"),		/* backarrow key mode */
++    DATA("1000", "X11MSE"),	/* XTerm: X11 mouse */
++    DATA("1034", "META"),	/* XTerm: meta/eightBitInput */
++    DATA("1049", "ALTSCRN"),	/* XTerm: alternate screen */
+     DATAX()
+ };
+ 
+@@ -845,7 +870,7 @@
+ }
+ 
+ static void
+-analyze_string(const char *name, const char *cap, TERMTYPE2 *tp)
++analyze_string(const char *name, const char *cap, TERMTYPE2 *tp, int many)
+ {
+     char buf2[MAX_TERMINFO_LENGTH + 1];
+     const char *sp;
+@@ -854,13 +879,17 @@
+ 
+     if (!VALID_STRING(cap))
+ 	return;
++    if (many)
++	putchar('\t');
+     (void) printf("%s: ", name);
+ 
+     for (sp = cap; *sp; sp++) {
+ 	int i;
+ 	int csi;
++	int final = '\0';
++	int private = 0;
+ 	size_t len = 0;
+-	size_t next;
++	size_t next = 0;
+ 	const char *expansion = NULL;
+ 	char buf3[MAX_TERMINFO_LENGTH];
+ 
+@@ -869,9 +898,9 @@
+ 	    const char *cp = tp->Strings[i];
+ 
+ 	    /* don't use function-key capabilities */
+-	    if (strnames[i] == NULL)
++	    if (!VALID_STRING(strnames[i]))
+ 		continue;
+-	    if (strnames[i][0] == 'k' && strnames[i][1] == 'f')
++	    if (is_fkey(strnames[i]))
+ 		continue;
+ 
+ 	    if (VALID_STRING(cp) &&
+@@ -922,14 +951,28 @@
+ 	    }
+ 	}
+ 
+-	/* now check for standard-mode sequences */
++	/* parse ECMA and DEC control sequences with numeric parameters */
++	csi = 0;
+ 	if (!expansion
+ 	    && (csi = skip_csi(sp)) != 0
+-	    && (len = (strspn) (sp + csi, "0123456789;"))
+-	    && (len < sizeof(buf3))
+-	    && (next = (size_t) csi + len)
+-	    && ((sp[next] == 'h') || (sp[next] == 'l'))) {
++	    && sp[csi] != '\0') {
++	    int adj = 0;
++	    if (strchr("<>=?", sp[csi])) {
++		private = sp[csi];
++	    }
++	    if (private)
++		adj = 1;
++	    len = (strspn) (sp + csi + adj, "0123456789;:");
++	    if (len < sizeof(buf3)) {
++		next = (size_t) (csi + adj) + len;
++		final = sp[next];
++	    }
++	}
+ 
++	/* now check for ECMA standard-mode sequences */
++	if (!expansion
++	    && !private
++	    && (final == 'h' || final == 'l')) {
+ 	    _nc_STRCPY(buf2,
+ 		       ((sp[next] == 'h')
+ 			? "ECMA+"
+@@ -941,15 +984,10 @@
+ 	    expansion = lookup_params(std_modes, buf2, buf3);
+ 	}
+ 
+-	/* now check for private-mode sequences */
++	/* now check for DEC private-mode sequences */
+ 	if (!expansion
+-	    && (csi = skip_csi(sp)) != 0
+-	    && sp[csi] == '?'
+-	    && (len = (strspn) (sp + csi + 1, "0123456789;"))
+-	    && (len < sizeof(buf3))
+-	    && (next = (size_t) csi + 1 + len)
+-	    && ((sp[next] == 'h') || (sp[next] == 'l'))) {
+-
++	    && (private == '?')
++	    && (final == 'h' || final == 'l')) {
+ 	    _nc_STRCPY(buf2,
+ 		       ((sp[next] == 'h')
+ 			? "DEC+"
+@@ -963,12 +1001,8 @@
+ 
+ 	/* now check for ECMA highlight sequences */
+ 	if (!expansion
+-	    && (csi = skip_csi(sp)) != 0
+-	    && (len = (strspn) (sp + csi, "0123456789;")) != 0
+-	    && (len < sizeof(buf3))
+-	    && (next = (size_t) csi + len)
+-	    && sp[next] == 'm') {
+-
++	    && !private
++	    && final == 'm') {
+ 	    _nc_STRCPY(buf2, "SGR:", sizeof(buf2));
+ 	    _nc_STRNCPY(buf3, sp + csi, len);
+ 	    buf3[len] = '\0';
+@@ -977,19 +1011,11 @@
+ 	    expansion = lookup_params(ecma_highlights, buf2, buf3);
+ 	}
+ 
+-	if (!expansion
+-	    && (csi = skip_csi(sp)) != 0
+-	    && sp[csi] == 'm') {
+-	    len = (size_t) csi + 1;
+-	    _nc_STRCPY(buf2, "SGR:", sizeof(buf2));
+-	    _nc_STRCAT(buf2, ecma_highlights[0].to, sizeof(buf2));
+-	    expansion = buf2;
+-	}
+-
+ 	/* now check for scroll region reset */
+ 	if (!expansion
+-	    && (csi = skip_csi(sp)) != 0) {
+-	    if (sp[csi] == 'r') {
++	    && !private
++	    && csi != 0) {
++	    if (final == 'r') {
+ 		expansion = "RSR";
+ 		len = 1;
+ 	    } else {
+@@ -1001,37 +1027,90 @@
+ 	    len += (size_t) csi;
+ 	}
+ 
+-	/* now check for home-down */
++	/* now check for home and home-down */
+ 	if (!expansion
+-	    && (csi = skip_csi(sp)) != 0) {
+-	    _nc_SPRINTF(buf2, _nc_SLIMIT(sizeof(buf2)) "%d;1H", tp_lines);
+-	    len = strlen(buf2);
+-	    if (strncmp(buf2, sp + csi, len) == 0) {
+-		expansion = "LL";
+-	    } else {
+-		_nc_SPRINTF(buf2, _nc_SLIMIT(sizeof(buf2)) "%dH", tp_lines);
+-		len = strlen(buf2);
+-		if (strncmp(buf2, sp + csi, len) == 0) {
++	    && !private
++	    && csi != 0
++	    && final == 'H') {
++	    int row, col;
++	    if (sp[csi] == final) {
++		expansion = "HOME";
++	    } else if (sscanf(sp + csi, "%dH", &row) == 1) {
++		if (row == 1) {
++		    expansion = "HOME";
++		} else if (row == tp_lines) {
++		    expansion = "LL";
++		}
++	    } else if (sscanf(sp + csi, "%d;%dH", &row, &col) == 2) {
++		if (col != 1) {
++		    expansion = NULL;
++		} else if (row == 1) {
++		    expansion = "HOME";
++		} else if (row == tp_lines) {
+ 		    expansion = "LL";
+ 		}
+ 	    }
+-	    len += (size_t) csi;
++
++	}
++
++	/* now check for DEC set conformance level */
++	if (!expansion
++	    && !private
++	    && csi != 0
++	    && final == '"'
++	    && sp[next + 1] == 'p') {
++	    if (sp[csi] != '"') {
++		_nc_SPRINTF(buf2, _nc_SLIMIT(sizeof(buf2))
++			    "DECSCL %.*s", (int) (next - 2), sp + csi);
++		expansion = buf2;
++	    } else {
++		expansion = "DECSCL";
++	    }
++	    ++next;
+ 	}
+ 
+ 	/* now look at the expansion we got, if any */
+ 	if (expansion) {
+ 	    printf("{%s}", expansion);
+-	    sp += len - 1;
++	    if (csi && final) {
++		sp += next;
++	    } else {
++		sp += len - 1;
++	    }
+ 	} else {
+ 	    /* couldn't match anything */
+-	    buf2[0] = *sp;
+-	    buf2[1] = '\0';
+-	    fputs(TIC_EXPAND(buf2), stdout);
++	    if (!csi || !final) {
++		next = 1;
++	    }
++	    while (next-- != 0) {
++		buf2[0] = *sp++;
++		buf2[1] = '\0';
++		fputs(TIC_EXPAND(buf2), stdout);
++	    }
++	    --sp;
+ 	}
+     }
+     putchar('\n');
+ }
+ 
++static void
++do_analysis(TERMTYPE2 *tp, int many)
++{
++#undef CUR
++#define CUR	tp->
++    analyze_string("is1", init_1string, tp, many);
++    analyze_string("is2", init_2string, tp, many);
++    analyze_string("is3", init_3string, tp, many);
++    analyze_string("rs1", reset_1string, tp, many);
++    analyze_string("rs2", reset_2string, tp, many);
++    analyze_string("rs3", reset_3string, tp, many);
++    analyze_string("smcup", enter_ca_mode, tp, many);
++    analyze_string("rmcup", exit_ca_mode, tp, many);
++    analyze_string("smkx", keypad_xmit, tp, many);
++    analyze_string("rmkx", keypad_local, tp, many);
++#undef CUR
++}
++
+ /***************************************************************************
+  *
+  * File comparison
+@@ -1907,7 +1986,7 @@
+ 
+     /* exactly one terminal name with no options means display it */
+     /* exactly two terminal names with no options means do -d */
+-    if (compare == C_DEFAULT) {
++    if (compare == C_DEFAULT && !init_analyze) {
+ 	switch (argc - optind) {
+ 	default:
+ 	    fprintf(stderr, "%s: too many names to compare\n", _nc_progname);
+@@ -2024,19 +2103,11 @@
+ 
+ 	/* analyze the init strings */
+ 	else if (init_analyze) {
+-#undef CUR
+-#define CUR	entries[0].tterm.
+-	    analyze_string("is1", init_1string, &entries[0].tterm);
+-	    analyze_string("is2", init_2string, &entries[0].tterm);
+-	    analyze_string("is3", init_3string, &entries[0].tterm);
+-	    analyze_string("rs1", reset_1string, &entries[0].tterm);
+-	    analyze_string("rs2", reset_2string, &entries[0].tterm);
+-	    analyze_string("rs3", reset_3string, &entries[0].tterm);
+-	    analyze_string("smcup", enter_ca_mode, &entries[0].tterm);
+-	    analyze_string("rmcup", exit_ca_mode, &entries[0].tterm);
+-	    analyze_string("smkx", keypad_xmit, &entries[0].tterm);
+-	    analyze_string("rmkx", keypad_local, &entries[0].tterm);
+-#undef CUR
++	    for (c = 0; c < termcount; ++c) {
++		if (termcount > 1)
++		    printf("%s\n", tname[c]);
++		do_analysis(&entries[c].tterm, termcount > 1);
++	    }
+ 	} else {
+ 	    int i;
+ 	    int len;
+Index: progs/progs.priv.h
+Prereq:  1.63 
+--- ncurses-6.6-20260131+/progs/progs.priv.h	2025-12-27 22:17:25.000000000 +0000
++++ ncurses-6.6-20260207/progs/progs.priv.h	2026-02-07 13:27:57.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2019-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2019-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2015,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -31,7 +31,7 @@
+  *  Author: Thomas E. Dickey                    1997-on                     *
+  ****************************************************************************/
+ /*
+- * $Id: progs.priv.h,v 1.63 2025/12/27 22:17:25 tom Exp $
++ * $Id: progs.priv.h,v 1.64 2026/02/07 13:27:57 tom Exp $
+  *
+  *	progs.priv.h
+  *
+@@ -130,6 +130,8 @@
+ #define use_verbosity(level) do { set_trace_level(level); } while (0)
+ #endif
+ 
++#define is_fkey(name) (name[0] == 'k')
++
+ #ifndef CUR
+ #define CUR ((TERMTYPE *)(cur_term))->
+ #endif
+Index: progs/tic.c
+Prereq:  1.335 
+--- ncurses-6.6-20260131+/progs/tic.c	2025-12-31 12:03:37.000000000 +0000
++++ ncurses-6.6-20260207/progs/tic.c	2026-02-07 22:22:45.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2017,2018 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -49,7 +49,7 @@
+ #include <parametrized.h>
+ #include <transform.h>
+ 
+-MODULE_ID("$Id: tic.c,v 1.335 2025/12/31 12:03:37 tom Exp $")
++MODULE_ID("$Id: tic.c,v 1.338 2026/02/07 22:22:45 tom Exp $")
+ 
+ #define STDIN_NAME "<stdin>"
+ 
+@@ -366,7 +366,7 @@
+ 
+ /* Returns a string, stripped of leading/trailing whitespace */
+ static char *
+-stripped(char *src)
++stripped(const char *src)
+ {
+     char *dst = NULL;
+ 
+@@ -494,8 +494,8 @@
+ make_namelist(char *src)
+ {
+     char **dst = NULL;
+-
+-    char *s, *base;
++    char *s;
++    const char *base;
+     unsigned pass, n, nn;
+     char buffer[BUFSIZ];
+ 
+@@ -1762,7 +1762,7 @@
+ 	} else if (have_XT && screen_base) {
+ 	    _nc_warning("screen's \"screen\" entries should not have XT set");
+ 	} else if (have_XT) {
+-	    char *s;
++	    const char *s;
+ 
+ 	    if (!have_kmouse && is_screen) {
+ 		if (VALID_STRING(key_mouse)) {
+@@ -1898,7 +1898,7 @@
+ lookup_user_capability(const char *name)
+ {
+     struct user_table_entry const *result = NULL;
+-    if (*name != 'k') {
++    if (!is_fkey(name)) {
+ 	result = _nc_find_user_entry(name);
+     }
+     return result;
+@@ -2193,7 +2193,7 @@
+ 		if ((rc != 2) || (mark != NULL && (check_c != *mark)) || mixed) {
+ 		    _nc_warning("syntax error in %s delay '%.*s'", name,
+ 				(int) (q - base), base);
+-		} else if (*name == 'k') {
++		} else if (is_fkey(name)) {
+ 		    _nc_warning("function-key %s has delay", name);
+ 		} else if (proportional && !line_capability(name)) {
+ 		    _nc_warning("non-line capability using proportional delay: %s", name);
+@@ -2456,7 +2456,7 @@
+ 	bool embedded;
+ 	int params = ((i < (int) SIZEOF(parametrized))
+ 		      ? parametrized[i]
+-		      : ((*value == 'k')
++		      : (is_fkey(value)
+ 			 ? 0
+ 			 : has_params(value, FALSE)));
+ 
+@@ -2720,7 +2720,7 @@
+ #if NCURSES_XNAMES
+     for (j = STRCOUNT; j < NUM_STRINGS(tp); ++j) {
+ 	const char *name = ExtStrname(tp, (int) j, strnames);
+-	if (*name == 'k') {
++	if (is_fkey(name)) {
+ 	    result[used].keycode = -1;
+ 	    result[used].name = name;
+ 	    result[used].value = tp->Strings[j];
+@@ -2998,7 +2998,7 @@
+ 			name_of_type(actual),
+ 			name_of_type(expected)
+ 		);
+-	} else if (*name != 'k') {
++	} else if (!is_fkey(name)) {
+ 	    _nc_warning("undocumented %s capability %s",
+ 			name_of_type(actual),
+ 			name);
+@@ -3272,7 +3272,7 @@
+     ANDMISSING(clear_all_tabs, set_tab);
+ 
+     if (PRESENT(set_attributes)) {
+-	char *zero = NULL;
++	const char *zero = NULL;
+ 
+ 	_nc_tparm_err = 0;
+ 	if (PRESENT(exit_attribute_mode)) {

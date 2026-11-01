@@ -1,0 +1,1779 @@
+# ncurses 6.6 - patch 20260905 - Thomas E. Dickey
+#
+# ------------------------------------------------------------------------------
+#
+# Ncurses 6.6 is at
+#   https://invisible-island.net/archives/ncurses/
+#   https://invisible-mirror.net/archives/ncurses/
+#   https://ftp.gnu.org/gnu/ncurses/
+#
+# Patches for ncurses 6.6 can be found at
+#   https://invisible-island.net/archives/ncurses/6.6
+#   https://invisible-mirror.net/archives/ncurses/6.6
+#
+# ------------------------------------------------------------------------------
+# https://invisible-island.net/archives/ncurses/6.6/ncurses-6.6-20260905.patch.gz
+# patch by Thomas E. Dickey <dickey@invisible-island.net>
+# created  Sun Sep  6 00:43:13 UTC 2026
+# ------------------------------------------------------------------------------
+# Ada95/gen/terminal_interface-curses-mouse.ads.m4      |    8 
+# NEWS                                                  |   10 
+# VERSION                                               |    2 
+# dist.mk                                               |    4 
+# doc/html/ada/funcs/T.htm                              |    2 
+# doc/html/ada/terminal_interface-curses-mouse__ads.htm |    8 
+# doc/html/man/curs_sp_funcs.3x.html                    |   11 
+# doc/html/man/ncurses.3x.html                          |    2 
+# doc/html/man/terminfo.5.html                          |    2 
+# include/curses.h.in                                   |    3 
+# man/curs_sp_funcs.3x                                  |    7 
+# ncurses/base/lib_driver.c                             |   24 -
+# ncurses/base/lib_endwin.c                             |   22 +
+# ncurses/base/lib_mouse.c                              |  283 ++++++----------
+# ncurses/base/resizeterm.c                             |    4 
+# ncurses/curses.priv.h                                 |    6 
+# ncurses/llib-lncurses                                 |    6 
+# ncurses/llib-lncursest                                |    6 
+# ncurses/llib-lncursestw                               |    6 
+# ncurses/llib-lncursesw                                |    6 
+# ncurses/llib-ltinfo                                   |    6 
+# ncurses/llib-ltinfot                                  |    6 
+# ncurses/llib-ltinfotw                                 |    6 
+# ncurses/llib-ltinfow                                  |    6 
+# ncurses/tinfo/lib_options.c                           |   17 
+# ncurses/tinfo/lib_ttyflags.c                          |    5 
+# ncurses/tinfo/tinfo_driver.c                          |    5 
+# ncurses/trace/lib_tracemse.c                          |    8 
+# ncurses/tty/lib_mvcur.c                               |    6 
+# ncurses/tty/tty_update.c                              |   13 
+# ncurses/win32con/win32_driver.c                       |   19 -
+# package/debian-mingw/changelog                        |    4 
+# package/debian-mingw64/changelog                      |    4 
+# package/debian/changelog                              |    4 
+# package/mingw-ncurses.nsi                             |    4 
+# package/mingw-ncurses.spec                            |    6 
+# package/ncurses.map                                   |    3 
+# package/ncurses.spec                                  |    6 
+# package/ncurses.sym                                   |    3 
+# package/ncursest.map                                  |    3 
+# package/ncursest.spec                                 |    6 
+# package/ncursest.sym                                  |    3 
+# package/ncursestw.map                                 |    3 
+# package/ncursestw.sym                                 |    3 
+# package/ncursesw.map                                  |    3 
+# package/ncursesw.sym                                  |    3 
+# test/README                                           |    5 
+# test/test_mouse.c                                     |   79 ++--
+# 48 files changed, 373 insertions(+), 288 deletions(-)
+# ------------------------------------------------------------------------------
+Index: Ada95/gen/terminal_interface-curses-mouse.ads.m4
+--- ncurses-6.6-20260829+/Ada95/gen/terminal_interface-curses-mouse.ads.m4	2020-02-02 23:34:34.000000000 +0000
++++ ncurses-6.6-20260905/Ada95/gen/terminal_interface-curses-mouse.ads.m4	2026-08-30 18:16:31.000000000 +0000
+@@ -10,7 +10,7 @@
+ --                                 S P E C                                  --
+ --                                                                          --
+ ------------------------------------------------------------------------------
+--- Copyright 2020 Thomas E. Dickey                                          --
++-- Copyright 2020,2026 Thomas E. Dickey                                     --
+ -- Copyright 1998-2014,2015 Free Software Foundation, Inc.                  --
+ --                                                                          --
+ -- Permission is hereby granted, free of charge, to any person obtaining a  --
+@@ -39,8 +39,8 @@
+ ------------------------------------------------------------------------------
+ --  Author:  Juergen Pfeifer, 1996
+ --  Version Control:
+---  $Revision: 1.33 $
+---  $Date: 2020/02/02 23:34:34 $
++--  $Revision: 1.34 $
++--  $Date: 2026/08/30 18:16:31 $
+ --  Binding Version 01.00
+ ------------------------------------------------------------------------------
+ with System;
+@@ -158,7 +158,7 @@
+    --  This can be as little as 32 bits (unsigned), or as long as the system's
+    --  unsigned long.  Declare it as the minimum size to handle all valid
+    --  sizes.
+-   type Event_Mask is mod 4294967296;
++   type Event_Mask is mod Curses_Constants.REPORT_MOUSE_POSITION;
+ 
+    type Mouse_Event is
+       record
+Index: NEWS
+Prereq:  1.4523 
+--- ncurses-6.6-20260829+/NEWS	2026-08-29 21:34:50.000000000 +0000
++++ ncurses-6.6-20260905/NEWS	2026-09-05 19:52:15.000000000 +0000
+@@ -26,7 +26,7 @@
+ -- sale, use or other dealings in this Software without prior written        --
+ -- authorization.                                                            --
+ -------------------------------------------------------------------------------
+--- $Id: NEWS,v 1.4523 2026/08/29 21:34:50 tom Exp $
++-- $Id: NEWS,v 1.4529 2026/09/05 19:52:15 tom Exp $
+ -------------------------------------------------------------------------------
+ 
+ This is a log of changes that ncurses has gone through since Zeyd started
+@@ -46,6 +46,14 @@
+ Changes through 1.9.9e did not credit all contributions;
+ it is not possible to add this information.
+ 
++20260905
++	+ modify endwin() and doupdate() to save/restore keypad and meta modes
++	  (report by Ferenc Wagner).
++	+ improve range-checks for xterm X10 and SGR mouse protocol.
++	+ correct modifier-masking for buttons 6-11 in mouse version 3
++	  (report by Ravi Arnan Irianto).
++	+ build-fix for Ada95 with ABI 7 (report by Branden Robinson)
++
+ 20260829
+ 	+ add configure check to ensure that mmask_t is large enough for the
+ 	  configured mouse version (report by Ravi Arnan Irianto)
+Index: VERSION
+--- ncurses-6.6-20260829+/VERSION	2026-08-29 09:26:56.000000000 +0000
++++ ncurses-6.6-20260905/VERSION	2026-09-05 00:09:29.000000000 +0000
+@@ -1 +1 @@
+-5:0:10	6.6	20260829
++5:0:10	6.6	20260905
+Index: dist.mk
+Prereq:  1.1749 
+--- ncurses-6.6-20260829+/dist.mk	2026-08-29 09:26:56.000000000 +0000
++++ ncurses-6.6-20260905/dist.mk	2026-09-05 00:09:29.000000000 +0000
+@@ -26,7 +26,7 @@
+ # use or other dealings in this Software without prior written               #
+ # authorization.                                                             #
+ ##############################################################################
+-# $Id: dist.mk,v 1.1749 2026/08/29 09:26:56 tom Exp $
++# $Id: dist.mk,v 1.1751 2026/09/05 00:09:29 tom Exp $
+ # Makefile for creating ncurses distributions.
+ #
+ # This only needs to be used directly as a makefile by developers, but
+@@ -38,7 +38,7 @@
+ # These define the major/minor/patch versions of ncurses.
+ NCURSES_MAJOR = 6
+ NCURSES_MINOR = 6
+-NCURSES_PATCH = 20260829
++NCURSES_PATCH = 20260905
+ 
+ # We don't append the patch to the version, since this only applies to releases
+ VERSION = $(NCURSES_MAJOR).$(NCURSES_MINOR)
+Index: doc/html/ada/funcs/T.htm
+--- ncurses-6.6-20260829+/doc/html/ada/funcs/T.htm	2025-02-02 00:44:01.000000000 +0000
++++ ncurses-6.6-20260905/doc/html/ada/funcs/T.htm	2026-09-05 20:59:07.000000000 +0000
+@@ -20,8 +20,8 @@
+ <li><a href="../terminal_interface-curses-termcap__adb.htm#ref_90_16" target="main">tgetnum</a>
+ <li><a href="../terminal_interface-curses-termcap__adb.htm#ref_109_16" target="main">tgetstr -  terminal_interface-curses-termcap.adb:109</a>
+ <li><a href="../terminal_interface-curses-termcap__adb.htm#ref_130_16" target="main">tgetstr -  terminal_interface-curses-termcap.adb:130</a>
+-<li><a href="../terminal_interface-curses-termcap__adb.htm#ref_152_16" target="main">tgoto</a>
+ <li><a href="../terminal_interface-curses-termcap__ads.htm#ref_54_13" target="main">TGoto</a>
++<li><a href="../terminal_interface-curses-termcap__adb.htm#ref_152_16" target="main">tgoto</a>
+ <li><a href="../terminal_interface-curses-terminfo__adb.htm#ref_70_16" target="main">tigetflag</a>
+ <li><a href="../terminal_interface-curses-terminfo__adb.htm#ref_88_16" target="main">tigetstr -  terminal_interface-curses-terminfo.adb:88</a>
+ <li><a href="../terminal_interface-curses-terminfo__adb.htm#ref_109_16" target="main">tigetstr -  terminal_interface-curses-terminfo.adb:109</a>
+Index: doc/html/ada/terminal_interface-curses-mouse__ads.htm
+--- ncurses-6.6-20260829+/doc/html/ada/terminal_interface-curses-mouse__ads.htm	2022-01-15 20:50:51.000000000 +0000
++++ ncurses-6.6-20260905/doc/html/ada/terminal_interface-curses-mouse__ads.htm	2026-09-05 20:59:07.000000000 +0000
+@@ -24,7 +24,7 @@
+ <span class="comment"><em>--                                 S P E C                                  --</em></span>
+ <span class="comment"><em>--                                                                          --</em></span>
+ <span class="comment"><em>------------------------------------------------------------------------------</em></span>
+-<span class="comment"><em>-- Copyright 2020 Thomas E. Dickey                                          --</em></span>
++<span class="comment"><em>-- Copyright 2020,2026 Thomas E. Dickey                                     --</em></span>
+ <span class="comment"><em>-- Copyright 1998-2014,2015 Free Software Foundation, Inc.                  --</em></span>
+ <span class="comment"><em>--                                                                          --</em></span>
+ <span class="comment"><em>-- Permission is hereby granted, free of charge, to any person obtaining a  --</em></span>
+@@ -53,8 +53,8 @@
+ <span class="comment"><em>------------------------------------------------------------------------------</em></span>
+ <span class="comment"><em>--  Author:  Juergen Pfeifer, 1996</em></span>
+ <span class="comment"><em>--  Version Control:</em></span>
+-<span class="comment"><em>--  @Revision: 1.33 @</em></span>
+-<span class="comment"><em>--  @Date: 2020/02/02 23:34:34 @</em></span>
++<span class="comment"><em>--  @Revision: 1.34 @</em></span>
++<span class="comment"><em>--  @Date: 2026/08/30 18:16:31 @</em></span>
+ <span class="comment"><em>--  Binding Version 01.00</em></span>
+ <span class="comment"><em>------------------------------------------------------------------------------</em></span>
+ <b>with</b> System;
+@@ -176,7 +176,7 @@
+    <span class="comment"><em>--  This can be as little as 32 bits (unsigned), or as long as the system's</em></span>
+    <span class="comment"><em>--  unsigned long.  Declare it as the minimum size to handle all valid</em></span>
+    <span class="comment"><em>--  sizes.</em></span>
+-   <b>type</b> <a href="terminal_interface-curses-mouse__ads.htm#ref_57_9">Event_Mask</a> <b>is</b> <b>mod</b> 4294967296;
++   <b>type</b> <a href="terminal_interface-curses-mouse__ads.htm#ref_57_9">Event_Mask</a> <b>is</b> <b>mod</b> <a href="terminal_interface-curses_constants__ads.htm#ref_6_28">Curses_Constants</a>.<a href="terminal_interface-curses_constants__ads.htm#ref_351_4">REPORT_MOUSE_POSITION</a>;
+ 
+    <b>type</b> <a href="terminal_interface-curses-mouse__ads.htm#ref_85_9">Mouse_Event</a> <b>is</b>
+       <b>record</b>
+Index: doc/html/man/curs_sp_funcs.3x.html
+--- ncurses-6.6-20260829+/doc/html/man/curs_sp_funcs.3x.html	2025-12-30 23:23:59.000000000 +0000
++++ ncurses-6.6-20260905/doc/html/man/curs_sp_funcs.3x.html	2026-09-05 20:59:04.000000000 +0000
+@@ -1,6 +1,6 @@
+ <!--
+   ****************************************************************************
+-  * Copyright 2018-2024,2025 Thomas E. Dickey                                *
++  * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+   * Copyright 2010-2015,2017 Free Software Foundation, Inc.                  *
+   *                                                                          *
+   * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -27,19 +27,19 @@
+   * sale, use or other dealings in this Software without prior written       *
+   * authorization.                                                           *
+   ****************************************************************************
+-  * @Id: curs_sp_funcs.3x,v 1.57 2025/02/01 22:47:44 tom Exp @
++  * @Id: curs_sp_funcs.3x,v 1.58 2026/09/05 20:08:00 tom Exp @
+ -->
+ <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+ <HTML>
+ <HEAD>
+ <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+ <meta name="generator" content="Manpage converted by man2html - see https://invisible-island.net/scripts/readme.html#others_scripts">
+-<TITLE>curs_sp_funcs 3x 2025-02-01 ncurses 6.6 Library calls</TITLE>
++<TITLE>curs_sp_funcs 3x 2026-09-05 ncurses 6.6 Library calls</TITLE>
+ <link rel="author" href="mailto:bug-ncurses@gnu.org">
+ 
+ </HEAD>
+ <BODY>
+-<H1 class="no-header">curs_sp_funcs 3x 2025-02-01 ncurses 6.6 Library calls</H1>
++<H1 class="no-header">curs_sp_funcs 3x 2026-09-05 ncurses 6.6 Library calls</H1>
+ <PRE>
+ <STRONG><A HREF="curs_sp_funcs.3x.html">curs_sp_funcs(3x)</A></STRONG>                Library calls               <STRONG><A HREF="curs_sp_funcs.3x.html">curs_sp_funcs(3x)</A></STRONG>
+ 
+@@ -109,6 +109,7 @@
+        <STRONG>int</STRONG> <STRONG>killwchar_sp(SCREEN</STRONG> <STRONG>*</STRONG> <EM>sp</EM><STRONG>,</STRONG> <STRONG>wchar_t</STRONG> <STRONG>*</STRONG><EM>wc</EM><STRONG>);</STRONG>
+        <STRONG>char</STRONG> <STRONG>*</STRONG> <STRONG>longname_sp(SCREEN</STRONG> <STRONG>*</STRONG> <EM>sp</EM><STRONG>);</STRONG>
+        <STRONG>int</STRONG> <STRONG>mcprint_sp(SCREEN</STRONG> <STRONG>*</STRONG> <EM>sp</EM><STRONG>,</STRONG> <STRONG>char</STRONG> <STRONG>*</STRONG><EM>data</EM><STRONG>,</STRONG> <STRONG>int</STRONG> <EM>len</EM><STRONG>);</STRONG>
++       <STRONG>int</STRONG> <STRONG>meta_sp(SCREEN</STRONG> <STRONG>*</STRONG> <EM>sp</EM><STRONG>,</STRONG> <STRONG>bool</STRONG> <EM>flag</EM><STRONG>);</STRONG>
+        <STRONG>int</STRONG> <STRONG>mouseinterval_sp(SCREEN</STRONG> <STRONG>*</STRONG> <EM>sp</EM><STRONG>,</STRONG> <STRONG>int</STRONG> <EM>erval</EM><STRONG>);</STRONG>
+        <STRONG>mmask_t</STRONG> <STRONG>mousemask_sp(SCREEN</STRONG> <STRONG>*</STRONG> <EM>sp</EM><STRONG>,</STRONG> <STRONG>mmask_t</STRONG> <EM>newmask</EM><STRONG>,</STRONG> <STRONG>mmask_t</STRONG> <STRONG>*</STRONG><EM>oldmask</EM><STRONG>);</STRONG>
+        <STRONG>int</STRONG> <STRONG>mvcur_sp(SCREEN</STRONG> <STRONG>*</STRONG> <EM>sp</EM><STRONG>,</STRONG> <STRONG>int</STRONG> <EM>oldrow</EM><STRONG>,</STRONG> <STRONG>int</STRONG> <EM>oldcol</EM><STRONG>,</STRONG> <STRONG>int</STRONG> <EM>newrow</EM><STRONG>,</STRONG> <STRONG>int</STRONG> <EM>newcol</EM><STRONG>);</STRONG>
+@@ -290,7 +291,7 @@
+ </PRE><H2><a name="h2-SEE-ALSO">SEE ALSO</a></H2><PRE>
+        <STRONG><A HREF="ncurses.3x.html">curses(3x)</A></STRONG>, <STRONG><A HREF="curs_opaque.3x.html">curs_opaque(3x)</A></STRONG>, <STRONG><A HREF="curs_threads.3x.html">curs_threads(3x)</A></STRONG>
+ 
+-ncurses 6.6                       2025-02-01                 <STRONG><A HREF="curs_sp_funcs.3x.html">curs_sp_funcs(3x)</A></STRONG>
++ncurses 6.6                       2026-09-05                 <STRONG><A HREF="curs_sp_funcs.3x.html">curs_sp_funcs(3x)</A></STRONG>
+ </PRE>
+ <div class="nav">
+ <ul>
+Index: doc/html/man/ncurses.3x.html
+--- ncurses-6.6-20260829+/doc/html/man/ncurses.3x.html	2026-08-22 21:50:59.000000000 +0000
++++ ncurses-6.6-20260905/doc/html/man/ncurses.3x.html	2026-09-05 20:59:05.000000000 +0000
+@@ -59,7 +59,7 @@
+        displays with output optimized to  minimize  screen  updates.   <EM>ncurses</EM>
+        replaces the <EM>curses</EM> libraries from System V Release 4 Unix ("SVr4") and
+        4.4BSD  Unix,  the  development  of  which  ceased  in the 1990s.  This
+-       document describes <EM>ncurses</EM> version 6.6 (patch 20260822).
++       document describes <EM>ncurses</EM> version 6.6 (patch 20260905).
+ 
+        <EM>ncurses</EM> permits control of the terminal screen's contents;  abstraction
+        and  subdivision thereof with <EM>windows</EM> and <EM>pads</EM>; acquisition of keyboard
+Index: doc/html/man/terminfo.5.html
+--- ncurses-6.6-20260829+/doc/html/man/terminfo.5.html	2026-08-22 21:51:00.000000000 +0000
++++ ncurses-6.6-20260905/doc/html/man/terminfo.5.html	2026-09-05 20:59:06.000000000 +0000
+@@ -72,7 +72,7 @@
+        have, by specifying how to perform screen operations, and by specifying
+        padding requirements and initialization sequences.
+ 
+-       This document describes <EM>ncurses</EM> version 6.6 (patch 20260822).
++       This document describes <EM>ncurses</EM> version 6.6 (patch 20260905).
+ 
+ 
+ </PRE><H3><a name="h3-terminfo-Entry-Syntax"><EM>terminfo</EM> Entry Syntax</a></H3><PRE>
+Index: include/curses.h.in
+Prereq:  1.301 
+--- ncurses-6.6-20260829+/include/curses.h.in	2026-05-30 19:13:55.000000000 +0000
++++ ncurses-6.6-20260905/include/curses.h.in	2026-09-05 20:02:00.000000000 +0000
+@@ -33,7 +33,7 @@
+  *     and: Thomas E. Dickey                        1996-on                 *
+  ****************************************************************************/
+ 
+-/* $Id: curses.h.in,v 1.301 2026/05/30 19:13:55 tom Exp $ */
++/* $Id: curses.h.in,v 1.302 2026/09/05 20:02:00 tom Exp $ */
+ 
+ #ifndef __NCURSES_H
+ #define __NCURSES_H
+@@ -1027,6 +1027,7 @@
+ typedef int (*NCURSES_SP_OUTC)(SCREEN*, int);
+ 
+ extern NCURSES_EXPORT(SCREEN *) new_prescr (void); /* implemented:SP_FUNC */
++extern NCURSES_EXPORT(int) NCURSES_SP_NAME(meta) (SCREEN*, bool); /* implemented:SP_FUNC */
+ 
+ extern NCURSES_EXPORT(int) NCURSES_SP_NAME(baudrate) (SCREEN*); /* implemented:SP_FUNC */
+ extern NCURSES_EXPORT(int) NCURSES_SP_NAME(beep) (SCREEN*); /* implemented:SP_FUNC */
+Index: man/curs_sp_funcs.3x
+Prereq:  1.57 
+--- ncurses-6.6-20260829+/man/curs_sp_funcs.3x	2025-02-01 22:47:44.000000000 +0000
++++ ncurses-6.6-20260905/man/curs_sp_funcs.3x	2026-09-05 20:08:00.000000000 +0000
+@@ -1,5 +1,5 @@
+ .\"***************************************************************************
+-.\" Copyright 2018-2024,2025 Thomas E. Dickey                                *
++.\" Copyright 2018-2025,2026 Thomas E. Dickey                                *
+ .\" Copyright 2010-2015,2017 Free Software Foundation, Inc.                  *
+ .\"                                                                          *
+ .\" Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -27,8 +27,8 @@
+ .\" authorization.                                                           *
+ .\"***************************************************************************
+ .\"
+-.\" $Id: curs_sp_funcs.3x,v 1.57 2025/02/01 22:47:44 tom Exp $
+-.TH curs_sp_funcs 3X 2025-02-01 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "Library calls"
++.\" $Id: curs_sp_funcs.3x,v 1.58 2026/09/05 20:08:00 tom Exp $
++.TH curs_sp_funcs 3X 2026-09-05 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "Library calls"
+ .ie \n(.g \{\
+ .ds `` \(lq
+ .ds '' \(rq
+@@ -104,6 +104,7 @@
+ \fBint killwchar_sp(SCREEN * \fIsp\fP, wchar_t *\fIwc\fP);
+ \fBchar * longname_sp(SCREEN * \fIsp\fP);
+ \fBint mcprint_sp(SCREEN * \fIsp\fP, char *\fIdata\fP, int \fIlen\fP);
++\fBint meta_sp(SCREEN * \fIsp\fP, bool \fIflag\fP);
+ \fBint mouseinterval_sp(SCREEN * \fIsp\fP, int \fIerval\fP);
+ \fBmmask_t mousemask_sp(SCREEN * \fIsp\fP, mmask_t \fInewmask\fP, mmask_t *\fIoldmask\fP);
+ \fBint mvcur_sp(SCREEN * \fIsp\fP, int \fIoldrow\fP, int \fIoldcol\fP, int \fInewrow\fP, int \fInewcol\fP);
+Index: ncurses/base/lib_driver.c
+Prereq:  1.12 
+--- ncurses-6.6-20260829+/ncurses/base/lib_driver.c	2025-10-18 19:20:33.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/base/lib_driver.c	2026-09-05 19:08:42.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+  * Copyright 2009-2012,2014 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -34,10 +34,10 @@
+ 
+ #include <curses.priv.h>
+ 
+-MODULE_ID("$Id: lib_driver.c,v 1.12 2025/10/18 19:20:33 tom Exp $")
++MODULE_ID("$Id: lib_driver.c,v 1.13 2026/09/05 19:08:42 tom Exp $")
+ 
+ NCURSES_EXPORT(int)
+-NCURSES_SP_NAME(has_key) (SCREEN *sp, int keycode)
++NCURSES_SP_NAME(has_key)(SCREEN *sp, int keycode)
+ {
+     T((T_CALLED("has_key(%p, %d)"), (void *) sp, keycode));
+     returnCode(IsValidTIScreen(sp) ? CallDriver_1(sp, td_kyExist, keycode) : FALSE);
+@@ -46,11 +46,11 @@
+ NCURSES_EXPORT(int)
+ has_key(int keycode)
+ {
+-    return NCURSES_SP_NAME(has_key) (CURRENT_SCREEN, keycode);
++    return NCURSES_SP_NAME(has_key)(CURRENT_SCREEN, keycode);
+ }
+ 
+ NCURSES_EXPORT(int)
+-NCURSES_SP_NAME(_nc_mcprint) (SCREEN *sp, char *data, int len)
++NCURSES_SP_NAME(_nc_mcprint)(SCREEN *sp, char *data, int len)
+ {
+     int code = ERR;
+ 
+@@ -62,11 +62,11 @@
+ NCURSES_EXPORT(int)
+ mcprint(char *data, int len)
+ {
+-    return NCURSES_SP_NAME(_nc_mcprint) (CURRENT_SCREEN, data, len);
++    return NCURSES_SP_NAME(_nc_mcprint)(CURRENT_SCREEN, data, len);
+ }
+ 
+ NCURSES_EXPORT(int)
+-NCURSES_SP_NAME(doupdate) (SCREEN *sp)
++NCURSES_SP_NAME(doupdate)(SCREEN *sp)
+ {
+     int code = ERR;
+ 
+@@ -81,15 +81,15 @@
+ NCURSES_EXPORT(int)
+ doupdate(void)
+ {
+-    return NCURSES_SP_NAME(doupdate) (CURRENT_SCREEN);
++    return NCURSES_SP_NAME(doupdate)(CURRENT_SCREEN);
+ }
+ 
+ NCURSES_EXPORT(int)
+-NCURSES_SP_NAME(mvcur) (SCREEN *sp, int yold, int xold, int ynew, int xnew)
++NCURSES_SP_NAME(mvcur)(SCREEN *sp, int yold, int xold, int ynew, int xnew)
+ {
+     int code = ERR;
+-    TR(TRACE_CALLS | TRACE_MOVE, (T_CALLED("mvcur(%p,%d,%d,%d,%d)"),
+-				  (void *) sp, yold, xold, ynew, xnew));
++    TR(TRACE_CALLS, (T_CALLED("mvcur(%p,%d,%d,%d,%d)"),
++		     (void *) sp, yold, xold, ynew, xnew));
+     if (HasTerminal(sp)) {
+ 	code = CallDriver_4(sp, td_hwcur, yold, xold, ynew, xnew);
+     }
+@@ -100,5 +100,5 @@
+ mvcur(int yold, int xold, int ynew, int xnew)
+ /* optimized cursor move from (yold, xold) to (ynew, xnew) */
+ {
+-    return NCURSES_SP_NAME(mvcur) (CURRENT_SCREEN, yold, xold, ynew, xnew);
++    return NCURSES_SP_NAME(mvcur)(CURRENT_SCREEN, yold, xold, ynew, xnew);
+ }
+Index: ncurses/base/lib_endwin.c
+Prereq:  1.30 
+--- ncurses-6.6-20260829+/ncurses/base/lib_endwin.c	2026-05-30 22:10:47.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/base/lib_endwin.c	2026-09-05 19:30:54.000000000 +0000
+@@ -43,7 +43,7 @@
+ 
+ #include <curses.priv.h>
+ 
+-MODULE_ID("$Id: lib_endwin.c,v 1.30 2026/05/30 22:10:47 tom Exp $")
++MODULE_ID("$Id: lib_endwin.c,v 1.32 2026/09/05 19:30:54 tom Exp $")
+ 
+ NCURSES_EXPORT(int)
+ NCURSES_SP_NAME(endwin)(NCURSES_SP_DCL0)
+@@ -53,6 +53,10 @@
+     T((T_CALLED("endwin(%p)"), (void *) SP_PARM));
+ 
+     if (SP_PARM != NULL) {
++	bool save_keypad = stdscr->_use_keypad;
++	bool save_meta = SP_PARM->_use_meta;
++	bool suspended = FALSE;
++
+ 	if (SP_PARM->_endwin != ewSuspend) {
+ #if USE_TERM_DRIVER
+ 	    TERMINAL_CONTROL_BLOCK *TCB = TCBOf(SP_PARM);
+@@ -63,13 +67,25 @@
+ #else
+ 	    SP_PARM->_endwin = ewSuspend;
+ 	    SP_PARM->_mouse_wrap(SP_PARM);
+-	    _nc_screen_wrap();
+-	    _nc_mvcur_wrap();	/* wrap up cursor addressing */
++
++	    NCURSES_SP_NAME(_nc_screen_wrap)(NCURSES_SP_ARG);
++	    NCURSES_SP_NAME(_nc_mvcur_wrap)(NCURSES_SP_ARG);
+ #endif
++	    suspended = TRUE;
+ 	    code = OK;
+ 	}
+ 	if (NCURSES_SP_NAME(reset_shell_mode)(NCURSES_SP_ARG) == ERR)
+ 	    code = ERR;
++	/*
++	 * reset_shell_mode resets the terminal's keypad and meta modes.
++	 * If we did this as part of suspending screen mode, keep the
++	 * "use" flags in the data structure, for reference when restoring
++	 * screen mode in doupdate(), e.g., as called from refresh().
++	 */
++	if (suspended) {
++	    stdscr->_use_keypad = save_keypad;
++	    SP_PARM->_use_meta = save_meta;
++	}
+     }
+ 
+     returnCode(code);
+Index: ncurses/base/lib_mouse.c
+Prereq:  1.237 
+--- ncurses-6.6-20260829+/ncurses/base/lib_mouse.c	2026-08-29 22:54:06.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/base/lib_mouse.c	2026-09-05 00:04:40.000000000 +0000
+@@ -84,7 +84,7 @@
+ #define CUR SP_TERMTYPE
+ #endif
+ 
+-MODULE_ID("$Id: lib_mouse.c,v 1.237 2026/08/29 22:54:06 tom Exp $")
++MODULE_ID("$Id: lib_mouse.c,v 1.252 2026/09/05 00:04:40 tom Exp $")
+ 
+ #include <tic.h>
+ 
+@@ -978,130 +978,90 @@
+     } while (0)
+ #endif
+ 
++#define MODIFY_PRESS(mods) \
++    do { \
++	if ((mods) & 4) \
++	    eventp->bstate |= BUTTON_SHIFT; \
++	if ((mods) & 8) \
++	    eventp->bstate |= BUTTON_ALT; \
++	if ((mods) & 16) \
++	    eventp->bstate |= BUTTON_CTRL; \
++    } while (0)
++
++#if NCURSES_MOUSE_VERSION > 2
++#define MAX_OPCODE 192
++#elif NCURSES_MOUSE_VERSION > 1
++#define MAX_OPCODE 96
++#else
++#define MAX_OPCODE 64
++#endif
++
+ /*
++ * Parse X10/SGR xterm mouse protocol, returning
++ * 1 if a button is decoded,
++ * 0 if a release or motion event is decoded, and
++ * -1 if the opcode is not valid in the given protocol.
++ *
+  * Refer to XTerm Control Sequences "Mouse Tracking", as well as the
+  * mouse-codes script added in xterm patch #338 (2018).
+  */
+-static bool
+-handle_wheel(SCREEN *sp, MEVENT * eventp, int button, int wheel)
++static int
++decode_xterm_opcode(SCREEN *sp, MEVENT * eventp, int opcode)
+ {
+-    bool result = TRUE;
++    int result = 1;
+ 
+-#if NCURSES_MOUSE_VERSION == 3
+-    (void) sp;
+-    (void) wheel;
+-    if (button > 191 || button < 0) {
+-	result = FALSE;
++    if (opcode >= MAX_OPCODE || opcode < 0) {
++	result = -1;
+     } else {
+-	int bbits = button;
+-	int bcode = button % 4;
++	int bbits = opcode;
++	int bcode = opcode % 4;
+ 
+-	if (button >= 128) {	/* buttons 8-11 */
++	if (opcode >= 128) {	/* buttons 8-11 */
+ 	    bcode += 8;
+-	} else if (button >= 64) {	/* buttons 4-7 */
++	} else if (opcode >= 64) {	/* buttons 4-7 */
+ 	    bcode += 4;
+-	} else if ((button % 4) < 3) {	/* buttons 1-3, unmodified release */
++	} else if ((opcode % 4) < 3) {	/* buttons 1-3, unmodified release */
+ 	    bcode += 1;
+ 	}
+-	if (button == 64 || button == 65) {
+-	    eventp->bstate = MASK_PRESS((button == 64) ? 4 : 5);
+-	    bbits &= ~1;
+-	} else if (button != 3) {
+-	    PRESS_POSITION(bcode);
++	if (bcode > MAX_BUTTON) {
++	    result = -1;
+ 	} else {
+-	    eventp->bstate = REPORT_MOUSE_POSITION;
+-	    result = FALSE;
+-	}
+-	/*
+-	 * xterm does not produce the shift/control/alt modifiers, but someone
+-	 * may have read the mouse protocol documentation.
+-	 */
+-	if (button > 3) {
+-	    if (bbits & 1)
+-		eventp->bstate |= BUTTON_SHIFT;
+-	    if (bbits & 2)
+-		eventp->bstate |= BUTTON_ALT;
+-	    if (bbits & 4)
+-		eventp->bstate |= BUTTON_CTRL;
+-	}
+-    }
+-#else /* NCURSES_MOUSE_VERSION <= 2 */
+-    switch (button & 3) {
+-    case 0:
+-	if (wheel) {
+-	    eventp->bstate = MASK_PRESS(4);
+-	    /* Do not record in sp->_mouse_bstate; there will be no
+-	     * corresponding release event.
++	    if (opcode >= 64) {
++		eventp->bstate = MASK_PRESS(bcode);
++	    } else if ((opcode % 4) == 3) {
++		eventp->bstate = REPORT_MOUSE_POSITION;
++		result = 0;
++	    } else if (opcode >= 4) {
++		eventp->bstate = MASK_PRESS(bcode);
++	    } else {
++		PRESS_POSITION(bcode);
++	    }
++	    /*
++	     * xterm does not produce the shift/control/alt modifiers, but
++	     * someone may have read the mouse protocol documentation.
+ 	     */
+-	} else {
+-	    PRESS_POSITION(1);
+-	}
+-	break;
+-    case 1:
+-	if (wheel) {
+-#if NCURSES_MOUSE_VERSION >= 2
+-	    eventp->bstate = MASK_PRESS(5);
+-	    /* See comment above for button 4 */
+-#else
+-	    /* Ignore this event as it is not a true press of the button */
+-	    eventp->bstate = REPORT_MOUSE_POSITION;
+-#endif
+-	} else {
+-	    PRESS_POSITION(2);
+-	}
+-	break;
+-    case 2:
+-	if (wheel) {
+-	    /* Ignore this event as it is not a true press of the button */
+-	    eventp->bstate = REPORT_MOUSE_POSITION;
+-	} else {
+-	    PRESS_POSITION(3);
++	    if (opcode > 3) {
++		MODIFY_PRESS(bbits);
++	    }
+ 	}
+-	break;
+-    default:
+-	/*
+-	 * case 3 is sent when the mouse buttons are released.
+-	 *
+-	 * If the terminal uses xterm mode 1003, a continuous series of
+-	 * button-release events is sent as the mouse moves around the screen,
+-	 * or as the wheel mouse is rotated.
+-	 *
+-	 * Return false in this case, so that when running in X10 mode, we will
+-	 * recalculate bstate.
+-	 */
+-	eventp->bstate = REPORT_MOUSE_POSITION;
+-	result = FALSE;
+-	break;
+     }
+-#endif
+     TR(TRACE_IEVENT,
+-       ("handle_wheel %d: %d(%d) %d %lx",
+-	result, button, button & 3, wheel, (unsigned long) eventp->bstate));
++       ("decode_xterm_opcode %d: %d(%d) %lx",
++	result, opcode, opcode & 3, (unsigned long) eventp->bstate));
+     return result;
+ }
+ 
+-static bool
++static int
+ decode_X10_bstate(SCREEN *sp, MEVENT * eventp, unsigned intro)
+ {
+-    bool result;
+-    int button = 0;
+-    int wheel = (intro & 96) == 96;
++    int result;
+ 
+     eventp->bstate = 0;
+ 
+-    if (intro >= 96) {
+-	if (intro >= 160) {
+-	    button = (int) (intro - 152);	/* buttons 8-11 */
+-	} else {
+-	    button = (int) (intro - 92);	/* buttons 4-7 */
+-	}
+-    } else {
+-	button = (intro & 3);
+-    }
+-
+-    if (button > MAX_BUTTON) {
++    result = decode_xterm_opcode(sp, eventp, (int) (intro) - 32);
++    if (result < 0) {
+ 	eventp->bstate = REPORT_MOUSE_POSITION;
+-    } else if (!handle_wheel(sp, eventp, (int) (intro) - 32, wheel)) {
++    } else if (result == 0) {
+ 
+ 	/*
+ 	 * Release events aren't reported for individual buttons, just for
+@@ -1128,17 +1088,10 @@
+ 	    eventp->bstate = REPORT_MOUSE_POSITION;
+ 	}
+     }
+-
+-    if (intro & 4) {
+-	eventp->bstate |= BUTTON_SHIFT;
+-    }
+-    if (intro & 8) {
+-	eventp->bstate |= BUTTON_ALT;
+-    }
+-    if (intro & 16) {
+-	eventp->bstate |= BUTTON_CTRL;
++    if (result >= 0) {
++	MODIFY_PRESS(intro);
++	result = (eventp->bstate & REPORT_MOUSE_POSITION) ? TRUE : FALSE;
+     }
+-    result = (eventp->bstate & REPORT_MOUSE_POSITION) ? TRUE : FALSE;
+     return result;
+ }
+ 
+@@ -1170,14 +1123,17 @@
+  * Wheel mice may return buttons 4 and 5 when the wheel is turned.  We encode
+  * those as button presses.
+  */
+-static bool
++#define MIN_WHEEL	4
++#define MAX_WHEEL	5
++
++static int
+ decode_xterm_X10(SCREEN *sp, MEVENT * eventp)
+ {
+ #define MAX_KBUF 3
+     unsigned char kbuf[MAX_KBUF + 1];
+     size_t grabbed;
+     int res;
+-    bool result;
++    int result;
+ 
+     _nc_set_read_thread(TRUE);
+     for (grabbed = 0; grabbed < MAX_KBUF; grabbed += (size_t) res) {
+@@ -1196,10 +1152,10 @@
+     /* there's only one mouse... */
+     eventp->id = NORMAL_EVENT;
+ 
+-    result = decode_X10_bstate(sp, eventp, kbuf[0]);
+-
+-    eventp->x = (kbuf[1] - ' ') - 1;
+-    eventp->y = (kbuf[2] - ' ') - 1;
++    if ((result = decode_X10_bstate(sp, eventp, kbuf[0])) >= 0) {
++	eventp->x = (kbuf[1] - ' ') - 1;
++	eventp->y = (kbuf[2] - ' ') - 1;
++    }
+ 
+     return result;
+ }
+@@ -1209,14 +1165,14 @@
+  * This is identical to X10/X11 responses except that there are two UTF-8
+  * characters storing the ordinates instead of two bytes.
+  */
+-static bool
++static int
+ decode_xterm_1005(SCREEN *sp, MEVENT * eventp)
+ {
+     char kbuf[80];
+     size_t grabbed;
+     size_t limit = (sizeof(kbuf) - 1);
+     unsigned coords[2];
+-    bool result;
++    int result;
+ 
+     coords[0] = 0;
+     coords[1] = 0;
+@@ -1258,10 +1214,10 @@
+     /* there's only one mouse... */
+     eventp->id = NORMAL_EVENT;
+ 
+-    result = decode_X10_bstate(sp, eventp, UChar(kbuf[0]));
+-
+-    eventp->x = (int) (coords[0] - ' ') - 1;
+-    eventp->y = (int) (coords[1] - ' ') - 1;
++    if ((result = decode_X10_bstate(sp, eventp, UChar(kbuf[0]))) >= 0) {
++	eventp->x = (int) (coords[0] - ' ') - 1;
++	eventp->y = (int) (coords[1] - ' ') - 1;
++    }
+ 
+     return result;
+ }
+@@ -1283,7 +1239,7 @@
+     int final;			/* the final-character */
+ } SGR_DATA;
+ 
+-static bool
++static int
+ read_SGR(const SCREEN *sp, SGR_DATA * result)
+ {
+     char kbuf[80];		/* bigger than any possible mouse response */
+@@ -1365,29 +1321,30 @@
+     return (grabbed > 0) && !result->nerror;
+ }
+ 
+-static bool
++static int
+ decode_xterm_SGR1006(SCREEN *sp, MEVENT * eventp)
+ {
+     SGR_DATA data;
+-    bool result = FALSE;
++    int result = FALSE;
+     if (read_SGR(sp, &data)) {
+ 	int b = data.params[0];
+ 	int b3 = 1 + (b & 3);
+-	int wheel = ((b & 64) == 64);
+ 
+-	if (b >= 132) {
++	if (b >= 192) {
+ 	    b3 = MAX_BUTTON + 1;
+ 	} else if (b >= 128) {
+-	    b3 = (b - 120);	/* buttons 8-11 */
++	    b3 += 7;		/* buttons 8-11 */
+ 	} else if (b >= 64) {
+-	    b3 = (b - 60);	/* buttons 6-7 */
++	    b3 += 3;		/* buttons 4-7 */
+ 	}
+ 
+ 	eventp->id = NORMAL_EVENT;
+-	if (data.final == 'M') {
+-	    (void) handle_wheel(sp, eventp, b, wheel);
+-	} else if (b3 > MAX_BUTTON) {
+-	    eventp->bstate = REPORT_MOUSE_POSITION;
++	if (b < 0 || (b < 64 && ((b & 3) == 3))) {
++	    result = -TRUE;
++	} else if (data.final == 'M') {
++	    result = decode_xterm_opcode(sp, eventp, b);
++	} else if (data.final != 'm' || b3 > MAX_BUTTON) {
++	    result = -TRUE;
+ 	} else {
+ 	    mmask_t pressed = (mmask_t) NCURSES_MOUSE_MASK(b3, NCURSES_BUTTON_PRESSED);
+ 	    mmask_t release = (mmask_t) NCURSES_MOUSE_MASK(b3, NCURSES_BUTTON_RELEASED);
+@@ -1395,21 +1352,15 @@
+ 		eventp->bstate = release;
+ 		sp->_mouse_bstate &= ~pressed;
+ 	    } else {
+-		eventp->bstate = REPORT_MOUSE_POSITION;
++		eventp->bstate = MASK_RELEASE(b3);
+ 	    }
+ 	}
+-	if (b & 4) {
+-	    eventp->bstate |= BUTTON_SHIFT;
+-	}
+-	if (b & 8) {
+-	    eventp->bstate |= BUTTON_ALT;
+-	}
+-	if (b & 16) {
+-	    eventp->bstate |= BUTTON_CTRL;
++	if (result >= 0) {
++	    MODIFY_PRESS(b);
++	    result = (eventp->bstate & REPORT_MOUSE_POSITION) ? TRUE : FALSE;
++	    eventp->x = (data.params[1] ? (data.params[1] - 1) : 0);
++	    eventp->y = (data.params[2] ? (data.params[2] - 1) : 0);
+ 	}
+-	result = (eventp->bstate & REPORT_MOUSE_POSITION) ? TRUE : FALSE;
+-	eventp->x = (data.params[1] ? (data.params[1] - 1) : 0);
+-	eventp->y = (data.params[2] ? (data.params[2] - 1) : 0);
+     }
+     return result;
+ }
+@@ -1418,7 +1369,7 @@
+ _nc_mouse_inline(SCREEN *sp)
+ /* mouse report received in the keyboard stream -- parse its info */
+ {
+-    bool result = FALSE;
++    int result = FALSE;
+     MEVENT *eventp = EventAt(sp, sp->_mouse_write);
+ 
+     TR(MY_TRACE, (T_CALLED("_nc_mouse_inline(%p)"), (void *) sp));
+@@ -1438,26 +1389,28 @@
+ #endif
+ 	}
+ 
+-	TR(MY_TRACE,
+-	   ("_nc_mouse_inline: slot %ld %s",
+-	    (long) IndexEV(sp, eventp),
+-	    _nc_tracemouse(sp, eventp)));
+-
+-	/* bump the next-free pointer into the circular list */
+-	sp->_mouse_write++;
+-
+-	if (!result) {
+-	    /* If this event is from a wheel-mouse, treat it like position
+-	     * reports and avoid waiting for the release-events which will
+-	     * never come.
+-	     */
+-	    if (eventp->bstate & BUTTON_PRESSED) {
+-		int b;
++	if (result >= 0) {
++	    TR(MY_TRACE,
++	       ("_nc_mouse_inline: slot %ld %s",
++		(long) IndexEV(sp, eventp),
++		_nc_tracemouse(sp, eventp)));
++
++	    /* bump the next-free pointer into the circular list */
++	    sp->_mouse_write++;
++
++	    if (!result) {
++		/* If this event is from a wheel-mouse, treat it like position
++		 * reports and avoid waiting for the release-events which will
++		 * never come.
++		 */
++		if (eventp->bstate & BUTTON_PRESSED) {
++		    int b;
+ 
+-		for (b = 4; b <= MAX_BUTTON; ++b) {
+-		    if ((eventp->bstate & MASK_PRESS(b))) {
+-			result = TRUE;
+-			break;
++		    for (b = MIN_WHEEL; b <= MAX_WHEEL; ++b) {
++			if ((eventp->bstate & MASK_PRESS(b))) {
++			    result = TRUE;
++			    break;
++			}
+ 		    }
+ 		}
+ 	    }
+@@ -1576,7 +1529,7 @@
+     bool merge;
+     bool endLoop;
+ 
+-    TR(MY_TRACE, (T_CALLED("_nc_mouse_parse(%d)"), runcount));
++    T((T_CALLED("_nc_mouse_parse(%d)"), runcount));
+ 
+     if (!sp->_maxclick
+ 	&& ValidEvent(readp)
+Index: ncurses/base/resizeterm.c
+Prereq:  1.65 
+--- ncurses-6.6-20260829+/ncurses/base/resizeterm.c	2026-06-06 09:59:40.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/base/resizeterm.c	2026-09-05 14:47:30.000000000 +0000
+@@ -46,7 +46,7 @@
+ #define CUR SP_TERMTYPE
+ #endif
+ 
+-MODULE_ID("$Id: resizeterm.c,v 1.65 2026/06/06 09:59:40 tom Exp $")
++MODULE_ID("$Id: resizeterm.c,v 1.66 2026/09/05 14:47:30 tom Exp $")
+ 
+ /*
+  * If we're trying to be reentrant, do not want any local statics.
+@@ -489,7 +489,7 @@
+ 				&& !(SP_PARM->_slk->hidden));
+ 	    T(("resizeterm: check slk"));
+ 	    if (slk_visible) {
+-		slk_clear();
++		NCURSES_SP_NAME(slk_clear)(NCURSES_SP_ARG);
+ 	    }
+ #endif
+ 	    result = NCURSES_SP_NAME(resize_term)(NCURSES_SP_ARGx ToLines, ToCols);
+Index: ncurses/curses.priv.h
+Prereq:  1.759 
+--- ncurses-6.6-20260829+/ncurses/curses.priv.h	2026-08-29 14:08:41.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/curses.priv.h	2026-09-05 22:53:02.000000000 +0000
+@@ -35,7 +35,7 @@
+  ****************************************************************************/
+ 
+ /*
+- * $Id: curses.priv.h,v 1.759 2026/08/29 14:08:41 tom Exp $
++ * $Id: curses.priv.h,v 1.760 2026/09/05 22:53:02 tom Exp $
+  *
+  *	curses.priv.h
+  *
+@@ -2733,6 +2733,10 @@
+ extern NCURSES_EXPORT(wchar_t *) NCURSES_SP_NAME(_nc_wunctrl)(SCREEN*, cchar_t *);
+ #endif
+ 
++#else
++
++extern NCURSES_EXPORT(int) meta_sp(SCREEN *sp, bool flag);
++
+ #endif /* NCURSES_SP_FUNCS */
+ 
+ #if NCURSES_SP_FUNCS
+Index: ncurses/llib-lncurses
+--- ncurses-6.6-20260829+/ncurses/llib-lncurses	2026-05-23 21:22:56.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/llib-lncurses	2026-09-05 21:01:27.000000000 +0000
+@@ -3315,6 +3315,12 @@
+ 		NCURSES_BOOL flag)
+ 		{ return(*(int *)0); }
+ 
++#undef meta_sp
++int	meta_sp(
++		SCREEN	*sp,
++		NCURSES_BOOL flag)
++		{ return(*(int *)0); }
++
+ #undef meta
+ int	meta(
+ 		WINDOW	*win,
+Index: ncurses/llib-lncursest
+--- ncurses-6.6-20260829+/ncurses/llib-lncursest	2026-05-23 21:22:56.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/llib-lncursest	2026-09-05 21:03:19.000000000 +0000
+@@ -3370,6 +3370,12 @@
+ 		NCURSES_BOOL flag)
+ 		{ return(*(int *)0); }
+ 
++#undef meta_sp
++int	meta_sp(
++		SCREEN	*sp,
++		NCURSES_BOOL flag)
++		{ return(*(int *)0); }
++
+ #undef meta
+ int	meta(
+ 		WINDOW	*win,
+Index: ncurses/llib-lncursestw
+--- ncurses-6.6-20260829+/ncurses/llib-lncursestw	2026-05-23 21:22:56.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/llib-lncursestw	2026-09-05 21:02:42.000000000 +0000
+@@ -4332,6 +4332,12 @@
+ 		NCURSES_BOOL flag)
+ 		{ return(*(int *)0); }
+ 
++#undef meta_sp
++int	meta_sp(
++		SCREEN	*sp,
++		NCURSES_BOOL flag)
++		{ return(*(int *)0); }
++
+ #undef meta
+ int	meta(
+ 		WINDOW	*win,
+Index: ncurses/llib-lncursesw
+--- ncurses-6.6-20260829+/ncurses/llib-lncursesw	2026-05-23 21:23:19.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/llib-lncursesw	2026-09-05 21:02:04.000000000 +0000
+@@ -4277,6 +4277,12 @@
+ 		NCURSES_BOOL flag)
+ 		{ return(*(int *)0); }
+ 
++#undef meta_sp
++int	meta_sp(
++		SCREEN	*sp,
++		NCURSES_BOOL flag)
++		{ return(*(int *)0); }
++
+ #undef meta
+ int	meta(
+ 		WINDOW	*win,
+Index: ncurses/llib-ltinfo
+--- ncurses-6.6-20260829+/ncurses/llib-ltinfo	2026-05-23 21:23:19.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/llib-ltinfo	2026-09-05 21:01:41.000000000 +0000
+@@ -579,6 +579,12 @@
+ 		NCURSES_BOOL flag)
+ 		{ return(*(int *)0); }
+ 
++#undef meta_sp
++int	meta_sp(
++		SCREEN	*sp,
++		NCURSES_BOOL flag)
++		{ return(*(int *)0); }
++
+ #undef meta
+ int	meta(
+ 		WINDOW	*win,
+Index: ncurses/llib-ltinfot
+--- ncurses-6.6-20260829+/ncurses/llib-ltinfot	2026-05-23 21:23:19.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/llib-ltinfot	2026-09-05 21:03:34.000000000 +0000
+@@ -625,6 +625,12 @@
+ 		NCURSES_BOOL flag)
+ 		{ return(*(int *)0); }
+ 
++#undef meta_sp
++int	meta_sp(
++		SCREEN	*sp,
++		NCURSES_BOOL flag)
++		{ return(*(int *)0); }
++
+ #undef meta
+ int	meta(
+ 		WINDOW	*win,
+Index: ncurses/llib-ltinfotw
+--- ncurses-6.6-20260829+/ncurses/llib-ltinfotw	2026-05-23 21:23:38.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/llib-ltinfotw	2026-09-05 21:02:59.000000000 +0000
+@@ -647,6 +647,12 @@
+ 		NCURSES_BOOL flag)
+ 		{ return(*(int *)0); }
+ 
++#undef meta_sp
++int	meta_sp(
++		SCREEN	*sp,
++		NCURSES_BOOL flag)
++		{ return(*(int *)0); }
++
+ #undef meta
+ int	meta(
+ 		WINDOW	*win,
+Index: ncurses/llib-ltinfow
+--- ncurses-6.6-20260829+/ncurses/llib-ltinfow	2026-05-23 21:23:38.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/llib-ltinfow	2026-09-05 21:02:19.000000000 +0000
+@@ -601,6 +601,12 @@
+ 		NCURSES_BOOL flag)
+ 		{ return(*(int *)0); }
+ 
++#undef meta_sp
++int	meta_sp(
++		SCREEN	*sp,
++		NCURSES_BOOL flag)
++		{ return(*(int *)0); }
++
+ #undef meta
+ int	meta(
+ 		WINDOW	*win,
+Index: ncurses/tinfo/lib_options.c
+Prereq:  1.87 
+--- ncurses-6.6-20260829+/ncurses/tinfo/lib_options.c	2026-05-30 22:10:47.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/tinfo/lib_options.c	2026-09-05 22:52:49.000000000 +0000
+@@ -47,7 +47,7 @@
+ #define CUR SP_TERMTYPE
+ #endif
+ 
+-MODULE_ID("$Id: lib_options.c,v 1.87 2026/05/30 22:10:47 tom Exp $")
++MODULE_ID("$Id: lib_options.c,v 1.90 2026/09/05 22:52:49 tom Exp $")
+ 
+ NCURSES_EXPORT(int)
+ idlok(WINDOW *win, bool flag)
+@@ -155,13 +155,11 @@
+ }
+ 
+ NCURSES_EXPORT(int)
+-meta(WINDOW *win GCC_UNUSED, bool flag)
++meta_sp(SCREEN *sp, bool flag)
+ {
+     int result = ERR;
+-    SCREEN *sp = (win == NULL) ? CURRENT_SCREEN : _nc_screen_of(win);
+ 
+-    /* Ok, we stay relaxed and don't signal an error if win is NULL */
+-    T((T_CALLED("meta(%p,%d)"), (void *) win, flag));
++    T((T_CALLED("meta(%p,%d)"), (void *) sp, flag));
+ 
+     /* Ok, we stay relaxed and don't signal an error if win is NULL */
+ 
+@@ -187,6 +185,12 @@
+     returnCode(result);
+ }
+ 
++NCURSES_EXPORT(int)
++meta(WINDOW *win GCC_UNUSED, bool flag)
++{
++    return meta_sp((win == NULL) ? CURRENT_SCREEN : _nc_screen_of(win), flag);
++}
++
+ /* curs_set() moved here to narrow the kernel interface */
+ 
+ NCURSES_EXPORT(int)
+@@ -334,6 +338,7 @@
+ {
+     int rc = ERR;
+ 
++    T((T_CALLED("_nc_keypad(%p,%d)"), (void *) sp, flag));
+     if (sp != NULL) {
+ #ifdef USE_PTHREADS
+ 	/*
+@@ -374,5 +379,5 @@
+ #endif
+ 	}
+     }
+-    return (rc);
++    returnCode(rc);
+ }
+Index: ncurses/tinfo/lib_ttyflags.c
+Prereq:  1.42 
+--- ncurses-6.6-20260829+/ncurses/tinfo/lib_ttyflags.c	2026-05-30 21:17:40.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/tinfo/lib_ttyflags.c	2026-09-05 20:27:44.000000000 +0000
+@@ -42,7 +42,7 @@
+ #define CUR SP_TERMTYPE
+ #endif
+ 
+-MODULE_ID("$Id: lib_ttyflags.c,v 1.42 2026/05/30 21:17:40 tom Exp $")
++MODULE_ID("$Id: lib_ttyflags.c,v 1.44 2026/09/05 20:27:44 tom Exp $")
+ 
+ NCURSES_EXPORT(int)
+ NCURSES_SP_NAME(_nc_get_tty_mode)(NCURSES_SP_DCLx TTY * buf)
+@@ -227,6 +227,8 @@
+ 	    if (SP_PARM) {
+ 		if (SP_PARM->_keypad_on)
+ 		    _nc_keypad(SP_PARM, TRUE);
++		if (SP_PARM->_use_meta)
++		    meta_sp(SP_PARM, TRUE);
+ 	    }
+ 	    rc = OK;
+ 	}
+@@ -258,6 +260,7 @@
+ #else
+ 	if (SP_PARM) {
+ 	    _nc_keypad(SP_PARM, FALSE);
++	    meta_sp(SP_PARM, FALSE);
+ 	    _nc_flush();
+ 	}
+ 	rc = _nc_set_tty_mode(&termp->Ottyb);
+Index: ncurses/tinfo/tinfo_driver.c
+Prereq:  1.91 
+--- ncurses-6.6-20260829+/ncurses/tinfo/tinfo_driver.c	2026-05-30 22:57:16.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/tinfo/tinfo_driver.c	2026-09-05 20:28:39.000000000 +0000
+@@ -52,7 +52,7 @@
+ # endif
+ #endif
+ 
+-MODULE_ID("$Id: tinfo_driver.c,v 1.91 2026/05/30 22:57:16 tom Exp $")
++MODULE_ID("$Id: tinfo_driver.c,v 1.92 2026/09/05 20:28:39 tom Exp $")
+ 
+ /*
+  * SCO defines TIOCGSIZE and the corresponding struct.  Other systems (SunOS,
+@@ -631,6 +631,8 @@
+ 		if (sp) {
+ 		    if (sp->_keypad_on)
+ 			_nc_keypad(sp, TRUE);
++		    if (sp->_use_meta)
++			meta_sp(sp, TRUE);
+ 		}
+ #if defined(USE_WIN32CON_DRIVER)
+ 		if (!WINCONSOLE.buffered)
+@@ -661,6 +663,7 @@
+ 	    /* reset_shell_mode */
+ 	    if (sp) {
+ 		_nc_keypad(sp, FALSE);
++		meta_sp(sp, FALSE);
+ 		NCURSES_SP_NAME(_nc_flush)(sp);
+ 	    }
+ 	    code = drv_sgmode(TCB, TRUE, &(_term->Ottyb));
+Index: ncurses/trace/lib_tracemse.c
+Prereq:  1.25 
+--- ncurses-6.6-20260829+/ncurses/trace/lib_tracemse.c	2026-08-29 14:35:37.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/trace/lib_tracemse.c	2026-08-31 23:56:06.000000000 +0000
+@@ -39,7 +39,7 @@
+ 
+ #include <curses.priv.h>
+ 
+-MODULE_ID("$Id: lib_tracemse.c,v 1.25 2026/08/29 14:35:37 tom Exp $")
++MODULE_ID("$Id: lib_tracemse.c,v 1.26 2026/08/31 23:56:06 tom Exp $")
+ 
+ #ifdef TRACE
+ 
+@@ -63,10 +63,8 @@
+ 	_nc_STRCAT(my_buffer, my_button, sizeof(my_buffer)); \
+     }
+ 
+-#define OTHER_MASK(name) NCURSES_MOUSE_MASK(MAX_BUTTON, name)
+-
+ #define SHOW(name, show) \
+-    if ((code & OTHER_MASK(name)) == OTHER_MASK(name)) { \
++    if ((code & name) == name) { \
+ 	size_t n = strlen(my_buffer); \
+ 	if (n && (my_buffer[n-1] != '{')) \
+ 	_nc_STRCAT(my_buffer, ", ", sizeof(my_buffer)); \
+@@ -74,8 +72,8 @@
+     }
+ 
+     for (button = 1; button <= MAX_BUTTON; ++button) {
++	SHOW_BUTTON(NCURSES_BUTTON_PRESSED, "press");
+ 	SHOW_BUTTON(NCURSES_BUTTON_RELEASED, "release");
+-	SHOW_BUTTON(NCURSES_BUTTON_PRESSED, "press-1");
+ 	SHOW_BUTTON(NCURSES_BUTTON_CLICKED, "clicked");
+ 	SHOW_BUTTON(NCURSES_DOUBLE_CLICKED, "doubleclick");
+ 	SHOW_BUTTON(NCURSES_TRIPLE_CLICKED, "tripleclick");
+Index: ncurses/tty/lib_mvcur.c
+Prereq:  1.171 
+--- ncurses-6.6-20260829+/ncurses/tty/lib_mvcur.c	2026-06-06 09:59:40.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/tty/lib_mvcur.c	2026-09-05 19:09:44.000000000 +0000
+@@ -160,7 +160,7 @@
+ #define CUR SP_TERMTYPE
+ #endif
+ 
+-MODULE_ID("$Id: lib_mvcur.c,v 1.171 2026/06/06 09:59:40 tom Exp $")
++MODULE_ID("$Id: lib_mvcur.c,v 1.172 2026/09/05 19:09:44 tom Exp $")
+ 
+ #define WANT_CHAR(sp, y, x) NewScreen(sp)->_line[y].text[x]	/* desired state */
+ 
+@@ -1003,8 +1003,8 @@
+ {
+     int code;
+ 
+-    TR(TRACE_CALLS | TRACE_MOVE, (T_CALLED("_nc_real_mvcur(%p,%d,%d,%d,%d)"),
+-				  (void *) SP_PARM, yold, xold, ynew, xnew));
++    TR(TRACE_CALLS, (T_CALLED("_nc_real_mvcur(%p,%d,%d,%d,%d)"),
++		     (void *) SP_PARM, yold, xold, ynew, xnew));
+ 
+     if (SP_PARM == NULL) {
+ 	code = ERR;
+Index: ncurses/tty/tty_update.c
+Prereq:  1.326 
+--- ncurses-6.6-20260829+/ncurses/tty/tty_update.c	2026-06-06 09:59:40.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/tty/tty_update.c	2026-09-05 19:42:15.000000000 +0000
+@@ -91,7 +91,7 @@
+ #endif
+ #endif
+ 
+-MODULE_ID("$Id: tty_update.c,v 1.326 2026/06/06 09:59:40 tom Exp $")
++MODULE_ID("$Id: tty_update.c,v 1.327 2026/09/05 19:42:15 tom Exp $")
+ 
+ /*
+  * This define controls the line-breakout optimization.  Every once in a
+@@ -823,6 +823,17 @@
+ 	T(("coming back from shell mode"));
+ 	NCURSES_SP_NAME(reset_prog_mode)(NCURSES_SP_ARG);
+ 
++	if (StdScreen(SP_PARM)->_use_keypad) {
++	    StdScreen(SP_PARM)->_use_keypad = FALSE;
++	    T(("restoring keypad mode"));
++	    _nc_keypad(SP_PARM, TRUE);
++	}
++	if (SP_PARM->_use_meta) {
++	    SP_PARM->_use_meta = FALSE;
++	    T(("restoring meta mode"));
++	    meta(StdScreen(SP_PARM), TRUE);
++	}
++
+ 	NCURSES_SP_NAME(_nc_mvcur_resume)(NCURSES_SP_ARG);
+ 	NCURSES_SP_NAME(_nc_screen_resume)(NCURSES_SP_ARG);
+ 	SP_PARM->_mouse_resume(SP_PARM);
+Index: ncurses/win32con/win32_driver.c
+Prereq:  1.24 
+--- ncurses-6.6-20260829+/ncurses/win32con/win32_driver.c	2026-08-22 22:02:50.000000000 +0000
++++ ncurses-6.6-20260905/ncurses/win32con/win32_driver.c	2026-09-05 20:33:40.000000000 +0000
+@@ -41,7 +41,7 @@
+ 
+ #define CUR TerminalType(my_term).
+ 
+-MODULE_ID("$Id: win32_driver.c,v 1.24 2026/08/22 22:02:50 Liu.Hao Exp $")
++MODULE_ID("$Id: win32_driver.c,v 1.25 2026/09/05 20:33:40 tom Exp $")
+ 
+ #define WINMAGIC NCDRV_MAGIC(NCDRV_WINCONSOLE)
+ #define EXP_OPTIMIZE 0
+@@ -171,13 +171,13 @@
+     for (i = actual = 0; i < limit; i++) {
+ 	ch = str[i];
+ 	if (isWidecExt(ch)) {
+-            /* Skip trailing cell of a double-width character.  */
+-            ci[actual].CharInfoChar = ' ';
+-            ci[actual].Attributes = MapAttr(WINCONSOLE.SBI.wAttributes,
+-                                            AttrOf(ch));
+-            ++actual;
+-            continue;
+-        }
++	    /* Skip trailing cell of a double-width character.  */
++	    ci[actual].CharInfoChar = ' ';
++	    ci[actual].Attributes = MapAttr(WINCONSOLE.SBI.wAttributes,
++					    AttrOf(ch));
++	    ++actual;
++	    continue;
++	}
+ 	ci[actual].CharInfoChar = CharOf(ch);
+ 	ci[actual].Attributes = MapAttr(WINCONSOLE.SBI.wAttributes,
+ 					AttrOf(ch));
+@@ -779,6 +779,8 @@
+ 		    if (sp) {
+ 			if (sp->_keypad_on)
+ 			    _nc_keypad(sp, TRUE);
++			if (sp->_use_meta)
++			    meta_sp(sp, TRUE);
+ 		    }
+ 		    if (!WINCONSOLE.buffered) {
+ 			_nc_console_set_scrollback(FALSE, &WINCONSOLE.SBI);
+@@ -798,6 +800,7 @@
+ 		/* reset_shell_mode */
+ 		if (sp) {
+ 		    _nc_keypad(sp, FALSE);
++		    meta_sp(sp, FALSE);
+ 		    NCURSES_SP_NAME(_nc_flush)(sp);
+ 		}
+ 		code = wcon_sgmode(TCB, TRUE, &(_term->Ottyb));
+Index: package/debian-mingw/changelog
+--- ncurses-6.6-20260829+/package/debian-mingw/changelog	2026-08-29 09:26:56.000000000 +0000
++++ ncurses-6.6-20260905/package/debian-mingw/changelog	2026-09-05 00:09:29.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260829) unstable; urgency=low
++ncurses6td (6.6+20260905) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 29 Aug 2026 05:26:56 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Fri, 04 Sep 2026 20:09:29 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian-mingw64/changelog
+--- ncurses-6.6-20260829+/package/debian-mingw64/changelog	2026-08-29 09:26:56.000000000 +0000
++++ ncurses-6.6-20260905/package/debian-mingw64/changelog	2026-09-05 00:09:29.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260829) unstable; urgency=low
++ncurses6td (6.6+20260905) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 29 Aug 2026 05:26:56 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Fri, 04 Sep 2026 20:09:29 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian/changelog
+--- ncurses-6.6-20260829+/package/debian/changelog	2026-08-29 09:26:56.000000000 +0000
++++ ncurses-6.6-20260905/package/debian/changelog	2026-09-05 00:09:29.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260829) unstable; urgency=low
++ncurses6td (6.6+20260905) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 29 Aug 2026 05:26:56 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Fri, 04 Sep 2026 20:09:29 -0400
+ 
+ ncurses6 (5.9+20120608) unstable; urgency=low
+ 
+Index: package/mingw-ncurses.nsi
+Prereq:  1.779 
+--- ncurses-6.6-20260829+/package/mingw-ncurses.nsi	2026-08-29 09:26:56.000000000 +0000
++++ ncurses-6.6-20260905/package/mingw-ncurses.nsi	2026-09-05 00:09:29.000000000 +0000
+@@ -1,4 +1,4 @@
+-; $Id: mingw-ncurses.nsi,v 1.779 2026/08/29 09:26:56 tom Exp $
++; $Id: mingw-ncurses.nsi,v 1.781 2026/09/05 00:09:29 tom Exp $
+ 
+ ; TODO add examples
+ ; TODO bump ABI to 6
+@@ -10,7 +10,7 @@
+ !define VERSION_MAJOR "6"
+ !define VERSION_MINOR "6"
+ !define VERSION_YYYY  "2026"
+-!define VERSION_MMDD  "0829"
++!define VERSION_MMDD  "0905"
+ !define VERSION_PATCH ${VERSION_YYYY}${VERSION_MMDD}
+ 
+ !define MY_ABI   "5"
+Index: package/mingw-ncurses.spec
+--- ncurses-6.6-20260829+/package/mingw-ncurses.spec	2026-08-29 09:26:56.000000000 +0000
++++ ncurses-6.6-20260905/package/mingw-ncurses.spec	2026-09-05 09:37:18.000000000 +0000
+@@ -3,7 +3,7 @@
+ Summary: shared libraries for terminal handling
+ Name: mingw32-ncurses6
+ Version: 6.6
+-Release: 20260829
++Release: 20260905
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -144,8 +144,8 @@
+ 
+ %changelog
+ 
+-* Sat Aug 29 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260829
++* Sat Sep 05 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260905
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncurses.map
+Prereq:  1.62 
+--- ncurses-6.6-20260829+/package/ncurses.map	2026-06-08 23:34:10.000000000 +0000
++++ ncurses-6.6-20260905/package/ncurses.map	2026-09-05 20:20:35.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncurses.map,v 1.62 2026/06/08 23:34:10 tom Exp $
++# $Id: ncurses.map,v 1.63 2026/09/05 20:20:35 tom Exp $
+ # script for shared library symbol-versioning using ld
+ #
+ # This file was generated by ncu-mapsyms
+@@ -1241,6 +1241,7 @@
+ 	global:
+ 		_nc_cookie_allowed;
+ 		_nc_cookie_init;
++		meta_sp;
+ 	local:
+ 		_*;
+ } NCURSES_TINFO_6.6.20251230;
+Index: package/ncurses.spec
+--- ncurses-6.6-20260829+/package/ncurses.spec	2026-08-29 09:26:56.000000000 +0000
++++ ncurses-6.6-20260905/package/ncurses.spec	2026-09-05 09:37:18.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: shared libraries for terminal handling
+ Name: ncurses6
+ Version: 6.6
+-Release: 20260829
++Release: 20260905
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -134,8 +134,8 @@
+ 
+ %changelog
+ 
+-* Sat Aug 29 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260829
++* Sat Sep 05 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260905
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncurses.sym
+Prereq:  1.41 
+--- ncurses-6.6-20260829+/package/ncurses.sym	2026-05-17 00:28:07.000000000 +0000
++++ ncurses-6.6-20260905/package/ncurses.sym	2026-09-05 20:20:35.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncurses.sym,v 1.41 2026/05/17 00:28:07 tom Exp $
++# $Id: ncurses.sym,v 1.42 2026/09/05 20:20:35 tom Exp $
+ # script for shared library symbol-visibility using libtool
+ #
+ # This file was generated by ncu-mapsyms
+@@ -521,6 +521,7 @@
+ menu_userptr
+ menu_win
+ meta
++meta_sp
+ mouse_trafo
+ mouseinterval
+ mouseinterval_sp
+Index: package/ncursest.map
+Prereq:  1.60 
+--- ncurses-6.6-20260829+/package/ncursest.map	2026-06-08 23:34:10.000000000 +0000
++++ ncurses-6.6-20260905/package/ncursest.map	2026-09-05 20:20:35.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncursest.map,v 1.60 2026/06/08 23:34:10 tom Exp $
++# $Id: ncursest.map,v 1.61 2026/09/05 20:20:35 tom Exp $
+ # script for shared library symbol-versioning using ld
+ #
+ # This file was generated by ncu-mapsyms
+@@ -518,6 +518,7 @@
+ 	global:
+ 		_nc_cookie_allowed;
+ 		_nc_cookie_init;
++		meta_sp;
+ 	local:
+ 		_*;
+ } NCURSES_TINFO_6.6.20251230;
+Index: package/ncursest.spec
+--- ncurses-6.6-20260829+/package/ncursest.spec	2026-08-29 09:26:56.000000000 +0000
++++ ncurses-6.6-20260905/package/ncursest.spec	2026-09-05 09:37:18.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: Curses library with POSIX thread support.
+ Name: ncursest6
+ Version: 6.6
+-Release: 20260829
++Release: 20260905
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ Source: ncurses-%{version}-%{release}.tgz
+@@ -142,8 +142,8 @@
+ 
+ %changelog
+ 
+-* Sat Aug 29 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260829
++* Sat Sep 05 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260905
+ 
+ * Tue Dec 24 2019 Thomas Dickey
+ - drop custom CC_NORMAL warning flags because setting CFLAGS interferes with
+Index: package/ncursest.sym
+Prereq:  1.45 
+--- ncurses-6.6-20260829+/package/ncursest.sym	2026-05-17 00:28:07.000000000 +0000
++++ ncurses-6.6-20260905/package/ncursest.sym	2026-09-05 20:20:35.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncursest.sym,v 1.45 2026/05/17 00:28:07 tom Exp $
++# $Id: ncursest.sym,v 1.46 2026/09/05 20:20:35 tom Exp $
+ # script for shared library symbol-visibility using libtool
+ #
+ # This file was generated by ncu-mapsyms
+@@ -530,6 +530,7 @@
+ menu_userptr
+ menu_win
+ meta
++meta_sp
+ mouse_trafo
+ mouseinterval
+ mouseinterval_sp
+Index: package/ncursestw.map
+Prereq:  1.63 
+--- ncurses-6.6-20260829+/package/ncursestw.map	2026-06-08 23:34:10.000000000 +0000
++++ ncurses-6.6-20260905/package/ncursestw.map	2026-09-05 20:20:35.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncursestw.map,v 1.63 2026/06/08 23:34:10 tom Exp $
++# $Id: ncursestw.map,v 1.64 2026/09/05 20:20:35 tom Exp $
+ # script for shared library symbol-versioning using ld
+ #
+ # This file was generated by ncu-mapsyms
+@@ -526,6 +526,7 @@
+ 	global:
+ 		_nc_cookie_allowed;
+ 		_nc_cookie_init;
++		meta_sp;
+ 	local:
+ 		_*;
+ } NCURSES_TINFO_6.6.20251230;
+Index: package/ncursestw.sym
+Prereq:  1.45 
+--- ncurses-6.6-20260829+/package/ncursestw.sym	2026-05-17 00:28:07.000000000 +0000
++++ ncurses-6.6-20260905/package/ncursestw.sym	2026-09-05 20:20:35.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncursestw.sym,v 1.45 2026/05/17 00:28:07 tom Exp $
++# $Id: ncursestw.sym,v 1.46 2026/09/05 20:20:35 tom Exp $
+ # script for shared library symbol-visibility using libtool
+ #
+ # This file was generated by ncu-mapsyms
+@@ -569,6 +569,7 @@
+ menu_userptr
+ menu_win
+ meta
++meta_sp
+ mouse_trafo
+ mouseinterval
+ mouseinterval_sp
+Index: package/ncursesw.map
+Prereq:  1.66 
+--- ncurses-6.6-20260829+/package/ncursesw.map	2026-06-08 23:34:10.000000000 +0000
++++ ncurses-6.6-20260905/package/ncursesw.map	2026-09-05 20:20:35.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncursesw.map,v 1.66 2026/06/08 23:34:10 tom Exp $
++# $Id: ncursesw.map,v 1.67 2026/09/05 20:20:35 tom Exp $
+ # script for shared library symbol-versioning using ld
+ #
+ # This file was generated by ncu-mapsyms
+@@ -520,6 +520,7 @@
+ 	global:
+ 		_nc_cookie_allowed;
+ 		_nc_cookie_init;
++		meta_sp;
+ 	local:
+ 		_*;
+ } NCURSES_TINFO_6.6.20251230;
+Index: package/ncursesw.sym
+Prereq:  1.44 
+--- ncurses-6.6-20260829+/package/ncursesw.sym	2026-05-17 00:28:07.000000000 +0000
++++ ncurses-6.6-20260905/package/ncursesw.sym	2026-09-05 20:20:35.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncursesw.sym,v 1.44 2026/05/17 00:28:07 tom Exp $
++# $Id: ncursesw.sym,v 1.45 2026/09/05 20:20:35 tom Exp $
+ # script for shared library symbol-visibility using libtool
+ #
+ # This file was generated by ncu-mapsyms
+@@ -557,6 +557,7 @@
+ menu_userptr
+ menu_win
+ meta
++meta_sp
+ mouse_trafo
+ mouseinterval
+ mouseinterval_sp
+Index: test/README
+Prereq:  1.84 
+--- ncurses-6.6-20260829+/test/README	2026-08-15 22:48:47.000000000 +0000
++++ ncurses-6.6-20260905/test/README	2026-09-05 21:25:30.000000000 +0000
+@@ -26,7 +26,7 @@
+ -- sale, use or other dealings in this Software without prior written        --
+ -- authorization.                                                            --
+ -------------------------------------------------------------------------------
+--- $Id: README,v 1.84 2026/08/15 22:48:47 tom Exp $
++-- $Id: README,v 1.85 2026/09/05 21:25:30 tom Exp $
+ -------------------------------------------------------------------------------
+ 
+ The programs in this directory are used to test and demonstrate ncurses.
+@@ -461,6 +461,7 @@
+ mcprint				-
+ mcprint_sp			-
+ meta				test: key_names keynames ncurses
++meta_sp				lib: ncurses
+ mouse_trafo			lib: form
+ mouseinterval			test: test_mouse
+ mouseinterval_sp		-
+@@ -651,7 +652,7 @@
+ slk_attrset			test: extended_color ncurses
+ slk_attrset_sp			-
+ slk_clear			test: ncurses
+-slk_clear_sp			-
++slk_clear_sp			lib: ncurses
+ slk_color			test: ncurses
+ slk_color_sp			-
+ slk_init			test: extended_color ncurses
+Index: test/test_mouse.c
+Prereq:  1.39 
+--- ncurses-6.6-20260829+/test/test_mouse.c	2026-08-29 22:56:31.000000000 +0000
++++ ncurses-6.6-20260905/test/test_mouse.c	2026-09-05 21:31:48.000000000 +0000
+@@ -27,7 +27,7 @@
+  * authorization.                                                           *
+  ****************************************************************************/
+ /*
+- * $Id: test_mouse.c,v 1.39 2026/08/29 22:56:31 tom Exp $
++ * $Id: test_mouse.c,v 1.48 2026/09/05 21:31:48 tom Exp $
+  *
+  * Author: Leonid S Usov
+  *
+@@ -41,6 +41,19 @@
+ static int logoffset = 0;
+ 
+ static void
++cleanup(void)
++{
++    stop_curses();
++}
++
++static void
++onsig(int sig GCC_UNUSED)
++{
++    cleanup();
++    ExitProgram(EXIT_FAILURE);
++}
++
++static void
+ raw_loop(void)
+ {
+     const char *xtermcap;
+@@ -105,11 +118,30 @@
+     clrtoeol();
+ }
+ 
++#define ShowQ(btn,name) \
++	(((this_event & NCURSES_MOUSE_MASK(btn, NCURSES_ ## name)) != 0) \
++	 ? (" " #name) \
++	 : "")
++#define ShowM(name) \
++	(((this_event & BUTTON_ ## name) != 0) \
++	 ? (" " #name) \
++	 : "")
++#define ShowP() \
++	 ((this_event & REPORT_MOUSE_POSITION) != 0 \
++	  ? " position" \
++	  : "")
++#if NCURSES_MOUSE_VERSION == 3
++#define HexFormat "[%016lX]"
++#else
++#define HexFormat "[%08lX]"
++#endif
++
+ static void
+ cooked_loop(char *my_environ, int interval)
+ {
+     MEVENT event;
+ 
++    signal(SIGINT, onsig);
+     initscr();
+     noecho();
+     cbreak();			/* Line buffering disabled; pass everything */
+@@ -133,7 +165,6 @@
+ 	case KEY_MOUSE:
+ 	    if (getmouse(&event) == OK) {
+ 		unsigned btn;
+-		mmask_t events;
+ #if NCURSES_MOUSE_VERSION > 2
+ 		const unsigned max_btn = 11;
+ #elif NCURSES_MOUSE_VERSION > 1
+@@ -147,53 +178,43 @@
+ 					  NCURSES_DOUBLE_CLICKED |
+ 					  NCURSES_TRIPLE_CLICKED);
+ 		bool found = FALSE;
++		mmask_t this_event = event.bstate;
+ 		for (btn = 1; btn <= max_btn; btn++) {
+-		    events = (mmask_t) (event.bstate
+-					& NCURSES_MOUSE_MASK(btn, btn_mask));
+-		    if (events == 0)
++		    mmask_t this_btn = (mmask_t) (this_event
++						  & NCURSES_MOUSE_MASK(btn, btn_mask));
++		    if (this_btn == 0)
+ 			continue;
+-#define ShowQ(btn,name) \
+-	(((event.bstate & NCURSES_MOUSE_MASK(btn, NCURSES_ ## name)) != 0) \
+-	 ? (" " #name) \
+-	 : "")
+-#define ShowM(name) \
+-	(((event.bstate & NCURSES_MOUSE_MASK(btn, BUTTON_ ## name)) != 0) \
+-	 ? (" " #name) \
+-	 : "")
+-#define ShowP() \
+-	 ((event.bstate & REPORT_MOUSE_POSITION) != 0 \
+-	  ? " position" \
+-	  : "")
+-		    logw("[%08lX] button %d%s%s%s%s%s%s%s%s%s @ %d, %d",
+-			 (unsigned long) events,
++		    logw(HexFormat " button %2d%s%s%s%s%s%s @%3d,%3d%s%s%s",
++			 (unsigned long) this_btn,
+ 			 btn,
+ 			 ShowQ(btn, BUTTON_RELEASED),
+ 			 ShowQ(btn, BUTTON_PRESSED),
+ 			 ShowQ(btn, BUTTON_CLICKED),
+ 			 ShowQ(btn, DOUBLE_CLICKED),
+ 			 ShowQ(btn, TRIPLE_CLICKED),
++			 ShowP(),
++			 event.y, event.x,
+ 			 ShowM(SHIFT),
+ 			 ShowM(CTRL),
+-			 ShowM(ALT),
+-			 ShowP(),
+-			 event.y, event.x);
++			 ShowM(ALT));
+ 		    found = TRUE;
+ 		}
+ 		/*
+ 		 * A position report need not have a button associated with it.
+ 		 * The modifiers probably are unused.
+ 		 */
+-		if (!found && (event.bstate & REPORT_MOUSE_POSITION)) {
+-		    logw("[%08lX]%s%s%s%s @ %d, %d",
+-			 (unsigned long) events,
++		if (!found && (this_event & REPORT_MOUSE_POSITION)) {
++		    logw(HexFormat "%s @%3d,%3d%s%s%s",
++			 (unsigned long) this_event,
++			 ShowP(),
++			 event.y, event.x,
+ 			 ShowM(SHIFT),
+ 			 ShowM(CTRL),
+-			 ShowM(ALT),
+-			 ShowP(),
+-			 event.y, event.x);
++			 ShowM(ALT));
+ 		}
+ 	    }
+ 	    break;
++	case ERR:
+ 	case '\003':
+ 	    goto end;
+ 	default:
+@@ -238,7 +259,7 @@
+ main(int argc, char *argv[])
+ {
+     bool rawmode = FALSE;
+-    int interval = 0;
++    int interval = -1;
+     int ch;
+     size_t my_len;
+     char *my_environ = NULL;

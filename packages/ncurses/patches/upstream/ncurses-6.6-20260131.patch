@@ -1,0 +1,461 @@
+# ncurses 6.6 - patch 20260131 - Thomas E. Dickey
+#
+# ------------------------------------------------------------------------------
+#
+# Ncurses 6.6 is at
+#   https://invisible-island.net/archives/ncurses/
+#   https://invisible-mirror.net/archives/ncurses/
+#   https://ftp.gnu.org/gnu/ncurses/
+#
+# Patches for ncurses 6.6 can be found at
+#   https://invisible-island.net/archives/ncurses/6.6
+#   https://invisible-mirror.net/archives/ncurses/6.6
+#
+# ------------------------------------------------------------------------------
+# https://invisible-island.net/archives/ncurses/6.6/ncurses-6.6-20260131.patch.gz
+# patch by Thomas E. Dickey <dickey@invisible-island.net>
+# created  Sat Jan 31 22:51:17 UTC 2026
+# ------------------------------------------------------------------------------
+# Ada95/aclocal.m4                 |    6 +--
+# NEWS                             |    8 ++++
+# VERSION                          |    2 -
+# aclocal.m4                       |    6 +--
+# configure                        |    2 -
+# dist.mk                          |    4 +-
+# misc/terminfo.src                |   60 ++++++++++++++++++++++++++++++-------
+# package/debian-mingw/changelog   |    4 +-
+# package/debian-mingw64/changelog |    4 +-
+# package/debian/changelog         |    4 +-
+# package/mingw-ncurses.nsi        |    4 +-
+# package/mingw-ncurses.spec       |    6 +--
+# package/ncurses.spec             |    6 +--
+# package/ncursest.spec            |    6 +--
+# test/aclocal.m4                  |    6 +--
+# 15 files changed, 87 insertions(+), 41 deletions(-)
+# ------------------------------------------------------------------------------
+Index: Ada95/aclocal.m4
+Prereq:  1.243 
+--- ncurses-6.6-20260124+/Ada95/aclocal.m4	2026-01-18 16:36:44.000000000 +0000
++++ ncurses-6.6-20260131/Ada95/aclocal.m4	2026-01-31 14:07:58.000000000 +0000
+@@ -29,7 +29,7 @@
+ dnl
+ dnl Author: Thomas E. Dickey
+ dnl
+-dnl $Id: aclocal.m4,v 1.243 2026/01/18 16:36:44 tom Exp $
++dnl $Id: aclocal.m4,v 1.244 2026/01/31 14:07:58 tom Exp $
+ dnl Macros used in NCURSES Ada95 auto-configuration script.
+ dnl
+ dnl These macros are maintained separately from NCURSES.  The copyright on
+@@ -4024,7 +4024,7 @@
+ AC_SUBST(cf_ada_config_C)
+ ])dnl
+ dnl ---------------------------------------------------------------------------
+-dnl CF_PROG_INSTALL version: 13 updated: 2025/10/21 16:28:49
++dnl CF_PROG_INSTALL version: 14 updated: 2026/01/31 09:07:58
+ dnl ---------------
+ dnl Force $INSTALL to be an absolute-path.  Otherwise, edit_man.sh and the
+ dnl misc/tabset install won't work properly.  Usually this happens only when
+@@ -4036,7 +4036,7 @@
+ 	if test -f /usr/sbin/install ; then
+ 		case "$host_os" in
+ 		(linux*gnu*|uclinux*|gnu*|mint*|k*bsd*-gnu|cygwin|msys|mingw*|linux*uclibc)
+-			INSTALL=/usr/sbin/install 
++			INSTALL=/usr/sbin/install
+ 			;;
+ 		esac
+ 	fi
+Index: NEWS
+Prereq:  1.4414 
+--- ncurses-6.6-20260124+/NEWS	2026-01-25 01:28:03.000000000 +0000
++++ ncurses-6.6-20260131/NEWS	2026-01-31 21:41:20.000000000 +0000
+@@ -26,7 +26,7 @@
+ -- sale, use or other dealings in this Software without prior written        --
+ -- authorization.                                                            --
+ -------------------------------------------------------------------------------
+--- $Id: NEWS,v 1.4414 2026/01/25 01:28:03 tom Exp $
++-- $Id: NEWS,v 1.4416 2026/01/31 21:41:20 tom Exp $
+ -------------------------------------------------------------------------------
+ 
+ This is a log of changes that ncurses has gone through since Zeyd started
+@@ -46,6 +46,12 @@
+ Changes through 1.9.9e did not credit all contributions;
+ it is not possible to add this information.
+ 
++20260131
++	+ add putty+3keys -TD
++	+ add dim to putty -TD
++	+ add xterm+3keys -TD
++	+ add note explaining origin of ecma+overline -TD
++
+ 20260124
+ 	+ add xterm+indirect16, vt100+keypad+emul, putty-direct,
+ 	  putty-direct16, wezterm-direct, wezterm-direct16
+Index: VERSION
+--- ncurses-6.6-20260124+/VERSION	2026-01-24 10:50:05.000000000 +0000
++++ ncurses-6.6-20260131/VERSION	2026-01-31 10:19:27.000000000 +0000
+@@ -1 +1 @@
+-5:0:10	6.6	20260124
++5:0:10	6.6	20260131
+Index: aclocal.m4
+Prereq:  1.1151 
+--- ncurses-6.6-20260124+/aclocal.m4	2026-01-24 19:16:57.000000000 +0000
++++ ncurses-6.6-20260131/aclocal.m4	2026-01-31 14:07:58.000000000 +0000
+@@ -29,7 +29,7 @@
+ dnl
+ dnl Author: Thomas E. Dickey 1995-on
+ dnl
+-dnl $Id: aclocal.m4,v 1.1151 2026/01/24 19:16:57 tom Exp $
++dnl $Id: aclocal.m4,v 1.1152 2026/01/31 14:07:58 tom Exp $
+ dnl Macros used in NCURSES auto-configuration script.
+ dnl
+ dnl These macros are maintained separately from NCURSES.  The copyright on
+@@ -7206,7 +7206,7 @@
+ AC_SUBST(cf_ada_config_C)
+ ])dnl
+ dnl ---------------------------------------------------------------------------
+-dnl CF_PROG_INSTALL version: 13 updated: 2025/10/21 16:28:49
++dnl CF_PROG_INSTALL version: 14 updated: 2026/01/31 09:07:58
+ dnl ---------------
+ dnl Force $INSTALL to be an absolute-path.  Otherwise, edit_man.sh and the
+ dnl misc/tabset install won't work properly.  Usually this happens only when
+@@ -7218,7 +7218,7 @@
+ 	if test -f /usr/sbin/install ; then
+ 		case "$host_os" in
+ 		(linux*gnu*|uclinux*|gnu*|mint*|k*bsd*-gnu|cygwin|msys|mingw*|linux*uclibc)
+-			INSTALL=/usr/sbin/install 
++			INSTALL=/usr/sbin/install
+ 			;;
+ 		esac
+ 	fi
+Index: configure
+--- ncurses-6.6-20260124+/configure	2026-01-24 18:55:17.000000000 +0000
++++ ncurses-6.6-20260131/configure	2026-01-24 18:56:52.000000000 +0000
+@@ -1,5 +1,5 @@
+ #! /bin/sh
+-# From configure.in Revision: 1.826 .
++# From configure.in Revision: 1.827 .
+ # Guess values for system-dependent variables and create Makefiles.
+ # Generated by Autoconf 2.52.20260118.
+ #
+Index: dist.mk
+Prereq:  1.1715 
+--- ncurses-6.6-20260124+/dist.mk	2026-01-24 10:50:05.000000000 +0000
++++ ncurses-6.6-20260131/dist.mk	2026-01-31 10:19:27.000000000 +0000
+@@ -26,7 +26,7 @@
+ # use or other dealings in this Software without prior written               #
+ # authorization.                                                             #
+ ##############################################################################
+-# $Id: dist.mk,v 1.1715 2026/01/24 10:50:05 tom Exp $
++# $Id: dist.mk,v 1.1716 2026/01/31 10:19:27 tom Exp $
+ # Makefile for creating ncurses distributions.
+ #
+ # This only needs to be used directly as a makefile by developers, but
+@@ -38,7 +38,7 @@
+ # These define the major/minor/patch versions of ncurses.
+ NCURSES_MAJOR = 6
+ NCURSES_MINOR = 6
+-NCURSES_PATCH = 20260124
++NCURSES_PATCH = 20260131
+ 
+ # We don't append the patch to the version, since this only applies to releases
+ VERSION = $(NCURSES_MAJOR).$(NCURSES_MINOR)
+Index: misc/terminfo.src
+--- ncurses-6.6-20260124+/misc/terminfo.src	2026-01-25 00:46:12.000000000 +0000
++++ ncurses-6.6-20260131/misc/terminfo.src	2026-01-31 21:33:33.000000000 +0000
+@@ -6,8 +6,8 @@
+ # Report bugs and new terminal descriptions to
+ #	bug-ncurses@gnu.org
+ #
+-#	$Revision: 1.1216 $
+-#	$Date: 2026/01/25 00:46:12 $
++#	$Revision: 1.1221 $
++#	$Date: 2026/01/31 21:33:33 $
+ #
+ # The original header is preserved below for reference.  It is noted that there
+ # is a "newer" version which differs in some cosmetic details (but actually
+@@ -484,6 +484,17 @@
+ ecma+sgr|attribute capabilities for true ECMA-48 terminals,
+ 	use=ecma+underline, use=ecma+standout, use=klone+sgr8,
+ 
++# Although SGR 53/55 are listed in ECMA-48 (second edition, 1979), it was not
++# of interest to developers of terminal emulators until Thomas Wolff added it
++# to mintty July 31 2015 (36 years elapsed).  After that, other developers
++# copied the feature:
++#	Jul 16 2016 konsole (KDE #362171)
++#	Jul 31 2017 RLogin
++#	Nov 25 2017 mlterm
++#	Dec 11 2017 vte (GNOME #767115)
++#
++# Thomas Wolff suggested smol/rmol in June 2019, but by that point these names
++# had already been chosen for consistency with Smulx a month earlier.
+ ecma+overline|ECMA-48 overlined,
+ 	Rmol=\E[55m, Smol=\E[53m,
+ 
+@@ -4226,7 +4237,7 @@
+ 	it#8, ncv@, U8#1,
+ 	acsc=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+ 	bel=^G, cr=\r, cub1=^H, cud1=\ED, cuu1=\EM, dch=\E[%p1%dP,
+-	dch1=\E[P,
++	dch1=\E[P, dim=\E[2m,
+ 	dispc=%?%p1%{8}%=%t\E%%G\342\227\230\E%%@%e%p1%{10}%=%t\E%%G
+ 	      \342\227\231\E%%@%e%p1%{12}%=%t\E%%G\342\231\0\E%%@%e
+ 	      %p1%{13}%=%t\E%%G\342\231\252\E%%@%e%p1%{14}%=%t\E%%G
+@@ -4244,7 +4255,7 @@
+ 	rs2=\E<\E["p\E[50;6"p\Ec\E[?3l\E]R\E[?1000l,
+ 	s0ds=\E[10m, s1ds=\E[11m, s2ds=\E[12m,
+ 	sgr=\E[0%?%p1%p6%|%t;1%;%?%p2%t;4%;%?%p1%p3%|%t;7%;%?%p4%t;5
+-	    %;m%?%p9%t\016%e\017%;,
++	    %;%?%p5%t;2%;m%?%p9%t\016%e\017%;,
+ 	sgr0=\E[m\017, smacs=^N, smam=\E[?7h, smir=\E[4h,
+ 	smkx=\E[?1h\E=, E3=\E[3J, rv=\E\\[>0;136;0c,
+ 	use=ecma+underline, use=ecma+standout,
+@@ -4253,9 +4264,18 @@
+ 	use=ansi+tabs, use=ansi+rep, use=bracketed+paste,
+ 	use=ecma+index, use=ansi+rca2, use=ecma+strikeout,
+ 	use=klone+color, use=klone+sgr, use=putty+cursor,
+-	use=putty+fnkeys, use=report+da2, use=vt220+pcedit,
+-	use=xterm+alt1049, use=vt102+enq, use=xterm+sm+1006,
+-	use=xterm+sl, use=putty+keypad, use=vt220+cvis,
++	use=putty+fnkeys, use=putty+3keys, use=report+da2,
++	use=vt220+pcedit, use=xterm+alt1049, use=vt102+enq,
++	use=xterm+sm+1006, use=xterm+sl, use=putty+keypad,
++	use=vt220+cvis,
++
++# Seen in testing PuTTY 0.83 with vttest, private-use utf-8:
++#	o^\^P	239, 156, 144	0xf710	Print Screen
++#	o^\^Q	239, 156, 145	0xf711	ScrollLock (shift)
++#	o^\^R	239, 156, 146	0xf712	Pause (shift)
++putty+3keys|PuTTY 3-keys,
++	kPause=\357\234\222, kPrint=\357\234\220,
++	kScroll=\357\234\221,
+ 
+ # older versions (e.g., before 0.71) of PuTTY used a shift-modifier to toggle
+ # between normal- and application-mode for the cursor-keys.  That was dropped,
+@@ -5106,7 +5126,7 @@
+ 	use=ecma+index, use=ansi+rep, use=ecma+strikeout,
+ 	use=xterm+pcfkeys, use=xterm+nofkeys,
+ 	use=bracketed+paste, use=report+version,
+-	use=xterm+focus,
++	use=xterm+focus, use=xterm+3keys,
+ 
+ xterm-p371|xterm patch #371,
+ 	use=dec+sl, use=xterm-p370,
+@@ -5383,6 +5403,16 @@
+ 	acsc=``aaffggiijjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+ 	enacs@, rmacs=\E(B, smacs=\E(0,
+ 
++# Seen with XQuartz 1.20.1, xev says these are F13, F14, F15.  The ";2" denotes
++# the shift modifier.  mlterm, pterm, and vte imitate this behavior (konsole
++# ignores), and since other environments send nothing, the block can be used
++# for those without confusion.
++# 2026/01/31 -TD
++xterm+3keys|X11 3-keys,
++	kPause=\E[26;2~, kPrint=\E[25~, kPrint2=\E[25;2~,
++	kPrint3=\E[25;3~, kPrint4=\E[25;4~, kPrint5=\E[25;5~,
++	kPrint6=\E[25;6~, kPrint7=\E[25;7~, kScroll=\E[28;2~,
++
+ # This chunk is used for building the VT220/Sun/PC keyboard variants.
+ xterm-basic|modern xterm terminal emulator - common,
+ 	OTbs, am, bce, mir, msgr, xenl, AX, XT,
+@@ -6431,7 +6461,7 @@
+ # - xterm's extension to clear scrollback
+ vte-2022|VTE aka GNOME Terminal,
+ 	xr=\EP>\\|VTE\\(([0-9])\\)\E\\\\, use=report+version,
+-	use=report+da2, use=vte-2018,
++	use=report+da2, use=vte-2018, use=xterm+3keys,
+ 
+ vte|VTE aka GNOME Terminal,
+ 	use=vte-2022,
+@@ -6760,7 +6790,7 @@
+ 	use=xterm+pcc2, use=xterm+pce2, use=xterm+meta,
+ 	use=xterm+alt+title, use=xterm+sm+1006,
+ 	use=vt100+pfkeys-sco, use=bracketed+paste, use=mlterm2,
+-	use=report+version,
++	use=report+version, use=xterm+3keys,
+ 
+ # This is mlterm 2.9.3's mlterm.ti, with some additions/corrections -TD
+ #
+@@ -25619,7 +25649,11 @@
+ #   kLFT{3|4|5|6|7}                modifier + cursor-left
+ #   kNXT{3|4|5|6|7}                modifier + next
+ #   kPRV{3|4|5|6|7}                modifier + previous
++#   kPause                         pause/break
++#   kPrint                         print screen
++#   kPrint{2|3|4|5|6|7}            print screen
+ #   kRIT{3|4|5|6|7}                modifier + cursor-right
++#   kScroll                        scroll lock
+ #   kUP                            shifted cursor-up
+ #   kUP{3|4|5|6|7}                 modifier + cursor-up
+ #   ka2                            keypad key between ka1 and ka3
+@@ -28079,4 +28113,10 @@
+ #	  Finder)
+ #	+ add ecma+overline -TD
+ #
++# 2026-01-31
++#	+ add putty+3keys -TD
++#	+ add dim to putty -TD
++#	+ add xterm+3keys -TD
++#	+ add note explaining origin of ecma+overline -TD
++#
+ ######## SHANTIH!  SHANTIH!  SHANTIH!
+Index: package/debian-mingw/changelog
+--- ncurses-6.6-20260124+/package/debian-mingw/changelog	2026-01-24 10:50:05.000000000 +0000
++++ ncurses-6.6-20260131/package/debian-mingw/changelog	2026-01-31 10:19:27.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260124) unstable; urgency=low
++ncurses6td (6.6+20260131) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 24 Jan 2026 05:50:05 -0500
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 31 Jan 2026 05:19:27 -0500
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian-mingw64/changelog
+--- ncurses-6.6-20260124+/package/debian-mingw64/changelog	2026-01-24 10:50:05.000000000 +0000
++++ ncurses-6.6-20260131/package/debian-mingw64/changelog	2026-01-31 10:19:27.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260124) unstable; urgency=low
++ncurses6td (6.6+20260131) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 24 Jan 2026 05:50:05 -0500
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 31 Jan 2026 05:19:27 -0500
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian/changelog
+--- ncurses-6.6-20260124+/package/debian/changelog	2026-01-24 10:50:05.000000000 +0000
++++ ncurses-6.6-20260131/package/debian/changelog	2026-01-31 10:19:27.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260124) unstable; urgency=low
++ncurses6td (6.6+20260131) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 24 Jan 2026 05:50:05 -0500
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 31 Jan 2026 05:19:27 -0500
+ 
+ ncurses6 (5.9+20120608) unstable; urgency=low
+ 
+Index: package/mingw-ncurses.nsi
+Prereq:  1.745 
+--- ncurses-6.6-20260124+/package/mingw-ncurses.nsi	2026-01-24 10:50:05.000000000 +0000
++++ ncurses-6.6-20260131/package/mingw-ncurses.nsi	2026-01-31 10:19:27.000000000 +0000
+@@ -1,4 +1,4 @@
+-; $Id: mingw-ncurses.nsi,v 1.745 2026/01/24 10:50:05 tom Exp $
++; $Id: mingw-ncurses.nsi,v 1.746 2026/01/31 10:19:27 tom Exp $
+ 
+ ; TODO add examples
+ ; TODO bump ABI to 6
+@@ -10,7 +10,7 @@
+ !define VERSION_MAJOR "6"
+ !define VERSION_MINOR "6"
+ !define VERSION_YYYY  "2026"
+-!define VERSION_MMDD  "0124"
++!define VERSION_MMDD  "0131"
+ !define VERSION_PATCH ${VERSION_YYYY}${VERSION_MMDD}
+ 
+ !define MY_ABI   "5"
+Index: package/mingw-ncurses.spec
+--- ncurses-6.6-20260124+/package/mingw-ncurses.spec	2026-01-24 10:50:05.000000000 +0000
++++ ncurses-6.6-20260131/package/mingw-ncurses.spec	2026-01-31 10:19:27.000000000 +0000
+@@ -3,7 +3,7 @@
+ Summary: shared libraries for terminal handling
+ Name: mingw32-ncurses6
+ Version: 6.6
+-Release: 20260124
++Release: 20260131
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -144,8 +144,8 @@
+ 
+ %changelog
+ 
+-* Sat Jan 24 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260124
++* Sat Jan 31 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260131
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncurses.spec
+--- ncurses-6.6-20260124+/package/ncurses.spec	2026-01-24 10:50:05.000000000 +0000
++++ ncurses-6.6-20260131/package/ncurses.spec	2026-01-31 10:19:27.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: shared libraries for terminal handling
+ Name: ncurses6
+ Version: 6.6
+-Release: 20260124
++Release: 20260131
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -134,8 +134,8 @@
+ 
+ %changelog
+ 
+-* Sat Jan 24 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260124
++* Sat Jan 31 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260131
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncursest.spec
+--- ncurses-6.6-20260124+/package/ncursest.spec	2026-01-24 10:50:05.000000000 +0000
++++ ncurses-6.6-20260131/package/ncursest.spec	2026-01-31 10:19:27.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: Curses library with POSIX thread support.
+ Name: ncursest6
+ Version: 6.6
+-Release: 20260124
++Release: 20260131
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ Source: ncurses-%{version}-%{release}.tgz
+@@ -142,8 +142,8 @@
+ 
+ %changelog
+ 
+-* Sat Jan 24 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260124
++* Sat Jan 31 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260131
+ 
+ * Tue Dec 24 2019 Thomas Dickey
+ - drop custom CC_NORMAL warning flags because setting CFLAGS interferes with
+Index: test/aclocal.m4
+Prereq:  1.248 
+--- ncurses-6.6-20260124+/test/aclocal.m4	2026-01-24 19:31:26.000000000 +0000
++++ ncurses-6.6-20260131/test/aclocal.m4	2026-01-31 14:07:58.000000000 +0000
+@@ -27,7 +27,7 @@
+ dnl authorization.                                                           *
+ dnl***************************************************************************
+ dnl
+-dnl $Id: aclocal.m4,v 1.248 2026/01/24 19:31:26 tom Exp $
++dnl $Id: aclocal.m4,v 1.249 2026/01/31 14:07:58 tom Exp $
+ dnl
+ dnl Author: Thomas E. Dickey
+ dnl
+@@ -3619,7 +3619,7 @@
+ CF_CC_ENV_FLAGS
+ ])dnl
+ dnl ---------------------------------------------------------------------------
+-dnl CF_PROG_INSTALL version: 13 updated: 2025/10/21 16:28:49
++dnl CF_PROG_INSTALL version: 14 updated: 2026/01/31 09:07:58
+ dnl ---------------
+ dnl Force $INSTALL to be an absolute-path.  Otherwise, edit_man.sh and the
+ dnl misc/tabset install won't work properly.  Usually this happens only when
+@@ -3631,7 +3631,7 @@
+ 	if test -f /usr/sbin/install ; then
+ 		case "$host_os" in
+ 		(linux*gnu*|uclinux*|gnu*|mint*|k*bsd*-gnu|cygwin|msys|mingw*|linux*uclibc)
+-			INSTALL=/usr/sbin/install 
++			INSTALL=/usr/sbin/install
+ 			;;
+ 		esac
+ 	fi

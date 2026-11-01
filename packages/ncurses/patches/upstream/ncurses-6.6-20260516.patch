@@ -1,0 +1,2050 @@
+# ncurses 6.6 - patch 20260516 - Thomas E. Dickey
+#
+# ------------------------------------------------------------------------------
+#
+# Ncurses 6.6 is at
+#   https://invisible-island.net/archives/ncurses/
+#   https://invisible-mirror.net/archives/ncurses/
+#   https://ftp.gnu.org/gnu/ncurses/
+#
+# Patches for ncurses 6.6 can be found at
+#   https://invisible-island.net/archives/ncurses/6.6
+#   https://invisible-mirror.net/archives/ncurses/6.6
+#
+# ------------------------------------------------------------------------------
+# https://invisible-island.net/archives/ncurses/6.6/ncurses-6.6-20260516.patch.gz
+# patch by Thomas E. Dickey <dickey@invisible-island.net>
+# created  Sun May 17 01:14:56 UTC 2026
+# ------------------------------------------------------------------------------
+# MANIFEST                                          |    2 
+# NEWS                                              |   10 -
+# VERSION                                           |    2 
+# dist.mk                                           |    4 
+# ncurses-6.6-20260516/ncurses/tinfo/cookie_caps.c  |  156 ++++++++++++++++
+# ncurses-6.6-20260516/ncurses/tty/cookie_updates.c |   93 +++++++++
+# ncurses/base/lib_getch.c                          |    4 
+# ncurses/base/lib_set_term.c                       |   90 ---------
+# ncurses/curses.priv.h                             |   11 -
+# ncurses/modules                                   |    4 
+# ncurses/tinfo/tinfo_driver.c                      |  166 +++--------------
+# ncurses/tinfo/trim_sgr0.c                         |   11 -
+# ncurses/tty/lib_vidattr.c                         |   57 ++---
+# ncurses/tty/tty_update.c                          |  195 ++++++++++----------
+# ncurses/widechar/lib_ins_wch.c                    |    6 
+# ncurses/widechar/lib_vid_attr.c                   |   79 ++++----
+# package/debian-mingw/changelog                    |    4 
+# package/debian-mingw64/changelog                  |    4 
+# package/debian/changelog                          |    4 
+# package/mingw-ncurses.nsi                         |    4 
+# package/mingw-ncurses.spec                        |    6 
+# package/ncurses.map                               |    6 
+# package/ncurses.spec                              |    6 
+# package/ncurses.sym                               |    4 
+# package/ncursest.map                              |    6 
+# package/ncursest.spec                             |    6 
+# package/ncursest.sym                              |    4 
+# package/ncursestw.map                             |    6 
+# package/ncursestw.sym                             |    4 
+# package/ncursesw.map                              |    6 
+# package/ncursesw.sym                              |    4 
+# progs/infocmp.c                                   |   22 +-
+# 32 files changed, 549 insertions(+), 437 deletions(-)
+# ------------------------------------------------------------------------------
+Index: MANIFEST
+--- ncurses-6.6-20260509+/MANIFEST	2025-12-30 15:15:35.000000000 +0000
++++ ncurses-6.6-20260516/MANIFEST	2026-05-16 23:25:16.000000000 +0000
+@@ -921,6 +921,7 @@
+ ./ncurses/tinfo/comp_hash.c
+ ./ncurses/tinfo/comp_parse.c
+ ./ncurses/tinfo/comp_scan.c
++./ncurses/tinfo/cookie_caps.c
+ ./ncurses/tinfo/db_iterator.c
+ ./ncurses/tinfo/doalloc.c
+ ./ncurses/tinfo/entries.c
+@@ -975,6 +976,7 @@
+ ./ncurses/trace/varargs.c
+ ./ncurses/trace/visbuf.c
+ ./ncurses/tty/MKexpanded.sh
++./ncurses/tty/cookie_updates.c
+ ./ncurses/tty/hardscroll.c
+ ./ncurses/tty/hashmap.c
+ ./ncurses/tty/lib_mvcur.c
+Index: NEWS
+Prereq:  1.4457 
+--- ncurses-6.6-20260509+/NEWS	2026-05-09 23:29:09.000000000 +0000
++++ ncurses-6.6-20260516/NEWS	2026-05-16 22:49:26.000000000 +0000
+@@ -26,7 +26,7 @@
+ -- sale, use or other dealings in this Software without prior written        --
+ -- authorization.                                                            --
+ -------------------------------------------------------------------------------
+--- $Id: NEWS,v 1.4457 2026/05/09 23:29:09 tom Exp $
++-- $Id: NEWS,v 1.4461 2026/05/16 22:49:26 tom Exp $
+ -------------------------------------------------------------------------------
+ 
+ This is a log of changes that ncurses has gone through since Zeyd started
+@@ -46,6 +46,14 @@
+ Changes through 1.9.9e did not credit all contributions;
+ it is not possible to add this information.
+ 
++20260516
++	+ defer initialization of magic-cookies, which disables some
++	  capabilities, until the first screen update using a video attribute
++	  which might introduce a magic cookie (report by Frank Palazzolo).
++	+ correct buffer limit in recur_wgetnstr() (report by Daniel Anderson).
++	+ correct logic in safe_name() function of infocmp, used in -E/-e
++	  options (report/patch by Daniel Anderson).
++
+ 20260509
+ 	+ modify adjust_cancels() to allow for cancelled boolean extended
+ 	  capabilities.
+Index: VERSION
+--- ncurses-6.6-20260509+/VERSION	2026-05-09 10:07:07.000000000 +0000
++++ ncurses-6.6-20260516/VERSION	2026-05-16 09:57:27.000000000 +0000
+@@ -1 +1 @@
+-5:0:10	6.6	20260509
++5:0:10	6.6	20260516
+Index: dist.mk
+Prereq:  1.1731 
+--- ncurses-6.6-20260509+/dist.mk	2026-05-09 10:07:07.000000000 +0000
++++ ncurses-6.6-20260516/dist.mk	2026-05-16 09:57:27.000000000 +0000
+@@ -26,7 +26,7 @@
+ # use or other dealings in this Software without prior written               #
+ # authorization.                                                             #
+ ##############################################################################
+-# $Id: dist.mk,v 1.1731 2026/05/09 10:07:07 tom Exp $
++# $Id: dist.mk,v 1.1732 2026/05/16 09:57:27 tom Exp $
+ # Makefile for creating ncurses distributions.
+ #
+ # This only needs to be used directly as a makefile by developers, but
+@@ -38,7 +38,7 @@
+ # These define the major/minor/patch versions of ncurses.
+ NCURSES_MAJOR = 6
+ NCURSES_MINOR = 6
+-NCURSES_PATCH = 20260509
++NCURSES_PATCH = 20260516
+ 
+ # We don't append the patch to the version, since this only applies to releases
+ VERSION = $(NCURSES_MAJOR).$(NCURSES_MINOR)
+Index: ncurses/base/lib_getch.c
+Prereq:  1.156 
+--- ncurses-6.6-20260509+/ncurses/base/lib_getch.c	2026-03-28 19:51:59.000000000 +0000
++++ ncurses-6.6-20260516/ncurses/base/lib_getch.c	2026-05-16 15:19:20.000000000 +0000
+@@ -44,7 +44,7 @@
+ #define NEED_KEY_EVENT
+ #include <curses.priv.h>
+ 
+-MODULE_ID("$Id: lib_getch.c,v 1.156 2026/03/28 19:51:59 tom Exp $")
++MODULE_ID("$Id: lib_getch.c,v 1.157 2026/05/16 15:19:20 tom Exp $")
+ 
+ #include <fifo_defs.h>
+ 
+@@ -407,7 +407,7 @@
+ #endif
+ 	{
+ 	    sp->_called_wgetch = TRUE;
+-	    rc = wgetnstr(win, buf, MAXCOLUMNS);
++	    rc = wgetnstr(win, buf, MAXCOLUMNS - 1);
+ 	    sp->_called_wgetch = FALSE;
+ 	}
+     } else {
+Index: ncurses/base/lib_set_term.c
+Prereq:  1.201 
+--- ncurses-6.6-20260509+/ncurses/base/lib_set_term.c	2026-04-25 16:48:57.000000000 +0000
++++ ncurses-6.6-20260516/ncurses/base/lib_set_term.c	2026-05-16 22:30:07.000000000 +0000
+@@ -57,7 +57,7 @@
+ #undef CUR
+ #define CUR SP_TERMTYPE
+ 
+-MODULE_ID("$Id: lib_set_term.c,v 1.201 2026/04/25 16:48:57 tom Exp $")
++MODULE_ID("$Id: lib_set_term.c,v 1.203 2026/05/16 22:30:07 tom Exp $")
+ 
+ #if USE_TERM_DRIVER
+ #define MaxColors      InfoOf(sp).maxcolors
+@@ -324,9 +324,6 @@
+     char *env;
+     int bottom_stolen = 0;
+     SCREEN *sp;
+-#if !USE_TERM_DRIVER
+-    bool support_cookies = USE_XMC_SUPPORT;
+-#endif
+ 
+     T((T_CALLED("_nc_setupscreen(%d, %d, %p, %d, %d)"),
+        slines, scolumns, (void *) output, filtered, slk_format));
+@@ -552,91 +549,6 @@
+     if (NCURSES_SP_NAME(has_colors)(NCURSES_SP_ARG)) {
+ 	sp->_ok_attributes |= A_COLOR;
+     }
+-#if USE_TERM_DRIVER
+-    _nc_cookie_init(sp);
+-#else
+-#if USE_XMC_SUPPORT
+-    /*
+-     * If we have no magic-cookie support compiled-in, or if it is suppressed
+-     * in the environment, reset the support-flag.
+-     */
+-    if (magic_cookie_glitch >= 0) {
+-	if (getenv("NCURSES_NO_MAGIC_COOKIE") != NULL) {
+-	    support_cookies = FALSE;
+-	}
+-    }
+-#endif
+-
+-    if (!support_cookies && magic_cookie_glitch >= 0) {
+-	T(("will disable attributes to work w/o magic cookies"));
+-    }
+-
+-    if (magic_cookie_glitch > 0) {	/* tvi, wyse */
+-
+-	sp->_xmc_triggers = sp->_ok_attributes & XMC_CONFLICT;
+-#if 0
+-	/*
+-	 * We "should" treat colors as an attribute.  The wyse350 (and its
+-	 * clones) appear to be the only ones that have both colors and magic
+-	 * cookies.
+-	 */
+-	if (has_colors()) {
+-	    sp->_xmc_triggers |= A_COLOR;
+-	}
+-#endif
+-	sp->_xmc_suppress = sp->_xmc_triggers & (chtype) ~(A_BOLD);
+-
+-	T(("magic cookie attributes %s", _traceattr(sp->_xmc_suppress)));
+-	/*
+-	 * Supporting line-drawing may be possible.  But make the regular
+-	 * video attributes work first.
+-	 */
+-	acs_chars = ABSENT_STRING;
+-	ena_acs = ABSENT_STRING;
+-	enter_alt_charset_mode = ABSENT_STRING;
+-	exit_alt_charset_mode = ABSENT_STRING;
+-#if USE_XMC_SUPPORT
+-	/*
+-	 * To keep the cookie support simple, suppress all of the optimization
+-	 * hooks except for clear_screen and the cursor addressing.
+-	 */
+-	if (support_cookies) {
+-	    clr_eol = ABSENT_STRING;
+-	    clr_eos = ABSENT_STRING;
+-	    set_attributes = ABSENT_STRING;
+-	}
+-#endif
+-    } else if (magic_cookie_glitch == 0) {	/* hpterm */
+-    }
+-
+-    /*
+-     * If magic cookies are not supported, cancel the strings that set
+-     * video attributes.
+-     */
+-    if (!support_cookies && magic_cookie_glitch >= 0) {
+-	/* *INDENT-EQLS* */
+-	magic_cookie_glitch  = ABSENT_NUMERIC;
+-	set_attributes       = ABSENT_STRING;
+-	enter_blink_mode     = ABSENT_STRING;
+-	enter_bold_mode      = ABSENT_STRING;
+-	enter_dim_mode       = ABSENT_STRING;
+-	enter_reverse_mode   = ABSENT_STRING;
+-	enter_standout_mode  = ABSENT_STRING;
+-	enter_underline_mode = ABSENT_STRING;
+-    }
+-
+-    /* initialize normal acs before wide, since we use mapping in the latter */
+-#if !USE_WIDEC_SUPPORT
+-    if (_nc_unicode_locale() && _nc_locale_breaks_acs(sp->_term)) {
+-	/* *INDENT-EQLS* */
+-	acs_chars              = NULL;
+-	ena_acs                = NULL;
+-	enter_alt_charset_mode = NULL;
+-	exit_alt_charset_mode  = NULL;
+-	set_attributes         = NULL;
+-    }
+-#endif
+-#endif
+ 
+     NCURSES_SP_NAME(_nc_init_acs)(NCURSES_SP_ARG);
+ #if USE_WIDEC_SUPPORT
+Index: ncurses/curses.priv.h
+Prereq:  1.747 
+--- ncurses-6.6-20260509+/ncurses/curses.priv.h	2026-04-04 22:09:24.000000000 +0000
++++ ncurses-6.6-20260516/ncurses/curses.priv.h	2026-05-16 23:36:17.000000000 +0000
+@@ -35,7 +35,7 @@
+  ****************************************************************************/
+ 
+ /*
+- * $Id: curses.priv.h,v 1.747 2026/04/04 22:09:24 tom Exp $
++ * $Id: curses.priv.h,v 1.751 2026/05/16 23:36:17 tom Exp $
+  *
+  *	curses.priv.h
+  *
+@@ -1195,6 +1195,9 @@
+ 
+ 	int		_legacy_coding;	/* see use_legacy_coding() */
+ 
++	bool		cookie_initialized;
++	bool		cookie_active;
++
+ #if NCURSES_NO_PADDING
+ 	bool		_no_padding;	/* flag to set if padding disabled  */
+ #endif
+@@ -2707,8 +2710,6 @@
+ extern NCURSES_EXPORT(void)     NCURSES_SP_NAME(_nc_scroll_optimize)(SCREEN*);
+ extern NCURSES_EXPORT(void)     NCURSES_SP_NAME(_nc_set_buffer)(SCREEN*, FILE *, int);
+ 
+-extern NCURSES_EXPORT(void)     _nc_cookie_init(SCREEN *sp);
+-
+ #if defined(TRACE) || defined(SCROLLDEBUG) || defined(HASHDEBUG)
+ extern NCURSES_EXPORT(void)     NCURSES_SP_NAME(_nc_linedump)(SCREEN*);
+ #endif
+@@ -2742,6 +2743,10 @@
+ extern NCURSES_EXPORT(int) _nc_conv_to_utf32(unsigned *, const char *, unsigned);
+ #endif
+ 
++extern NCURSES_EXPORT(bool)     _nc_cookie_allowed(const SCREEN *sp);
++extern NCURSES_EXPORT(void)     _nc_cookie_init(SCREEN *sp);
++extern NCURSES_EXPORT(void)     _nc_cookie_updates(SCREEN *sp);
++
+ #ifdef _NC_WINDOWS
+ #if USE_WIDEC_SUPPORT
+ #define write_screen WriteConsoleOutputW
+Index: ncurses/modules
+Prereq:  1.135 
+--- ncurses-6.6-20260509+/ncurses/modules	2026-03-28 10:58:05.000000000 +0000
++++ ncurses-6.6-20260516/ncurses/modules	2026-05-16 20:20:51.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: modules,v 1.135 2026/03/28 10:58:05 tom Exp $
++# $Id: modules,v 1.137 2026/05/16 20:20:51 tom Exp $
+ ##############################################################################
+ # Copyright 2019-2025,2026 Thomas E. Dickey                                  #
+ # Copyright 1998-2013,2017 Free Software Foundation, Inc.                    #
+@@ -33,6 +33,7 @@
+ 
+ @ base
+ # Library objects
++cookie_updates	lib		$(serial)	$(HEADER_DEPS)	$(INCDIR)/tic.h
+ hardscroll	lib		$(serial)	$(HEADER_DEPS)
+ hashmap		lib		$(serial)	$(HEADER_DEPS)
+ lib_addch	lib		$(base)		$(HEADER_DEPS)
+@@ -167,6 +168,7 @@
+ comp_error	lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h
+ comp_hash	lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h ../include/hashsize.h
+ comp_userdefs	lib		.		$(HEADER_DEPS)	$(INCDIR)/tic.h ../include/hashsize.h
++cookie_caps	lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h
+ db_iterator	lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h
+ doalloc		lib		$(tinfo)	$(HEADER_DEPS)
+ entries		lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h
+Index: ncurses/tinfo/cookie_caps.c
+--- /dev/null	2026-05-16 22:16:20.691999950 +0000
++++ ncurses-6.6-20260516/ncurses/tinfo/cookie_caps.c	2026-05-16 23:42:24.000000000 +0000
+@@ -0,0 +1,156 @@
++/****************************************************************************
++ * Copyright 2026 Thomas E. Dickey                                          *
++ *                                                                          *
++ * Permission is hereby granted, free of charge, to any person obtaining a  *
++ * copy of this software and associated documentation files (the            *
++ * "Software"), to deal in the Software without restriction, including      *
++ * without limitation the rights to use, copy, modify, merge, publish,      *
++ * distribute, distribute with modifications, sublicense, and/or sell       *
++ * copies of the Software, and to permit persons to whom the Software is    *
++ * furnished to do so, subject to the following conditions:                 *
++ *                                                                          *
++ * The above copyright notice and this permission notice shall be included  *
++ * in all copies or substantial portions of the Software.                   *
++ *                                                                          *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS  *
++ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF               *
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.   *
++ * IN NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,   *
++ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR    *
++ * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR    *
++ * THE USE OR OTHER DEALINGS IN THE SOFTWARE.                               *
++ *                                                                          *
++ * Except as contained in this notice, the name(s) of the above copyright   *
++ * holders shall not be used in advertising or otherwise to promote the     *
++ * sale, use or other dealings in this Software without prior written       *
++ * authorization.                                                           *
++ ****************************************************************************/
++
++/****************************************************************************
++ *  Author: Thomas E. Dickey                                                *
++ ****************************************************************************/
++
++#include <curses.priv.h>
++#include <tic.h>
++
++#ifndef CUR
++#define CUR SP_TERMTYPE
++#endif
++
++
++MODULE_ID("$Id: cookie_caps.c,v 1.4 2026/05/16 23:42:24 tom Exp $")
++
++NCURSES_EXPORT(void)
++_nc_cookie_init(SCREEN *sp)
++{
++    bool support_cookies = USE_XMC_SUPPORT;
++    if (sp == NULL || !IsTermInfo(sp))
++	return;
++    if (sp->cookie_initialized)
++	return;
++
++#if USE_XMC_SUPPORT
++    /*
++     * If we have no magic-cookie support compiled-in, or if it is suppressed
++     * in the environment, reset the support-flag.
++     */
++    if (magic_cookie_glitch >= 0) {
++	if (getenv("NCURSES_NO_MAGIC_COOKIE") != NULL) {
++	    support_cookies = FALSE;
++	}
++    }
++#endif
++
++    if (!support_cookies && magic_cookie_glitch >= 0) {
++	T(("will disable attributes to work w/o magic cookies"));
++    }
++
++    if (magic_cookie_glitch > 0) {	/* tvi, wyse */
++
++	sp->_xmc_triggers = sp->_ok_attributes & XMC_CONFLICT;
++#if 0
++	/*
++	 * We "should" treat colors as an attribute.  The wyse350 (and its
++	 * clones) appear to be the only ones that have both colors and magic
++	 * cookies.
++	 */
++	if (has_colors()) {
++	    sp->_xmc_triggers |= A_COLOR;
++	}
++#endif
++	sp->_xmc_suppress = sp->_xmc_triggers & (chtype) ~(A_BOLD);
++
++	T(("magic cookie attributes %s", _traceattr(sp->_xmc_suppress)));
++	/*
++	 * Supporting line-drawing may be possible.  But make the regular
++	 * video attributes work first.
++	 */
++	acs_chars = ABSENT_STRING;
++	ena_acs = ABSENT_STRING;
++	enter_alt_charset_mode = ABSENT_STRING;
++	exit_alt_charset_mode = ABSENT_STRING;
++#if USE_XMC_SUPPORT
++	/*
++	 * To keep the cookie support simple, suppress all of the optimization
++	 * hooks except for clear_screen and the cursor addressing.
++	 */
++	if (support_cookies) {
++	    clr_eol = ABSENT_STRING;
++	    clr_eos = ABSENT_STRING;
++	    set_attributes = ABSENT_STRING;
++	}
++#endif
++    } else if (magic_cookie_glitch == 0) {	/* hpterm */
++    }
++
++    /*
++     * If magic cookies are not supported, cancel the strings that set
++     * video attributes.
++     */
++    if (!support_cookies && magic_cookie_glitch >= 0) {
++	/* *INDENT-EQLS* */
++	magic_cookie_glitch  = ABSENT_NUMERIC;
++	set_attributes       = ABSENT_STRING;
++	enter_blink_mode     = ABSENT_STRING;
++	enter_bold_mode      = ABSENT_STRING;
++	enter_dim_mode       = ABSENT_STRING;
++	enter_reverse_mode   = ABSENT_STRING;
++	enter_standout_mode  = ABSENT_STRING;
++	enter_underline_mode = ABSENT_STRING;
++    }
++
++    /* initialize normal acs before wide, since we use mapping in the latter */
++#if !USE_WIDEC_SUPPORT
++    if (_nc_unicode_locale() && _nc_locale_breaks_acs(sp->_term)) {
++	/* *INDENT-EQLS* */
++	acs_chars              = NULL;
++	ena_acs                = NULL;
++	enter_alt_charset_mode = NULL;
++	exit_alt_charset_mode  = NULL;
++	set_attributes         = NULL;
++    }
++#endif
++    sp->cookie_initialized = TRUE;
++}
++
++/*
++ * Check if the current terminal entry says to expect magic cookies, and if so,
++ * whether there are any valid capabilities by which the cookies would be made.
++ */
++NCURSES_EXPORT(bool)
++_nc_cookie_allowed(const SCREEN *sp)
++{
++    bool result = FALSE;
++    if (sp != NULL && IsTermInfo(sp) &&
++	magic_cookie_glitch >= 0 &&
++	(VALID_STRING(set_attributes) ||
++	 VALID_STRING(enter_blink_mode) ||
++	 VALID_STRING(enter_bold_mode) ||
++	 VALID_STRING(enter_dim_mode) ||
++	 VALID_STRING(enter_reverse_mode) ||
++	 VALID_STRING(enter_standout_mode) ||
++	 VALID_STRING(enter_underline_mode))) {
++	result = TRUE;
++    }
++    return result;
++}
+Index: ncurses/tinfo/tinfo_driver.c
+Prereq:  1.88 
+--- ncurses-6.6-20260509+/ncurses/tinfo/tinfo_driver.c	2025-12-27 12:33:34.000000000 +0000
++++ ncurses-6.6-20260516/ncurses/tinfo/tinfo_driver.c	2026-05-16 22:53:29.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+  * Copyright 2008-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -52,7 +52,7 @@
+ # endif
+ #endif
+ 
+-MODULE_ID("$Id: tinfo_driver.c,v 1.88 2025/12/27 12:33:34 tom Exp $")
++MODULE_ID("$Id: tinfo_driver.c,v 1.90 2026/05/16 22:53:29 tom Exp $")
+ 
+ /*
+  * SCO defines TIOCGSIZE and the corresponding struct.  Other systems (SunOS,
+@@ -189,7 +189,7 @@
+     }
+ 
+     if (status != TGETENT_YES) {
+-	NCURSES_SP_NAME(del_curterm) (NCURSES_SP_ARGx termp);
++	NCURSES_SP_NAME(del_curterm)(NCURSES_SP_ARGx termp);
+ 	if (status == TGETENT_ERR) {
+ 	    ret_error0(status, "terminals database is inaccessible\n");
+ 	} else if (status == TGETENT_NO) {
+@@ -267,18 +267,18 @@
+     if (beepFlag) {
+ 	if (bell) {
+ 	    res = NCURSES_PUTP2("bell", bell);
+-	    NCURSES_SP_NAME(_nc_flush) (sp);
++	    NCURSES_SP_NAME(_nc_flush)(sp);
+ 	} else if (flash_screen) {
+ 	    res = NCURSES_PUTP2("flash_screen", flash_screen);
+-	    NCURSES_SP_NAME(_nc_flush) (sp);
++	    NCURSES_SP_NAME(_nc_flush)(sp);
+ 	}
+     } else {
+ 	if (flash_screen) {
+ 	    res = NCURSES_PUTP2("flash_screen", flash_screen);
+-	    NCURSES_SP_NAME(_nc_flush) (sp);
++	    NCURSES_SP_NAME(_nc_flush)(sp);
+ 	} else if (bell) {
+ 	    res = NCURSES_PUTP2("bell", bell);
+-	    NCURSES_SP_NAME(_nc_flush) (sp);
++	    NCURSES_SP_NAME(_nc_flush)(sp);
+ 	}
+     }
+     return res;
+@@ -309,7 +309,7 @@
+     AssertTCB();
+     SetSP();
+ #if NCURSES_EXT_FUNCS
+-    return NCURSES_SP_NAME(mcprint) (TCB->csp, data, len);
++    return NCURSES_SP_NAME(mcprint)(TCB->csp, data, len);
+ #else
+     return ERR;
+ #endif
+@@ -327,18 +327,18 @@
+     if (sp != NULL && orig_pair && orig_colors && (initialize_pair != NULL)) {
+ #if NCURSES_EXT_FUNCS
+ 	sp->_default_color = isDefaultColor(fg) || isDefaultColor(bg);
+-	sp->_has_sgr_39_49 = (NCURSES_SP_NAME(tigetflag) (NCURSES_SP_ARGx
+-							  UserCap(AX))
++	sp->_has_sgr_39_49 = (NCURSES_SP_NAME(tigetflag)(NCURSES_SP_ARGx
++							 UserCap(AX))
+ 			      == TRUE);
+ 	sp->_default_fg = isDefaultColor(fg) ? COLOR_DEFAULT : fg;
+ 	sp->_default_bg = isDefaultColor(bg) ? COLOR_DEFAULT : bg;
+ 	if (sp->_color_pairs != NULL) {
+ 	    bool save = sp->_default_color;
+ 	    sp->_default_color = TRUE;
+-	    NCURSES_SP_NAME(init_pair) (NCURSES_SP_ARGx
+-					0,
+-					(short)fg,
+-					(short)bg);
++	    NCURSES_SP_NAME(init_pair)(NCURSES_SP_ARGx
++				       0,
++				         (short) fg,
++				         (short) bg);
+ 	    sp->_default_color = save;
+ 	}
+ #endif
+@@ -361,24 +361,24 @@
+     if (fore) {
+ 	if (set_a_foreground) {
+ 	    TPUTS_TRACE("set_a_foreground");
+-	    NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-				    TIPARM_1(set_a_foreground, color), 1, outc);
++	    NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++				   TIPARM_1(set_a_foreground, color), 1, outc);
+ 	} else {
+ 	    TPUTS_TRACE("set_foreground");
+-	    NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-				    TIPARM_1(set_foreground,
+-					     toggled_colors(color)), 1, outc);
++	    NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++				   TIPARM_1(set_foreground,
++					    toggled_colors(color)), 1, outc);
+ 	}
+     } else {
+ 	if (set_a_background) {
+ 	    TPUTS_TRACE("set_a_background");
+-	    NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-				    TIPARM_1(set_a_background, color), 1, outc);
++	    NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++				   TIPARM_1(set_a_background, color), 1, outc);
+ 	} else {
+ 	    TPUTS_TRACE("set_background");
+-	    NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-				    TIPARM_1(set_background,
+-					     toggled_colors(color)), 1, outc);
++	    NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++				   TIPARM_1(set_background,
++					    toggled_colors(color)), 1, outc);
+ 	}
+     }
+ }
+@@ -661,7 +661,7 @@
+ 	    /* reset_shell_mode */
+ 	    if (sp) {
+ 		_nc_keypad(sp, FALSE);
+-		NCURSES_SP_NAME(_nc_flush) (sp);
++		NCURSES_SP_NAME(_nc_flush)(sp);
+ 	    }
+ 	    code = drv_sgmode(TCB, TRUE, &(_term->Ottyb));
+ #if defined(USE_WIN32CON_DRIVER)
+@@ -678,8 +678,8 @@
+ {
+     if (sp) {
+ 	sp->_mouse_wrap(sp);
+-	NCURSES_SP_NAME(_nc_screen_wrap) (sp);
+-	NCURSES_SP_NAME(_nc_mvcur_wrap) (sp);	/* wrap up cursor addressing */
++	NCURSES_SP_NAME(_nc_screen_wrap)(sp);
++	NCURSES_SP_NAME(_nc_mvcur_wrap)(sp);	/* wrap up cursor addressing */
+     }
+ }
+ 
+@@ -722,11 +722,11 @@
+ 			parm_delete_line ||
+ 			delete_line)));
+ 
+-    NCURSES_SP_NAME(baudrate) (sp);
++    NCURSES_SP_NAME(baudrate)(sp);
+ 
+-    NCURSES_SP_NAME(_nc_mvcur_init) (sp);
++    NCURSES_SP_NAME(_nc_mvcur_init)(sp);
+     /* initialize terminal to a sane state */
+-    NCURSES_SP_NAME(_nc_screen_init) (sp);
++    NCURSES_SP_NAME(_nc_screen_init)(sp);
+ }
+ 
+ static void
+@@ -853,8 +853,8 @@
+     } else if (pair != 0) {
+ 	if (set_color_pair) {
+ 	    TPUTS_TRACE("set_color_pair");
+-	    NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-				    TIPARM_1(set_color_pair, pair), 1, outc);
++	    NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++				   TIPARM_1(set_color_pair, pair), 1, outc);
+ 	    return;
+ 	} else if (sp != NULL) {
+ 	    _nc_pair_content(SP_PARM, pair, &fg, &bg);
+@@ -875,11 +875,11 @@
+ 	    if (sp->_has_sgr_39_49
+ 		&& isDefaultColor(old_bg)
+ 		&& !isDefaultColor(old_fg)) {
+-		NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx "\033[39m", 1, outc);
++		NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx "\033[39m", 1, outc);
+ 	    } else if (sp->_has_sgr_39_49
+ 		       && isDefaultColor(old_fg)
+ 		       && !isDefaultColor(old_bg)) {
+-		NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx "\033[49m", 1, outc);
++		NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx "\033[49m", 1, outc);
+ 	    } else
+ #endif
+ 		drv_rescol(TCB);
+@@ -919,7 +919,7 @@
+ init_xterm_mouse(SCREEN *sp)
+ {
+     sp->_mouse_type = M_XTERM;
+-    sp->_mouse_xtermcap = NCURSES_SP_NAME(tigetstr) (NCURSES_SP_ARGx UserCap(XM));
++    sp->_mouse_xtermcap = NCURSES_SP_NAME(tigetstr)(NCURSES_SP_ARGx UserCap(XM));
+     if (!VALID_STRING(sp->_mouse_xtermcap))
+ 	sp->_mouse_xtermcap = "\033[?1000%?%p1%{1}%=%th%el%;";
+ }
+@@ -990,7 +990,7 @@
+ {
+     SCREEN *sp = TCB->csp;
+     AssertTCB();
+-    return NCURSES_SP_NAME(_nc_mvcur) (sp, yold, xold, ynew, xnew);
++    return NCURSES_SP_NAME(_nc_mvcur)(sp, yold, xold, ynew, xnew);
+ }
+ 
+ static void
+@@ -1167,98 +1167,6 @@
+ #endif /* TRACE */
+ }
+ 
+-#define ENSURE_TINFO(sp) (TCBOf(sp)->drv->isTerminfo)
+-
+-NCURSES_EXPORT(void)
+-_nc_cookie_init(SCREEN *sp)
+-{
+-    bool support_cookies = USE_XMC_SUPPORT;
+-    TERMINAL_CONTROL_BLOCK *TCB = (TERMINAL_CONTROL_BLOCK *) (sp->_term);
+-
+-    if (sp == NULL || !ENSURE_TINFO(sp))
+-	return;
+-
+-#if USE_XMC_SUPPORT
+-    /*
+-     * If we have no magic-cookie support compiled-in, or if it is suppressed
+-     * in the environment, reset the support-flag.
+-     */
+-    if (magic_cookie_glitch >= 0) {
+-	if (getenv("NCURSES_NO_MAGIC_COOKIE") != NULL) {
+-	    support_cookies = FALSE;
+-	}
+-    }
+-#endif
+-
+-    if (!support_cookies && magic_cookie_glitch >= 0) {
+-	T(("will disable attributes to work w/o magic cookies"));
+-    }
+-
+-    if (magic_cookie_glitch > 0) {	/* tvi, wyse */
+-
+-	sp->_xmc_triggers = sp->_ok_attributes & XMC_CONFLICT;
+-#if 0
+-	/*
+-	 * We "should" treat colors as an attribute.  The wyse350 (and its
+-	 * clones) appear to be the only ones that have both colors and magic
+-	 * cookies.
+-	 */
+-	if (has_colors()) {
+-	    sp->_xmc_triggers |= A_COLOR;
+-	}
+-#endif
+-	sp->_xmc_suppress = sp->_xmc_triggers & (chtype) ~(A_BOLD);
+-
+-	T(("magic cookie attributes %s", _traceattr(sp->_xmc_suppress)));
+-	/*
+-	 * Supporting line-drawing may be possible.  But make the regular
+-	 * video attributes work first.
+-	 */
+-	acs_chars = ABSENT_STRING;
+-	ena_acs = ABSENT_STRING;
+-	enter_alt_charset_mode = ABSENT_STRING;
+-	exit_alt_charset_mode = ABSENT_STRING;
+-#if USE_XMC_SUPPORT
+-	/*
+-	 * To keep the cookie support simple, suppress all of the optimization
+-	 * hooks except for clear_screen and the cursor addressing.
+-	 */
+-	if (support_cookies) {
+-	    clr_eol = ABSENT_STRING;
+-	    clr_eos = ABSENT_STRING;
+-	    set_attributes = ABSENT_STRING;
+-	}
+-#endif
+-    } else if (magic_cookie_glitch == 0) {	/* hpterm */
+-    }
+-
+-    /*
+-     * If magic cookies are not supported, cancel the strings that set
+-     * video attributes.
+-     */
+-    if (!support_cookies && magic_cookie_glitch >= 0) {
+-	magic_cookie_glitch = ABSENT_NUMERIC;
+-	set_attributes = ABSENT_STRING;
+-	enter_blink_mode = ABSENT_STRING;
+-	enter_bold_mode = ABSENT_STRING;
+-	enter_dim_mode = ABSENT_STRING;
+-	enter_reverse_mode = ABSENT_STRING;
+-	enter_standout_mode = ABSENT_STRING;
+-	enter_underline_mode = ABSENT_STRING;
+-    }
+-
+-    /* initialize normal acs before wide, since we use mapping in the latter */
+-#if !USE_WIDEC_SUPPORT
+-    if (_nc_unicode_locale() && _nc_locale_breaks_acs(sp->_term)) {
+-	acs_chars = NULL;
+-	ena_acs = NULL;
+-	enter_alt_charset_mode = NULL;
+-	exit_alt_charset_mode = NULL;
+-	set_attributes = NULL;
+-    }
+-#endif
+-}
+-
+ static int
+ drv_twait(TERMINAL_CONTROL_BLOCK * TCB,
+ 	  int mode,
+@@ -1346,7 +1254,7 @@
+ {
+     int rc = __nc_putp(sp, name, value);
+     if (rc != ERR) {
+-	NCURSES_SP_NAME(_nc_flush) (sp);
++	NCURSES_SP_NAME(_nc_flush)(sp);
+     }
+     return rc;
+ }
+Index: ncurses/tinfo/trim_sgr0.c
+Prereq:  1.29 
+--- ncurses-6.6-20260509+/ncurses/tinfo/trim_sgr0.c	2026-04-14 00:20:23.000000000 +0000
++++ ncurses-6.6-20260516/ncurses/tinfo/trim_sgr0.c	2026-05-16 23:17:01.000000000 +0000
+@@ -37,7 +37,7 @@
+ 
+ #include <tic.h>
+ 
+-MODULE_ID("$Id: trim_sgr0.c,v 1.29 2026/04/14 00:20:23 tom Exp $")
++MODULE_ID("$Id: trim_sgr0.c,v 1.30 2026/05/16 23:17:01 tom Exp $")
+ 
+ #undef CUR
+ #define CUR tp->
+@@ -95,7 +95,7 @@
+ 		break;
+ 	    ++s;
+ 	} else {
+-	    char *d = NULL;
++	    const char *d = NULL;
+ 	    if (ch == '$')
+ 		d = skip_padding(s);
+ 	    if (d != NULL) {
+@@ -373,10 +373,11 @@
+ 		&& strcmp(end, off) != 0) {
+ 		i = (size_t) (tmp - end);
+ 		j = strlen(off) + i;
+-		tmp = strdup(end);
+-		chop_out(tmp, (unsigned) i, (unsigned) j);
++		if ((tmp = strdup(end)) != NULL) {
++		    chop_out(tmp, (unsigned) i, (unsigned) j);
++		    result = tmp;
++		}
+ 		free(off);
+-		result = tmp;
+ 	    }
+ 	    TR(TRACE_DATABASE, ("...adjusted sgr0 : %s", _nc_visbuf(result)));
+ 	    if (!strcmp(result, exit_attribute_mode)) {
+Index: ncurses/tty/cookie_updates.c
+--- /dev/null	2026-05-16 22:16:20.691999950 +0000
++++ ncurses-6.6-20260516/ncurses/tty/cookie_updates.c	2026-05-16 23:40:00.000000000 +0000
+@@ -0,0 +1,93 @@
++/****************************************************************************
++ * Copyright 2026 Thomas E. Dickey                                          *
++ *                                                                          *
++ * Permission is hereby granted, free of charge, to any person obtaining a  *
++ * copy of this software and associated documentation files (the            *
++ * "Software"), to deal in the Software without restriction, including      *
++ * without limitation the rights to use, copy, modify, merge, publish,      *
++ * distribute, distribute with modifications, sublicense, and/or sell       *
++ * copies of the Software, and to permit persons to whom the Software is    *
++ * furnished to do so, subject to the following conditions:                 *
++ *                                                                          *
++ * The above copyright notice and this permission notice shall be included  *
++ * in all copies or substantial portions of the Software.                   *
++ *                                                                          *
++ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS  *
++ * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF               *
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.   *
++ * IN NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,   *
++ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR    *
++ * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR    *
++ * THE USE OR OTHER DEALINGS IN THE SOFTWARE.                               *
++ *                                                                          *
++ * Except as contained in this notice, the name(s) of the above copyright   *
++ * holders shall not be used in advertising or otherwise to promote the     *
++ * sale, use or other dealings in this Software without prior written       *
++ * authorization.                                                           *
++ ****************************************************************************/
++
++/****************************************************************************
++ *  Author: Thomas E. Dickey                                                *
++ ****************************************************************************/
++
++#include <curses.priv.h>
++#include <tic.h>
++
++#ifndef CUR
++#define CUR SP_TERMTYPE
++#endif
++
++MODULE_ID("$Id: cookie_updates.c,v 1.4 2026/05/16 23:40:00 tom Exp $")
++
++static bool
++check_attrs(const SCREEN *sp, WINDOW *win)
++{
++    bool found = FALSE;
++    if (win != NULL) {
++	int row;
++	for (row = 0; row < sp->_lines; ++row) {
++	    NCURSES_CH_T *text = win->_line[row].text;
++	    int col;
++	    for (col = 0; col < sp->_columns; ++col) {
++		attr_t attr = AttrOf(text[col]);
++		/*
++		 * Note: magic cookies predate hardware support for dim,
++		 * italics, and (likely) alternate character set.
++		 */
++		if ((attr & (A_STANDOUT |
++			     A_UNDERLINE |
++			     A_REVERSE |
++			     A_BLINK |
++			     A_DIM |
++			     A_BOLD)) != 0) {
++		    found = TRUE;
++		    break;
++		}
++	    }
++	    if (found)
++		break;
++	}
++    }
++    return found;
++}
++
++NCURSES_EXPORT(void)
++_nc_cookie_updates(SCREEN *sp)
++{
++    if (magic_cookie_glitch >= 0 &&
++	sp != NULL &&
++	!sp->cookie_initialized) {
++	if (_nc_cookie_allowed(sp)) {
++	    bool found = (check_attrs(sp, sp->_curscr) ||
++			  check_attrs(sp, sp->_newscr) ||
++			  check_attrs(sp, sp->_stdscr));
++	    if (found) {
++		_nc_cookie_init(sp);
++		sp->cookie_active = TRUE;
++	    }
++	} else {
++	    sp->cookie_initialized = TRUE;
++	    magic_cookie_glitch = ABSENT_NUMERIC;
++	}
++    }
++}
+Index: ncurses/tty/lib_vidattr.c
+Prereq:  1.81 
+--- ncurses-6.6-20260509+/ncurses/tty/lib_vidattr.c	2025-12-27 12:41:23.000000000 +0000
++++ ncurses-6.6-20260516/ncurses/tty/lib_vidattr.c	2026-05-16 22:53:53.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2014,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -70,7 +70,7 @@
+ #define CUR SP_TERMTYPE
+ #endif
+ 
+-MODULE_ID("$Id: lib_vidattr.c,v 1.81 2025/12/27 12:41:23 tom Exp $")
++MODULE_ID("$Id: lib_vidattr.c,v 1.82 2026/05/16 22:53:53 tom Exp $")
+ 
+ #define doPut(mode) \
+ 	TPUTS_TRACE(#mode); \
+@@ -107,9 +107,9 @@
+ #define PreviousAttr _nc_prescreen.previous_attr
+ 
+ NCURSES_EXPORT(int)
+-NCURSES_SP_NAME(vidputs) (NCURSES_SP_DCLx
+-			  chtype newmode,
+-			  NCURSES_SP_OUTC outc)
++NCURSES_SP_NAME(vidputs)(NCURSES_SP_DCLx
++			 chtype newmode,
++			 NCURSES_SP_OUTC outc)
+ {
+     attr_t turn_on, turn_off;
+     int pair;
+@@ -134,8 +134,7 @@
+ 
+     TR(TRACE_ATTRS, ("previous attribute was %s", _traceattr(PreviousAttr)));
+ 
+-    if ((SP_PARM != NULL)
+-	&& (magic_cookie_glitch > 0)) {
++    if ((SP_PARM != NULL) && SP_PARM->cookie_active) {
+ #if USE_XMC_SUPPORT
+ 	static const chtype table[] =
+ 	{
+@@ -258,18 +257,18 @@
+     } else if (set_attributes) {
+ 	if (turn_on || turn_off) {
+ 	    TPUTS_TRACE("set_attributes");
+-	    NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-				    TIPARM_9(set_attributes,
+-					     (newmode & A_STANDOUT) != 0,
+-					     (newmode & A_UNDERLINE) != 0,
+-					     (newmode & A_REVERSE) != 0,
+-					     (newmode & A_BLINK) != 0,
+-					     (newmode & A_DIM) != 0,
+-					     (newmode & A_BOLD) != 0,
+-					     (newmode & A_INVIS) != 0,
+-					     (newmode & A_PROTECT) != 0,
+-					     (newmode & A_ALTCHARSET) != 0),
+-				    1, outc);
++	    NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++				   TIPARM_9(set_attributes,
++					      (newmode & A_STANDOUT) != 0,
++					      (newmode & A_UNDERLINE) != 0,
++					      (newmode & A_REVERSE) != 0,
++					      (newmode & A_BLINK) != 0,
++					      (newmode & A_DIM) != 0,
++					      (newmode & A_BOLD) != 0,
++					      (newmode & A_INVIS) != 0,
++					      (newmode & A_PROTECT) != 0,
++					      (newmode & A_ALTCHARSET) != 0),
++				   1, outc);
+ 	    PreviousAttr &= ALL_BUT_COLOR;
+ 	}
+ #if USE_ITALIC
+@@ -349,31 +348,31 @@
+ vidputs(chtype newmode, NCURSES_OUTC outc)
+ {
+     SetSafeOutcWrapper(outc);
+-    return NCURSES_SP_NAME(vidputs) (CURRENT_SCREEN,
+-				     newmode,
+-				     _nc_outc_wrapper);
++    return NCURSES_SP_NAME(vidputs)(CURRENT_SCREEN,
++				    newmode,
++				    _nc_outc_wrapper);
+ }
+ #endif
+ 
+ NCURSES_EXPORT(int)
+-NCURSES_SP_NAME(vidattr) (NCURSES_SP_DCLx chtype newmode)
++NCURSES_SP_NAME(vidattr)(NCURSES_SP_DCLx chtype newmode)
+ {
+     T((T_CALLED("vidattr(%p,%s)"), (void *) SP_PARM, _traceattr(newmode)));
+-    returnCode(NCURSES_SP_NAME(vidputs) (NCURSES_SP_ARGx
+-					 newmode,
+-					 NCURSES_SP_NAME(_nc_putchar)));
++    returnCode(NCURSES_SP_NAME(vidputs)(NCURSES_SP_ARGx
++					newmode,
++					NCURSES_SP_NAME(_nc_putchar)));
+ }
+ 
+ #if NCURSES_SP_FUNCS
+ NCURSES_EXPORT(int)
+ vidattr(chtype newmode)
+ {
+-    return NCURSES_SP_NAME(vidattr) (CURRENT_SCREEN, newmode);
++    return NCURSES_SP_NAME(vidattr)(CURRENT_SCREEN, newmode);
+ }
+ #endif
+ 
+ NCURSES_EXPORT(chtype)
+-NCURSES_SP_NAME(termattrs) (NCURSES_SP_DCL0)
++NCURSES_SP_NAME(termattrs)(NCURSES_SP_DCL0)
+ {
+     chtype attrs = A_NORMAL;
+ 
+@@ -428,6 +427,6 @@
+ NCURSES_EXPORT(chtype)
+ termattrs(void)
+ {
+-    return NCURSES_SP_NAME(termattrs) (CURRENT_SCREEN);
++    return NCURSES_SP_NAME(termattrs)(CURRENT_SCREEN);
+ }
+ #endif
+Index: ncurses/tty/tty_update.c
+Prereq:  1.323 
+--- ncurses-6.6-20260509+/ncurses/tty/tty_update.c	2025-12-27 12:34:03.000000000 +0000
++++ ncurses-6.6-20260516/ncurses/tty/tty_update.c	2026-05-16 22:53:53.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -91,7 +91,7 @@
+ #endif
+ #endif
+ 
+-MODULE_ID("$Id: tty_update.c,v 1.323 2025/12/27 12:34:03 tom Exp $")
++MODULE_ID("$Id: tty_update.c,v 1.324 2026/05/16 22:53:53 tom Exp $")
+ 
+ /*
+  * This define controls the line-breakout optimization.  Every once in a
+@@ -152,7 +152,7 @@
+     if (!_nc_tracing || (expected_y < 0 && expected_x < 0))
+ 	return;
+ 
+-    NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_ARG);
++    NCURSES_SP_NAME(_nc_flush)(NCURSES_SP_ARG);
+     memset(buf, '\0', sizeof(buf));
+     NCURSES_PUTP2_FLUSH("cpr", "\033[6n");	/* only works on ANSI-compatibles */
+     *(s = buf) = 0;
+@@ -174,12 +174,12 @@
+ 	if (expected_y < 0)
+ 	    expected_y = y - 1;
+ 	if (y - 1 != expected_y || x - 1 != expected_x) {
+-	    NCURSES_SP_NAME(beep) (NCURSES_SP_ARG);
+-	    NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-				    TIPARM_2("\033[%d;%dH",
+-					     expected_y + 1,
+-					     expected_x + 1),
+-				    1, NCURSES_SP_NAME(_nc_outch));
++	    NCURSES_SP_NAME(beep)(NCURSES_SP_ARG);
++	    NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++				   TIPARM_2("\033[%d;%dH",
++					    expected_y + 1,
++					    expected_x + 1),
++				   1, NCURSES_SP_NAME(_nc_outch));
+ 	    _tracef("position seen (%d, %d) doesn't match expected one (%d, %d) in %s",
+ 		    y - 1, x - 1, expected_y, expected_x, legend);
+ 	} else {
+@@ -425,7 +425,7 @@
+     }
+     if (have_pending) {
+ 	SP_PARM->_fifohold = 5;
+-	NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_ARG);
++	NCURSES_SP_NAME(_nc_flush)(NCURSES_SP_ARG);
+     }
+     return FALSE;
+ }
+@@ -548,9 +548,9 @@
+ 	    return FALSE;
+ 	if ((pair = GetPair(CHDEREF(ch))) != 0) {
+ 	    NCURSES_COLOR_T fg, bg;
+-	    if (NCURSES_SP_NAME(pair_content) (NCURSES_SP_ARGx
+-					       (short) pair,
+-					       &fg, &bg) == ERR
++	    if (NCURSES_SP_NAME(pair_content)(NCURSES_SP_ARGx
++					        (short) pair,
++					      &fg, &bg) == ERR
+ 		|| !(isDefaultColor(fg) && isDefaultColor(bg))) {
+ 		return FALSE;
+ 	    }
+@@ -657,12 +657,12 @@
+ 			    (SP_PARM->_acs_map[CharOf(ntext0)] & A_CHARTEXT),
+ 			    AttrOf(ntext0) | A_ALTCHARSET);
+ 		}
+-		NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-					TIPARM_2(repeat_char,
+-						 CharOf(temp),
+-						 rep_count),
+-					1,
+-					NCURSES_SP_NAME(_nc_outch));
++		NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++				       TIPARM_2(repeat_char,
++						CharOf(temp),
++						rep_count),
++				       1,
++				       NCURSES_SP_NAME(_nc_outch));
+ 		SP_PARM->_curscol += rep_count;
+ 
+ 		if (wrap_possible)
+@@ -821,10 +821,10 @@
+     if (SP_PARM->_endwin == ewSuspend) {
+ 
+ 	T(("coming back from shell mode"));
+-	NCURSES_SP_NAME(reset_prog_mode) (NCURSES_SP_ARG);
++	NCURSES_SP_NAME(reset_prog_mode)(NCURSES_SP_ARG);
+ 
+-	NCURSES_SP_NAME(_nc_mvcur_resume) (NCURSES_SP_ARG);
+-	NCURSES_SP_NAME(_nc_screen_resume) (NCURSES_SP_ARG);
++	NCURSES_SP_NAME(_nc_mvcur_resume)(NCURSES_SP_ARG);
++	NCURSES_SP_NAME(_nc_screen_resume)(NCURSES_SP_ARG);
+ 	SP_PARM->_mouse_resume(SP_PARM);
+ 
+ 	SP_PARM->_endwin = ewRunning;
+@@ -846,8 +846,9 @@
+      * guaranteed room for its cookie).  If not, nuke the added attributes out
+      * of the span.
+      */
++    _nc_cookie_updates(SP_PARM);
+ #if USE_XMC_SUPPORT
+-    if (magic_cookie_glitch > 0) {
++    if (SP_PARM->cookie_active) {
+ 	int j, k;
+ 	attr_t rattr = A_NORMAL;
+ 
+@@ -1016,7 +1017,7 @@
+ 	nonempty = Min(screen_lines(SP_PARM), NewScreen(SP_PARM)->_maxy + 1);
+ 
+ 	if (SP_PARM->_scrolling) {
+-	    NCURSES_SP_NAME(_nc_scroll_optimize) (NCURSES_SP_ARG);
++	    NCURSES_SP_NAME(_nc_scroll_optimize)(NCURSES_SP_ARG);
+ 	}
+ 
+ 	nonempty = ClrBottom(NCURSES_SP_ARGx nonempty);
+@@ -1077,11 +1078,11 @@
+      * past the current position.
+      */
+ #if USE_XMC_SUPPORT
+-    if (magic_cookie_glitch != 0)
++    if (SP_PARM->cookie_active)
+ #endif
+ 	UpdateAttrs(SP_PARM, normal);
+ 
+-    NCURSES_SP_NAME(_nc_flush) (NCURSES_SP_ARG);
++    NCURSES_SP_NAME(_nc_flush)(NCURSES_SP_ARG);
+     WINDOW_ATTRS(CurScreen(SP_PARM)) = WINDOW_ATTRS(NewScreen(SP_PARM));
+ 
+ #if USE_TRACE_TIMES
+@@ -1217,10 +1218,10 @@
+ 
+     UpdateAttrs(SP_PARM, blank);
+     TPUTS_TRACE("clr_eos");
+-    NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-			    clr_eos,
+-			    screen_lines(SP_PARM) - row,
+-			    NCURSES_SP_NAME(_nc_outch));
++    NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++			   clr_eos,
++			   screen_lines(SP_PARM) - row,
++			   NCURSES_SP_NAME(_nc_outch));
+ 
+     while (col < screen_columns(SP_PARM))
+ 	CurScreen(SP_PARM)->_line[row].text[col++] = blank;
+@@ -1385,7 +1386,7 @@
+ 	 * will work properly only once, since we may overwrite a cookie in a
+ 	 * following operation.
+ 	 */
+-    } else if (magic_cookie_glitch > 0) {
++    } else if (SP_PARM->cookie_active) {
+ 	GoTo(NCURSES_SP_ARGx lineno, firstChar);
+ 	for (n = 0; n < screen_columns(SP_PARM); n++) {
+ 	    int m = n + magic_cookie_glitch;
+@@ -1527,7 +1528,7 @@
+ 	} else if ((nLastChar != oLastChar)
+ 		   && (!CharEq(newLine[nLastChar], oldLine[oLastChar])
+ 		       || !(SP_PARM->_nc_sp_idcok
+-			    && NCURSES_SP_NAME(has_ic) (NCURSES_SP_ARG)))) {
++			    && NCURSES_SP_NAME(has_ic)(NCURSES_SP_ARG)))) {
+ 	    GoTo(NCURSES_SP_ARGx lineno, firstChar);
+ 	    if ((oLastChar - nLastChar) > SP_PARM->_el_cost) {
+ 		if (PutRange(NCURSES_SP_ARGx
+@@ -1656,11 +1657,11 @@
+ #if NCURSES_EXT_FUNCS
+     if (SP_PARM->_coloron
+ 	&& !SP_PARM->_default_color) {
+-	NCURSES_SP_NAME(_nc_do_color) (NCURSES_SP_ARGx
+-				       (short) GET_SCREEN_PAIR(SP_PARM),
+-				       0,
+-				       FALSE,
+-				       NCURSES_SP_NAME(_nc_outch));
++	NCURSES_SP_NAME(_nc_do_color)(NCURSES_SP_ARGx
++				        (short) GET_SCREEN_PAIR(SP_PARM),
++				      0,
++				      FALSE,
++				      NCURSES_SP_NAME(_nc_outch));
+ 	if (!back_color_erase) {
+ 	    fast_clear = FALSE;
+ 	}
+@@ -1681,10 +1682,10 @@
+ 	    GoTo(NCURSES_SP_ARGx 0, 0);
+ 	    UpdateAttrs(SP_PARM, blank);
+ 	    TPUTS_TRACE("clr_eos");
+-	    NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-				    clr_eos,
+-				    screen_lines(SP_PARM),
+-				    NCURSES_SP_NAME(_nc_outch));
++	    NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++				   clr_eos,
++				   screen_lines(SP_PARM),
++				   NCURSES_SP_NAME(_nc_outch));
+ 	} else if (clr_eol) {
+ 	    SP_PARM->_cursrow = SP_PARM->_curscol = -1;
+ 	    UpdateAttrs(SP_PARM, blank);
+@@ -1731,10 +1732,10 @@
+     /* The order must match that of InsCharCost. */
+     if (parm_ich) {
+ 	TPUTS_TRACE("parm_ich");
+-	NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-				TIPARM_1(parm_ich, count),
+-				1,
+-				NCURSES_SP_NAME(_nc_outch));
++	NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++			       TIPARM_1(parm_ich, count),
++			       1,
++			       NCURSES_SP_NAME(_nc_outch));
+ 	while (count > 0) {
+ 	    PutAttrChar(NCURSES_SP_ARGx CHREF(*line));
+ 	    line++;
+@@ -1784,10 +1785,10 @@
+ 
+     if (parm_dch) {
+ 	TPUTS_TRACE("parm_dch");
+-	NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-				TIPARM_1(parm_dch, count),
+-				1,
+-				NCURSES_SP_NAME(_nc_outch));
++	NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++			       TIPARM_1(parm_dch, count),
++			       1,
++			       NCURSES_SP_NAME(_nc_outch));
+     } else {
+ 	int n;
+ 
+@@ -1853,18 +1854,18 @@
+ 	GoTo(NCURSES_SP_ARGx bot, 0);
+ 	UpdateAttrs(SP_PARM, blank);
+ 	TPUTS_TRACE("parm_index");
+-	NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-				TIPARM_1(parm_index, n),
+-				n,
+-				NCURSES_SP_NAME(_nc_outch));
++	NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++			       TIPARM_1(parm_index, n),
++			       n,
++			       NCURSES_SP_NAME(_nc_outch));
+     } else if (parm_delete_line && bot == maxy) {
+ 	GoTo(NCURSES_SP_ARGx top, 0);
+ 	UpdateAttrs(SP_PARM, blank);
+ 	TPUTS_TRACE("parm_delete_line");
+-	NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-				TIPARM_1(parm_delete_line, n),
+-				n,
+-				NCURSES_SP_NAME(_nc_outch));
++	NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++			       TIPARM_1(parm_delete_line, n),
++			       n,
++			       NCURSES_SP_NAME(_nc_outch));
+     } else if (scroll_forward && top == miny && bot == maxy) {
+ 	GoTo(NCURSES_SP_ARGx bot, 0);
+ 	UpdateAttrs(SP_PARM, blank);
+@@ -1918,18 +1919,18 @@
+ 	GoTo(NCURSES_SP_ARGx top, 0);
+ 	UpdateAttrs(SP_PARM, blank);
+ 	TPUTS_TRACE("parm_rindex");
+-	NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-				TIPARM_1(parm_rindex, n),
+-				n,
+-				NCURSES_SP_NAME(_nc_outch));
++	NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++			       TIPARM_1(parm_rindex, n),
++			       n,
++			       NCURSES_SP_NAME(_nc_outch));
+     } else if (parm_insert_line && bot == maxy) {
+ 	GoTo(NCURSES_SP_ARGx top, 0);
+ 	UpdateAttrs(SP_PARM, blank);
+ 	TPUTS_TRACE("parm_insert_line");
+-	NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-				TIPARM_1(parm_insert_line, n),
+-				n,
+-				NCURSES_SP_NAME(_nc_outch));
++	NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++			       TIPARM_1(parm_insert_line, n),
++			       n,
++			       NCURSES_SP_NAME(_nc_outch));
+     } else if (scroll_reverse && top == miny && bot == maxy) {
+ 	GoTo(NCURSES_SP_ARGx top, 0);
+ 	UpdateAttrs(SP_PARM, blank);
+@@ -1974,10 +1975,10 @@
+ 	NCURSES_PUTP2("delete_line", delete_line);
+     } else if (parm_delete_line) {
+ 	TPUTS_TRACE("parm_delete_line");
+-	NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-				TIPARM_1(parm_delete_line, n),
+-				n,
+-				NCURSES_SP_NAME(_nc_outch));
++	NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++			       TIPARM_1(parm_delete_line, n),
++			       n,
++			       NCURSES_SP_NAME(_nc_outch));
+     } else {			/* if (delete_line) */
+ 	for (i = 0; i < n; i++) {
+ 	    NCURSES_PUTP2("delete_line", delete_line);
+@@ -1990,10 +1991,10 @@
+ 	NCURSES_PUTP2("insert_line", insert_line);
+     } else if (parm_insert_line) {
+ 	TPUTS_TRACE("parm_insert_line");
+-	NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-				TIPARM_1(parm_insert_line, n),
+-				n,
+-				NCURSES_SP_NAME(_nc_outch));
++	NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++			       TIPARM_1(parm_insert_line, n),
++			       n,
++			       NCURSES_SP_NAME(_nc_outch));
+     } else {			/* if (insert_line) */
+ 	for (i = 0; i < n; i++) {
+ 	    NCURSES_PUTP2("insert_line", insert_line);
+@@ -2012,11 +2013,11 @@
+  * save/restore cursor capabilities if the terminal has them.
+  */
+ NCURSES_EXPORT(int)
+-NCURSES_SP_NAME(_nc_scrolln) (NCURSES_SP_DCLx
+-			      int n,
+-			      int top,
+-			      int bot,
+-			      int maxy)
++NCURSES_SP_NAME(_nc_scrolln)(NCURSES_SP_DCLx
++			     int n,
++			     int top,
++			     int bot,
++			     int maxy)
+ /* scroll region from top to bot by n lines */
+ {
+     NCURSES_CH_T blank;
+@@ -2036,7 +2037,7 @@
+     /*
+      * If we scroll, we might remove a cookie.
+      */
+-    if (magic_cookie_glitch > 0) {
++    if (SP_PARM->cookie_active) {
+ 	return (ERR);
+     }
+ #endif
+@@ -2142,7 +2143,7 @@
+ 		      blank);
+ 
+     /* shift hash values too - they can be reused */
+-    NCURSES_SP_NAME(_nc_scroll_oldhash) (NCURSES_SP_ARGx n, top, bot);
++    NCURSES_SP_NAME(_nc_scroll_oldhash)(NCURSES_SP_ARGx n, top, bot);
+ 
+     return (OK);
+ }
+@@ -2151,12 +2152,12 @@
+ NCURSES_EXPORT(int)
+ _nc_scrolln(int n, int top, int bot, int maxy)
+ {
+-    return NCURSES_SP_NAME(_nc_scrolln) (CURRENT_SCREEN, n, top, bot, maxy);
++    return NCURSES_SP_NAME(_nc_scrolln)(CURRENT_SCREEN, n, top, bot, maxy);
+ }
+ #endif
+ 
+ NCURSES_EXPORT(void)
+-NCURSES_SP_NAME(_nc_screen_resume) (NCURSES_SP_DCL0)
++NCURSES_SP_NAME(_nc_screen_resume)(NCURSES_SP_DCL0)
+ {
+     assert(SP_PARM);
+ 
+@@ -2166,7 +2167,7 @@
+ 
+     /* reset color pairs and definitions */
+     if (SP_PARM->_coloron || SP_PARM->_color_defs)
+-	NCURSES_SP_NAME(_nc_reset_colors) (NCURSES_SP_ARG);
++	NCURSES_SP_NAME(_nc_reset_colors)(NCURSES_SP_ARG);
+ 
+     /* restore user-defined colors, if any */
+     if (SP_PARM->_color_defs < 0 && !SP_PARM->_direct_color.value) {
+@@ -2209,27 +2210,27 @@
+ NCURSES_EXPORT(void)
+ _nc_screen_resume(void)
+ {
+-    NCURSES_SP_NAME(_nc_screen_resume) (CURRENT_SCREEN);
++    NCURSES_SP_NAME(_nc_screen_resume)(CURRENT_SCREEN);
+ }
+ #endif
+ 
+ NCURSES_EXPORT(void)
+-NCURSES_SP_NAME(_nc_screen_init) (NCURSES_SP_DCL0)
++NCURSES_SP_NAME(_nc_screen_init)(NCURSES_SP_DCL0)
+ {
+-    NCURSES_SP_NAME(_nc_screen_resume) (NCURSES_SP_ARG);
++    NCURSES_SP_NAME(_nc_screen_resume)(NCURSES_SP_ARG);
+ }
+ 
+ #if NCURSES_SP_FUNCS
+ NCURSES_EXPORT(void)
+ _nc_screen_init(void)
+ {
+-    NCURSES_SP_NAME(_nc_screen_init) (CURRENT_SCREEN);
++    NCURSES_SP_NAME(_nc_screen_init)(CURRENT_SCREEN);
+ }
+ #endif
+ 
+ /* wrap up screen handling */
+ NCURSES_EXPORT(void)
+-NCURSES_SP_NAME(_nc_screen_wrap) (NCURSES_SP_DCL0)
++NCURSES_SP_NAME(_nc_screen_wrap)(NCURSES_SP_DCL0)
+ {
+     if (SP_PARM != NULL) {
+ 
+@@ -2239,11 +2240,11 @@
+ 	    && !SP_PARM->_default_color) {
+ 	    static const NCURSES_CH_T blank = NewChar(BLANK_TEXT);
+ 	    SP_PARM->_default_color = TRUE;
+-	    NCURSES_SP_NAME(_nc_do_color) (NCURSES_SP_ARGx
+-					   -1,
+-					   0,
+-					   FALSE,
+-					   NCURSES_SP_NAME(_nc_outch));
++	    NCURSES_SP_NAME(_nc_do_color)(NCURSES_SP_ARGx
++					  -1,
++					  0,
++					  FALSE,
++					  NCURSES_SP_NAME(_nc_outch));
+ 	    SP_PARM->_default_color = FALSE;
+ 
+ 	    TINFO_MVCUR(NCURSES_SP_ARGx
+@@ -2256,7 +2257,7 @@
+ 	}
+ #endif
+ 	if (SP_PARM->_color_defs) {
+-	    NCURSES_SP_NAME(_nc_reset_colors) (NCURSES_SP_ARG);
++	    NCURSES_SP_NAME(_nc_reset_colors)(NCURSES_SP_ARG);
+ 	}
+     }
+ }
+@@ -2265,13 +2266,13 @@
+ NCURSES_EXPORT(void)
+ _nc_screen_wrap(void)
+ {
+-    NCURSES_SP_NAME(_nc_screen_wrap) (CURRENT_SCREEN);
++    NCURSES_SP_NAME(_nc_screen_wrap)(CURRENT_SCREEN);
+ }
+ #endif
+ 
+ #if USE_XMC_SUPPORT
+ NCURSES_EXPORT(void)
+-NCURSES_SP_NAME(_nc_do_xmc_glitch) (NCURSES_SP_DCLx attr_t previous)
++NCURSES_SP_NAME(_nc_do_xmc_glitch)(NCURSES_SP_DCLx attr_t previous)
+ {
+     if (SP_PARM != NULL) {
+ 	attr_t chg = XMC_CHANGES(previous ^ AttrOf(SCREEN_ATTRS(SP_PARM)));
+@@ -2293,7 +2294,7 @@
+ NCURSES_EXPORT(void)
+ _nc_do_xmc_glitch(attr_t previous)
+ {
+-    NCURSES_SP_NAME(_nc_do_xmc_glitch) (CURRENT_SCREEN, previous);
++    NCURSES_SP_NAME(_nc_do_xmc_glitch)(CURRENT_SCREEN, previous);
+ }
+ #endif
+ 
+Index: ncurses/widechar/lib_ins_wch.c
+Prereq:  1.34 
+--- ncurses-6.6-20260509+/ncurses/widechar/lib_ins_wch.c	2025-06-21 22:26:21.000000000 +0000
++++ ncurses-6.6-20260516/ncurses/widechar/lib_ins_wch.c	2026-05-16 23:23:36.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2019-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2019-2025,2026 Thomas E. Dickey                                *
+  * Copyright 2002-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -40,7 +40,7 @@
+ 
+ #include <curses.priv.h>
+ 
+-MODULE_ID("$Id: lib_ins_wch.c,v 1.34 2025/06/21 22:26:21 tom Exp $")
++MODULE_ID("$Id: lib_ins_wch.c,v 1.35 2026/05/16 23:23:36 tom Exp $")
+ 
+ /*
+  * Insert the given character, updating the current location to simplify
+@@ -101,7 +101,7 @@
+ }
+ 
+ static int
+-flush_wchars(WINDOW *win, wchar_t *wchars)
++flush_wchars(WINDOW *win, const wchar_t *wchars)
+ {
+     cchar_t tmp_cchar;
+     (void) setcchar(&tmp_cchar, wchars, WA_NORMAL, (short) 0, (void *) 0);
+Index: ncurses/widechar/lib_vid_attr.c
+Prereq:  1.32 
+--- ncurses-6.6-20260509+/ncurses/widechar/lib_vid_attr.c	2024-12-07 20:08:59.000000000 +0000
++++ ncurses-6.6-20260516/ncurses/widechar/lib_vid_attr.c	2026-05-16 22:53:53.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2023,2024 Thomas E. Dickey                                *
++ * Copyright 2018-2024,2026 Thomas E. Dickey                                *
+  * Copyright 2002-2014,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -37,7 +37,7 @@
+ #define CUR SP_TERMTYPE
+ #endif
+ 
+-MODULE_ID("$Id: lib_vid_attr.c,v 1.32 2024/12/07 20:08:59 tom Exp $")
++MODULE_ID("$Id: lib_vid_attr.c,v 1.33 2026/05/16 22:53:53 tom Exp $")
+ 
+ #define doPut(mode) \
+ 	TPUTS_TRACE(#mode); \
+@@ -74,11 +74,11 @@
+ 	mode |= (attr_t) ColorPair(pair)
+ 
+ NCURSES_EXPORT(int)
+-NCURSES_SP_NAME(vid_puts) (NCURSES_SP_DCLx
+-			   attr_t newmode,
+-			   NCURSES_PAIRS_T pair_arg,
+-			   void *opts OPTIONAL_PAIR,
+-			   NCURSES_SP_OUTC outc)
++NCURSES_SP_NAME(vid_puts)(NCURSES_SP_DCLx
++			  attr_t newmode,
++			  NCURSES_PAIRS_T pair_arg,
++			  void *opts OPTIONAL_PAIR,
++			  NCURSES_SP_OUTC outc)
+ {
+     int color_pair = pair_arg;
+ #if NCURSES_EXT_COLORS
+@@ -111,8 +111,7 @@
+ 		     _traceattr(previous_attr), previous_pair));
+ 
+ #if !USE_XMC_SUPPORT
+-    if ((SP_PARM != 0)
+-	&& (magic_cookie_glitch > 0))
++    if ((SP_PARM != 0) && SP_PARM->cookie_active)
+ 	newmode &= ~(SP_PARM->_xmc_suppress);
+ #endif
+ 
+@@ -191,18 +190,18 @@
+     } else if (set_attributes) {
+ 	if (turn_on || turn_off) {
+ 	    TPUTS_TRACE("set_attributes");
+-	    NCURSES_SP_NAME(tputs) (NCURSES_SP_ARGx
+-				    TIPARM_9(set_attributes,
+-					     (newmode & A_STANDOUT) != 0,
+-					     (newmode & A_UNDERLINE) != 0,
+-					     (newmode & A_REVERSE) != 0,
+-					     (newmode & A_BLINK) != 0,
+-					     (newmode & A_DIM) != 0,
+-					     (newmode & A_BOLD) != 0,
+-					     (newmode & A_INVIS) != 0,
+-					     (newmode & A_PROTECT) != 0,
+-					     (newmode & A_ALTCHARSET) != 0),
+-				    1, outc);
++	    NCURSES_SP_NAME(tputs)(NCURSES_SP_ARGx
++				   TIPARM_9(set_attributes,
++					      (newmode & A_STANDOUT) != 0,
++					      (newmode & A_UNDERLINE) != 0,
++					      (newmode & A_REVERSE) != 0,
++					      (newmode & A_BLINK) != 0,
++					      (newmode & A_DIM) != 0,
++					      (newmode & A_BOLD) != 0,
++					      (newmode & A_INVIS) != 0,
++					      (newmode & A_PROTECT) != 0,
++					      (newmode & A_ALTCHARSET) != 0),
++				   1, outc);
+ 	    previous_attr &= ALL_BUT_COLOR;
+ 	    previous_pair = 0;
+ 	}
+@@ -284,7 +283,7 @@
+     T((T_CALLED("vid_puts(%s,%d)"), _traceattr(newmode), color_pair));
+     (void) opts;
+     set_color(newmode, color_pair);
+-    returnCode(NCURSES_SP_NAME(vidputs) (NCURSES_SP_ARGx newmode, outc));
++    returnCode(NCURSES_SP_NAME(vidputs)(NCURSES_SP_ARGx newmode, outc));
+ #endif
+ }
+ 
+@@ -296,34 +295,34 @@
+ 	 NCURSES_OUTC outc)
+ {
+     SetSafeOutcWrapper(outc);
+-    return NCURSES_SP_NAME(vid_puts) (CURRENT_SCREEN,
+-				      newmode,
+-				      pair_arg,
+-				      opts,
+-				      _nc_outc_wrapper);
++    return NCURSES_SP_NAME(vid_puts)(CURRENT_SCREEN,
++				     newmode,
++				     pair_arg,
++				     opts,
++				     _nc_outc_wrapper);
+ }
+ #endif
+ 
+ #undef vid_attr
+ NCURSES_EXPORT(int)
+-NCURSES_SP_NAME(vid_attr) (NCURSES_SP_DCLx
+-			   attr_t newmode,
+-			   NCURSES_PAIRS_T pair_arg,
+-			   void *opts)
++NCURSES_SP_NAME(vid_attr)(NCURSES_SP_DCLx
++			  attr_t newmode,
++			  NCURSES_PAIRS_T pair_arg,
++			  void *opts)
+ {
+     T((T_CALLED("vid_attr(%s,%d)"), _traceattr(newmode), (int) pair_arg));
+-    returnCode(NCURSES_SP_NAME(vid_puts) (NCURSES_SP_ARGx
+-					  newmode,
+-					  pair_arg,
+-					  opts,
+-					  NCURSES_SP_NAME(_nc_putchar)));
++    returnCode(NCURSES_SP_NAME(vid_puts)(NCURSES_SP_ARGx
++					 newmode,
++					 pair_arg,
++					 opts,
++					 NCURSES_SP_NAME(_nc_putchar)));
+ }
+ 
+ #if NCURSES_SP_FUNCS
+ NCURSES_EXPORT(int)
+ vid_attr(attr_t newmode, NCURSES_PAIRS_T pair_arg, void *opts)
+ {
+-    return NCURSES_SP_NAME(vid_attr) (CURRENT_SCREEN, newmode, pair_arg, opts);
++    return NCURSES_SP_NAME(vid_attr)(CURRENT_SCREEN, newmode, pair_arg, opts);
+ }
+ #endif
+ 
+@@ -332,13 +331,13 @@
+  * we can use termattrs() for part of the logic.
+  */
+ NCURSES_EXPORT(attr_t)
+-NCURSES_SP_NAME(term_attrs) (NCURSES_SP_DCL0)
++NCURSES_SP_NAME(term_attrs)(NCURSES_SP_DCL0)
+ {
+     attr_t attrs = 0;
+ 
+     T((T_CALLED("term_attrs()")));
+     if (SP_PARM) {
+-	attrs = NCURSES_SP_NAME(termattrs) (NCURSES_SP_ARG);
++	attrs = NCURSES_SP_NAME(termattrs)(NCURSES_SP_ARG);
+ 
+ #if USE_WIDEC_SUPPORT && defined(enter_horizontal_hl_mode)
+ 	/* these are only supported for wide-character mode */
+@@ -364,6 +363,6 @@
+ NCURSES_EXPORT(attr_t)
+ term_attrs(void)
+ {
+-    return NCURSES_SP_NAME(term_attrs) (CURRENT_SCREEN);
++    return NCURSES_SP_NAME(term_attrs)(CURRENT_SCREEN);
+ }
+ #endif
+Index: package/debian-mingw/changelog
+--- ncurses-6.6-20260509+/package/debian-mingw/changelog	2026-05-06 20:28:51.000000000 +0000
++++ ncurses-6.6-20260516/package/debian-mingw/changelog	2026-05-16 09:57:27.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260509) unstable; urgency=low
++ncurses6td (6.6+20260516) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Wed, 06 May 2026 16:28:51 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 16 May 2026 05:57:27 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian-mingw64/changelog
+--- ncurses-6.6-20260509+/package/debian-mingw64/changelog	2026-05-06 20:28:51.000000000 +0000
++++ ncurses-6.6-20260516/package/debian-mingw64/changelog	2026-05-16 09:57:27.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260509) unstable; urgency=low
++ncurses6td (6.6+20260516) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Wed, 06 May 2026 16:28:51 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 16 May 2026 05:57:27 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian/changelog
+--- ncurses-6.6-20260509+/package/debian/changelog	2026-05-06 20:28:51.000000000 +0000
++++ ncurses-6.6-20260516/package/debian/changelog	2026-05-16 09:57:27.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260509) unstable; urgency=low
++ncurses6td (6.6+20260516) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Wed, 06 May 2026 16:28:51 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 16 May 2026 05:57:27 -0400
+ 
+ ncurses6 (5.9+20120608) unstable; urgency=low
+ 
+Index: package/mingw-ncurses.nsi
+Prereq:  1.761 
+--- ncurses-6.6-20260509+/package/mingw-ncurses.nsi	2026-05-06 20:28:51.000000000 +0000
++++ ncurses-6.6-20260516/package/mingw-ncurses.nsi	2026-05-16 09:57:27.000000000 +0000
+@@ -1,4 +1,4 @@
+-; $Id: mingw-ncurses.nsi,v 1.761 2026/05/06 20:28:51 tom Exp $
++; $Id: mingw-ncurses.nsi,v 1.762 2026/05/16 09:57:27 tom Exp $
+ 
+ ; TODO add examples
+ ; TODO bump ABI to 6
+@@ -10,7 +10,7 @@
+ !define VERSION_MAJOR "6"
+ !define VERSION_MINOR "6"
+ !define VERSION_YYYY  "2026"
+-!define VERSION_MMDD  "0509"
++!define VERSION_MMDD  "0516"
+ !define VERSION_PATCH ${VERSION_YYYY}${VERSION_MMDD}
+ 
+ !define MY_ABI   "5"
+Index: package/mingw-ncurses.spec
+--- ncurses-6.6-20260509+/package/mingw-ncurses.spec	2026-05-09 10:07:07.000000000 +0000
++++ ncurses-6.6-20260516/package/mingw-ncurses.spec	2026-05-16 09:57:27.000000000 +0000
+@@ -3,7 +3,7 @@
+ Summary: shared libraries for terminal handling
+ Name: mingw32-ncurses6
+ Version: 6.6
+-Release: 20260509
++Release: 20260516
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -144,8 +144,8 @@
+ 
+ %changelog
+ 
+-* Sat May 09 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260509
++* Sat May 16 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260516
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncurses.map
+Prereq:  1.60 
+--- ncurses-6.6-20260509+/package/ncurses.map	2025-12-30 20:32:50.000000000 +0000
++++ ncurses-6.6-20260516/package/ncurses.map	2026-05-17 00:30:17.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncurses.map,v 1.60 2025/12/30 20:32:50 tom Exp $
++# $Id: ncurses.map,v 1.61 2026/05/17 00:30:17 tom Exp $
+ # script for shared library symbol-versioning using ld
+ #
+ # This file was generated by ncu-mapsyms
+@@ -1232,8 +1232,10 @@
+ 		_*;
+ } NCURSES_TINFO_6.2.20211010;
+ 
+-NCURSES_TINFO_6.6.20251230{
++NCURSES_TINFO_6.6.20260516{
+ 	global:
++		_nc_cookie_allowed;
++		_nc_cookie_init;
+ 		_nc_is_path_found;
+ 	local:
+ 		_*;
+Index: package/ncurses.spec
+--- ncurses-6.6-20260509+/package/ncurses.spec	2026-05-09 10:07:07.000000000 +0000
++++ ncurses-6.6-20260516/package/ncurses.spec	2026-05-16 09:57:27.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: shared libraries for terminal handling
+ Name: ncurses6
+ Version: 6.6
+-Release: 20260509
++Release: 20260516
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -134,8 +134,8 @@
+ 
+ %changelog
+ 
+-* Sat May 09 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260509
++* Sat May 16 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260516
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncurses.sym
+Prereq:  1.40 
+--- ncurses-6.6-20260509+/package/ncurses.sym	2025-12-25 22:03:42.000000000 +0000
++++ ncurses-6.6-20260516/package/ncurses.sym	2026-05-17 00:28:07.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncurses.sym,v 1.40 2025/12/25 22:03:42 tom Exp $
++# $Id: ncurses.sym,v 1.41 2026/05/17 00:28:07 tom Exp $
+ # script for shared library symbol-visibility using libtool
+ #
+ # This file was generated by ncu-mapsyms
+@@ -89,6 +89,8 @@
+ _nc_check_termtype
+ _nc_check_termtype2
+ _nc_comp_scan_leaks
++_nc_cookie_allowed
++_nc_cookie_init
+ _nc_copy_termtype
+ _nc_copy_termtype2
+ _nc_curr_col
+Index: package/ncursest.map
+Prereq:  1.58 
+--- ncurses-6.6-20260509+/package/ncursest.map	2025-12-30 20:32:50.000000000 +0000
++++ ncurses-6.6-20260516/package/ncursest.map	2026-05-17 00:30:17.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncursest.map,v 1.58 2025/12/30 20:32:50 tom Exp $
++# $Id: ncursest.map,v 1.59 2026/05/17 00:30:17 tom Exp $
+ # script for shared library symbol-versioning using ld
+ #
+ # This file was generated by ncu-mapsyms
+@@ -509,8 +509,10 @@
+ 		tiscan_s;
+ } NCURSES_TINFO_6.2.20211010;
+ 
+-NCURSES_TINFO_6.6.20251230{
++NCURSES_TINFO_6.6.20260516{
+ 	global:
++		_nc_cookie_allowed;
++		_nc_cookie_init;
+ 		_nc_is_path_found;
+ 	local:
+ 		_*;
+Index: package/ncursest.spec
+--- ncurses-6.6-20260509+/package/ncursest.spec	2026-05-09 10:07:07.000000000 +0000
++++ ncurses-6.6-20260516/package/ncursest.spec	2026-05-16 09:57:27.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: Curses library with POSIX thread support.
+ Name: ncursest6
+ Version: 6.6
+-Release: 20260509
++Release: 20260516
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ Source: ncurses-%{version}-%{release}.tgz
+@@ -142,8 +142,8 @@
+ 
+ %changelog
+ 
+-* Sat May 09 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260509
++* Sat May 16 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260516
+ 
+ * Tue Dec 24 2019 Thomas Dickey
+ - drop custom CC_NORMAL warning flags because setting CFLAGS interferes with
+Index: package/ncursest.sym
+Prereq:  1.44 
+--- ncurses-6.6-20260509+/package/ncursest.sym	2025-12-25 22:03:42.000000000 +0000
++++ ncurses-6.6-20260516/package/ncursest.sym	2026-05-17 00:28:07.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncursest.sym,v 1.44 2025/12/25 22:03:42 tom Exp $
++# $Id: ncursest.sym,v 1.45 2026/05/17 00:28:07 tom Exp $
+ # script for shared library symbol-visibility using libtool
+ #
+ # This file was generated by ncu-mapsyms
+@@ -81,6 +81,8 @@
+ _nc_check_termtype2
+ _nc_codes_leaks
+ _nc_comp_scan_leaks
++_nc_cookie_allowed
++_nc_cookie_init
+ _nc_copy_termtype
+ _nc_copy_termtype2
+ _nc_count_outchars
+Index: package/ncursestw.map
+Prereq:  1.61 
+--- ncurses-6.6-20260509+/package/ncursestw.map	2025-12-30 20:32:50.000000000 +0000
++++ ncurses-6.6-20260516/package/ncursestw.map	2026-05-17 00:30:17.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncursestw.map,v 1.61 2025/12/30 20:32:50 tom Exp $
++# $Id: ncursestw.map,v 1.62 2026/05/17 00:30:17 tom Exp $
+ # script for shared library symbol-versioning using ld
+ #
+ # This file was generated by ncu-mapsyms
+@@ -517,8 +517,10 @@
+ 		tiscan_s;
+ } NCURSES_TINFO_6.2.20211010;
+ 
+-NCURSES_TINFO_6.6.20251230{
++NCURSES_TINFO_6.6.20260516{
+ 	global:
++		_nc_cookie_allowed;
++		_nc_cookie_init;
+ 		_nc_is_path_found;
+ 	local:
+ 		_*;
+Index: package/ncursestw.sym
+Prereq:  1.44 
+--- ncurses-6.6-20260509+/package/ncursestw.sym	2025-12-25 22:03:42.000000000 +0000
++++ ncurses-6.6-20260516/package/ncursestw.sym	2026-05-17 00:28:07.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncursestw.sym,v 1.44 2025/12/25 22:03:42 tom Exp $
++# $Id: ncursestw.sym,v 1.45 2026/05/17 00:28:07 tom Exp $
+ # script for shared library symbol-visibility using libtool
+ #
+ # This file was generated by ncu-mapsyms
+@@ -81,6 +81,8 @@
+ _nc_check_termtype2
+ _nc_codes_leaks
+ _nc_comp_scan_leaks
++_nc_cookie_allowed
++_nc_cookie_init
+ _nc_copy_termtype
+ _nc_copy_termtype2
+ _nc_count_outchars
+Index: package/ncursesw.map
+Prereq:  1.64 
+--- ncurses-6.6-20260509+/package/ncursesw.map	2025-12-30 20:32:50.000000000 +0000
++++ ncurses-6.6-20260516/package/ncursesw.map	2026-05-17 00:30:17.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncursesw.map,v 1.64 2025/12/30 20:32:50 tom Exp $
++# $Id: ncursesw.map,v 1.65 2026/05/17 00:30:17 tom Exp $
+ # script for shared library symbol-versioning using ld
+ #
+ # This file was generated by ncu-mapsyms
+@@ -511,8 +511,10 @@
+ 		tiscan_s;
+ } NCURSES_TINFO_6.2.20211010;
+ 
+-NCURSES_TINFO_6.6.20251230{
++NCURSES_TINFO_6.6.20260516{
+ 	global:
++		_nc_cookie_allowed;
++		_nc_cookie_init;
+ 		_nc_is_path_found;
+ 	local:
+ 		_*;
+Index: package/ncursesw.sym
+Prereq:  1.43 
+--- ncurses-6.6-20260509+/package/ncursesw.sym	2025-12-25 22:03:42.000000000 +0000
++++ ncurses-6.6-20260516/package/ncursesw.sym	2026-05-17 00:28:07.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncursesw.sym,v 1.43 2025/12/25 22:03:42 tom Exp $
++# $Id: ncursesw.sym,v 1.44 2026/05/17 00:28:07 tom Exp $
+ # script for shared library symbol-visibility using libtool
+ #
+ # This file was generated by ncu-mapsyms
+@@ -85,6 +85,8 @@
+ _nc_check_termtype
+ _nc_check_termtype2
+ _nc_comp_scan_leaks
++_nc_cookie_allowed
++_nc_cookie_init
+ _nc_copy_termtype
+ _nc_copy_termtype2
+ _nc_curr_col
+Index: progs/infocmp.c
+Prereq:  1.180 
+--- ncurses-6.6-20260509+/progs/infocmp.c	2026-03-04 21:16:45.000000000 +0000
++++ ncurses-6.6-20260516/progs/infocmp.c	2026-05-16 13:38:02.000000000 +0000
+@@ -43,7 +43,7 @@
+ 
+ #include <dump_entry.h>
+ 
+-MODULE_ID("$Id: infocmp.c,v 1.180 2026/03/04 21:16:45 tom Exp $")
++MODULE_ID("$Id: infocmp.c,v 1.181 2026/05/16 13:38:02 Daniel.Anderson Exp $")
+ 
+ #ifndef ACTUAL_TIC
+ #define ACTUAL_TIC "tic"
+@@ -1378,13 +1378,23 @@
+ {
+     static char *result;
+     static size_t need;
++    size_t want;
+     char *s;
+ 
++    /*
++     * Leave room for the optional "ti_" prefix, optional leading '_',
++     * the formatted name, and the trailing NUL.
++     */
++    want = strlen(prefix) + strlen(name) + strlen(format) + 5;
++    if (want > need) {
++	char *next = (char *) realloc(result, want);
++	if (next == NULL)
++	    failed("safe_name");
++	result = next;
++	need = want;
++    }
+     if (result == NULL) {
+-	need = (strlen(prefix)
+-		+ strlen(name)
+-		+ strlen(format));
+-	result = (char *) malloc(need + 1);
++	result = (char *) malloc(need);
+ 	if (result == NULL)
+ 	    failed("safe_name");
+     }
+@@ -1400,7 +1410,7 @@
+     *s = 0;
+     if (isdigit(UChar(*name)) && !*prefix)
+ 	*s++ = '_';
+-    _nc_SPRINTF(s, _nc_SLIMIT(need) format, name);
++    _nc_SPRINTF(s, _nc_SLIMIT(need - (size_t) (s - result)) format, name);
+     return result;
+ }
+ 

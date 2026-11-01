@@ -1,0 +1,224 @@
+# ncurses 6.6 - patch 20260607 - Thomas E. Dickey
+#
+# ------------------------------------------------------------------------------
+#
+# Ncurses 6.6 is at
+#   https://invisible-island.net/archives/ncurses/
+#   https://invisible-mirror.net/archives/ncurses/
+#   https://ftp.gnu.org/gnu/ncurses/
+#
+# Patches for ncurses 6.6 can be found at
+#   https://invisible-island.net/archives/ncurses/6.6
+#   https://invisible-mirror.net/archives/ncurses/6.6
+#
+# ------------------------------------------------------------------------------
+# https://invisible-island.net/archives/ncurses/6.6/ncurses-6.6-20260607.patch.gz
+# patch by Thomas E. Dickey <dickey@invisible-island.net>
+# created  Sun Jun  7 09:11:29 UTC 2026
+# ------------------------------------------------------------------------------
+# NEWS                             |    5 ++++-
+# VERSION                          |    2 +-
+# dist.mk                          |    4 ++--
+# misc/terminfo.src                |    2 +-
+# package/debian-mingw/changelog   |    4 ++--
+# package/debian-mingw64/changelog |    4 ++--
+# package/debian/changelog         |    4 ++--
+# package/mingw-ncurses.nsi        |    4 ++--
+# package/mingw-ncurses.spec       |    6 +++---
+# package/ncurses.spec             |    6 +++---
+# package/ncursest.spec            |    6 +++---
+# 11 files changed, 25 insertions(+), 22 deletions(-)
+# ------------------------------------------------------------------------------
+Index: NEWS
+Prereq:  1.4472 
+--- ncurses-6.6-20260606+/NEWS	2026-06-07 00:14:38.000000000 +0000
++++ ncurses-6.6-20260607/NEWS	2026-06-07 09:10:56.000000000 +0000
+@@ -26,7 +26,7 @@
+ -- sale, use or other dealings in this Software without prior written        --
+ -- authorization.                                                            --
+ -------------------------------------------------------------------------------
+--- $Id: NEWS,v 1.4472 2026/06/07 00:14:38 tom Exp $
++-- $Id: NEWS,v 1.4473 2026/06/07 09:10:56 tom Exp $
+ -------------------------------------------------------------------------------
+ 
+ This is a log of changes that ncurses has gone through since Zeyd started
+@@ -46,6 +46,9 @@
+ Changes through 1.9.9e did not credit all contributions;
+ it is not possible to add this information.
+ 
++20260607
++	+ actually add kmscon (report by Branden Robinson)
++
+ 20260606
+ 	+ add kmscon (report by Jocelyn Falempe) -TD
+ 	+ fix a minor regression in infocmp -g option.
+Index: VERSION
+--- ncurses-6.6-20260606+/VERSION	2026-06-06 09:35:30.000000000 +0000
++++ ncurses-6.6-20260607/VERSION	2026-06-07 09:10:14.000000000 +0000
+@@ -1 +1 @@
+-5:0:10	6.6	20260606
++5:0:10	6.6	20260607
+Index: dist.mk
+Prereq:  1.1735 
+--- ncurses-6.6-20260606+/dist.mk	2026-06-06 09:35:30.000000000 +0000
++++ ncurses-6.6-20260607/dist.mk	2026-06-07 09:10:14.000000000 +0000
+@@ -26,7 +26,7 @@
+ # use or other dealings in this Software without prior written               #
+ # authorization.                                                             #
+ ##############################################################################
+-# $Id: dist.mk,v 1.1735 2026/06/06 09:35:30 tom Exp $
++# $Id: dist.mk,v 1.1736 2026/06/07 09:10:14 tom Exp $
+ # Makefile for creating ncurses distributions.
+ #
+ # This only needs to be used directly as a makefile by developers, but
+@@ -38,7 +38,7 @@
+ # These define the major/minor/patch versions of ncurses.
+ NCURSES_MAJOR = 6
+ NCURSES_MINOR = 6
+-NCURSES_PATCH = 20260606
++NCURSES_PATCH = 20260607
+ 
+ # We don't append the patch to the version, since this only applies to releases
+ VERSION = $(NCURSES_MAJOR).$(NCURSES_MINOR)
+Index: misc/terminfo.src
+--- ncurses-6.6-20260606+/misc/terminfo.src	2026-06-06 23:47:05.000000000 +0000
++++ ncurses-6.6-20260607/misc/terminfo.src	2026-06-06 23:47:05.000000000 +0000
+@@ -6,7 +6,7 @@
+ # Report bugs and new terminal descriptions to
+ #	bug-ncurses@gnu.org
+ #
+-#	$Revision: 1.1250.1.8 $
++#	$Revision: 1.1251 $
+ #	$Date: 2026/06/06 23:47:05 $
+ #
+ # The original header is preserved below for reference.  It is noted that there
+Index: package/debian-mingw/changelog
+--- ncurses-6.6-20260606+/package/debian-mingw/changelog	2026-06-05 19:38:34.000000000 +0000
++++ ncurses-6.6-20260607/package/debian-mingw/changelog	2026-06-07 09:10:14.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260606) unstable; urgency=low
++ncurses6td (6.6+20260607) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Fri, 05 Jun 2026 15:38:34 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sun, 07 Jun 2026 05:10:14 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian-mingw64/changelog
+--- ncurses-6.6-20260606+/package/debian-mingw64/changelog	2026-06-05 19:38:34.000000000 +0000
++++ ncurses-6.6-20260607/package/debian-mingw64/changelog	2026-06-07 09:10:14.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260606) unstable; urgency=low
++ncurses6td (6.6+20260607) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Fri, 05 Jun 2026 15:38:34 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sun, 07 Jun 2026 05:10:14 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian/changelog
+--- ncurses-6.6-20260606+/package/debian/changelog	2026-06-05 19:38:34.000000000 +0000
++++ ncurses-6.6-20260607/package/debian/changelog	2026-06-07 09:10:14.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260606) unstable; urgency=low
++ncurses6td (6.6+20260607) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Fri, 05 Jun 2026 15:38:34 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sun, 07 Jun 2026 05:10:14 -0400
+ 
+ ncurses6 (5.9+20120608) unstable; urgency=low
+ 
+Index: package/mingw-ncurses.nsi
+Prereq:  1.765 
+--- ncurses-6.6-20260606+/package/mingw-ncurses.nsi	2026-06-05 19:38:34.000000000 +0000
++++ ncurses-6.6-20260607/package/mingw-ncurses.nsi	2026-06-07 09:10:14.000000000 +0000
+@@ -1,4 +1,4 @@
+-; $Id: mingw-ncurses.nsi,v 1.765 2026/06/05 19:38:34 tom Exp $
++; $Id: mingw-ncurses.nsi,v 1.766 2026/06/07 09:10:14 tom Exp $
+ 
+ ; TODO add examples
+ ; TODO bump ABI to 6
+@@ -10,7 +10,7 @@
+ !define VERSION_MAJOR "6"
+ !define VERSION_MINOR "6"
+ !define VERSION_YYYY  "2026"
+-!define VERSION_MMDD  "0606"
++!define VERSION_MMDD  "0607"
+ !define VERSION_PATCH ${VERSION_YYYY}${VERSION_MMDD}
+ 
+ !define MY_ABI   "5"
+Index: package/mingw-ncurses.spec
+--- ncurses-6.6-20260606+/package/mingw-ncurses.spec	2026-06-06 09:35:30.000000000 +0000
++++ ncurses-6.6-20260607/package/mingw-ncurses.spec	2026-06-07 09:10:14.000000000 +0000
+@@ -3,7 +3,7 @@
+ Summary: shared libraries for terminal handling
+ Name: mingw32-ncurses6
+ Version: 6.6
+-Release: 20260606
++Release: 20260607
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -144,8 +144,8 @@
+ 
+ %changelog
+ 
+-* Sat Jun 06 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260606
++* Sun Jun 07 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260607
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncurses.spec
+--- ncurses-6.6-20260606+/package/ncurses.spec	2026-06-06 09:35:30.000000000 +0000
++++ ncurses-6.6-20260607/package/ncurses.spec	2026-06-07 09:10:14.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: shared libraries for terminal handling
+ Name: ncurses6
+ Version: 6.6
+-Release: 20260606
++Release: 20260607
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -134,8 +134,8 @@
+ 
+ %changelog
+ 
+-* Sat Jun 06 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260606
++* Sun Jun 07 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260607
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncursest.spec
+--- ncurses-6.6-20260606+/package/ncursest.spec	2026-06-06 09:35:30.000000000 +0000
++++ ncurses-6.6-20260607/package/ncursest.spec	2026-06-07 09:10:14.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: Curses library with POSIX thread support.
+ Name: ncursest6
+ Version: 6.6
+-Release: 20260606
++Release: 20260607
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ Source: ncurses-%{version}-%{release}.tgz
+@@ -142,8 +142,8 @@
+ 
+ %changelog
+ 
+-* Sat Jun 06 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260606
++* Sun Jun 07 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260607
+ 
+ * Tue Dec 24 2019 Thomas Dickey
+ - drop custom CC_NORMAL warning flags because setting CFLAGS interferes with

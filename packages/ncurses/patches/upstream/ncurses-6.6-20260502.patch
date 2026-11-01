@@ -1,0 +1,317 @@
+# ncurses 6.6 - patch 20260502 - Thomas E. Dickey
+#
+# ------------------------------------------------------------------------------
+#
+# Ncurses 6.6 is at
+#   https://invisible-island.net/archives/ncurses/
+#   https://invisible-mirror.net/archives/ncurses/
+#   https://ftp.gnu.org/gnu/ncurses/
+#
+# Patches for ncurses 6.6 can be found at
+#   https://invisible-island.net/archives/ncurses/6.6
+#   https://invisible-mirror.net/archives/ncurses/6.6
+#
+# ------------------------------------------------------------------------------
+# https://invisible-island.net/archives/ncurses/6.6/ncurses-6.6-20260502.patch.gz
+# patch by Thomas E. Dickey <dickey@invisible-island.net>
+# created  Sat May  2 23:34:13 UTC 2026
+# ------------------------------------------------------------------------------
+# NEWS                             |    6 +++
+# VERSION                          |    2 -
+# dist.mk                          |    4 +-
+# misc/terminfo.src                |   59 +++++++++++++++++++++++++++++++++++--
+# ncurses/tty/lib_twait.c          |    4 +-
+# package/debian-mingw/changelog   |    4 +-
+# package/debian-mingw64/changelog |    4 +-
+# package/debian/changelog         |    4 +-
+# package/mingw-ncurses.nsi        |    4 +-
+# package/mingw-ncurses.spec       |    6 +--
+# package/ncurses.spec             |    6 +--
+# package/ncursest.spec            |    6 +--
+# 12 files changed, 84 insertions(+), 25 deletions(-)
+# ------------------------------------------------------------------------------
+Index: NEWS
+Prereq:  1.4452 
+--- ncurses-6.6-20260425+/NEWS	2026-04-25 23:55:35.000000000 +0000
++++ ncurses-6.6-20260502/NEWS	2026-05-02 22:49:35.000000000 +0000
+@@ -26,7 +26,7 @@
+ -- sale, use or other dealings in this Software without prior written        --
+ -- authorization.                                                            --
+ -------------------------------------------------------------------------------
+--- $Id: NEWS,v 1.4452 2026/04/25 23:55:35 tom Exp $
++-- $Id: NEWS,v 1.4454 2026/05/02 22:49:35 tom Exp $
+ -------------------------------------------------------------------------------
+ 
+ This is a log of changes that ncurses has gone through since Zeyd started
+@@ -46,6 +46,10 @@
+ Changes through 1.9.9e did not credit all contributions;
+ it is not possible to add this information.
+ 
++20260502
++	+ add warp -TD
++	+ correct loop limit in lib_twait.c (OpenSUSE #1262780, cf: 20260411)
++
+ 20260425
+ 	+ review screen4 vs screen5 -TD
+ 	+ review some XR/xr pairs -TD
+Index: VERSION
+--- ncurses-6.6-20260425+/VERSION	2026-04-25 09:30:45.000000000 +0000
++++ ncurses-6.6-20260502/VERSION	2026-05-02 09:48:18.000000000 +0000
+@@ -1 +1 @@
+-5:0:10	6.6	20260425
++5:0:10	6.6	20260502
+Index: dist.mk
+Prereq:  1.1729 
+--- ncurses-6.6-20260425+/dist.mk	2026-04-25 09:30:45.000000000 +0000
++++ ncurses-6.6-20260502/dist.mk	2026-05-02 09:48:18.000000000 +0000
+@@ -26,7 +26,7 @@
+ # use or other dealings in this Software without prior written               #
+ # authorization.                                                             #
+ ##############################################################################
+-# $Id: dist.mk,v 1.1729 2026/04/25 09:30:45 tom Exp $
++# $Id: dist.mk,v 1.1730 2026/05/02 09:48:18 tom Exp $
+ # Makefile for creating ncurses distributions.
+ #
+ # This only needs to be used directly as a makefile by developers, but
+@@ -38,7 +38,7 @@
+ # These define the major/minor/patch versions of ncurses.
+ NCURSES_MAJOR = 6
+ NCURSES_MINOR = 6
+-NCURSES_PATCH = 20260425
++NCURSES_PATCH = 20260502
+ 
+ # We don't append the patch to the version, since this only applies to releases
+ VERSION = $(NCURSES_MAJOR).$(NCURSES_MINOR)
+Index: misc/terminfo.src
+--- ncurses-6.6-20260425+/misc/terminfo.src	2026-04-25 23:45:26.000000000 +0000
++++ ncurses-6.6-20260502/misc/terminfo.src	2026-05-02 22:42:21.000000000 +0000
+@@ -6,8 +6,8 @@
+ # Report bugs and new terminal descriptions to
+ #	bug-ncurses@gnu.org
+ #
+-#	$Revision: 1.1243 $
+-#	$Date: 2026/04/25 23:45:26 $
++#	$Revision: 1.1247 $
++#	$Date: 2026/05/02 22:42:21 $
+ #
+ # The original header is preserved below for reference.  It is noted that there
+ # is a "newer" version which differs in some cosmetic details (but actually
+@@ -8075,6 +8075,58 @@
+ 	setal=\E[58:2::%p1%{65536}%/%d:%p1%{256}%/%{255}%&%d:%p1
+ 	      %{255}%&%dm,
+ 
++#### Warp
++# https://github.com/warpdotdev/Warp
++#
++# The actual terminal emulator is a small fraction of the source code
++# (even the part under app/src/terminal is mostly not relevant to terminal
++# emulation, rather it is concerned with the "agentic" interface).
++#
++# Initially a little over 900,000 lines of rust source code, it grew to 1.25
++# million lines during the week after release.
++#
++# The Git repo lacks history before the public release in April 2026; comments
++# in the source code indicate that features were copied from several other
++# terminals, but the timeline, scope of copying, and motivation is obscured.
++#
++# Testing with vttest and tack:
++# + DA response is \E[?62c, asserting that it is a VT220.  It is not.
++#   For instance, it does not support DECSCA.
++# + DA2 response is \E[>0;95;0c, which is misattributed to iTerm2.
++#   That was from a 2017 comment in vim's source code, mentioning workarounds
++#   which some developers have used to pretend their programs are xterm.
++#   The corresponding code in iTerm2 was revised in 2020 to use a more
++#   elaborate workaround.
++# + ISO-6429 cursor-movement works
++# + xterm-style window reporting for sizes (chars, pixels) works
++# + none of the tab-stop tests in vttest work.
++# + the bce test for ECH/indexing fails.
++# + control-modifier does not work with function-keys, although shift- and alt-
++#   modifiers imitate xterm, so the "xterm+pcfkeys" block is incomplete.
++# + SD works, SU, SL, SR do not.
++# + no left/right margin
++# + no blinking text
++# + no cvvis, etc
++# + no flash
++# + no meta mode (an escape-prefix is not the same thing)
++# + no X11 mouse, but SGR mouse works
++# + no application keypad mode
++#
++# Other comments
++# + works only with specific shells (no bash, yes zsh)
++# + cursor-right does not work reliably
++# + sets TERM to xterm-256color, which is a poor match.
++# + supports XTVERSION, unlike alacritty
++warp|warp terminal,
++	bce@,
++	civis@, cnorm@, cvvis@, kcbt=\E[Z, RV=\E[>c, XR=\E[>0q,
++	rv=\E\\[>0;95;0c,
++	xr=\EP>\\|Warp\\(([[:alnum:]._]+)\\)\E\\\\,
++	use=ansi+rep, use=bracketed+paste, use=ecma+italics,
++	use=xterm+sm+1006, use=xterm+pcfkeys,
++	use=ecma+strikeout, use=xterm+tmux, use=xterm+256color,
++	use=xterm-basic,
++
+ ######## WAYLAND CLIENTS
+ 
+ #### Foot
+@@ -28220,4 +28272,7 @@
+ #	+ review screen4 vs screen5 -TD
+ #	+ review some XR/xr pairs -TD
+ #
++# 2026-05-02
++#	+ add warp -TD
++#
+ ######## SHANTIH!  SHANTIH!  SHANTIH!
+Index: ncurses/tty/lib_twait.c
+Prereq:  1.88 
+--- ncurses-6.6-20260425+/ncurses/tty/lib_twait.c	2026-04-18 22:18:52.000000000 +0000
++++ ncurses-6.6-20260502/ncurses/tty/lib_twait.c	2026-04-27 07:35:26.000000000 +0000
+@@ -76,7 +76,7 @@
+ #endif
+ #undef CUR
+ 
+-MODULE_ID("$Id: lib_twait.c,v 1.88 2026/04/18 22:18:52 tom Exp $")
++MODULE_ID("$Id: lib_twait.c,v 1.89 2026/04/27 07:35:26 tom Exp $")
+ 
+ /*
+  * Returns an elapsed time, in milliseconds (if possible).
+@@ -283,7 +283,7 @@
+ 		&& (ev->data.fev.flags & _NC_EVENT_FILE_READABLE)) {
+ 		ev->data.fev.result = 0;
+ 		for (c = 0; c < count; c++)
+-		    if (fds[count].revents & POLLNVAL) {
++		    if (fds[c].revents & POLLNVAL) {
+ 			errno = EBADF;
+ 		    } else if (fds[c].fd == ev->data.fev.fd
+ 			       && fds[c].revents & POLLIN) {
+Index: package/debian-mingw/changelog
+--- ncurses-6.6-20260425+/package/debian-mingw/changelog	2026-04-24 20:57:06.000000000 +0000
++++ ncurses-6.6-20260502/package/debian-mingw/changelog	2026-04-27 08:08:19.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260425) unstable; urgency=low
++ncurses6td (6.6+20260502) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Fri, 24 Apr 2026 16:57:06 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Mon, 27 Apr 2026 04:08:19 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian-mingw64/changelog
+--- ncurses-6.6-20260425+/package/debian-mingw64/changelog	2026-04-24 20:57:06.000000000 +0000
++++ ncurses-6.6-20260502/package/debian-mingw64/changelog	2026-04-27 08:08:19.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260425) unstable; urgency=low
++ncurses6td (6.6+20260502) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Fri, 24 Apr 2026 16:57:06 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Mon, 27 Apr 2026 04:08:19 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian/changelog
+--- ncurses-6.6-20260425+/package/debian/changelog	2026-04-24 20:57:06.000000000 +0000
++++ ncurses-6.6-20260502/package/debian/changelog	2026-04-27 08:08:19.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260425) unstable; urgency=low
++ncurses6td (6.6+20260502) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Fri, 24 Apr 2026 16:57:06 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Mon, 27 Apr 2026 04:08:19 -0400
+ 
+ ncurses6 (5.9+20120608) unstable; urgency=low
+ 
+Index: package/mingw-ncurses.nsi
+Prereq:  1.759 
+--- ncurses-6.6-20260425+/package/mingw-ncurses.nsi	2026-04-24 20:57:06.000000000 +0000
++++ ncurses-6.6-20260502/package/mingw-ncurses.nsi	2026-04-27 08:08:19.000000000 +0000
+@@ -1,4 +1,4 @@
+-; $Id: mingw-ncurses.nsi,v 1.759 2026/04/24 20:57:06 tom Exp $
++; $Id: mingw-ncurses.nsi,v 1.760 2026/04/27 08:08:19 tom Exp $
+ 
+ ; TODO add examples
+ ; TODO bump ABI to 6
+@@ -10,7 +10,7 @@
+ !define VERSION_MAJOR "6"
+ !define VERSION_MINOR "6"
+ !define VERSION_YYYY  "2026"
+-!define VERSION_MMDD  "0425"
++!define VERSION_MMDD  "0502"
+ !define VERSION_PATCH ${VERSION_YYYY}${VERSION_MMDD}
+ 
+ !define MY_ABI   "5"
+Index: package/mingw-ncurses.spec
+--- ncurses-6.6-20260425+/package/mingw-ncurses.spec	2026-04-25 09:30:37.000000000 +0000
++++ ncurses-6.6-20260502/package/mingw-ncurses.spec	2026-05-02 09:48:18.000000000 +0000
+@@ -3,7 +3,7 @@
+ Summary: shared libraries for terminal handling
+ Name: mingw32-ncurses6
+ Version: 6.6
+-Release: 20260425
++Release: 20260502
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -144,8 +144,8 @@
+ 
+ %changelog
+ 
+-* Sat Apr 25 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260425
++* Sat May 02 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260502
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncurses.spec
+--- ncurses-6.6-20260425+/package/ncurses.spec	2026-04-25 09:30:37.000000000 +0000
++++ ncurses-6.6-20260502/package/ncurses.spec	2026-05-02 09:48:18.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: shared libraries for terminal handling
+ Name: ncurses6
+ Version: 6.6
+-Release: 20260425
++Release: 20260502
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -134,8 +134,8 @@
+ 
+ %changelog
+ 
+-* Sat Apr 25 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260425
++* Sat May 02 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260502
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncursest.spec
+--- ncurses-6.6-20260425+/package/ncursest.spec	2026-04-25 09:30:37.000000000 +0000
++++ ncurses-6.6-20260502/package/ncursest.spec	2026-05-02 09:48:18.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: Curses library with POSIX thread support.
+ Name: ncursest6
+ Version: 6.6
+-Release: 20260425
++Release: 20260502
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ Source: ncurses-%{version}-%{release}.tgz
+@@ -142,8 +142,8 @@
+ 
+ %changelog
+ 
+-* Sat Apr 25 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260425
++* Sat May 02 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260502
+ 
+ * Tue Dec 24 2019 Thomas Dickey
+ - drop custom CC_NORMAL warning flags because setting CFLAGS interferes with

@@ -1,0 +1,377 @@
+# ncurses 6.6 - patch 20260608 - Thomas E. Dickey
+#
+# ------------------------------------------------------------------------------
+#
+# Ncurses 6.6 is at
+#   https://invisible-island.net/archives/ncurses/
+#   https://invisible-mirror.net/archives/ncurses/
+#   https://ftp.gnu.org/gnu/ncurses/
+#
+# Patches for ncurses 6.6 can be found at
+#   https://invisible-island.net/archives/ncurses/6.6
+#   https://invisible-mirror.net/archives/ncurses/6.6
+#
+# ------------------------------------------------------------------------------
+# https://invisible-island.net/archives/ncurses/6.6/ncurses-6.6-20260608.patch.gz
+# patch by Thomas E. Dickey <dickey@invisible-island.net>
+# created  Tue Jun  9 00:36:56 UTC 2026
+# ------------------------------------------------------------------------------
+# NEWS                             |    7 ++++++-
+# VERSION                          |    2 +-
+# dist.mk                          |    4 ++--
+# misc/terminfo.src                |   11 ++++++-----
+# package/debian-mingw/changelog   |    4 ++--
+# package/debian-mingw64/changelog |    4 ++--
+# package/debian/changelog         |    4 ++--
+# package/mingw-ncurses.nsi        |    4 ++--
+# package/mingw-ncurses.spec       |    6 +++---
+# package/ncurses.map              |   12 ++++++++----
+# package/ncurses.spec             |    6 +++---
+# package/ncursest.map             |   12 ++++++++----
+# package/ncursest.spec            |    6 +++---
+# package/ncursestw.map            |   12 ++++++++----
+# package/ncursesw.map             |   12 ++++++++----
+# 15 files changed, 64 insertions(+), 42 deletions(-)
+# ------------------------------------------------------------------------------
+Index: NEWS
+Prereq:  1.4473 
+--- ncurses-6.6-20260607+/NEWS	2026-06-07 09:10:56.000000000 +0000
++++ ncurses-6.6-20260608/NEWS	2026-06-08 23:46:21.000000000 +0000
+@@ -26,7 +26,7 @@
+ -- sale, use or other dealings in this Software without prior written        --
+ -- authorization.                                                            --
+ -------------------------------------------------------------------------------
+--- $Id: NEWS,v 1.4473 2026/06/07 09:10:56 tom Exp $
++-- $Id: NEWS,v 1.4474 2026/06/08 23:46:21 tom Exp $
+ -------------------------------------------------------------------------------
+ 
+ This is a log of changes that ncurses has gone through since Zeyd started
+@@ -46,6 +46,11 @@
+ Changes through 1.9.9e did not credit all contributions;
+ it is not possible to add this information.
+ 
++20260608
++	+ amend *.map to put recent cookie-related functions in a new tinfo
++	  ".current" section (report by Sven Joachim).
++	+ add npc to kmscon, fixing flash -TD
++
+ 20260607
+ 	+ actually add kmscon (report by Branden Robinson)
+ 
+Index: VERSION
+--- ncurses-6.6-20260607+/VERSION	2026-06-07 09:10:14.000000000 +0000
++++ ncurses-6.6-20260608/VERSION	2026-06-08 23:44:31.000000000 +0000
+@@ -1 +1 @@
+-5:0:10	6.6	20260607
++5:0:10	6.6	20260608
+Index: dist.mk
+Prereq:  1.1736 
+--- ncurses-6.6-20260607+/dist.mk	2026-06-07 09:10:14.000000000 +0000
++++ ncurses-6.6-20260608/dist.mk	2026-06-08 23:44:31.000000000 +0000
+@@ -26,7 +26,7 @@
+ # use or other dealings in this Software without prior written               #
+ # authorization.                                                             #
+ ##############################################################################
+-# $Id: dist.mk,v 1.1736 2026/06/07 09:10:14 tom Exp $
++# $Id: dist.mk,v 1.1737 2026/06/08 23:44:31 tom Exp $
+ # Makefile for creating ncurses distributions.
+ #
+ # This only needs to be used directly as a makefile by developers, but
+@@ -38,7 +38,7 @@
+ # These define the major/minor/patch versions of ncurses.
+ NCURSES_MAJOR = 6
+ NCURSES_MINOR = 6
+-NCURSES_PATCH = 20260607
++NCURSES_PATCH = 20260608
+ 
+ # We don't append the patch to the version, since this only applies to releases
+ VERSION = $(NCURSES_MAJOR).$(NCURSES_MINOR)
+Index: misc/terminfo.src
+--- ncurses-6.6-20260607+/misc/terminfo.src	2026-06-06 23:47:05.000000000 +0000
++++ ncurses-6.6-20260608/misc/terminfo.src	2026-06-08 23:43:34.000000000 +0000
+@@ -6,8 +6,8 @@
+ # Report bugs and new terminal descriptions to
+ #	bug-ncurses@gnu.org
+ #
+-#	$Revision: 1.1251 $
+-#	$Date: 2026/06/06 23:47:05 $
++#	$Revision: 1.1252 $
++#	$Date: 2026/06/08 23:43:34 $
+ #
+ # The original header is preserved below for reference.  It is noted that there
+ # is a "newer" version which differs in some cosmetic details (but actually
+@@ -1308,10 +1308,8 @@
+ # - implements REP in a nonstandard manner
+ # - supports SD and SU
+ # - freezes console on SL; does not implement SR
+-# tack:
+-# - flash does not work reliably
+ kmscon|KMS Console,
+-	am, bce, km, mir, msgr, xenl,
++	am, bce, km, mir, msgr, npc, xenl,
+ 	cols#80, lines#24, pairs#0x7fff,
+ 	acsc=``aaffggiijjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~,
+ 	bel=^G, bold=\E[1m, civis=\E[?25l, clear=\E[H\E[2J,
+@@ -28356,4 +28354,7 @@
+ # 2026-06-06
+ #	+ add kmscon (report by Jocelyn Falempe) -TD
+ #
++# 2026-06-08
++#	+ add npc to kmscon, fixing flash -TD
++#
+ ######## SHANTIH!  SHANTIH!  SHANTIH!
+Index: package/debian-mingw/changelog
+--- ncurses-6.6-20260607+/package/debian-mingw/changelog	2026-06-07 09:10:14.000000000 +0000
++++ ncurses-6.6-20260608/package/debian-mingw/changelog	2026-06-08 23:44:31.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260607) unstable; urgency=low
++ncurses6td (6.6+20260608) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sun, 07 Jun 2026 05:10:14 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Mon, 08 Jun 2026 19:44:31 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian-mingw64/changelog
+--- ncurses-6.6-20260607+/package/debian-mingw64/changelog	2026-06-07 09:10:14.000000000 +0000
++++ ncurses-6.6-20260608/package/debian-mingw64/changelog	2026-06-08 23:44:31.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260607) unstable; urgency=low
++ncurses6td (6.6+20260608) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sun, 07 Jun 2026 05:10:14 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Mon, 08 Jun 2026 19:44:31 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian/changelog
+--- ncurses-6.6-20260607+/package/debian/changelog	2026-06-07 09:10:14.000000000 +0000
++++ ncurses-6.6-20260608/package/debian/changelog	2026-06-08 23:44:31.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260607) unstable; urgency=low
++ncurses6td (6.6+20260608) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sun, 07 Jun 2026 05:10:14 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Mon, 08 Jun 2026 19:44:31 -0400
+ 
+ ncurses6 (5.9+20120608) unstable; urgency=low
+ 
+Index: package/mingw-ncurses.nsi
+Prereq:  1.766 
+--- ncurses-6.6-20260607+/package/mingw-ncurses.nsi	2026-06-07 09:10:14.000000000 +0000
++++ ncurses-6.6-20260608/package/mingw-ncurses.nsi	2026-06-08 23:44:31.000000000 +0000
+@@ -1,4 +1,4 @@
+-; $Id: mingw-ncurses.nsi,v 1.766 2026/06/07 09:10:14 tom Exp $
++; $Id: mingw-ncurses.nsi,v 1.767 2026/06/08 23:44:31 tom Exp $
+ 
+ ; TODO add examples
+ ; TODO bump ABI to 6
+@@ -10,7 +10,7 @@
+ !define VERSION_MAJOR "6"
+ !define VERSION_MINOR "6"
+ !define VERSION_YYYY  "2026"
+-!define VERSION_MMDD  "0607"
++!define VERSION_MMDD  "0608"
+ !define VERSION_PATCH ${VERSION_YYYY}${VERSION_MMDD}
+ 
+ !define MY_ABI   "5"
+Index: package/mingw-ncurses.spec
+--- ncurses-6.6-20260607+/package/mingw-ncurses.spec	2026-06-07 09:10:14.000000000 +0000
++++ ncurses-6.6-20260608/package/mingw-ncurses.spec	2026-06-08 23:44:31.000000000 +0000
+@@ -3,7 +3,7 @@
+ Summary: shared libraries for terminal handling
+ Name: mingw32-ncurses6
+ Version: 6.6
+-Release: 20260607
++Release: 20260608
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -144,8 +144,8 @@
+ 
+ %changelog
+ 
+-* Sun Jun 07 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260607
++* Mon Jun 08 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260608
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncurses.map
+Prereq:  1.61 
+--- ncurses-6.6-20260607+/package/ncurses.map	2026-05-17 00:30:17.000000000 +0000
++++ ncurses-6.6-20260608/package/ncurses.map	2026-06-08 23:34:10.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncurses.map,v 1.61 2026/05/17 00:30:17 tom Exp $
++# $Id: ncurses.map,v 1.62 2026/06/08 23:34:10 tom Exp $
+ # script for shared library symbol-versioning using ld
+ #
+ # This file was generated by ncu-mapsyms
+@@ -1232,11 +1232,15 @@
+ 		_*;
+ } NCURSES_TINFO_6.2.20211010;
+ 
+-NCURSES_TINFO_6.6.20260516{
++NCURSES_TINFO_6.6.20251230{
++	global:
++		_nc_is_path_found;
++} NCURSES_TINFO_6.5.20240427;
++
++NCURSES_TINFO_6.6.current{
+ 	global:
+ 		_nc_cookie_allowed;
+ 		_nc_cookie_init;
+-		_nc_is_path_found;
+ 	local:
+ 		_*;
+-} NCURSES_TINFO_6.5.20240427;
++} NCURSES_TINFO_6.6.20251230;
+Index: package/ncurses.spec
+--- ncurses-6.6-20260607+/package/ncurses.spec	2026-06-07 09:10:14.000000000 +0000
++++ ncurses-6.6-20260608/package/ncurses.spec	2026-06-08 23:44:31.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: shared libraries for terminal handling
+ Name: ncurses6
+ Version: 6.6
+-Release: 20260607
++Release: 20260608
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -134,8 +134,8 @@
+ 
+ %changelog
+ 
+-* Sun Jun 07 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260607
++* Mon Jun 08 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260608
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncursest.map
+Prereq:  1.59 
+--- ncurses-6.6-20260607+/package/ncursest.map	2026-05-17 00:30:17.000000000 +0000
++++ ncurses-6.6-20260608/package/ncursest.map	2026-06-08 23:34:10.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncursest.map,v 1.59 2026/05/17 00:30:17 tom Exp $
++# $Id: ncursest.map,v 1.60 2026/06/08 23:34:10 tom Exp $
+ # script for shared library symbol-versioning using ld
+ #
+ # This file was generated by ncu-mapsyms
+@@ -509,14 +509,18 @@
+ 		tiscan_s;
+ } NCURSES_TINFO_6.2.20211010;
+ 
+-NCURSES_TINFO_6.6.20260516{
++NCURSES_TINFO_6.6.20251230{
++	global:
++		_nc_is_path_found;
++} NCURSES_TINFO_6.5.20240427;
++
++NCURSES_TINFO_6.6.current{
+ 	global:
+ 		_nc_cookie_allowed;
+ 		_nc_cookie_init;
+-		_nc_is_path_found;
+ 	local:
+ 		_*;
+-} NCURSES_TINFO_6.5.20240427;
++} NCURSES_TINFO_6.6.20251230;
+ 
+ NCURSEST_5.7.20081102 {
+ 	global:
+Index: package/ncursest.spec
+--- ncurses-6.6-20260607+/package/ncursest.spec	2026-06-07 09:10:14.000000000 +0000
++++ ncurses-6.6-20260608/package/ncursest.spec	2026-06-08 23:44:31.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: Curses library with POSIX thread support.
+ Name: ncursest6
+ Version: 6.6
+-Release: 20260607
++Release: 20260608
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ Source: ncurses-%{version}-%{release}.tgz
+@@ -142,8 +142,8 @@
+ 
+ %changelog
+ 
+-* Sun Jun 07 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260607
++* Mon Jun 08 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260608
+ 
+ * Tue Dec 24 2019 Thomas Dickey
+ - drop custom CC_NORMAL warning flags because setting CFLAGS interferes with
+Index: package/ncursestw.map
+Prereq:  1.62 
+--- ncurses-6.6-20260607+/package/ncursestw.map	2026-05-17 00:30:17.000000000 +0000
++++ ncurses-6.6-20260608/package/ncursestw.map	2026-06-08 23:34:10.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncursestw.map,v 1.62 2026/05/17 00:30:17 tom Exp $
++# $Id: ncursestw.map,v 1.63 2026/06/08 23:34:10 tom Exp $
+ # script for shared library symbol-versioning using ld
+ #
+ # This file was generated by ncu-mapsyms
+@@ -517,14 +517,18 @@
+ 		tiscan_s;
+ } NCURSES_TINFO_6.2.20211010;
+ 
+-NCURSES_TINFO_6.6.20260516{
++NCURSES_TINFO_6.6.20251230{
++	global:
++		_nc_is_path_found;
++} NCURSES_TINFO_6.5.20240427;
++
++NCURSES_TINFO_6.6.current{
+ 	global:
+ 		_nc_cookie_allowed;
+ 		_nc_cookie_init;
+-		_nc_is_path_found;
+ 	local:
+ 		_*;
+-} NCURSES_TINFO_6.5.20240427;
++} NCURSES_TINFO_6.6.20251230;
+ 
+ NCURSESTW_5.7.20081102 {
+ 	global:
+Index: package/ncursesw.map
+Prereq:  1.65 
+--- ncurses-6.6-20260607+/package/ncursesw.map	2026-05-17 00:30:17.000000000 +0000
++++ ncurses-6.6-20260608/package/ncursesw.map	2026-06-08 23:34:10.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: ncursesw.map,v 1.65 2026/05/17 00:30:17 tom Exp $
++# $Id: ncursesw.map,v 1.66 2026/06/08 23:34:10 tom Exp $
+ # script for shared library symbol-versioning using ld
+ #
+ # This file was generated by ncu-mapsyms
+@@ -511,14 +511,18 @@
+ 		tiscan_s;
+ } NCURSES_TINFO_6.2.20211010;
+ 
+-NCURSES_TINFO_6.6.20260516{
++NCURSES_TINFO_6.6.20251230{
++	global:
++		_nc_is_path_found;
++} NCURSES_TINFO_6.5.20240427;
++
++NCURSES_TINFO_6.6.current{
+ 	global:
+ 		_nc_cookie_allowed;
+ 		_nc_cookie_init;
+-		_nc_is_path_found;
+ 	local:
+ 		_*;
+-} NCURSES_TINFO_6.5.20240427;
++} NCURSES_TINFO_6.6.20251230;
+ 
+ NCURSESW_5.1.20000708 {
+ 	global:

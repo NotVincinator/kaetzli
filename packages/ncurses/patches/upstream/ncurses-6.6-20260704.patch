@@ -1,0 +1,1603 @@
+# ncurses 6.6 - patch 20260704 - Thomas E. Dickey
+#
+# ------------------------------------------------------------------------------
+#
+# Ncurses 6.6 is at
+#   https://invisible-island.net/archives/ncurses/
+#   https://invisible-mirror.net/archives/ncurses/
+#   https://ftp.gnu.org/gnu/ncurses/
+#
+# Patches for ncurses 6.6 can be found at
+#   https://invisible-island.net/archives/ncurses/6.6
+#   https://invisible-mirror.net/archives/ncurses/6.6
+#
+# ------------------------------------------------------------------------------
+# https://invisible-island.net/archives/ncurses/6.6/ncurses-6.6-20260704.patch.gz
+# patch by Thomas E. Dickey <dickey@invisible-island.net>
+# created  Sat Jul  4 21:58:35 UTC 2026
+# ------------------------------------------------------------------------------
+# NEWS                             |   16 +++++++-
+# VERSION                          |    2 -
+# dist.mk                          |    4 +-
+# doc/html/man/curs_inch.3x.html   |   52 ++++++++++++++-------------
+# doc/html/man/ncurses.3x.html     |    2 -
+# doc/html/man/terminfo.5.html     |    2 -
+# man/curs_inch.3x                 |   47 +++++++++++++-----------
+# misc/terminfo.src                |   71 +++++++++++++++++++++++++++++++++++--
+# ncurses/base/lib_insch.c         |    9 ++--
+# ncurses/base/lib_instr.c         |    6 +--
+# ncurses/base/lib_set_term.c      |    5 ++
+# ncurses/base/lib_slk.c           |    5 +-
+# ncurses/base/lib_winch.c         |   47 +++++++++++++++++++++---
+# ncurses/curses.priv.h            |    3 +
+# ncurses/tinfo/comp_parse.c       |    3 +
+# ncurses/tinfo/lib_termcap.c      |   33 ++++++++++++++---
+# ncurses/tinfo/lib_tgoto.c        |    4 +-
+# ncurses/tinfo/lib_tparm.c        |   16 +++++++-
+# ncurses/tinfo/lib_win32con.c     |    9 ++--
+# ncurses/tinfo/read_entry.c       |    6 +--
+# ncurses/tinfo/read_termcap.c     |   45 ++++++++++++++---------
+# ncurses/tinfo/write_entry.c      |   10 ++---
+# ncurses/widechar/lib_cchar.c     |    8 ++--
+# ncurses/widechar/lib_key_name.c  |    6 +--
+# ncurses/widechar/lib_vid_attr.c  |    4 +-
+# package/debian-mingw/changelog   |    4 +-
+# package/debian-mingw64/changelog |    4 +-
+# package/debian/changelog         |    4 +-
+# package/mingw-ncurses.nsi        |    4 +-
+# package/mingw-ncurses.spec       |    6 +--
+# package/ncurses.spec             |    6 +--
+# package/ncursest.spec            |    6 +--
+# progs/dump_entry.c               |    9 ++--
+# progs/reset_cmd.c                |   20 ++++++----
+# progs/tic.c                      |   46 +++++++++++++----------
+# progs/toe.c                      |    8 ++--
+# test/cardfile.c                  |    4 +-
+# test/demo_defkey.c               |    4 +-
+# test/demo_termcap.c              |    4 +-
+# test/ncurses.c                   |   23 ++++++-----
+# 40 files changed, 377 insertions(+), 190 deletions(-)
+# ------------------------------------------------------------------------------
+Index: NEWS
+Prereq:  1.4485 
+--- ncurses-6.6-20260627+/NEWS	2026-06-27 23:06:41.000000000 +0000
++++ ncurses-6.6-20260704/NEWS	2026-07-04 21:53:11.000000000 +0000
+@@ -26,7 +26,7 @@
+ -- sale, use or other dealings in this Software without prior written        --
+ -- authorization.                                                            --
+ -------------------------------------------------------------------------------
+--- $Id: NEWS,v 1.4485 2026/06/27 23:06:41 tom Exp $
++-- $Id: NEWS,v 1.4492 2026/07/04 21:53:11 tom Exp $
+ -------------------------------------------------------------------------------
+ 
+ This is a log of changes that ncurses has gone through since Zeyd started
+@@ -46,6 +46,20 @@
+ Changes through 1.9.9e did not credit all contributions;
+ it is not possible to add this information.
+ 
++20260704
++	+ add zutty -TD
++	+ modify winch() and winsch() to use wcstombs() to convert 8-bit codes
++	  to Unicode when ncurses is configured to support Unicode but is not
++	  using UTF-8 encoding (report/analysis by Serhiy Storchaka).
++	+ fixes for compiler warnings/cppcheck.
++	+ fixes for scan-build, valgrind build/testing.
++	+ fix a memory leak in _nc_resolve_uses2 (report/testcase by
++	  Yufeng Wu, Zhijie Zhang, Qizhen Xu)
++	+ add a check for escaped nul in fmt_complex (report/testcase by
++	  Yufeng Wu, Zhijie Zhang, Qizhen Xu).
++	+ add a limit-check in _nc_tgetent (report by Utku Yildirim).
++	+ add a buffer-limit check in tgetstr.
++
+ 20260627
+ 	+ add a makefile symbol for the names of the installed libraries to
+ 	  simplify parallel build of more than one configuration (patch by
+Index: VERSION
+--- ncurses-6.6-20260627+/VERSION	2026-06-27 09:25:24.000000000 +0000
++++ ncurses-6.6-20260704/VERSION	2026-07-04 09:32:27.000000000 +0000
+@@ -1 +1 @@
+-5:0:10	6.6	20260627
++5:0:10	6.6	20260704
+Index: dist.mk
+Prereq:  1.1740 
+--- ncurses-6.6-20260627+/dist.mk	2026-06-27 09:25:24.000000000 +0000
++++ ncurses-6.6-20260704/dist.mk	2026-07-04 09:32:27.000000000 +0000
+@@ -26,7 +26,7 @@
+ # use or other dealings in this Software without prior written               #
+ # authorization.                                                             #
+ ##############################################################################
+-# $Id: dist.mk,v 1.1740 2026/06/27 09:25:24 tom Exp $
++# $Id: dist.mk,v 1.1741 2026/07/04 09:32:27 tom Exp $
+ # Makefile for creating ncurses distributions.
+ #
+ # This only needs to be used directly as a makefile by developers, but
+@@ -38,7 +38,7 @@
+ # These define the major/minor/patch versions of ncurses.
+ NCURSES_MAJOR = 6
+ NCURSES_MINOR = 6
+-NCURSES_PATCH = 20260627
++NCURSES_PATCH = 20260704
+ 
+ # We don't append the patch to the version, since this only applies to releases
+ VERSION = $(NCURSES_MAJOR).$(NCURSES_MINOR)
+Index: doc/html/man/curs_inch.3x.html
+--- ncurses-6.6-20260627+/doc/html/man/curs_inch.3x.html	2025-12-30 23:23:58.000000000 +0000
++++ ncurses-6.6-20260704/doc/html/man/curs_inch.3x.html	2026-07-04 21:54:34.000000000 +0000
+@@ -1,7 +1,7 @@
+ <!--
+   * t
+   ****************************************************************************
+-  * Copyright 2018-2024,2025 Thomas E. Dickey                                *
++  * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+   * Copyright 1998-2010,2017 Free Software Foundation, Inc.                  *
+   *                                                                          *
+   * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -28,19 +28,19 @@
+   * sale, use or other dealings in this Software without prior written       *
+   * authorization.                                                           *
+   ****************************************************************************
+-  * @Id: curs_inch.3x,v 1.70 2025/02/15 19:36:03 tom Exp @
++  * @Id: curs_inch.3x,v 1.71 2026/07/04 19:34:12 tom Exp @
+ -->
+ <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+ <HTML>
+ <HEAD>
+ <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+ <meta name="generator" content="Manpage converted by man2html - see https://invisible-island.net/scripts/readme.html#others_scripts">
+-<TITLE>curs_inch 3x 2025-02-15 ncurses 6.6 Library calls</TITLE>
++<TITLE>curs_inch 3x 2026-07-04 ncurses 6.6 Library calls</TITLE>
+ <link rel="author" href="mailto:bug-ncurses@gnu.org">
+ 
+ </HEAD>
+ <BODY>
+-<H1 class="no-header">curs_inch 3x 2025-02-15 ncurses 6.6 Library calls</H1>
++<H1 class="no-header">curs_inch 3x 2026-07-04 ncurses 6.6 Library calls</H1>
+ <PRE>
+ <STRONG><A HREF="curs_inch.3x.html">curs_inch(3x)</A></STRONG>                    Library calls                   <STRONG><A HREF="curs_inch.3x.html">curs_inch(3x)</A></STRONG>
+ 
+@@ -66,12 +66,10 @@
+ 
+ 
+ </PRE><H2><a name="h2-RETURN-VALUE">RETURN VALUE</a></H2><PRE>
+-       These functions return <STRONG>OK</STRONG> on success and <STRONG>ERR</STRONG> on failure.
++       Functions prefixed with "mv" first perform cursor  movement  and  fail,
++       returning <STRONG>ERR</STRONG> if the position (<EM>y</EM>, <EM>x</EM>) is outside the window boundaries.
+ 
+-       In <EM>ncurses</EM>, they return <STRONG>ERR</STRONG> if <EM>win</EM> is <EM>NULL</EM>.
+-
+-       Functions prefixed with "mv" first perform cursor movement and fail  if
+-       the position (<EM>y</EM>, <EM>x</EM>) is outside the window boundaries.
++       If <EM>win</EM> is <EM>NULL</EM>, <EM>ncurses</EM> returns <STRONG>0</STRONG>, which is not <STRONG>OK</STRONG>.
+ 
+ 
+ </PRE><H2><a name="h2-NOTES">NOTES</a></H2><PRE>
+@@ -80,8 +78,14 @@
+        These  functions  do  not  fail  if the window contains cells of <EM>curses</EM>
+        complex characters; that is, if  they  contain  characters  with  codes
+        wider  than  eight  bits  (or  greater  than 255 as an unsigned decimal
+-       integer).  They instead extract only the low-order eight  bits  of  the
+-       character code from the cell.
++       integer).  The returned value depends upon the locale:
++
++       <STRONG>o</STRONG>   If the locale encoding is UTF-8, <EM>ncurses</EM>  extracts  only  the  low-
++           order eight bits of the character code from the cell.
++
++       <STRONG>o</STRONG>   If the locale encoding is not UTF-8, <EM>ncurses</EM> converts the character
++           from  Unicode  to  the  locale encoding, and extracts the low-order
++           eight bits from the resulting character.
+ 
+ 
+ </PRE><H2><a name="h2-PORTABILITY">PORTABILITY</a></H2><PRE>
+@@ -90,31 +94,31 @@
+ 
+ 
+ </PRE><H2><a name="h2-HISTORY">HISTORY</a></H2><PRE>
+-       The  original  <EM>curses</EM> in 4BSD (1980) defined <EM>winch</EM> as a macro accessing
+-       the <EM>WINDOW</EM> structure member representing character cell data,  at  that
+-       time  a  <EM>char</EM>,  containing  only  a  7-bit  ASCII  character code and a
++       The original <EM>curses</EM> in 4BSD (1980) defined <EM>winch</EM> as a  macro  accessing
++       the  <EM>WINDOW</EM>  structure member representing character cell data, at that
++       time a <EM>char</EM>, containing  only  a  7-bit  ASCII  character  code  and  a
+        "standout" attribute bit, the only one the library supported.
+ 
+-       SVr2 <EM>curses</EM> (1984) extended this approach, widening the character  code
+-       to  eight bits and permitting several attributes to be combined with it
+-       by storing them together in a  <EM>chtype</EM>,  an  alias  of  <EM>unsigned</EM>  <EM>short</EM>.
+-       Because  a macro was used, its value was not type-checked as a function
+-       return value could have been.  Goodheart documented SVr3  (1987)  <EM>winch</EM>
+-       as  returning  an  <EM>int</EM>.   SVr3.1's  (1987)  <EM>chtype</EM>  became  an alias of
+-       <EM>unsigned</EM> <EM>long</EM>, using 16 bits for the character code  and  widening  the
++       SVr2  <EM>curses</EM> (1984) extended this approach, widening the character code
++       to eight bits and permitting several attributes to be combined with  it
++       by  storing  them  together  in  a  <EM>chtype</EM>, an alias of <EM>unsigned</EM> <EM>short</EM>.
++       Because a macro was used, its value was not type-checked as a  function
++       return  value  could have been.  Goodheart documented SVr3 (1987) <EM>winch</EM>
++       as returning an  <EM>int</EM>.   SVr3.1's  (1987)  <EM>chtype</EM>  became  an  alias  of
++       <EM>unsigned</EM>  <EM>long</EM>,  using  16 bits for the character code and widening the
+        type in practical terms to 32 bits, as 64-bit Unix systems were not yet
+        in wide use, and fixed-width integral types would not be standard until
+-       ISO  C99.   SVr3.2 (1988) added a 6-bit color pair identifier alongside
++       ISO C99.  SVr3.2 (1988) added a 6-bit color pair  identifier  alongside
+        the attributes.
+ 
+ 
+ </PRE><H2><a name="h2-SEE-ALSO">SEE ALSO</a></H2><PRE>
+-       <STRONG><A HREF="curs_in_wch.3x.html">curs_in_wch(3x)</A></STRONG> describes comparable functions of the  <EM>ncurses</EM>  library
++       <STRONG><A HREF="curs_in_wch.3x.html">curs_in_wch(3x)</A></STRONG>  describes  comparable functions of the <EM>ncurses</EM> library
+        in its wide-character configuration (<EM>ncursesw</EM>).
+ 
+        <STRONG><A HREF="ncurses.3x.html">curses(3x)</A></STRONG>, <STRONG><A HREF="curs_instr.3x.html">curs_instr(3x)</A></STRONG>
+ 
+-ncurses 6.6                       2025-02-15                     <STRONG><A HREF="curs_inch.3x.html">curs_inch(3x)</A></STRONG>
++ncurses 6.6                       2026-07-04                     <STRONG><A HREF="curs_inch.3x.html">curs_inch(3x)</A></STRONG>
+ </PRE>
+ <div class="nav">
+ <ul>
+Index: doc/html/man/ncurses.3x.html
+--- ncurses-6.6-20260627+/doc/html/man/ncurses.3x.html	2026-04-18 23:17:14.000000000 +0000
++++ ncurses-6.6-20260704/doc/html/man/ncurses.3x.html	2026-07-04 21:54:37.000000000 +0000
+@@ -59,7 +59,7 @@
+        displays with output optimized to  minimize  screen  updates.   <EM>ncurses</EM>
+        replaces the <EM>curses</EM> libraries from System V Release 4 Unix ("SVr4") and
+        4.4BSD  Unix,  the  development  of  which  ceased  in the 1990s.  This
+-       document describes <EM>ncurses</EM> version 6.6 (patch 20260418).
++       document describes <EM>ncurses</EM> version 6.6 (patch 20260704).
+ 
+        <EM>ncurses</EM> permits control of the terminal screen's contents;  abstraction
+        and  subdivision thereof with <EM>windows</EM> and <EM>pads</EM>; acquisition of keyboard
+Index: doc/html/man/terminfo.5.html
+--- ncurses-6.6-20260627+/doc/html/man/terminfo.5.html	2026-04-18 23:17:15.000000000 +0000
++++ ncurses-6.6-20260704/doc/html/man/terminfo.5.html	2026-07-04 21:54:37.000000000 +0000
+@@ -72,7 +72,7 @@
+        have, by specifying how to perform screen operations, and by specifying
+        padding requirements and initialization sequences.
+ 
+-       This document describes <EM>ncurses</EM> version 6.6 (patch 20260418).
++       This document describes <EM>ncurses</EM> version 6.6 (patch 20260704).
+ 
+ 
+ </PRE><H3><a name="h3-terminfo-Entry-Syntax"><EM>terminfo</EM> Entry Syntax</a></H3><PRE>
+Index: man/curs_inch.3x
+Prereq:  1.70 
+--- ncurses-6.6-20260627+/man/curs_inch.3x	2025-02-15 19:36:03.000000000 +0000
++++ ncurses-6.6-20260704/man/curs_inch.3x	2026-07-04 19:34:12.000000000 +0000
+@@ -1,6 +1,6 @@
+ '\" t
+ .\"***************************************************************************
+-.\" Copyright 2018-2024,2025 Thomas E. Dickey                                *
++.\" Copyright 2018-2025,2026 Thomas E. Dickey                                *
+ .\" Copyright 1998-2010,2017 Free Software Foundation, Inc.                  *
+ .\"                                                                          *
+ .\" Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -28,8 +28,8 @@
+ .\" authorization.                                                           *
+ .\"***************************************************************************
+ .\"
+-.\" $Id: curs_inch.3x,v 1.70 2025/02/15 19:36:03 tom Exp $
+-.TH curs_inch 3X 2025-02-15 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "Library calls"
++.\" $Id: curs_inch.3x,v 1.71 2026/07/04 19:34:12 tom Exp $
++.TH curs_inch 3X 2026-07-04 "ncurses @NCURSES_MAJOR@.@NCURSES_MINOR@" "Library calls"
+ .ie \n(.g \{\
+ .ds `` \(lq
+ .ds '' \(rq
+@@ -73,26 +73,23 @@
+ .IR chtype "."
+ \fB\%ncurses\fP(3X) describes the variants of this function.
+ .SH RETURN VALUE
+-These functions return
+-.B OK
+-on success and
+-.B ERR
+-on failure.
+-.PP
+-In
+-.IR \%ncurses ","
+-they return
+-.B ERR
+-if
+-.I win
+-is
+-.IR NULL "."
+-.PP
+ Functions prefixed with \*(``mv\*('' first perform cursor movement and
+-fail if the position
++fail, returning
++.B ERR
++if the position
+ .RI ( y ,
+ .IR x )
+ is outside the window boundaries.
++.PP
++If
++.I win
++is
++.IR NULL ","
++.I \%ncurses
++returns
++.BR 0 ,
++which is not
++.BR OK .
+ .SH NOTES
+ .BR \%inch ,
+ .BR \%mvinch ,
+@@ -106,8 +103,16 @@
+ that is,
+ if they contain characters with codes wider than eight bits
+ (or greater than 255 as an unsigned decimal integer).
+-They instead extract only the low-order eight bits of the character code
+-from the cell.
++The returned value depends upon the locale:
++.bP
++If the locale encoding is UTF-8,
++.I \%ncurses
++extracts only the low-order eight bits of the character code from the cell.
++.bP
++If the locale encoding is not UTF-8,
++.I \%ncurses
++converts the character from Unicode to the locale encoding,
++and extracts the low-order eight bits from the resulting character.
+ .SH PORTABILITY
+ X/Open Curses Issue\ 4 describes these functions.
+ It specifies no error conditions for them.
+Index: misc/terminfo.src
+--- ncurses-6.6-20260627+/misc/terminfo.src	2026-06-27 20:11:18.000000000 +0000
++++ ncurses-6.6-20260704/misc/terminfo.src	2026-07-04 21:31:01.000000000 +0000
+@@ -6,8 +6,8 @@
+ # Report bugs and new terminal descriptions to
+ #	bug-ncurses@gnu.org
+ #
+-#	$Revision: 1.1256 $
+-#	$Date: 2026/06/27 20:11:18 $
++#	$Revision: 1.1257 $
++#	$Date: 2026/07/04 21:31:01 $
+ #
+ # The original header is preserved below for reference.  It is noted that there
+ # is a "newer" version which differs in some cosmetic details (but actually
+@@ -8193,6 +8193,70 @@
+ 	use=ecma+strikeout, use=xterm+tmux, use=xterm+256color,
+ 	use=xterm-basic,
+ 
++#### Zutty
++# https://git.hq.sig7.se/zutty.git
++#
++# Tested 0.16.6.20260114 with vttest and tack:
++#
++# vttest:
++# + da1 is 64;1;9;15;21;22
++#   1 = 132 columns (doesn't work)
++#   9 = NRCS (apparently not for VT520 ISO stuff)
++#   15 = DEC technical set (works)
++#   21 = horizontal scrolling
++#   22 = color
++# + da2 is 64;0;0
++#   64 = VT520
++# + does part of vt52 (doesn't clear the box on the right)
++# + implements most of the ISO-6249 cursor and misc tests, not SPA
++# + passes bce tests for ISO 6429 colors
++# + no blink
++# + no XTVERSION
++# + no mouse highlight tracking
++# + no window ops, either modify or report
++# + no title stack
++# + no DECRPM or DECRQSS
++# + no rectangles
++# + partial implementation of DECLRMM
++#
++# tack:
++# + tbc doesn't work
++# + doesn't set 256colors
++# + doesn't use colon for subparameters
++# + no 8-bit controls, even UTF-8 encoded
++# + no italics
++# + no crossed-out
++# + no cvvis
++# + no flash: no DECSCNM
++#
++# Other comments
++# + sets TERM to xterm-256color, which is a poor match.
++# + uses EGL library
++zutty|Zero-cost Unicode Teletype,
++	bce, mir, npc, xenl, AX, XT,
++	colors#8, pairs#64,
++	blink@, clear=\E[H\E[2J, cub1=^H, cud1=\n, cvvis@,
++	dch=\E[%p1%dP, dch1=\E[P, dim=\E[2m, ech=\E[%p1%dX,
++	ed=\E[J, el=\E[K, el1=\E[1K, flash@, ich=\E[%p1%d@,
++	is2=\E[!p\E[?3;4l\E[4l\E>, kcbt=\E[Z, nel=\EE,
++	op=\E[39;49m, ri=\EM, rmam=\E[?7l, rmir=\E[4l,
++	rmkx=\E[?1l\E>, rs1=\Ec, rs2=\E[!p\E[?3;4l\E[4l\E>,
++	setab=\E[4%p1%dm, setaf=\E[3%p1%dm,
++	sgr=%?%p9%t\E(0%e\E(B%;\E[0%?%p6%t;1%;%?%p5%t;2%;%?%p2%t;4%;
++	    %?%p1%p3%|%t;7%;%?%p7%t;8%;m,
++	sgr0=\E(B\E[m, smam=\E[?7h, smir=\E[4h, smkx=\E[?1h\E=,
++	tbc@, E3=\E[3J, rv=\E\\[>64;[0-9]+;[0-9]+c,
++	use=vt220+cvis, use=ansi+rep, use=xterm+pcfkeys,
++	use=bracketed+paste, use=xterm+3keys, use=ecma+index,
++	use=vt420+lrmm, use=xterm+sm+1006, use=xterm+keypad,
++	use=ecma+underline, use=ecma+standout, use=ansi+csr,
++	use=ansi+cup, use=ansi+enq, use=ansi+idl,
++	use=ansi+inittabs, use=ansi+local, use=ansi+rca2,
++	use=ansi+sgrbold, use=xterm+kbs, use=xterm+alt1049,
++	use=report+da2, use=xterm+acs, use=vt100+4bsd,
++zutty-256color|Zutty with 256 colors,
++	use=xterm+256setaf, use=zutty,
++
+ ######## WAYLAND CLIENTS
+ 
+ #### Foot
+@@ -28445,4 +28509,7 @@
+ #	+ add u6, u7, kdch1 to vp3a+ based on manual -TD
+ #	+ add u6, u7, home, cbt to adm20 based on manual -TD
+ #
++# 2026-07-04
++#	+ add zutty -TD
++#
+ ######## SHANTIH!  SHANTIH!  SHANTIH!
+Index: ncurses/base/lib_insch.c
+Prereq:  1.39 
+--- ncurses-6.6-20260627+/ncurses/base/lib_insch.c	2024-12-07 17:40:33.000000000 +0000
++++ ncurses-6.6-20260704/ncurses/base/lib_insch.c	2026-07-04 16:09:42.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2020,2024 Thomas E. Dickey                                     *
++ * Copyright 2020,2024,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2013,2016 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -44,7 +44,7 @@
+ #include <curses.priv.h>
+ #include <ctype.h>
+ 
+-MODULE_ID("$Id: lib_insch.c,v 1.39 2024/12/07 17:40:33 tom Exp $")
++MODULE_ID("$Id: lib_insch.c,v 1.40 2026/07/04 16:09:42 tom Exp $")
+ 
+ /*
+  * Insert the given character, updating the current location to simplify
+@@ -81,6 +81,7 @@
+     default:
+ 	if (
+ #if USE_WIDEC_SUPPORT
++	       _nc_unicode_locale() &&
+ 	       WINDOW_EXT(win, addch_used) == 0 &&
+ #endif
+ 	       (isprint(ch8) ||
+@@ -103,7 +104,7 @@
+ 	    }
+ 	} else if (iscntrl(ch8)) {
+ 	    NCURSES_CONST char *s;
+-	    s = NCURSES_SP_NAME(unctrl) (NCURSES_SP_ARGx (chtype) ch8);
++	    s = NCURSES_SP_NAME(unctrl)(NCURSES_SP_ARGx (chtype) ch8);
+ 	    while (*s != '\0') {
+ 		code = _nc_insert_ch(sp, win, ChAttrOf(ch) | UChar(*s));
+ 		if (code != OK)
+@@ -124,7 +125,7 @@
+ 	    } else if (count == -1) {
+ 		NCURSES_CONST char *s;
+ 		/* handle EILSEQ */
+-		s = NCURSES_SP_NAME(unctrl) (NCURSES_SP_ARGx (chtype) ch8);
++		s = NCURSES_SP_NAME(unctrl)(NCURSES_SP_ARGx (chtype) ch8);
+ 		if (strlen(s) > 1) {
+ 		    while (*s != '\0') {
+ 			code = _nc_insert_ch(sp, win,
+Index: ncurses/base/lib_instr.c
+Prereq:  1.28 
+--- ncurses-6.6-20260627+/ncurses/base/lib_instr.c	2024-12-07 17:53:39.000000000 +0000
++++ ncurses-6.6-20260704/ncurses/base/lib_instr.c	2026-07-04 13:45:15.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2020-2023,2024 Thomas E. Dickey                                *
++ * Copyright 2020-2024,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -42,7 +42,7 @@
+ 
+ #include <curses.priv.h>
+ 
+-MODULE_ID("$Id: lib_instr.c,v 1.28 2024/12/07 17:53:39 tom Exp $")
++MODULE_ID("$Id: lib_instr.c,v 1.29 2026/07/04 13:45:15 tom Exp $")
+ 
+ NCURSES_EXPORT(int)
+ winnstr(WINDOW *win, char *str, int n)
+@@ -83,7 +83,7 @@
+ 
+ 			init_mb(state);
+ 			n3 = wcstombs(NULL, wch, (size_t) 0);
+-			if (!isEILSEQ(n3) && (n3 != 0) && (n3 <= MB_LEN_MAX)) {
++			if (OkWcsToMbs(n3)) {
+ 			    size_t need = n3 + 10 + (size_t) i;
+ 			    int have = (int) n3 + i;
+ 
+Index: ncurses/base/lib_set_term.c
+Prereq:  1.205 
+--- ncurses-6.6-20260627+/ncurses/base/lib_set_term.c	2026-05-23 23:12:01.000000000 +0000
++++ ncurses-6.6-20260704/ncurses/base/lib_set_term.c	2026-07-03 16:57:04.000000000 +0000
+@@ -57,7 +57,7 @@
+ #undef CUR
+ #define CUR SP_TERMTYPE
+ 
+-MODULE_ID("$Id: lib_set_term.c,v 1.205 2026/05/23 23:12:01 tom Exp $")
++MODULE_ID("$Id: lib_set_term.c,v 1.206 2026/07/03 16:57:04 tom Exp $")
+ 
+ #if USE_TERM_DRIVER
+ #define MaxColors      InfoOf(sp).maxcolors
+@@ -210,6 +210,9 @@
+ 
+ 	FreeIfNeeded(sp->_acs_map);
+ 	FreeIfNeeded(sp->_screen_acs_map);
++#if USE_WIDEC_SUPPORT
++	FreeIfNeeded(sp->_wacs_map);
++#endif
+ 
+ 	NCURSES_SP_NAME(_nc_flush)(NCURSES_SP_ARG);
+ 	NCURSES_SP_NAME(del_curterm)(NCURSES_SP_ARGx sp->_term);
+Index: ncurses/base/lib_slk.c
+Prereq:  1.53 
+--- ncurses-6.6-20260627+/ncurses/base/lib_slk.c	2026-05-30 22:10:47.000000000 +0000
++++ ncurses-6.6-20260704/ncurses/base/lib_slk.c	2026-07-02 23:39:16.000000000 +0000
+@@ -48,7 +48,7 @@
+ #define CUR SP_TERMTYPE
+ #endif
+ 
+-MODULE_ID("$Id: lib_slk.c,v 1.53 2026/05/30 22:10:47 tom Exp $")
++MODULE_ID("$Id: lib_slk.c,v 1.54 2026/07/02 23:39:16 tom Exp $")
+ 
+ #if USE_TERM_DRIVER
+ #define NumLabels    InfoOf(SP_PARM).numlabels
+@@ -215,7 +215,8 @@
+ 
+     res = _nc_format_slks(NCURSES_SP_ARGx cols);
+ 
+-    if ((SP_PARM->_slk->win = stwin) == NULL) {
++    if ((SP_PARM->_slk == NULL)
++	|| (SP_PARM->_slk->win = stwin) == NULL) {
+ 	returnCode(slk_failed(NCURSES_SP_ARG));
+     }
+ 
+Index: ncurses/base/lib_winch.c
+Prereq:  1.10 
+--- ncurses-6.6-20260627+/ncurses/base/lib_winch.c	2024-12-07 20:03:37.000000000 +0000
++++ ncurses-6.6-20260704/ncurses/base/lib_winch.c	2026-07-04 18:59:09.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2020,2024 Thomas E. Dickey                                     *
++ * Copyright 2020-2024,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2009,2010 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -40,16 +40,51 @@
+ 
+ #include <curses.priv.h>
+ 
+-MODULE_ID("$Id: lib_winch.c,v 1.10 2024/12/07 20:03:37 tom Exp $")
++MODULE_ID("$Id: lib_winch.c,v 1.12 2026/07/04 18:59:09 tom Exp $")
+ 
+ NCURSES_EXPORT(chtype)
+ winch(WINDOW *win)
+ {
++    chtype result = 0;
++
+     T((T_CALLED("winch(%p)"), (void *) win));
+     if (win != NULL) {
+-	returnChtype((chtype) CharOf(win->_line[win->_cury].text[win->_curx])
+-		     | AttrOf(win->_line[win->_cury].text[win->_curx]));
+-    } else {
+-	returnChtype(0);
++	NCURSES_CH_T *cell = &win->_line[win->_cury].text[win->_curx];
++#if USE_WIDEC_SUPPORT
++	if (!_nc_unicode_locale()) {
++
++	    if (!isWidecExt(*cell)) {
++		attr_t attrs;
++		NCURSES_PAIRS_T pair;
++		wchar_t wch[CCHARW_MAX + 2];
++		int n2;
++
++		n2 = getcchar(cell, NULL, NULL, NULL, NULL);
++		if (n2 > 0 && n2 <= CCHARW_MAX) {
++
++		    if (getcchar(cell, wch, &attrs, &pair, NULL) == OK) {
++			mbstate_t state;
++			size_t n3;
++
++			init_mb(state);
++			n3 = wcstombs(NULL, wch, (size_t) 0);
++			if (OkWcsToMbs(n3) && n3 == 1) {
++			    char tmp[2];
++
++			    init_mb(state);
++			    n3 = wcstombs(tmp, wch, 1);
++			    if (OkWcsToMbs(n3)) {
++				result = tmp[0];
++			    }
++			}
++		    }
++		}
++	    }
++	} else
++#endif
++	{
++	    result = ((chtype) CharOf(*cell) | AttrOf(*cell));
++	}
+     }
++    returnChtype(result);
+ }
+Index: ncurses/curses.priv.h
+Prereq:  1.755 
+--- ncurses-6.6-20260627+/ncurses/curses.priv.h	2026-05-30 21:02:18.000000000 +0000
++++ ncurses-6.6-20260704/ncurses/curses.priv.h	2026-07-04 13:08:19.000000000 +0000
+@@ -35,7 +35,7 @@
+  ****************************************************************************/
+ 
+ /*
+- * $Id: curses.priv.h,v 1.755 2026/05/30 21:02:18 tom Exp $
++ * $Id: curses.priv.h,v 1.756 2026/07/04 13:08:19 tom Exp $
+  *
+  *	curses.priv.h
+  *
+@@ -1441,6 +1441,7 @@
+ #if USE_WIDEC_SUPPORT /* { */
+ /* true if the status/errno indicate an illegal multibyte sequence */
+ #define isEILSEQ(status) (((size_t)status == (size_t)-1) && (errno == EILSEQ))
++#define OkWcsToMbs(rc)   (!isEILSEQ(rc) && (rc != 0) && (rc <= MB_LEN_MAX))
+ 
+ #define init_mb(state)	memset(&(state), 0, sizeof(state))
+ 
+Index: ncurses/tinfo/comp_parse.c
+Prereq:  1.143 
+--- ncurses-6.6-20260627+/ncurses/tinfo/comp_parse.c	2026-03-07 11:42:23.000000000 +0000
++++ ncurses-6.6-20260704/ncurses/tinfo/comp_parse.c	2026-07-03 13:21:38.000000000 +0000
+@@ -48,7 +48,7 @@
+ 
+ #include <tic.h>
+ 
+-MODULE_ID("$Id: comp_parse.c,v 1.143 2026/03/07 11:42:23 tom Exp $")
++MODULE_ID("$Id: comp_parse.c,v 1.144 2026/07/03 13:21:38 tom Exp $")
+ 
+ static void sanity_check2(TERMTYPE2 *, bool);
+ NCURSES_IMPEXP void (NCURSES_API *_nc_check_termtype2) (TERMTYPE2 *, bool) = sanity_check2;
+@@ -520,6 +520,7 @@
+ 
+ 		_nc_curr_line = (int) lookline;
+ 		_nc_warning("resolution of use=%s failed", lookfor);
++		FreeIfNeeded(qp->uses[i].name);
+ 		qp->uses[i].link = NULL;
+ 	    }
+ 	}
+Index: ncurses/tinfo/lib_termcap.c
+Prereq:  1.98 
+--- ncurses-6.6-20260627+/ncurses/tinfo/lib_termcap.c	2026-06-20 13:13:01.000000000 +0000
++++ ncurses-6.6-20260704/ncurses/tinfo/lib_termcap.c	2026-07-03 22:59:11.000000000 +0000
+@@ -49,7 +49,7 @@
+ #define CUR SP_TERMTYPE
+ #endif
+ 
+-MODULE_ID("$Id: lib_termcap.c,v 1.98 2026/06/20 13:13:01 tom Exp $")
++MODULE_ID("$Id: lib_termcap.c,v 1.100 2026/07/03 22:59:11 tom Exp $")
+ 
+ NCURSES_EXPORT_VAR(char *) UP = NULL;
+ NCURSES_EXPORT_VAR(char *) BC = NULL;
+@@ -354,6 +354,17 @@
+ NCURSES_EXPORT(char *)
+ NCURSES_SP_NAME(tgetstr)(NCURSES_SP_DCLx const char *id, char **area)
+ {
++    /*
++     * The original termcap interface copies the resulting strings to the
++     * caller-supplied area.  But "modern" terminfo entries can have a total
++     * string size past the termcap 1023-byte limit.  This workaround will
++     * help with legacy termcap applications (which typically read all of
++     * the strings into the provided area), by keeping track of the usage.
++     * It will not help if the caller manipulates the area pointer.
++     */
++    static char *last_area;
++    static size_t area_limit = 0;
++
+     char *result = NULL;
+ 
+     T((T_CALLED("tgetstr(%s,%p)"), id, (void *) area));
+@@ -383,16 +394,26 @@
+ 	    TR(TRACE_DATABASE, ("found match %d: %s", j, _nc_visbuf(result)));
+ 	    /* setupterm forces canceled strings to null */
+ 	    if (VALID_STRING(result)) {
++		size_t result_size;
+ 		if (result == exit_attribute_mode
+ 		    && FIX_SGR0 != NULL) {
+ 		    result = FIX_SGR0;
+ 		    TR(TRACE_DATABASE, ("altered to : %s", _nc_visbuf(result)));
+ 		}
+-		if (area != NULL
+-		    && *area != NULL) {
+-		    _nc_STRCPY(*area, result, 1024);
+-		    result = *area;
+-		    *area += strlen(*area) + 1;
++		result_size = strlen(result) + 1;
++		if (area != NULL && *area != NULL) {
++		    if (*area != last_area) {
++			area_limit = 0;
++		    }
++		    if ((result_size + area_limit) < MAX_TERMCAP_LENGTH) {
++			_nc_STRCPY(*area, result, MAX_TERMCAP_LENGTH + 1);
++			result = *area;
++			*area += result_size;
++			last_area = *area;
++			area_limit += result_size;
++			TR(TRACE_DATABASE, ("updated area size to : %ld",
++					    (long) area_limit));
++		    }
+ 		}
+ 	    }
+ 	}
+Index: ncurses/tinfo/lib_tgoto.c
+Prereq:  1.24 
+--- ncurses-6.6-20260627+/ncurses/tinfo/lib_tgoto.c	2025-01-12 00:41:56.000000000 +0000
++++ ncurses-6.6-20260704/ncurses/tinfo/lib_tgoto.c	2026-07-03 00:10:11.000000000 +0000
+@@ -36,7 +36,7 @@
+ #include <ctype.h>
+ #include <termcap.h>
+ 
+-MODULE_ID("$Id: lib_tgoto.c,v 1.24 2025/01/12 00:41:56 tom Exp $")
++MODULE_ID("$Id: lib_tgoto.c,v 1.25 2026/07/03 00:10:11 tom Exp $")
+ 
+ #if !PURE_TERMINFO
+ static bool
+@@ -182,7 +182,7 @@
+ 	string++;
+     }
+     if (result != NULL) {
+-	if (need_BC) {
++	if (need_BC && BC != NULL) {
+ 	    _nc_STRCPY(result + used, BC, length - used);
+ 	    used += strlen(BC);
+ 	}
+Index: ncurses/tinfo/lib_tparm.c
+Prereq:  1.157 
+--- ncurses-6.6-20260627+/ncurses/tinfo/lib_tparm.c	2025-02-15 15:20:16.000000000 +0000
++++ ncurses-6.6-20260704/ncurses/tinfo/lib_tparm.c	2026-07-02 23:38:56.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2024,2025 Thomas E. Dickey                                *
++ * Copyright 2018-2025,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -53,7 +53,7 @@
+ #include <ctype.h>
+ #include <tic.h>
+ 
+-MODULE_ID("$Id: lib_tparm.c,v 1.157 2025/02/15 15:20:16 tom Exp $")
++MODULE_ID("$Id: lib_tparm.c,v 1.158 2026/07/02 23:38:56 tom Exp $")
+ 
+ /*
+  *	char *
+@@ -593,6 +593,14 @@
+ }
+ 
+ /*
++ * Workaround for false positive with tsearch.
++ */
++#if HAVE_TSEARCH
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
++#endif
++
++/*
+  * Analyze the capability string, finding the number of parameters and their
+  * types.
+  *
+@@ -678,6 +686,10 @@
+     return rc;
+ }
+ 
++#if HAVE_TSEARCH
++#pragma GCC diagnostic pop
++#endif
++
+ /*
+  * A few caps (such as plab_norm) have string-valued parms.  We'll have to
+  * assume that the caller knows the difference, since a char* and an int may
+Index: ncurses/tinfo/lib_win32con.c
+Prereq:  1.52 
+--- ncurses-6.6-20260627+/ncurses/tinfo/lib_win32con.c	2026-05-30 20:48:17.000000000 +0000
++++ ncurses-6.6-20260704/ncurses/tinfo/lib_win32con.c	2026-07-03 23:09:14.000000000 +0000
+@@ -39,12 +39,13 @@
+ #define TTY int			/* FIXME: TTY originalMode */
+ #include <curses.priv.h>
+ #include <nc_win32.h>
++#include <tic.h>
+ 
+ #ifndef _O_BINARY
+ #define _O_BINARY 0		/* FIXME: not defined in MSYS2 base */
+ #endif
+ 
+-MODULE_ID("$Id: lib_win32con.c,v 1.52 2026/05/30 20:48:17 tom Exp $")
++MODULE_ID("$Id: lib_win32con.c,v 1.53 2026/07/03 23:09:14 tom Exp $")
+ 
+ #if defined(_NC_WINDOWS)
+ 
+@@ -1134,9 +1135,9 @@
+ 	START_TRACE();
+ 	WINCONSOLE.isTermInfoConsole = assumeTermInfo;
+ 
+-	WINCONSOLE.map = (LPDWORD) malloc(sizeof(DWORD) * MAPSIZE);
+-	WINCONSOLE.rmap = (LPDWORD) malloc(sizeof(DWORD) * MAPSIZE);
+-	WINCONSOLE.ansi_map = (LPDWORD) malloc(sizeof(DWORD) * MAPSIZE);
++	TYPE_MALLOC(DWORD, MAPSIZE, WINCONSOLE.map);
++	TYPE_MALLOC(DWORD, MAPSIZE, WINCONSOLE.rmap);
++	TYPE_MALLOC(DWORD, MAPSIZE, WINCONSOLE.ansi_map);
+ 
+ 	for (i = 0; i < (N_INI + FKEYS); i++) {
+ 	    if (i < N_INI) {
+Index: ncurses/tinfo/read_entry.c
+Prereq:  1.177 
+--- ncurses-6.6-20260627+/ncurses/tinfo/read_entry.c	2026-06-06 09:59:40.000000000 +0000
++++ ncurses-6.6-20260704/ncurses/tinfo/read_entry.c	2026-07-03 23:31:35.000000000 +0000
+@@ -42,7 +42,7 @@
+ 
+ #include <tic.h>
+ 
+-MODULE_ID("$Id: read_entry.c,v 1.177 2026/06/06 09:59:40 tom Exp $")
++MODULE_ID("$Id: read_entry.c,v 1.178 2026/07/03 23:31:35 tom Exp $")
+ 
+ #define MyNumber(n) (short) LOW_MSB(n)
+ 
+@@ -802,7 +802,7 @@
+ 
+ 	memset(&key, 0, sizeof(key));
+ 	key.data = save;
+-	key.size = strlen(save);
++	key.size = (unsigned) strlen(save);
+ 
+ 	/*
+ 	 * This lookup could return termcap data, which we do not want.  We are
+@@ -845,7 +845,7 @@
+ 	     * Prepare for the second level.
+ 	     */
+ 	    key.data = have;
+-	    key.size = used;
++	    key.size = (unsigned) used;
+ 	}
+ 
+ 	free(save);
+Index: ncurses/tinfo/read_termcap.c
+Prereq:  1.108 
+--- ncurses-6.6-20260627+/ncurses/tinfo/read_termcap.c	2026-03-06 09:06:26.000000000 +0000
++++ ncurses-6.6-20260704/ncurses/tinfo/read_termcap.c	2026-07-03 23:40:36.000000000 +0000
+@@ -57,7 +57,7 @@
+ #include <sys/types.h>
+ #include <tic.h>
+ 
+-MODULE_ID("$Id: read_termcap.c,v 1.108 2026/03/06 09:06:26 tom Exp $")
++MODULE_ID("$Id: read_termcap.c,v 1.111 2026/07/03 23:40:36 tom Exp $")
+ 
+ #if !PURE_TERMINFO
+ 
+@@ -150,14 +150,14 @@
+ static int
+ _nc_cgetset(const char *ent)
+ {
+-    if (ent == 0) {
++    if (ent == NULL) {
+ 	FreeIfNeeded(toprec);
+-	toprec = 0;
++	toprec = NULL;
+ 	topreclen = 0;
+ 	return (0);
+     }
+     topreclen = strlen(ent);
+-    if ((toprec = typeMalloc(char, topreclen + 1)) == 0) {
++    if ((toprec = typeMalloc(char, topreclen + 1)) == NULL) {
+ 	errno = ENOMEM;
+ 	return (-1);
+     }
+@@ -193,7 +193,7 @@
+ 	 */
+ 	for (;;) {
+ 	    if (*bp == '\0')
+-		return (0);
++		return (NULL);
+ 	    else if (*bp++ == ':')
+ 		break;
+ 	}
+@@ -206,7 +206,7 @@
+ 	if (*cp != '\0')
+ 	    continue;
+ 	if (*bp == '@')
+-	    return (0);
++	    return (NULL);
+ 	if (type == ':') {
+ 	    if (*bp != '\0' && *bp != ':')
+ 		continue;
+@@ -215,7 +215,7 @@
+ 	if (*bp != type)
+ 	    continue;
+ 	bp++;
+-	return (*bp == '@' ? 0 : bp);
++	return (*bp == '@' ? NULL : bp);
+     }
+     /* NOTREACHED */
+ }
+@@ -239,7 +239,7 @@
+ {
+     unsigned dummy;
+ 
+-    return (_nc_getent(buf, &dummy, oline, 0, db_array, -1, name, 0, 0));
++    return (_nc_getent(buf, &dummy, oline, 0, db_array, -1, name, 0, NULL));
+ }
+ 
+ /*
+@@ -290,7 +290,7 @@
+     /*
+      * Check if we have a top record from cgetset().
+      */
+-    if (depth == 0 && toprec != 0 && _nc_cgetmatch(toprec, name) == 0) {
++    if (depth == 0 && toprec != NULL && _nc_cgetmatch(toprec, name) == 0) {
+ 	if ((record = DOALLOC(topreclen + BFRAG)) == NULL) {
+ 	    errno = ENOMEM;
+ 	    return (TC_SYS_ERR);
+@@ -437,7 +437,7 @@
+ 		     * See if this is the record we want ...
+ 		     */
+ 		    if (_nc_cgetmatch(record, name) == 0
+-			&& (nfield == 0
++			&& (nfield == NULL
+ 			    || !_nc_nfcmp(nfield, record))) {
+ 			foundit = TRUE;
+ 			*beginning = first;
+@@ -496,9 +496,9 @@
+ 	    tclen = (int) (s - tcstart);
+ 	    tcend = s;
+ 
+-	    icap = 0;
++	    icap = NULL;
+ 	    iret = _nc_getent(&icap, &ilen, &oline, current, db_array, fd,
+-			      tc, depth + 1, 0);
++			      tc, depth + 1, NULL);
+ 	    newicap = icap;	/* Put into a register. */
+ 	    newilen = (int) ilen;
+ 	    if (iret != TC_SUCCESS) {
+@@ -609,6 +609,9 @@
+     register const char *np;
+     register char *bp;
+ 
++    if (*name == '\0' || *buf == '\0')
++	return -1;
++
+     /*
+      * Start search at beginning of record.
+      */
+@@ -622,9 +625,9 @@
+ 	    if (*np == '\0') {
+ 		if (*bp == '|' || *bp == ':' || *bp == '\0')
+ 		    return (0);
+-		else
+-		    break;
++		break;
+ 	    } else if (*bp++ != *np++) {
++		bp--;		/* a '|' or ':' may have stopped the match */
+ 		break;
+ 	    }
+ 	}
+@@ -632,7 +635,6 @@
+ 	/*
+ 	 * Match failed, skip to next name in record.
+ 	 */
+-	bp--;			/* a '|' or ':' may have stopped the match */
+ 	for (;;) {
+ 	    if (*bp == '\0' || *bp == ':')
+ 		return (-1);	/* match failed totally */
+@@ -708,7 +710,8 @@
+ 
+ #define	PBUFSIZ		512	/* max length of filename path */
+ #define	PVECSIZ		32	/* max number of names in path */
+-#define TBUFSIZ (2048*2)
++#define	MAX_TOKENS	MAX_TERMCAP_LENGTH
++#define	TBUFSIZ		(MAX_TOKENS*4)
+ 
+ /*
+  * On entry, srcp points to a non ':' character which is the beginning of the
+@@ -852,7 +855,7 @@
+     }
+     *fname = NULL;		/* mark end of vector */
+ #if !HAVE_BSD_CGETENT
+-    (void) _nc_cgetset(0);
++    (void) _nc_cgetset(NULL);
+ #endif
+     if (_nc_is_abs_path(cp)) {
+ 	if (_nc_cgetset(cp) < 0) {
+@@ -870,7 +873,7 @@
+     if (i >= 0) {
+ 	char *pd, *ps, *tok;
+ 	int endflag = FALSE;
+-	char *list[1023];
++	char *list[MAX_TOKENS];
+ 	size_t n, count = 0;
+ 
+ 	pd = bp;
+@@ -878,6 +881,10 @@
+ 	while (!endflag && (tok = get_tc_token(&ps, &endflag)) != NULL) {
+ 	    bool ignore = FALSE;
+ 
++	    /*
++	     * termcap capability names are two characters.  scan the list
++	     * of capabilities to ignore repeats/redefinitions.
++	     */
+ 	    for (n = 1; n < count; n++) {
+ 		char *s = list[n];
+ 		if (s[0] == tok[0]
+@@ -887,6 +894,8 @@
+ 		}
+ 	    }
+ 	    if (ignore != TRUE) {
++		if (count >= MAX_TOKENS)
++		    break;
+ 		list[count++] = tok;
+ 		pd = copy_tc_token(pd, tok, (size_t) (TBUFSIZ - (2 + pd - bp)));
+ 		if (pd == NULL) {
+Index: ncurses/tinfo/write_entry.c
+Prereq:  1.147 
+--- ncurses-6.6-20260627+/ncurses/tinfo/write_entry.c	2026-06-06 09:59:40.000000000 +0000
++++ ncurses-6.6-20260704/ncurses/tinfo/write_entry.c	2026-07-03 23:35:04.000000000 +0000
+@@ -42,7 +42,7 @@
+ 
+ #include <tic.h>
+ 
+-MODULE_ID("$Id: write_entry.c,v 1.147 2026/06/06 09:59:40 tom Exp $")
++MODULE_ID("$Id: write_entry.c,v 1.148 2026/07/03 23:35:04 tom Exp $")
+ 
+ #if 1
+ #define TRACE_OUT(p) DEBUG(2, p)
+@@ -385,7 +385,7 @@
+ 
+ 	    memset(&key, 0, sizeof(key));
+ 	    key.data = term_names;
+-	    key.size = name_size;
++	    key.size = (unsigned) name_size;
+ 
+ 	    memset(&data, 0, sizeof(data));
+ 	    data.data = buffer;
+@@ -396,12 +396,12 @@
+ 	    buffer[0] = 2;
+ 
+ 	    key.data = name_list;
+-	    key.size = strlen(name_list);
++	    key.size = (unsigned) strlen(name_list);
+ 
+ 	    _nc_STRCPY(buffer + 1,
+ 		       term_names,
+ 		       sizeof(buffer) - 1);
+-	    data.size = name_size + 1;
++	    data.size = (unsigned) name_size + 1;
+ 
+ 	    total_size += (int) data.size;
+ 	    total_parts++;
+@@ -417,7 +417,7 @@
+ 		    *(other_names++) = '\0';
+ 
+ 		key.data = ptr;
+-		key.size = strlen(ptr);
++		key.size = (unsigned) strlen(ptr);
+ 
+ 		total_size += (int) data.size;
+ 		total_parts++;
+Index: ncurses/widechar/lib_cchar.c
+Prereq:  1.40 
+--- ncurses-6.6-20260627+/ncurses/widechar/lib_cchar.c	2024-12-07 18:07:52.000000000 +0000
++++ ncurses-6.6-20260704/ncurses/widechar/lib_cchar.c	2026-07-04 19:42:46.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2019-2022,2024 Thomas E. Dickey                                *
++ * Copyright 2019-2024,2026 Thomas E. Dickey                                *
+  * Copyright 2001-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -37,7 +37,7 @@
+ #include <curses.priv.h>
+ #include <wchar.h>
+ 
+-MODULE_ID("$Id: lib_cchar.c,v 1.40 2024/12/07 18:07:52 tom Exp $")
++MODULE_ID("$Id: lib_cchar.c,v 1.41 2026/07/04 19:42:46 tom Exp $")
+ 
+ /*
+  * The SuSv2 description leaves some room for interpretation.  We'll assume wch
+@@ -106,8 +106,8 @@
+ {
+     int code = ERR;
+ 
+-    TR(TRACE_CCALLS, (T_CALLED("getcchar(%p,%p,%p,%p,%p)"),
+-		      (const void *) wcval,
++    TR(TRACE_CCALLS, (T_CALLED("getcchar(%s,%p,%p,%p,%p)"),
++		      _tracecchar_t(wcval),
+ 		      (void *) wch,
+ 		      (void *) attrs,
+ 		      (void *) pair_arg,
+Index: ncurses/widechar/lib_key_name.c
+Prereq:  1.7 
+--- ncurses-6.6-20260627+/ncurses/widechar/lib_key_name.c	2024-07-27 19:23:59.000000000 +0000
++++ ncurses-6.6-20260704/ncurses/widechar/lib_key_name.c	2026-07-04 13:44:26.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2020-2023,2024 Thomas E. Dickey                                *
++ * Copyright 2020-2024,2026 Thomas E. Dickey                                *
+  * Copyright 2007-2008,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -36,7 +36,7 @@
+ 
+ #include <curses.priv.h>
+ 
+-MODULE_ID("$Id: lib_key_name.c,v 1.7 2024/07/27 19:23:59 tom Exp $")
++MODULE_ID("$Id: lib_key_name.c,v 1.8 2026/07/04 13:44:26 tom Exp $")
+ 
+ #define MyData _nc_globals.key_name
+ 
+@@ -59,7 +59,7 @@
+      * character string.
+      */
+     len = wcstombs(MyData, my_wchars, sizeof(MyData) - 1);
+-    if (!isEILSEQ(len) && (len != 0) && (len <= MB_LEN_MAX)) {
++    if (OkWcsToMbs(len)) {
+ 	MyData[len] = '\0';
+ 	result = MyData;
+     }
+Index: ncurses/widechar/lib_vid_attr.c
+Prereq:  1.33 
+--- ncurses-6.6-20260627+/ncurses/widechar/lib_vid_attr.c	2026-05-16 22:53:53.000000000 +0000
++++ ncurses-6.6-20260704/ncurses/widechar/lib_vid_attr.c	2026-07-02 21:07:56.000000000 +0000
+@@ -37,7 +37,7 @@
+ #define CUR SP_TERMTYPE
+ #endif
+ 
+-MODULE_ID("$Id: lib_vid_attr.c,v 1.33 2026/05/16 22:53:53 tom Exp $")
++MODULE_ID("$Id: lib_vid_attr.c,v 1.34 2026/07/02 21:07:56 tom Exp $")
+ 
+ #define doPut(mode) \
+ 	TPUTS_TRACE(#mode); \
+@@ -111,7 +111,7 @@
+ 		     _traceattr(previous_attr), previous_pair));
+ 
+ #if !USE_XMC_SUPPORT
+-    if ((SP_PARM != 0) && SP_PARM->cookie_active)
++    if ((SP_PARM != NULL) && SP_PARM->cookie_active)
+ 	newmode &= ~(SP_PARM->_xmc_suppress);
+ #endif
+ 
+Index: package/debian-mingw/changelog
+--- ncurses-6.6-20260627+/package/debian-mingw/changelog	2026-06-27 09:25:24.000000000 +0000
++++ ncurses-6.6-20260704/package/debian-mingw/changelog	2026-07-01 19:43:02.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260627) unstable; urgency=low
++ncurses6td (6.6+20260704) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 27 Jun 2026 05:25:24 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Wed, 01 Jul 2026 15:43:02 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian-mingw64/changelog
+--- ncurses-6.6-20260627+/package/debian-mingw64/changelog	2026-06-27 09:25:24.000000000 +0000
++++ ncurses-6.6-20260704/package/debian-mingw64/changelog	2026-07-01 19:43:02.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260627) unstable; urgency=low
++ncurses6td (6.6+20260704) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 27 Jun 2026 05:25:24 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Wed, 01 Jul 2026 15:43:02 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian/changelog
+--- ncurses-6.6-20260627+/package/debian/changelog	2026-06-27 09:25:24.000000000 +0000
++++ ncurses-6.6-20260704/package/debian/changelog	2026-07-01 19:43:02.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20260627) unstable; urgency=low
++ncurses6td (6.6+20260704) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 27 Jun 2026 05:25:24 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Wed, 01 Jul 2026 15:43:02 -0400
+ 
+ ncurses6 (5.9+20120608) unstable; urgency=low
+ 
+Index: package/mingw-ncurses.nsi
+Prereq:  1.770 
+--- ncurses-6.6-20260627+/package/mingw-ncurses.nsi	2026-06-27 09:25:24.000000000 +0000
++++ ncurses-6.6-20260704/package/mingw-ncurses.nsi	2026-07-01 19:43:02.000000000 +0000
+@@ -1,4 +1,4 @@
+-; $Id: mingw-ncurses.nsi,v 1.770 2026/06/27 09:25:24 tom Exp $
++; $Id: mingw-ncurses.nsi,v 1.771 2026/07/01 19:43:02 tom Exp $
+ 
+ ; TODO add examples
+ ; TODO bump ABI to 6
+@@ -10,7 +10,7 @@
+ !define VERSION_MAJOR "6"
+ !define VERSION_MINOR "6"
+ !define VERSION_YYYY  "2026"
+-!define VERSION_MMDD  "0627"
++!define VERSION_MMDD  "0704"
+ !define VERSION_PATCH ${VERSION_YYYY}${VERSION_MMDD}
+ 
+ !define MY_ABI   "5"
+Index: package/mingw-ncurses.spec
+--- ncurses-6.6-20260627+/package/mingw-ncurses.spec	2026-06-27 09:25:24.000000000 +0000
++++ ncurses-6.6-20260704/package/mingw-ncurses.spec	2026-07-04 09:32:27.000000000 +0000
+@@ -3,7 +3,7 @@
+ Summary: shared libraries for terminal handling
+ Name: mingw32-ncurses6
+ Version: 6.6
+-Release: 20260627
++Release: 20260704
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -144,8 +144,8 @@
+ 
+ %changelog
+ 
+-* Sat Jun 27 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260627
++* Sat Jul 04 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260704
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncurses.spec
+--- ncurses-6.6-20260627+/package/ncurses.spec	2026-06-27 09:25:24.000000000 +0000
++++ ncurses-6.6-20260704/package/ncurses.spec	2026-07-04 09:32:27.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: shared libraries for terminal handling
+ Name: ncurses6
+ Version: 6.6
+-Release: 20260627
++Release: 20260704
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -134,8 +134,8 @@
+ 
+ %changelog
+ 
+-* Sat Jun 27 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260627
++* Sat Jul 04 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260704
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncursest.spec
+--- ncurses-6.6-20260627+/package/ncursest.spec	2026-06-27 09:25:24.000000000 +0000
++++ ncurses-6.6-20260704/package/ncursest.spec	2026-07-04 09:32:27.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: Curses library with POSIX thread support.
+ Name: ncursest6
+ Version: 6.6
+-Release: 20260627
++Release: 20260704
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ Source: ncurses-%{version}-%{release}.tgz
+@@ -142,8 +142,8 @@
+ 
+ %changelog
+ 
+-* Sat Jun 27 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20260627
++* Sat Jul 04 2026 Thomas E. Dickey
++- testing ncurses 6.6-20260704
+ 
+ * Tue Dec 24 2019 Thomas Dickey
+ - drop custom CC_NORMAL warning flags because setting CFLAGS interferes with
+Index: progs/dump_entry.c
+Prereq:  1.203 
+--- ncurses-6.6-20260627+/progs/dump_entry.c	2026-06-20 16:50:30.000000000 +0000
++++ ncurses-6.6-20260704/progs/dump_entry.c	2026-07-03 12:45:20.000000000 +0000
+@@ -40,7 +40,7 @@
+ #include <termsort.h>		/* this C file is generated */
+ #include <parametrized.h>	/* so is this */
+ 
+-MODULE_ID("$Id: dump_entry.c,v 1.203 2026/06/20 16:50:30 tom Exp $")
++MODULE_ID("$Id: dump_entry.c,v 1.205 2026/07/03 12:45:20 tom Exp $")
+ 
+ #define DISCARD(string) string = ABSENT_STRING
+ #define PRINTF (void) printf
+@@ -775,8 +775,8 @@
+     return result;
+ }
+ 
+-static char *
+-fmt_complex(TERMTYPE2 *tterm, const char *capability, char *src, int level)
++static const char *
++fmt_complex(TERMTYPE2 *tterm, const char *capability, const char *src, int level)
+ {
+     bool percent = FALSE;
+     bool params = has_params(src, TRUE);
+@@ -869,7 +869,8 @@
+ 	    percent = FALSE;
+ 	    break;
+ 	}
+-	strncpy_DYN(&tmpbuf, src++, (size_t) 1);
++	if (*src)
++	    strncpy_DYN(&tmpbuf, src++, (size_t) 1);
+     }
+     return src;
+ }
+Index: progs/reset_cmd.c
+Prereq:  1.42 
+--- ncurses-6.6-20260627+/progs/reset_cmd.c	2025-11-22 21:38:31.000000000 +0000
++++ ncurses-6.6-20260704/progs/reset_cmd.c	2026-07-03 16:00:36.000000000 +0000
+@@ -53,7 +53,7 @@
+ #include <sys/ptem.h>
+ #endif
+ 
+-MODULE_ID("$Id: reset_cmd.c,v 1.42 2025/11/22 21:38:31 tom Exp $")
++MODULE_ID("$Id: reset_cmd.c,v 1.43 2026/07/03 16:00:36 tom Exp $")
+ 
+ /*
+  * SCO defines TIOCGSIZE and the corresponding struct.  Other systems (SunOS,
+@@ -105,16 +105,20 @@
+     bool sent = FALSE;
+ 
+     if (file != NULL) {
+-	if ((fp = safe_fopen(file, "r")) == NULL)
++	if ((fp = safe_fopen(file, "r")) == NULL) {
+ 	    failed(file);
+-
+-	while ((nr = fread(buf, sizeof(char), sizeof(buf), fp)) != 0) {
+-	    if (fwrite(buf, sizeof(char), nr, my_file) != nr) {
+-		failed(file);
++	} else {
++	    while (!feof(fp)
++		   && !ferror(fp)
++		   && (nr = fread(buf, sizeof(char), sizeof(buf), fp)) != 0) {
++		if (fwrite(buf, sizeof(char), nr, my_file) != nr
++		    || ferror(my_file)) {
++		    failed(file);
++		}
++		sent = TRUE;
+ 	    }
+-	    sent = TRUE;
++	    fclose(fp);
+ 	}
+-	fclose(fp);
+     }
+     return sent;
+ }
+Index: progs/tic.c
+Prereq:  1.346 
+--- ncurses-6.6-20260627+/progs/tic.c	2026-06-20 16:26:52.000000000 +0000
++++ ncurses-6.6-20260704/progs/tic.c	2026-07-03 23:10:48.000000000 +0000
+@@ -49,7 +49,7 @@
+ #include <parametrized.h>
+ #include <transform.h>
+ 
+-MODULE_ID("$Id: tic.c,v 1.346 2026/06/20 16:26:52 tom Exp $")
++MODULE_ID("$Id: tic.c,v 1.348 2026/07/03 23:10:48 tom Exp $")
+ 
+ #define STDIN_NAME "<stdin>"
+ 
+@@ -2649,15 +2649,18 @@
+ 		    num == 8,
+ 		    num == 9);
+     if (test != NULL) {
+-	if (PRESENT(cap)) {
+-	    if (!similar_sgr(num, test, cap)) {
+-		_nc_warning("%s differs from sgr(%d)\n\t%s=%s\n\tsgr(%d)=%s",
+-			    name, num,
+-			    name, _nc_visbuf2(1, cap),
+-			    num, _nc_visbuf2(2, test));
++	test = strdup(test);	/* make a copy since tparm may reallocate */
++	if (test != NULL) {
++	    if (PRESENT(cap)) {
++		if (!similar_sgr(num, test, cap)) {
++		    _nc_warning("%s differs from sgr(%d)\n\t%s=%s\n\tsgr(%d)=%s",
++				name, num,
++				name, _nc_visbuf2(1, cap),
++				num, _nc_visbuf2(2, test));
++		}
++	    } else if (_nc_capcmp(test, zero)) {
++		_nc_warning("sgr(%d) present, but not %s", num, name);
+ 	    }
+-	} else if (_nc_capcmp(test, zero)) {
+-	    _nc_warning("sgr(%d) present, but not %s", num, name);
+ 	}
+     } else if (PRESENT(cap)) {
+ 	_nc_warning("sgr(%d) missing, but %s present", num, name);
+@@ -3279,10 +3282,11 @@
+     ANDMISSING(clear_all_tabs, set_tab);
+ 
+     if (PRESENT(set_attributes)) {
+-	const char *zero = NULL;
++	char *zero = NULL;
++	bool freeze;
+ 
+ 	_nc_tparm_err = 0;
+-	if (PRESENT(exit_attribute_mode)) {
++	if ((freeze = PRESENT(exit_attribute_mode))) {
+ 	    zero = CHECK_SGR(0, exit_attribute_mode);
+ 	} else {
+ 	    zero = TIPARM_9(set_attributes, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+@@ -3290,15 +3294,17 @@
+ 	check_tparm_err(0);
+ 
+ 	if (zero != NULL) {
+-	    CHECK_SGR(1, enter_standout_mode);
+-	    CHECK_SGR(2, enter_underline_mode);
+-	    CHECK_SGR(3, enter_reverse_mode);
+-	    CHECK_SGR(4, enter_blink_mode);
+-	    CHECK_SGR(5, enter_dim_mode);
+-	    CHECK_SGR(6, enter_bold_mode);
+-	    CHECK_SGR(7, enter_secure_mode);
+-	    CHECK_SGR(8, enter_protected_mode);
+-	    CHECK_SGR(9, enter_alt_charset_mode);
++	    free(CHECK_SGR(1, enter_standout_mode));
++	    free(CHECK_SGR(2, enter_underline_mode));
++	    free(CHECK_SGR(3, enter_reverse_mode));
++	    free(CHECK_SGR(4, enter_blink_mode));
++	    free(CHECK_SGR(5, enter_dim_mode));
++	    free(CHECK_SGR(6, enter_bold_mode));
++	    free(CHECK_SGR(7, enter_secure_mode));
++	    free(CHECK_SGR(8, enter_protected_mode));
++	    free(CHECK_SGR(9, enter_alt_charset_mode));
++	    if (freeze)
++		free(zero);
+ 	} else {
+ 	    _nc_warning("sgr(0) did not return a value");
+ 	}
+Index: progs/toe.c
+Prereq:  1.96 
+--- ncurses-6.6-20260627+/progs/toe.c	2026-06-06 09:59:40.000000000 +0000
++++ ncurses-6.6-20260704/progs/toe.c	2026-07-02 20:53:27.000000000 +0000
+@@ -43,7 +43,7 @@
+ #include <hashed_db.h>
+ #endif
+ 
+-MODULE_ID("$Id: toe.c,v 1.96 2026/06/06 09:59:40 tom Exp $")
++MODULE_ID("$Id: toe.c,v 1.97 2026/07/02 20:53:27 tom Exp $")
+ 
+ #define isDotname(name) (!strcmp(name, ".") || !strcmp(name, ".."))
+ 
+@@ -564,8 +564,8 @@
+ 	    if (verbosity)
+ 		(void) printf("#\n#%s:\n#\n", eargv[i]);
+ 
+-	    if ((fp = safe_fopen(eargv[i], "r")) != 0) {
+-		while (fgets(buffer, sizeof(buffer), fp) != 0) {
++	    if ((fp = safe_fopen(eargv[i], "r")) != NULL) {
++		while (fgets(buffer, sizeof(buffer), fp) != NULL) {
+ 		    if (!is_termcap(buffer))
+ 			break;
+ 		    if (*buffer == '#')
+@@ -744,7 +744,7 @@
+ 		++count;
+ 	    }
+ 	    if (!pass) {
+-		eargv = allocArgv(count);
++		eargv = allocArgv(count + 1);
+ 		if (eargv == NULL)
+ 		    failed("eargv");
+ 	    } else {
+Index: test/cardfile.c
+Prereq:  1.56 
+--- ncurses-6.6-20260627+/test/cardfile.c	2026-04-25 10:35:16.000000000 +0000
++++ ncurses-6.6-20260704/test/cardfile.c	2026-07-02 20:42:59.000000000 +0000
+@@ -30,7 +30,7 @@
+ /*
+  * Author: Thomas E. Dickey
+  *
+- * $Id: cardfile.c,v 1.56 2026/04/25 10:35:16 tom Exp $
++ * $Id: cardfile.c,v 1.57 2026/07/02 20:42:59 tom Exp $
+  *
+  * File format: text beginning in column 1 is a title; other text is content.
+  */
+@@ -80,7 +80,7 @@
+ static const char *
+ skip(const char *buffer)
+ {
+-    while (isspace(UChar(*buffer)))
++    while (*buffer != '\0' && isspace(UChar(*buffer)))
+ 	buffer++;
+     return buffer;
+ }
+Index: test/demo_defkey.c
+Prereq:  1.39 
+--- ncurses-6.6-20260627+/test/demo_defkey.c	2026-06-06 09:59:40.000000000 +0000
++++ ncurses-6.6-20260704/test/demo_defkey.c	2026-07-03 15:28:36.000000000 +0000
+@@ -27,7 +27,7 @@
+  * authorization.                                                           *
+  ****************************************************************************/
+ /*
+- * $Id: demo_defkey.c,v 1.39 2026/06/06 09:59:40 tom Exp $
++ * $Id: demo_defkey.c,v 1.40 2026/07/03 15:28:36 tom Exp $
+  *
+  * Demonstrate the define_key() function.
+  * Thomas Dickey - 2002/11/23
+@@ -172,7 +172,7 @@
+     }
+     if (vis_string != NULL)
+ 	free(vis_string);
+-    if (old_string != NULL)
++    if (old_string != NULL && old_string != CANCELLED_STRING)
+ 	free(old_string);
+ }
+ 
+Index: test/demo_termcap.c
+Prereq:  1.76 
+--- ncurses-6.6-20260627+/test/demo_termcap.c	2026-01-11 12:03:22.000000000 +0000
++++ ncurses-6.6-20260704/test/demo_termcap.c	2026-07-01 21:04:16.000000000 +0000
+@@ -30,7 +30,7 @@
+ /*
+  * Author: Thomas E. Dickey
+  *
+- * $Id: demo_termcap.c,v 1.76 2026/01/11 12:03:22 tom Exp $
++ * $Id: demo_termcap.c,v 1.77 2026/07/01 21:04:16 tom Exp $
+  *
+  * A simple demo of the termcap interface.
+  */
+@@ -258,7 +258,7 @@
+      * for each call; a normal termcap application would try to use the buffer
+      * to hold all of the strings extracted from the terminal entry.
+      */
+-    char area[1024], *ap = area;
++    static char area[1024], *ap = area;
+     NCURSES_CONST char *str;
+     int num;
+ 
+Index: test/ncurses.c
+Prereq:  1.555 
+--- ncurses-6.6-20260627+/test/ncurses.c	2026-06-06 09:59:40.000000000 +0000
++++ ncurses-6.6-20260704/test/ncurses.c	2026-07-03 16:23:46.000000000 +0000
+@@ -41,7 +41,7 @@
+    Author: Eric S. Raymond <esr@snark.thyrsus.com> 1993
+            Thomas E. Dickey (beginning revision 1.27 in 1996).
+ 
+-$Id: ncurses.c,v 1.555 2026/06/06 09:59:40 tom Exp $
++$Id: ncurses.c,v 1.557 2026/07/03 16:23:46 tom Exp $
+ 
+ ***************************************************************************/
+ 
+@@ -467,14 +467,17 @@
+ 	default:
+ 	    if (fkey) {
+ 		beep();
+-	    } else if ((int) wcslen(buffer) < limit) {
+-		int j;
+-		for (j = (int) wcslen(buffer) + 1; j > x; --j) {
+-		    buffer[j] = buffer[j - 1];
+-		}
+-		buffer[x++] = (wchar_t) ch;
+ 	    } else {
+-		beep();
++		int have = (int) wcslen(buffer);
++		if (have < limit) {
++		    int j;
++		    for (j = have + 1; j > x; --j) {
++			buffer[j] = buffer[j - 1];
++		    }
++		    buffer[x++] = (wchar_t) ch;
++		} else {
++		    beep();
++		}
+ 	    }
+ 	}
+     }
+@@ -3525,7 +3528,7 @@
+ 	case '7':
+ 	case '8':
+ 	    MvAddStr(SLK_WORK, 0, "Please enter the label value: ");
+-	    *buf = 0;
++	    buf[0] = L'\0';
+ 	    if ((s = slk_label(c - '0')) != NULL) {
+ 		char *temp = strdup(s);
+ 		size_t used = strlen(s);
+@@ -3533,8 +3536,6 @@
+ #ifndef state_unused
+ 		mbstate_t state;
+ #endif
+-
+-		buf[0] = L'\0';
+ 		if (temp != NULL) {
+ 		    while (want > 0 && used != 0) {
+ 			size_t test;

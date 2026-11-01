@@ -1,0 +1,849 @@
+# ncurses 6.6 - patch 20261024 - Thomas E. Dickey
+#
+# ------------------------------------------------------------------------------
+#
+# Ncurses 6.6 is at
+#   https://invisible-island.net/archives/ncurses/
+#   https://invisible-mirror.net/archives/ncurses/
+#   https://ftp.gnu.org/gnu/ncurses/
+#
+# Patches for ncurses 6.6 can be found at
+#   https://invisible-island.net/archives/ncurses/6.6
+#   https://invisible-mirror.net/archives/ncurses/6.6
+#
+# ------------------------------------------------------------------------------
+# https://invisible-island.net/archives/ncurses/6.6/ncurses-6.6-20261024.patch.gz
+# patch by Thomas E. Dickey <dickey@invisible-island.net>
+# created  Sat Oct 24 23:06:20 UTC 2026
+# ------------------------------------------------------------------------------
+# MANIFEST                         |    1 
+# NEWS                             |   18 ++++++++
+# VERSION                          |    2 
+# dist.mk                          |    4 -
+# ncurses/base/lib_newwin.c        |   56 ++++++++++++++++++---------
+# ncurses/base/lib_set_term.c      |   48 +++++++++++++----------
+# ncurses/base/new_pair.c          |    4 -
+# ncurses/curses.priv.h            |    6 --
+# ncurses/modules                  |    7 ---
+# ncurses/new_pair.h               |    6 +-
+# ncurses/tinfo/comp_scan.c        |   52 ++++++++++++++-----------
+# ncurses/tinfo/lib_win32con.c     |   76 ++++++++++++++++++++++++++++++++++++-
+# ncurses/tinfo/tinfo_driver.c     |    4 -
+# ncurses/widechar/lib_ins_wch.c   |    6 +-
+# ncurses/win32con/win32_driver.c  |    4 -
+# package/debian-mingw/changelog   |    4 -
+# package/debian-mingw64/changelog |    4 -
+# package/debian/changelog         |    4 -
+# package/mingw-ncurses.nsi        |    4 -
+# package/mingw-ncurses.spec       |    6 +-
+# package/ncurses.spec             |    6 +-
+# package/ncursest.spec            |    6 +-
+# 22 files changed, 223 insertions(+), 105 deletions(-)
+# ------------------------------------------------------------------------------
+# Please remove the following file before applying this patch.
+# (You can feed this patch to 'sh' to do so.)
+
+rm -f ncurses/tinfo/lib_win32util.c
+exit
+
+Index: MANIFEST
+--- ncurses-6.6-20261017+/MANIFEST	2026-05-16 23:25:16.000000000 +0000
++++ ncurses-6.6-20261024/MANIFEST	2026-10-24 15:44:08.000000000 +0000
+@@ -950,7 +950,6 @@
+ ./ncurses/tinfo/lib_tputs.c
+ ./ncurses/tinfo/lib_ttyflags.c
+ ./ncurses/tinfo/lib_win32con.c
+-./ncurses/tinfo/lib_win32util.c
+ ./ncurses/tinfo/make_hash.c
+ ./ncurses/tinfo/make_keys.c
+ ./ncurses/tinfo/name_match.c
+Index: NEWS
+Prereq:  1.4547 
+--- ncurses-6.6-20261017+/NEWS	2026-10-17 21:32:08.000000000 +0000
++++ ncurses-6.6-20261024/NEWS	2026-10-24 20:44:36.000000000 +0000
+@@ -26,7 +26,7 @@
+ -- sale, use or other dealings in this Software without prior written        --
+ -- authorization.                                                            --
+ -------------------------------------------------------------------------------
+--- $Id: NEWS,v 1.4547 2026/10/17 21:32:08 tom Exp $
++-- $Id: NEWS,v 1.4555 2026/10/24 20:44:36 tom Exp $
+ -------------------------------------------------------------------------------
+ 
+ This is a log of changes that ncurses has gone through since Zeyd started
+@@ -46,6 +46,22 @@
+ Changes through 1.9.9e did not credit all contributions;
+ it is not possible to add this information.
+ 
++20261024
++	+ modify initialization for term-driver return terminfo data when given
++	  a name in $TERM unless _nc_console_vt_supported() returns true, as in
++	  the missing-name branch (patch by Daniel Aliev).
++	+ correct initialization of fallback entries which using term-driver
++	  configuration (patch by Daniel Aliev).
++	+ correct limit check in lib_ins_wch.c (patch by Serhiy Storchaka,
++	  cf: 20260815)
++	+ initialize sp->_wacs_map for each screen, rather than reusing data,
++	  to help with delscreen (patch by Serhiy Storchaka, cf: 20260523).
++	+ improve ripoff window cleanup in delwin (report by Serhiy Storchaka).
++	+ fix a duplicate declaration of _nc_gettimeofday() (report by Abril
++	  Rincon Blanco).
++	+ improve check for end of file in next_char() (report by Lingfeng
++	  Chen).
++
+ 20261017
+ 	+ improve configure script check for linker search path, avoiding cache
+ 	  rebuild on BSD systems (report by Showta Ishizaki).
+Index: VERSION
+--- ncurses-6.6-20261017+/VERSION	2026-10-17 09:10:05.000000000 +0000
++++ ncurses-6.6-20261024/VERSION	2026-10-24 09:29:08.000000000 +0000
+@@ -1 +1 @@
+-5:0:10	6.6	20261017
++5:0:10	6.6	20261024
+Index: dist.mk
+Prereq:  1.1756 
+--- ncurses-6.6-20261017+/dist.mk	2026-10-17 09:10:05.000000000 +0000
++++ ncurses-6.6-20261024/dist.mk	2026-10-24 09:29:08.000000000 +0000
+@@ -26,7 +26,7 @@
+ # use or other dealings in this Software without prior written               #
+ # authorization.                                                             #
+ ##############################################################################
+-# $Id: dist.mk,v 1.1756 2026/10/17 09:10:05 tom Exp $
++# $Id: dist.mk,v 1.1757 2026/10/24 09:29:08 tom Exp $
+ # Makefile for creating ncurses distributions.
+ #
+ # This only needs to be used directly as a makefile by developers, but
+@@ -38,7 +38,7 @@
+ # These define the major/minor/patch versions of ncurses.
+ NCURSES_MAJOR = 6
+ NCURSES_MINOR = 6
+-NCURSES_PATCH = 20261017
++NCURSES_PATCH = 20261024
+ 
+ # We don't append the patch to the version, since this only applies to releases
+ VERSION = $(NCURSES_MAJOR).$(NCURSES_MINOR)
+Index: ncurses/base/lib_newwin.c
+Prereq:  1.79 
+--- ncurses-6.6-20261017+/ncurses/base/lib_newwin.c	2024-12-14 23:50:18.000000000 +0000
++++ ncurses-6.6-20261024/ncurses/base/lib_newwin.c	2026-10-24 21:21:20.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2020-2021,2024 Thomas E. Dickey                                *
++ * Copyright 2020-2024,2026 Thomas E. Dickey                                *
+  * Copyright 1998-2016,2017 Free Software Foundation, Inc.                  *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -44,7 +44,7 @@
+ #include <curses.priv.h>
+ #include <stddef.h>
+ 
+-MODULE_ID("$Id: lib_newwin.c,v 1.79 2024/12/14 23:50:18 tom Exp $")
++MODULE_ID("$Id: lib_newwin.c,v 1.81 2026/10/24 21:21:20 tom Exp $")
+ 
+ #define window_is(name) ((sp)->_##name == win)
+ 
+@@ -89,6 +89,27 @@
+ #endif
+ }
+ 
++static void
++remove_window_from_ripoff(WINDOW *win)
++{
++#ifdef USE_SP_WINDOWLIST
++    SCREEN *sp;
++    if ((sp = _nc_screen_of(win)) != NULL) {
++	if (safe_ripoff_sp && safe_ripoff_sp != safe_ripoff_stack) {
++	    ripoff_t *rop;
++	    for (rop = safe_ripoff_stack;
++		 rop != safe_ripoff_sp && (rop - safe_ripoff_stack) < N_RIPS;
++		 rop++) {
++		if (win == rop->win)
++		    rop->win = NULL;
++	    }
++	} else {
++	    safe_ripoff_stack->win = NULL;
++	}
++    }
++#endif
++}
++
+ NCURSES_EXPORT(int)
+ _nc_freewin(WINDOW *win)
+ {
+@@ -109,6 +130,7 @@
+ 
+ 		if (&(p->win) == win) {
+ 		    remove_window_from_screen(win);
++		    remove_window_from_ripoff(win);
+ 		    if (q == NULL)
+ 			WindowList(sp) = p->next;
+ 		    else
+@@ -136,8 +158,8 @@
+ }
+ 
+ NCURSES_EXPORT(WINDOW *)
+-NCURSES_SP_NAME(newwin) (NCURSES_SP_DCLx
+-			 int num_lines, int num_columns, int begy, int begx)
++NCURSES_SP_NAME(newwin)(NCURSES_SP_DCLx
++			int num_lines, int num_columns, int begy, int begx)
+ {
+     WINDOW *win;
+     NCURSES_CH_T *ptr;
+@@ -158,8 +180,8 @@
+     if (num_columns == 0)
+ 	num_columns = screen_columns(SP_PARM) - begx;
+ 
+-    win = NCURSES_SP_NAME(_nc_makenew) (NCURSES_SP_ARGx
+-					num_lines, num_columns, begy, begx, 0);
++    win = NCURSES_SP_NAME(_nc_makenew)(NCURSES_SP_ARGx
++				       num_lines, num_columns, begy, begx, 0);
+     if (win == NULL)
+ 	returnWin(NULL);
+ 
+@@ -184,8 +206,8 @@
+ {
+     WINDOW *win;
+     _nc_sp_lock_global(curses);
+-    win = NCURSES_SP_NAME(newwin) (CURRENT_SCREEN,
+-				   num_lines, num_columns, begy, begx);
++    win = NCURSES_SP_NAME(newwin)(CURRENT_SCREEN,
++				  num_lines, num_columns, begy, begx);
+     _nc_sp_unlock_global(curses);
+     return (win);
+ }
+@@ -225,9 +247,9 @@
+     if (IS_PAD(orig))
+ 	flags |= _ISPAD;
+ 
+-    win = NCURSES_SP_NAME(_nc_makenew) (NCURSES_SP_ARGx num_lines, num_columns,
+-					orig->_begy + begy,
+-					orig->_begx + begx, flags);
++    win = NCURSES_SP_NAME(_nc_makenew)(NCURSES_SP_ARGx num_lines, num_columns,
++				       orig->_begy + begy,
++				       orig->_begx + begx, flags);
+     if (win == NULL)
+ 	returnWin(NULL);
+ 
+@@ -259,12 +281,12 @@
+ }
+ 
+ NCURSES_EXPORT(WINDOW *)
+-NCURSES_SP_NAME(_nc_makenew) (NCURSES_SP_DCLx
+-			      int num_lines,
+-			      int num_columns,
+-			      int begy,
+-			      int begx,
+-			      int flags)
++NCURSES_SP_NAME(_nc_makenew)(NCURSES_SP_DCLx
++			     int num_lines,
++			     int num_columns,
++			     int begy,
++			     int begx,
++			     int flags)
+ {
+     int i;
+     WINDOWLIST *wp;
+Index: ncurses/base/lib_set_term.c
+Prereq:  1.207 
+--- ncurses-6.6-20261017+/ncurses/base/lib_set_term.c	2026-08-08 23:42:56.000000000 +0000
++++ ncurses-6.6-20261024/ncurses/base/lib_set_term.c	2026-10-24 21:23:22.000000000 +0000
+@@ -57,7 +57,7 @@
+ #undef CUR
+ #define CUR SP_TERMTYPE
+ 
+-MODULE_ID("$Id: lib_set_term.c,v 1.207 2026/08/08 23:42:56 tom Exp $")
++MODULE_ID("$Id: lib_set_term.c,v 1.210 2026/10/24 21:23:22 tom Exp $")
+ 
+ #if USE_TERM_DRIVER
+ #define MaxColors      InfoOf(sp).maxcolors
+@@ -89,8 +89,8 @@
+ 	stdscr = StdScreen(newSP);
+ 	COLORS = newSP->_color_count;
+ 	COLOR_PAIRS = newSP->_pair_count;
+-	SetWacsMap(newSP->_wacs_map);
+ #endif
++	SetWacsMap(newSP->_wacs_map);
+     } else {
+ 	TINFO_SET_CURTERM(oldSP, NULL);
+ #if !USE_REENTRANT
+@@ -140,13 +140,31 @@
+     return result;
+ }
+ 
++static void
++delwin_ripoffs(SCREEN *sp, WINDOW *win)
++{
++    if (win != NULL && sp != NULL) {
++	if (safe_ripoff_sp && safe_ripoff_sp != safe_ripoff_stack) {
++	    ripoff_t *rop;
++	    for (rop = safe_ripoff_stack;
++		 rop != safe_ripoff_sp && (rop - safe_ripoff_stack) < N_RIPS;
++		 rop++) {
++		if (rop->win == win) {
++		    (void) delwin(rop->win);
++		    rop->win = NULL;
++		    break;
++		}
++	    }
++	}
++    }
++}
++
+ /*
+  * Free the storage associated with the given SCREEN sp.
+  */
+ NCURSES_EXPORT(void)
+ delscreen(SCREEN *sp)
+ {
+-
+     T((T_CALLED("delscreen(%p)"), (void *) sp));
+ 
+     _nc_lock_global(curses);
+@@ -154,24 +172,12 @@
+ 	WINDOWLIST *wl;
+ 	bool is_current = (sp == CURRENT_SCREEN);
+ 
+-#ifdef USE_SP_RIPOFF
+-	if (safe_ripoff_sp && safe_ripoff_sp != safe_ripoff_stack) {
+-	    ripoff_t *rop;
+-	    for (rop = safe_ripoff_stack;
+-		 rop != safe_ripoff_sp && (rop - safe_ripoff_stack) < N_RIPS;
+-		 rop++) {
+-		if (rop->win) {
+-		    (void) delwin(rop->win);
+-		    rop->win = NULL;
+-		}
+-	    }
+-	}
+-#endif
+-
+ 	/* delete all of the windows in this screen */
+       rescan:
+ 	for (each_window(sp, wl)) {
+-	    if (_nc_freewin(&(wl->win)) == OK) {
++	    WINDOW *win = &(wl->win);
++	    delwin_ripoffs(sp, win);
++	    if (_nc_freewin(win) == OK) {
+ 		goto rescan;
+ 	    }
+ 	}
+@@ -242,8 +248,8 @@
+ 	    stdscr = NULL;
+ 	    COLORS = 0;
+ 	    COLOR_PAIRS = 0;
+-	    SetWacsMap(NULL);
+ #endif
++	    SetWacsMap(NULL);
+ 	    _nc_set_screen(NULL);
+ #if USE_WIDEC_SUPPORT && !USE_REENTRANT
+ 	    if (SP == NULL) {
+@@ -559,10 +565,10 @@
+     NCURSES_SP_NAME(_nc_init_acs)(NCURSES_SP_ARG);
+ #if USE_WIDEC_SUPPORT
+     sp->_screen_unicode = _nc_unicode_locale();
+-    if (_nc_wacs == NULL) {
++    if (sp->_wacs_map == NULL) {
+ 	_nc_init_wacs(sp);
+     }
+-    if (_nc_wacs == NULL) {
++    if (sp->_wacs_map == NULL) {
+ 	ReturnScreenError();
+     }
+ 
+Index: ncurses/base/new_pair.c
+Prereq:  1.28 
+--- ncurses-6.6-20261017+/ncurses/base/new_pair.c	2026-05-30 22:10:47.000000000 +0000
++++ ncurses-6.6-20261024/ncurses/base/new_pair.c	2026-10-24 19:22:49.000000000 +0000
+@@ -61,7 +61,7 @@
+ 
+ #endif
+ 
+-MODULE_ID("$Id: new_pair.c,v 1.28 2026/05/30 22:10:47 tom Exp $")
++MODULE_ID("$Id: new_pair.c,v 1.29 2026/10/24 19:22:49 tom Exp $")
+ 
+ #if NCURSES_EXT_COLORS
+ 
+@@ -374,7 +374,7 @@
+ 
+ #if NO_LEAKS
+ NCURSES_EXPORT(void)
+-_nc_new_pair_leaks(SCREEN *sp)
++_nc_new_pair_leaks(const SCREEN *sp)
+ {
+     if (sp->_color_pairs) {
+ 	while (sp->_color_pairs[0].next) {
+Index: ncurses/curses.priv.h
+Prereq:  1.762 
+--- ncurses-6.6-20261017+/ncurses/curses.priv.h	2026-10-17 14:32:36.000000000 +0000
++++ ncurses-6.6-20261024/ncurses/curses.priv.h	2026-10-24 21:58:03.000000000 +0000
+@@ -35,7 +35,7 @@
+  ****************************************************************************/
+ 
+ /*
+- * $Id: curses.priv.h,v 1.762 2026/10/17 14:32:36 tom Exp $
++ * $Id: curses.priv.h,v 1.763 2026/10/24 21:58:03 tom Exp $
+  *
+  *	curses.priv.h
+  *
+@@ -2629,10 +2629,6 @@
+ extern NCURSES_EXPORT(int)  _nc_console_twait(const SCREEN *sp, HANDLE hdl,int mode,int msec,int *left EVENTLIST_2nd(_nc_eventlist * evl));
+ extern NCURSES_EXPORT(int)  _nc_console_vt_supported(void);
+ 
+-#ifdef _NC_CHECK_MINTTY
+-extern NCURSES_EXPORT(int)    _nc_console_checkmintty(int fd, LPHANDLE pMinTTY);
+-#endif
+-
+ #elif defined(_NC_WINDOWS_NATIVE)
+ 
+ #else
+Index: ncurses/modules
+Prereq:  1.138 
+--- ncurses-6.6-20261017+/ncurses/modules	2026-05-18 08:09:38.000000000 +0000
++++ ncurses-6.6-20261024/ncurses/modules	2026-10-24 15:44:01.000000000 +0000
+@@ -1,4 +1,4 @@
+-# $Id: modules,v 1.138 2026/05/18 08:09:38 tom Exp $
++# $Id: modules,v 1.140 2026/10/24 15:44:01 tom Exp $
+ ##############################################################################
+ # Copyright 2019-2025,2026 Thomas E. Dickey                                  #
+ # Copyright 1998-2013,2017 Free Software Foundation, Inc.                    #
+@@ -240,7 +240,6 @@
+ # MSYS2, using termios
+ @ port_msys2
+ gettimeofday	lib		$(win32con)	$(HEADER_DEPS)
+-lib_win32util	lib		$(tinfo)	$(HEADER_DEPS)
+ wcwidth		lib		$(win32con)	$(HEADER_DEPS)
+ widechars	lib		$(wide)		$(HEADER_DEPS)
+ 
+@@ -248,7 +247,6 @@
+ @ port_win32con
+ gettimeofday	lib		$(win32con)	$(HEADER_DEPS)
+ lib_win32con	lib		$(tinfo)	$(HEADER_DEPS)
+-lib_win32util	lib		$(tinfo)	$(HEADER_DEPS)
+ wcwidth		lib		$(win32con)	$(HEADER_DEPS)
+ widechars	lib		$(wide)		$(HEADER_DEPS)
+ win32_driver	lib		$(win32con)	$(HEADER_DEPS)
+@@ -257,14 +255,13 @@
+ @ port_win32
+ gettimeofday	lib		$(win32con)	$(HEADER_DEPS)
+ lib_win32con	lib		$(tinfo)	$(HEADER_DEPS)
+-lib_win32util	lib		$(tinfo)	$(HEADER_DEPS)
+ wcwidth		lib		$(win32con)	$(HEADER_DEPS)
+ win32_driver	lib		$(win32con)	$(HEADER_DEPS)
+ 
+ # MinGW-W64 or Windows native, using ConPTY
+ @ port_win32_conpty
++gettimeofday	lib		$(win32con)	$(HEADER_DEPS)
+ lib_win32conpty	lib		$(tinfo)	$(HEADER_DEPS)
+-lib_win32util	lib		$(tinfo)	$(HEADER_DEPS)
+ 
+ @ port_tinfo
+ tinfo_driver	lib		$(tinfo)	$(HEADER_DEPS)	$(INCDIR)/tic.h
+Index: ncurses/new_pair.h
+Prereq:  1.16 
+--- ncurses-6.6-20261017+/ncurses/new_pair.h	2024-12-07 17:27:35.000000000 +0000
++++ ncurses-6.6-20261024/ncurses/new_pair.h	2026-10-24 19:25:20.000000000 +0000
+@@ -1,5 +1,5 @@
+ /****************************************************************************
+- * Copyright 2018-2021,2024 Thomas E. Dickey                                *
++ * Copyright 2018-2024,2026 Thomas E. Dickey                                *
+  * Copyright 2017 Free Software Foundation, Inc.                            *
+  *                                                                          *
+  * Permission is hereby granted, free of charge, to any person obtaining a  *
+@@ -34,7 +34,7 @@
+ /*
+  * Common type definitions and macros for new_pair.c, lib_color.c
+  *
+- * $Id: new_pair.h,v 1.16 2024/12/07 17:27:35 tom Exp $
++ * $Id: new_pair.h,v 1.17 2026/10/24 19:25:20 tom Exp $
+  */
+ 
+ #ifndef NEW_PAIR_H
+@@ -131,7 +131,7 @@
+ #endif /* NEW_PAIR_INTERNAL */
+ 
+ #if NO_LEAKS
+-extern NCURSES_EXPORT(void)     _nc_new_pair_leaks(SCREEN*);
++extern NCURSES_EXPORT(void)     _nc_new_pair_leaks(const SCREEN*);
+ #endif
+ 
+ /* *INDENT-ON* */
+Index: ncurses/tinfo/comp_scan.c
+Prereq:  1.127 
+--- ncurses-6.6-20261017+/ncurses/tinfo/comp_scan.c	2026-06-06 09:59:40.000000000 +0000
++++ ncurses-6.6-20261024/ncurses/tinfo/comp_scan.c	2026-10-24 13:04:59.000000000 +0000
+@@ -51,7 +51,7 @@
+ #include <ctype.h>
+ #include <tic.h>
+ 
+-MODULE_ID("$Id: comp_scan.c,v 1.127 2026/06/06 09:59:40 tom Exp $")
++MODULE_ID("$Id: comp_scan.c,v 1.128 2026/10/24 13:04:59 tom Exp $")
+ 
+ /*
+  * Maximum length of string capability we'll accept before raising an error.
+@@ -232,8 +232,10 @@
+ 		if (used + (LEXBUFSIZ / 4) >= allocated) {
+ 		    allocated += (allocated + LEXBUFSIZ);
+ 		    result = typeRealloc(char, allocated, result);
+-		    if (result == NULL)
++		    if (result == NULL) {
++			allocated = 0;
+ 			return (EOF);
++		    }
+ 		    if (bufstart)
+ 			bufstart = result;
+ 		}
+@@ -255,31 +257,37 @@
+ 			_nc_STRCAT(result, "\n", allocated);
+ 		}
+ 		if ((bufptr = bufstart) != NULL) {
+-		    used = strlen(bufptr);
+-		    if (used == 0)
+-			return (EOF);
+-		    while (iswhite(*bufptr)) {
+-			if (*bufptr == '\t') {
+-			    _nc_curr_col = (_nc_curr_col | 7) + 1;
+-			} else {
+-			    _nc_curr_col++;
++		    if ((used = strlen(bufptr)) != 0) {
++			while (iswhite(*bufptr)) {
++			    if (*bufptr == '\t') {
++				_nc_curr_col = (_nc_curr_col | 7) + 1;
++			    } else {
++				_nc_curr_col++;
++			    }
++			    bufptr++;
+ 			}
+-			bufptr++;
+-		    }
+ 
+-		    /*
+-		     * Treat a trailing <cr><lf> the same as a <newline> so we
+-		     * can read files on OS/2, etc.
+-		     */
+-		    if ((len = strlen(bufptr)) > 1) {
+-			if (bufptr[len - 1] == '\n'
+-			    && bufptr[len - 2] == '\r') {
+-			    len--;
+-			    bufptr[len - 1] = '\n';
+-			    bufptr[len] = '\0';
++			/*
++			 * Treat a trailing <cr><lf> the same as a <newline> so
++			 * we can read files on OS/2, etc.
++			 */
++			if ((len = strlen(bufptr)) > 1) {
++			    if (bufptr[len - 1] == '\n'
++				&& bufptr[len - 2] == '\r') {
++				len--;
++				bufptr[len - 1] = '\n';
++				bufptr[len] = '\0';
++			    }
+ 			}
++		    } else {
++			len = 0;	/* force EOF return */
+ 		    }
+ 		} else {
++		    len = 0;	/* force EOF return */
++		}
++		if (len == 0) {
++		    FreeAndNull(result);
++		    allocated = 0;
+ 		    return (EOF);
+ 		}
+ 	    } while (bufptr[len - 1] != '\n');	/* complete a line */
+Index: ncurses/tinfo/lib_win32con.c
+Prereq:  1.53 
+--- ncurses-6.6-20261017+/ncurses/tinfo/lib_win32con.c	2026-07-03 23:09:14.000000000 +0000
++++ ncurses-6.6-20261024/ncurses/tinfo/lib_win32con.c	2026-10-24 15:43:36.000000000 +0000
+@@ -45,10 +45,15 @@
+ #define _O_BINARY 0		/* FIXME: not defined in MSYS2 base */
+ #endif
+ 
+-MODULE_ID("$Id: lib_win32con.c,v 1.53 2026/07/03 23:09:14 tom Exp $")
++MODULE_ID("$Id: lib_win32con.c,v 1.54 2026/10/24 15:43:36 tom Exp $")
+ 
+ #if defined(_NC_WINDOWS)
+ 
++#if defined(_NC_CHECK_MINTTY)
++#define PSAPI_VERSION 2
++#include <psapi.h>
++#endif
++
+ #define CONTROL_PRESSED (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED)
+ 
+ static bool read_screen_data(void);
+@@ -1082,6 +1087,75 @@
+ }
+ 
+ #if USE_TERM_DRIVER && (USE_NAMED_PIPES || defined(USE_WIN32CON_DRIVER))
++
++#ifdef _NC_CHECK_MINTTY
++/*   This function tests, whether or not the ncurses application
++     is running as a descendant of MSYS2/cygwin mintty terminal
++     application. mintty doesn't use Windows Console for its screen
++     I/O, so the native Windows _isatty doesn't recognize it as
++     character device. But we can discover we are at the end of an
++     Pipe and can query the server side of the pipe, looking whether
++     or not this is mintty.
++     For now we terminate the program if we discover that situation.
++     Although in theory it would be possible, to remotely manipulate
++     the terminal state of mintty, this is out of scope for now and
++     not worth the significant effort.
++ */
++static int
++_nc_console_checkmintty(int fd, LPHANDLE pMinTTY)
++{
++    HANDLE handle = _nc_console_handle(fd);
++    DWORD dw;
++    int code = 0;
++
++    T((T_CALLED("lib_winhelper::_nc_console_checkmintty(%d, %p)"), fd, pMinTTY));
++
++    if (handle != INVALID_HANDLE_VALUE) {
++	dw = GetFileType(handle);
++	if (dw == FILE_TYPE_PIPE) {
++	    if (GetNamedPipeInfo(handle, 0, 0, 0, 0)) {
++		ULONG pPid;
++		/* Requires NT6 */
++		if (GetNamedPipeServerProcessId(handle, &pPid)) {
++		    TCHAR buf[MAX_PATH];
++		    DWORD len = 0;
++		    /* These security attributes may allow us to
++		       create a remote thread in mintty to manipulate
++		       the terminal state remotely */
++		    HANDLE pHandle = OpenProcess(PROCESS_CREATE_THREAD
++						 | PROCESS_QUERY_INFORMATION
++						 | PROCESS_VM_OPERATION
++						 | PROCESS_VM_WRITE
++						 | PROCESS_VM_READ,
++						 FALSE,
++						 pPid);
++		    if (pMinTTY)
++			*pMinTTY = INVALID_HANDLE_VALUE;
++		    if (pHandle != INVALID_HANDLE_VALUE) {
++			if ((len = GetProcessImageFileName(pHandle,
++							   buf,
++							   (DWORD)
++							   array_length(buf)))) {
++			    TCHAR *pos = _tcsrchr(buf, _T('\\'));
++			    if (pos) {
++				pos++;
++				if (_tcsnicmp(pos, _TEXT("mintty.exe"), 10)
++				    == 0) {
++				    if (pMinTTY)
++					*pMinTTY = pHandle;
++				    code = 1;
++				}
++			    }
++			}
++		    }
++		}
++	    }
++	}
++    }
++    returnCode(code);
++}
++#endif /* _NC_CHECK_MINTTY */
++
+ /*   Our replacement for the systems _isatty to include also
+      a test for mintty. This is called from the NC_ISATTY macro
+      defined in curses.priv.h
+Index: ncurses/tinfo/tinfo_driver.c
+Prereq:  1.92 
+--- ncurses-6.6-20261017+/ncurses/tinfo/tinfo_driver.c	2026-09-05 20:28:39.000000000 +0000
++++ ncurses-6.6-20261024/ncurses/tinfo/tinfo_driver.c	2026-10-24 20:35:11.000000000 +0000
+@@ -52,7 +52,7 @@
+ # endif
+ #endif
+ 
+-MODULE_ID("$Id: tinfo_driver.c,v 1.92 2026/09/05 20:28:39 tom Exp $")
++MODULE_ID("$Id: tinfo_driver.c,v 1.93 2026/10/24 20:35:11 Daniel.Aliev Exp $")
+ 
+ /*
+  * SCO defines TIOCGSIZE and the corresponding struct.  Other systems (SunOS,
+@@ -183,7 +183,7 @@
+ 
+ 	if (fallback) {
+ 	    T(("found fallback entry"));
+-	    TerminalType(termp) = *fallback;
++	    _nc_copy_termtype2(&TerminalType(termp), fallback);
+ 	    status = TGETENT_YES;
+ 	}
+     }
+Index: ncurses/widechar/lib_ins_wch.c
+Prereq:  1.36 
+--- ncurses-6.6-20261017+/ncurses/widechar/lib_ins_wch.c	2026-08-15 15:56:54.000000000 +0000
++++ ncurses-6.6-20261024/ncurses/widechar/lib_ins_wch.c	2026-10-24 20:11:16.000000000 +0000
+@@ -40,7 +40,7 @@
+ 
+ #include <curses.priv.h>
+ 
+-MODULE_ID("$Id: lib_ins_wch.c,v 1.36 2026/08/15 15:56:54 tom Exp $")
++MODULE_ID("$Id: lib_ins_wch.c,v 1.37 2026/10/24 20:11:16 Serhiy.Storchaka Exp $")
+ 
+ /*
+  * Insert the given character, updating the current location to simplify
+@@ -59,11 +59,11 @@
+ 	if (cells == 0)
+ 	    cells = 1;
+ 
+-	if (win->_curx + cells > win->_maxx) {
++	if (win->_curx + cells > win->_maxx + 1) {
+ 	    cchar_t blank = *wch;
+ 	    memset(blank.chars, 0, sizeof(blank.chars));
+ 	    CharOf(blank) = ' ';
+-	    while (win->_curx < win->_maxx) {
++	    while (win->_curx <= win->_maxx) {
+ 		line->text[win->_curx++] = blank;
+ 	    }
+ 	} else {
+Index: ncurses/win32con/win32_driver.c
+Prereq:  1.25 
+--- ncurses-6.6-20261017+/ncurses/win32con/win32_driver.c	2026-09-05 20:33:40.000000000 +0000
++++ ncurses-6.6-20261024/ncurses/win32con/win32_driver.c	2026-10-24 20:38:37.000000000 +0000
+@@ -41,7 +41,7 @@
+ 
+ #define CUR TerminalType(my_term).
+ 
+-MODULE_ID("$Id: win32_driver.c,v 1.25 2026/09/05 20:33:40 tom Exp $")
++MODULE_ID("$Id: win32_driver.c,v 1.26 2026/10/24 20:38:37 Daniel.Aliev Exp $")
+ 
+ #define WINMAGIC NCDRV_MAGIC(NCDRV_WINCONSOLE)
+ #define EXP_OPTIMIZE 0
+@@ -549,7 +549,7 @@
+ 	code = TRUE;
+     }
+ #if !USE_NAMED_PIPES
+-    else if (_isatty(TCB->term.Filedes)) {
++    else if (_isatty(TCB->term.Filedes) && !_nc_console_vt_supported()) {
+ 	code = TRUE;
+     }
+ #endif
+Index: package/debian-mingw/changelog
+--- ncurses-6.6-20261017+/package/debian-mingw/changelog	2026-10-17 09:10:05.000000000 +0000
++++ ncurses-6.6-20261024/package/debian-mingw/changelog	2026-10-24 09:29:08.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20261017) unstable; urgency=low
++ncurses6td (6.6+20261024) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 17 Oct 2026 05:10:05 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 24 Oct 2026 05:29:08 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian-mingw64/changelog
+--- ncurses-6.6-20261017+/package/debian-mingw64/changelog	2026-10-17 09:10:05.000000000 +0000
++++ ncurses-6.6-20261024/package/debian-mingw64/changelog	2026-10-24 09:29:08.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20261017) unstable; urgency=low
++ncurses6td (6.6+20261024) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 17 Oct 2026 05:10:05 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 24 Oct 2026 05:29:08 -0400
+ 
+ ncurses6 (5.9+20131005) unstable; urgency=low
+ 
+Index: package/debian/changelog
+--- ncurses-6.6-20261017+/package/debian/changelog	2026-10-17 09:10:05.000000000 +0000
++++ ncurses-6.6-20261024/package/debian/changelog	2026-10-24 09:29:08.000000000 +0000
+@@ -1,8 +1,8 @@
+-ncurses6td (6.6+20261017) unstable; urgency=low
++ncurses6td (6.6+20261024) unstable; urgency=low
+ 
+   * latest weekly patch
+ 
+- -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 17 Oct 2026 05:10:05 -0400
++ -- Thomas E. Dickey <dickey@invisible-island.net>  Sat, 24 Oct 2026 05:29:08 -0400
+ 
+ ncurses6 (5.9+20120608) unstable; urgency=low
+ 
+Index: package/mingw-ncurses.nsi
+Prereq:  1.786 
+--- ncurses-6.6-20261017+/package/mingw-ncurses.nsi	2026-10-17 09:10:05.000000000 +0000
++++ ncurses-6.6-20261024/package/mingw-ncurses.nsi	2026-10-24 09:29:08.000000000 +0000
+@@ -1,4 +1,4 @@
+-; $Id: mingw-ncurses.nsi,v 1.786 2026/10/17 09:10:05 tom Exp $
++; $Id: mingw-ncurses.nsi,v 1.787 2026/10/24 09:29:08 tom Exp $
+ 
+ ; TODO add examples
+ ; TODO bump ABI to 6
+@@ -10,7 +10,7 @@
+ !define VERSION_MAJOR "6"
+ !define VERSION_MINOR "6"
+ !define VERSION_YYYY  "2026"
+-!define VERSION_MMDD  "1017"
++!define VERSION_MMDD  "1024"
+ !define VERSION_PATCH ${VERSION_YYYY}${VERSION_MMDD}
+ 
+ !define MY_ABI   "5"
+Index: package/mingw-ncurses.spec
+--- ncurses-6.6-20261017+/package/mingw-ncurses.spec	2026-10-17 09:10:05.000000000 +0000
++++ ncurses-6.6-20261024/package/mingw-ncurses.spec	2026-10-24 09:29:08.000000000 +0000
+@@ -3,7 +3,7 @@
+ Summary: shared libraries for terminal handling
+ Name: mingw32-ncurses6
+ Version: 6.6
+-Release: 20261017
++Release: 20261024
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -144,8 +144,8 @@
+ 
+ %changelog
+ 
+-* Sat Oct 17 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20261017
++* Sat Oct 24 2026 Thomas E. Dickey
++- testing ncurses 6.6-20261024
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncurses.spec
+--- ncurses-6.6-20261017+/package/ncurses.spec	2026-10-17 09:10:05.000000000 +0000
++++ ncurses-6.6-20261024/package/ncurses.spec	2026-10-24 09:29:08.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: shared libraries for terminal handling
+ Name: ncurses6
+ Version: 6.6
+-Release: 20261017
++Release: 20261024
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ URL: https://invisible-island.net/ncurses/
+@@ -134,8 +134,8 @@
+ 
+ %changelog
+ 
+-* Sat Oct 17 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20261017
++* Sat Oct 24 2026 Thomas E. Dickey
++- testing ncurses 6.6-20261024
+ 
+ * Sat Feb 25 2023 Thomas Dickey
+ - amend URLs per rpmlint
+Index: package/ncursest.spec
+--- ncurses-6.6-20261017+/package/ncursest.spec	2026-10-17 09:10:05.000000000 +0000
++++ ncurses-6.6-20261024/package/ncursest.spec	2026-10-24 09:29:08.000000000 +0000
+@@ -1,7 +1,7 @@
+ Summary: Curses library with POSIX thread support.
+ Name: ncursest6
+ Version: 6.6
+-Release: 20261017
++Release: 20261024
+ License: X11 License Distribution Modification Variant
+ Group: Development/Libraries
+ Source: ncurses-%{version}-%{release}.tgz
+@@ -142,8 +142,8 @@
+ 
+ %changelog
+ 
+-* Sat Oct 17 2026 Thomas E. Dickey
+-- testing ncurses 6.6-20261017
++* Sat Oct 24 2026 Thomas E. Dickey
++- testing ncurses 6.6-20261024
+ 
+ * Tue Dec 24 2019 Thomas Dickey
+ - drop custom CC_NORMAL warning flags because setting CFLAGS interferes with
