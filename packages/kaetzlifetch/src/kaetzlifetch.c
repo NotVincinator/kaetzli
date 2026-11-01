@@ -44,18 +44,19 @@ static const char *c_logo = "";
 static const char *c_key = "";
 static const char *c_off = "";
 
+/* A Kaetzli is a kitten. Backslashes doubled for C; the picture is what is between the
+ * quotes with every \\ read as one \. */
 static const char *logo[] = {
-	"   .-----------.",
-	"   | .-------. |",
-	"   | | o   o | |",
-	"   | |   _   | |",
-	"   | '-------' |",
-	"   '--+-----+--'",
-	"  .---'-----'---.",
-	"  | [ KAETZLI ] |",
-	"  |  o   o   o  |",
-	"  '-------------'",
-	"     |||   |||",
+	"      /\\_____/\\",
+	"     /  o   o  \\",
+	"    ( ==  ^  == )",
+	"     )   '-'   (",
+	"    (           )",
+	"   ( (  )   (  ) )",
+	"  (__(__)___(__)__)",
+	"         \\",
+	"          )",
+	"    ~ kaetzli ~",
 };
 #define LOGO_LINES ((int)(sizeof logo / sizeof logo[0]))
 
