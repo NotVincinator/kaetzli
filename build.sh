@@ -148,6 +148,10 @@ else
                      printf '%s:%s,' "${f#"$PKG_DIR"/patches/}" "$(sha256sum <"$f" | cut -d' ' -f1)"
                  done)
     [ -z "$patch_list" ] || component_env+=(--env "KAETZLI_PATCHES=${patch_list%,}")
+    # ...and the CVEs those patches fix (tools/patch-cves.sh), as <cve> <patch> <locator>
+    # separated by ';', for the SBOM's `fix` references and the CVE scan's VEX.
+    fix_list=$(./tools/patch-cves.sh "$PKG" | tr '\t' ' ' | paste -sd';' -)
+    [ -z "$fix_list" ] || component_env+=(--env "KAETZLI_FIXES=$fix_list")
 fi
 
 # packages/<pkg>/licenses/: license texts for a source that carries none of its own,

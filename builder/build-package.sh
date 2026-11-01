@@ -200,6 +200,8 @@ if [ -n "${KAETZLI_PKG:-}" ]; then
         if [ -n "${KAETZLI_SHA256:-}" ]; then printf 'sha256=%s\n' "$KAETZLI_SHA256"; fi
         if [ -n "${KAETZLI_CPE:-}" ];    then printf 'cpe=%s\n'    "$KAETZLI_CPE";    fi
         if [ -n "${KAETZLI_PATCHES:-}" ]; then printf 'patches=%s\n' "$KAETZLI_PATCHES"; fi
+        # One fix=<cve> <patch> <locator> per CVE a patch fixes (tools/patch-cves.sh).
+        if [ -n "${KAETZLI_FIXES:-}" ]; then printf '%s\n' "$KAETZLI_FIXES" | tr ';' '\n' | sed 's/^/fix=/'; fi
     } > "$components/$KAETZLI_PKG"
     # Vendored dependencies are a component of their own, with their own checksum.
     if [ -n "${KAETZLI_VENDOR_URL:-}" ]; then

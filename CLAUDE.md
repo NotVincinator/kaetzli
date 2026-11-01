@@ -378,6 +378,8 @@ and the assembly deletes. `test/check-sbom.sh` parses it. A package's `CPE=` (NV
 name for it, space-separated where NVD has two) becomes a `cpe23Type` reference each, and the Go modules and Rust crates a program
 compiled in (`go version -m`, `cargo tree -e normal`, recorded by `build-package.sh` in
 `usr/share/kaetzli/modules/`) become packages it `CONTAINS`: those two are what scanners match.
+A CVE a patch fixes (`tools/patch-cves.sh`) is a SPDX `fix` reference on its package, and
+`test/cve-scan.sh` makes OpenVEX of those, so grype reports it patched rather than open.
 `image/sbom.sh` is shared with `build-extension.sh`, which writes `sbom-ext-<name>.json`.
 Unresolved libraries
 are `DEPENDS_ON` without `CONTAINS`, computed like `check-rootfs-deps.sh` (a library is a
