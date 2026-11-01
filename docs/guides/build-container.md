@@ -42,4 +42,4 @@ CI prepares and publishes the inputs, then builds packages and assembles the ima
 `./tools/prep.sh --push` pushes newly built images.
 
 For the full build flow, see [How the build works](how-it-works.md). For the recipe archive
-proposal, see [Build reproduction and patches](../proposals/reproducing-a-build.md).
+proposal, see [Build reproduction](../proposals/reproducing-a-build.md).

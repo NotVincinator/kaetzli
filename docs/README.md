@@ -6,6 +6,7 @@ Guides describe current behavior. Proposals describe work that is not implemente
 
 - [How the build works](guides/how-it-works.md): package builds, assembly, and CI.
 - [Build inputs](guides/build-container.md): builder and sources images.
+- [Patches](guides/patches.md): package patches, upstream patch series, and CVE fixes.
 - [Linking](guides/linking.md): runtime library compatibility and ELF checks.
 - [System extensions](guides/sysext.md): build and attach extensions.
 - [Debugging](guides/debugging.md): tools available in the base and debug extension.
@@ -17,8 +18,8 @@ Guides describe current behavior. Proposals describe work that is not implemente
 - [Image variants](proposals/image-variants.md): select package sets at assembly time.
 - [macOS container host](proposals/container-host.md): use the image as a Podman VM.
 - [Releases](proposals/release.md): versioned VM artifacts and OCI tags.
-- [Build reproduction and patches](proposals/reproducing-a-build.md): archive the recipe
-  and support downstream source patches.
+- [Build reproduction](proposals/reproducing-a-build.md): archive the recipe as a future
+  improvement; package patches are already supported ([guide](guides/patches.md)).
 - [Ideas from other builders](proposals/ideas-from-other-builders.md): checks, hardening
   and SBOM features adapted from Talos, LinuxKit, Flatcar and podman-machine-os.
 

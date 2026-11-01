@@ -1,16 +1,17 @@
-# Reproducing builds and patching sources
+# Build reproduction
 
-This page records two proposals: archiving the build recipe as an artifact, and supporting
-local patches to upstream sources. Neither feature is implemented. The current build inputs
-and package reproducibility check are described below so the proposal does not imply
-stronger guarantees than the project provides.
+Archiving the full build recipe as an artifact remains a proposal. Package source patches
+and upstream patch series are implemented; see the [patches guide](../guides/patches.md).
+This page describes the current reproducibility checks and the remaining recipe proposal.
 
 ## Current reproducibility
 
 The build pins package source archives by SHA256, pins the Debian builder to a snapshot,
 and uses a fixed `SOURCE_DATE_EPOCH`. Image assembly normalizes timestamps and other
 metadata. `test/reproducible.sh <package>` builds a package twice from clean worktrees and
-compares staged paths, modes, owners, symlink targets, and file contents.
+compares staged paths, modes, owners, symlink targets, and file contents. CI also assembles
+the images a second time and compares the EROFS image, command line, OCI archive, SBOMs, and
+extension images byte for byte.
 
 To compare a local package build with a CI artifact for the same commit, use:
 
@@ -18,9 +19,10 @@ To compare a local package build with a CI artifact for the same commit, use:
 AGAINST_RUN=<github-actions-run-id> ./test/reproducible.sh <package>
 ```
 
-This verifies only the selected package. It does not establish that every package or image
-has been reproduced independently. The normal CI workflow tests image builds and boots;
-consult the workflow and reproducibility script for the checks currently run.
+This verifies only the selected package against the CI artifact. It does not establish that
+every package has been independently rebuilt on another machine. CI's image check repeats
+assembly from the same build artifacts, so it checks deterministic assembly rather than an
+independent end-to-end rebuild.
 
 ## Proposed recipe artifact
 
@@ -40,17 +42,8 @@ rebuild packages and images. It must report exactly which artifacts and checksum
 Until this exists, an image is not independently reconstructible from its OCI reference
 alone; the repository commit and build artifacts remain relevant inputs.
 
-## Proposed package patches
-
-There are no local patch sets today. If a package needs a downstream fix, first check
-whether an upstream option or version update solves it. A maintained patch should have an
-upstream reference, a reason, and an owner; prefer fixes that can be submitted upstream.
-
-A future implementation should keep patches under `packages/<name>/patches/`, apply them
-to a fresh source extraction in sorted order, and fail if they do not apply exactly. Patch
-files must be included in CI cache keys and SBOM provenance. Applying patches during
-extraction avoids ambiguous state between already-patched and unpatched source trees.
-
-The recipe artifact and patch mechanism are related: any recipe archive must include
-patches and all other tracked build inputs. Implement these ideas only when users need
-them, and update this document to describe the resulting behavior once it exists.
+Any future recipe archive should include patches and all other tracked build inputs. It
+should identify the source commit and inputs used, and support rebuilding the published
+artifacts with explicit checksums. Until that exists, an OCI reference alone is not enough
+to independently reconstruct an image; the repository commit and build artifacts remain
+relevant inputs.

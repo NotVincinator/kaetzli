@@ -73,14 +73,18 @@ files and file capabilities; the paths it adds are printed, written to
 
 ## Checks and CI
 
-CI prepares the inputs, builds glibc and the kernel, builds package artifacts for each
-architecture, merges them, assembles both image formats, and runs static and boot checks.
-Every push runs the workflow. A push that changes only `docs/**` or root `*.md` files skips
-the image build and gets the `docs` job, which checks that relative links resolve; the
-`result` job reports one status for either case and is the check to require in branch
-protection.
-The main branch also publishes the OCI image. A scheduled fresh build checks that pinned
-inputs can still be fetched and rebuilt.
+For build changes, CI prepares inputs, builds glibc and the kernel, builds package artifacts
+for each architecture, merges them, assembles both image formats, and runs static and boot
+checks. A push that changes only `docs/**` or root `*.md` files skips the image build and
+gets the `docs` job, which checks that relative links resolve. The `result` job reports one
+required status for either case. The main branch publishes a multi-architecture OCI image,
+tagged `latest` and with the source commit.
+
+CI repeats image assembly from the same package artifacts and compares the resulting image,
+SBOM, and extension bytes. This checks deterministic assembly; it is not an independent
+rebuild of all package sources. The CVE scan is informational and does not gate the result.
+Kubernetes cluster and node-conformance jobs also run, but are separate from the required
+result. Scheduled fresh builds check that pinned inputs can still be fetched and rebuilt.
 
 Checks cover package licenses, shared-library dependencies and symbols, kernel options,
 image contents and size, reproducibility, real boots, networking, SSH, containers, and

@@ -7,10 +7,12 @@ are built from pinned source archives, assembled into a read-only EROFS disk ima
 published as an OCI image. Optional systemd extensions add Podman, Kubernetes, and debugging
 tools without changing the base image.
 
-The project targets QEMU, Firecracker, and Apple's Virtualization.framework. It is built
-from source but uses a pinned Debian builder toolchain; it is not a self-hosting Linux From
-Scratch build. The base includes systemd, glibc, bash, coreutils, networking tools, and the
-container runtime components needed by `crun`. It has no package manager and does not target
+The project targets QEMU and Firecracker on Linux, and Apple's Virtualization.framework on
+Apple silicon. The EROFS image is a read-only filesystem, not a self-booting disk: a VM
+launcher supplies the matching kernel and command line. It is built from pinned source
+archives with a pinned Debian builder toolchain; it is not a self-hosting Linux From Scratch
+build. The base includes systemd, glibc, bash, coreutils, networking tools, and the
+container-runtime components needed by `crun`. It has no package manager and does not target
 physical hardware.
 
 ## Images and extensions
@@ -57,10 +59,11 @@ see [`examples/nginx`](examples/nginx/README.md) for an image built on top of ka
 
 ## Host requirements
 
-The project builds and publishes `amd64` and `arm64` images. Building from source requires
-Podman; fetching CI images requires an authenticated GitHub CLI (`gh`). QEMU runs with or
-without KVM, though KVM is recommended. The Kubernetes demo requires KVM and about 8 GB of
-RAM.
+The project builds and publishes `amd64` and `arm64` OCI images. Building from source
+requires Podman; fetching CI images requires an authenticated GitHub CLI (`gh`). QEMU runs
+with or without KVM, though KVM is recommended. Firecracker requires KVM on Linux;
+Virtualization.framework support is for Apple silicon. The Kubernetes demo requires KVM and
+about 8 GB of RAM.
 
 ## Build
 
@@ -159,9 +162,13 @@ and verified. The
 
 ## Verification and maintenance
 
-CI builds the images and runs static checks, boots, container and extension checks,
-reproducibility checks, and Kubernetes tests. Run an individual test with the image and
-kernel paths it requires, for example:
+CI builds both architectures and checks image contents, dependencies, licenses, symbols,
+kernel configuration, boot behavior, containers, extensions, and byte-for-byte image
+assembly reproducibility. It also reports known CVEs from the SBOMs; that scan is
+observational and does not gate the build. Kubernetes cluster and node-conformance jobs run
+separately and do not gate the required CI result. The main branch publishes a multi-arch
+OCI image as `latest` and by commit. Run an individual test with the image and kernel paths
+it requires, for example:
 
 ```sh
 ./test/podman.sh output/rootfs.erofs rootfs/boot/bzImage
