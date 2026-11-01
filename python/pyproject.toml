@@ -4,10 +4,13 @@ version = "0"
 description = "Host-side tooling for kaetzli: the code behind the Python scripts in test/ and tools/"
 requires-python = ">=3.12"
 # Runtime dependencies are an argument each (CLAUDE.md, Host-side code):
+#   python-debian  dpkg's version order, for cve-context's Debian verdicts; no
+#                  dependencies of its own
 #   spdx-tools     the SPDX project's library, for check-sbom's validation against the
 #                  SPDX 2.3 model; brings rdflib, beartype, license-expression, click,
 #                  pyyaml, xmltodict, ply, uritools, semantic-version (its other formats)
 dependencies = [
+    "python-debian>=1.1.1",
     "spdx-tools>=0.8.5",
 ]
 

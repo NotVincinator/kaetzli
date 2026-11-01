@@ -23,9 +23,10 @@ bash would be more to maintain, not less.
 
 ### 1. CVE reports: `test/cve-context.py`, `cve-scan.py`, `cve-history.py` (done)
 
-Ported with no dependency beyond the stdlib; `python-debian` was not needed to stay
-byte-identical, and changing the version comparison is a change of its own. What the
-bash versions said:
+Ported with no dependency beyond the stdlib, to stay byte-identical; `python-debian`
+came after, as a change of its own: Debian's fixed versions compare in dpkg's order, so
+`2026a` is before `2026b` and `1.0~rc1` before `1.0`, which the digits alone did not
+say. What the bash versions said:
 
 `cve-context.sh` is about 280 lines, most of them a jq program that joins five sources,
 plus a curl cache and `xargs -P 8 bash -c` with exported functions. Its Debian version

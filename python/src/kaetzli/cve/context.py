@@ -64,6 +64,8 @@ from itertools import groupby
 from pathlib import Path
 from typing import TextIO
 
+from debian.debian_support import Version
+
 from kaetzli import repo
 from kaetzli.cve.grype import cache_dir as kaetzli_cache
 from kaetzli.gh import Gh
@@ -275,22 +277,33 @@ def debian_source(pkg: str, version: str) -> str:
     return pkg
 
 
-def upstream_numbers(version: str) -> list[int]:
-    """A Debian version as the upstream version it packages, as numbers to compare:
-    "1:1.3.dfsg+really1.3.2-4" is 1.3.2, "1:10.2p1-6" is 10.2.1, "v0.59.0" is 0.59.0."""
-    v = re.sub(r"^[0-9]+:", "", version, count=1)
+# A repacked upstream tarball: Debian's suffixes for one, which say nothing about the
+# version (Developer's Reference 6.7.8.2, and what the archive does).
+_REPACK = re.compile(r"[+~.](?:dfsg|ds|repack)[0-9.]*$")
+
+
+def upstream_version(version: str) -> str:
+    """The upstream version a Debian version packages: "1:1.3.dfsg+really1.3.2-4" is
+    1.3.2 (+really says what the package really is), "2.1.9+ds1-5" is 2.1.9."""
+    v = Version(version).upstream_version or ""
     v = re.sub(r"^.*\+really", "", v, count=1)
-    v = re.sub(r"-[^-]*$", "", v, count=1)
-    v = re.sub(r"^v", "", v, count=1)
-    v = re.sub(r"[+~].*$", "", v, count=1)
-    return [int(n) for n in re.findall(r"[0-9]+", v)]
+    return _REPACK.sub("", v, count=1)
 
 
 def against(debian_fixed: str, ours: str) -> str:
     """How a Debian fix relates to the version we ship: "same" (Debian patched this very
     upstream version, so a patch exists), "newer" (fixed by a later upstream release) or
-    "older" (fixed before our version, so the match is most likely a false positive)."""
-    d, o = upstream_numbers(debian_fixed), upstream_numbers(ours)
+    "older" (fixed before our version, so the match is most likely a false positive), in
+    dpkg's order, which is the one Debian writes fixed_version in. "" when either is no
+    version at all. Ours is upstream's, a leading "v" aside (Go modules), so a "-0"
+    revision keeps any hyphen of its own in the upstream part."""
+    try:
+        d_up, o_up = upstream_version(debian_fixed), ours.removeprefix("v")
+        if not d_up or not o_up:
+            return ""
+        d, o = Version(d_up + "-0"), Version(o_up + "-0")
+    except ValueError:
+        return ""
     if d == o:
         return "same"
     return "newer" if d > o else "older"

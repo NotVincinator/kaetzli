@@ -36,20 +36,24 @@ class TestDebianSource:
 
 class TestUpstreamVersion:
     @pytest.mark.parametrize(
-        ("version", "numbers"),
+        ("version", "upstream"),
         [
-            ("1:1.3.dfsg+really1.3.2-4", [1, 3, 2]),
-            ("1:10.2p1-6", [10, 2, 1]),
-            ("v0.59.0", [0, 59, 0]),
-            ("2.1.9+ds1-5", [2, 1, 9]),
-            ("7.2.11-1", [7, 2, 11]),
-            ("1.3.2", [1, 3, 2]),
-            ("2.43-7", [2, 43]),
-            ("1.0~rc1-2", [1, 0]),
+            ("1:1.3.dfsg+really1.3.2-4", "1.3.2"),
+            ("1:10.2p1-6", "10.2p1"),
+            ("2.1.9+ds1-5", "2.1.9"),
+            ("1.31.4+ds-1", "1.31.4"),
+            ("5.2+dfsg.1-3", "5.2"),
+            ("3.0~repack-1", "3.0"),
+            ("7.2.11-1", "7.2.11"),
+            ("2.43-7", "2.43"),
+            ("1.0~rc1-2", "1.0~rc1"),
+            ("0.0~git20250201.1a2b3c4-1", "0.0~git20250201.1a2b3c4"),
         ],
     )
-    def test_as_numbers(self, version, numbers):
-        assert context.upstream_numbers(version) == numbers
+    def test_debians(self, version, upstream):
+        """Epoch and revision are Debian's; +really names the upstream version a
+        package really is, and +dfsg/+ds/+repack are a repacked tarball of it."""
+        assert context.upstream_version(version) == upstream
 
     @pytest.mark.parametrize(
         ("debian", "ours", "relation"),
@@ -59,10 +63,26 @@ class TestUpstreamVersion:
             ("6.0.12-1", "7.3.1", "older"),
             ("2.43-7", "2.44", "older"),
             ("1.10-1", "1.9", "newer"),
+            ("1:10.2p1-6", "10.2p1", "same"),
+            ("2.1.9+ds1-5", "2.1.9", "same"),
+            # Where comparing the digits alone was wrong: letters and ~ carry meaning,
+            # and dpkg's order is the one Debian's fixed_version is written in.
+            ("2026a-1", "2026b", "older"),
+            ("2026c-1", "2026b", "newer"),
+            ("10.2p2-1", "10.2p1", "newer"),
+            ("1.0~rc1-2", "1.0", "older"),
+            ("1.0-1", "1.0~rc2", "newer"),
+            # A hyphen in our version is ours, not a Debian revision.
+            ("1.2.2-1", "v0.0.0-20250101-abc", "newer"),
+            ("1.2.2-1", "1.2.3-20250101-abc", "older"),
         ],
     )
     def test_against_ours(self, debian, ours, relation):
         assert context.against(debian, ours) == relation
+
+    def test_a_version_debian_cannot_read_relates_to_nothing(self):
+        assert context.against("", "1.0") == ""
+        assert context.against("1.0-1", "") == ""
 
 
 class TestDebianVerdict:
