@@ -171,6 +171,9 @@ if [ "$flavour" = oci ]; then
     # .dynstr. `if` rather than `&&`, which would be the loop's exit status under set -e.
     rm -rf usr/lib/security etc/security usr/share/pam
     rm -f  usr/lib/libpam*
+    # The helpers modules exec, which link no libpam themselves; the module trim below
+    # would take them with their module, but finds no usr/lib/security to look in.
+    rm -f  usr/bin/unix_chkpwd usr/bin/pwhistory_helper usr/bin/pam_namespace_helper
     while IFS= read -r bin; do
         if grep -qa 'libpam\.so' "$bin" 2>/dev/null; then
             rm -f "$bin"

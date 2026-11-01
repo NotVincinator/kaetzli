@@ -16,3 +16,9 @@ absent usr/lib/libpsx.so*
 # pam_namespace is named by systemd's pam.d files, so it and what it reads stay.
 present:erofs usr/lib/security/pam_namespace.so
 present:erofs usr/share/pam/security/namespace.conf
+
+# The container image has no PAM, and these three helpers link no libpam, so the sweep
+# for its consumers does not find them (image/build-rootfs.sh's subtractions block).
+absent:oci usr/bin/unix_chkpwd
+absent:oci usr/bin/pwhistory_helper
+absent:oci usr/bin/pam_namespace_helper
