@@ -71,22 +71,56 @@ fetch_file() {
 
     local url
     for url in "$primary" $mirrors; do
-        echo "  $pkg: fetching $url"
-        if "${CURL[@]}" -o "$target" "$url"; then
-            if verify "$target" "$sha"; then
-                return 0
-            fi
-            # Not a transport problem: this URL serves the wrong bytes, and retrying it
-            # or resuming onto it cannot help. Say so loudly and move to the next source.
-            echo "  $pkg: CHECKSUM MISMATCH from $url" >&2
-            echo "         expected $sha" >&2
-            echo "         got      $(sha256sum <"$target" | cut -d' ' -f1)" >&2
-            rm -f "$target"
-        fi
+        try_url "$pkg" "$target" "$sha" "$url" && return 0
     done
+
+    # Last, and only now, because it costs an API request: see debian_snapshot_url.
+    url=$(debian_snapshot_url "$primary")
+    [ -n "$url" ] && try_url "$pkg" "$target" "$sha" "$url" && return 0
 
     echo "error: could not fetch $tarball for $pkg from any source" >&2
     return 1
+}
+
+# try_url <pkg> <target> <sha256> <url> — download and verify one candidate.
+try_url() {
+    local pkg=$1 target=$2 sha=$3 url=$4
+    echo "  $pkg: fetching $url"
+    "${CURL[@]}" -o "$target" "$url" || return 1
+    verify "$target" "$sha" && return 0
+    # Not a transport problem: this URL serves the wrong bytes, and retrying it or
+    # resuming onto it cannot help. Say so loudly and move to the next source.
+    echo "  $pkg: CHECKSUM MISMATCH from $url" >&2
+    echo "         expected $sha" >&2
+    echo "         got      $(sha256sum <"$target" | cut -d' ' -f1)" >&2
+    rm -f "$target"
+    return 1
+}
+
+# debian_snapshot_url <url> — for a deb.debian.org pool URL, the same file on
+# snapshot.debian.org; for anything else, nothing.
+#
+# The pool keeps a version only while some suite still names it, so a sid package is
+# deleted the day its successor migrates. Even a non-maintainer upload is enough
+# (ca-certificates 20260816 went that way under +nmu1). Snapshot keeps every file it has
+# seen, addressed by its SHA-1. The SHA-1 comes from snapshot's API at fetch time, so
+# nothing extra has to be pinned or bumped; the SHA256 in env.sh still decides whether the
+# bytes are accepted. fetch_file asks only after every other source has
+# failed, so while the pool still has the file snapshot is never contacted.
+#
+# Native packages only (<src>_<version>.tar.*): an .orig tarball's name carries the
+# upstream version, not the Debian one the API is keyed by.
+debian_snapshot_url() {
+    local re='^https?://deb\.debian\.org/debian/pool/[^/]+/[^/]+/([^/]+)/([^/_]+)_([^/]+)\.tar\.[a-z0-9]+$'
+    [[ $1 =~ $re ]] || return 0
+    local src=${BASH_REMATCH[1]} file=${1##*/} version=${BASH_REMATCH[3]} sha1
+    [ "${BASH_REMATCH[2]}" = "$src" ] || return 0
+    command -v jq >/dev/null || { echo "  (no jq: snapshot.debian.org fallback skipped)" >&2; return 0; }
+    sha1=$(fetch "https://snapshot.debian.org/mr/package/$src/${version//+/%2B}/srcfiles?fileinfo=1" 2>/dev/null \
+        | jq -r --arg f "$file" '.fileinfo | to_entries[] | select(any(.value[]; .name == $f)) | .key' 2>/dev/null \
+        | head -n1) || true
+    [ -n "$sha1" ] && echo "https://snapshot.debian.org/file/$sha1/$file"
+    return 0
 }
 
 verify() {

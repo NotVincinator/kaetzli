@@ -18,16 +18,22 @@
 # The parser is python and uses python3-cryptography; both are builder-side only. See
 # CLAUDE.md: what the image may not gain is an interpreter, and what ships from here is
 # a text file.
-VERSION="20260816"
+VERSION="20260816+nmu1"
 PACKAGE="ca-certificates-${VERSION}"
 TARBALL="ca-certificates_${VERSION}.tar.xz"
 URL="https://deb.debian.org/debian/pool/main/c/ca-certificates/${TARBALL}"
-SHA256="d939bcdd0cb058712cf4175bac76997676eb8b68fe9473765e1b40fb3d5b186a"
+SHA256="914416a1e44a25733aff51092fe4e27fdec1c9f6e8d1db0b8364922486153134"
 # certdata.txt is Mozilla's, under MPL-2.0; the Makefiles and certdata2pem.py are
 # Debian's, under GPL-2.0-or-later. Only the first half reaches the image — what ships is
 # the certificates.
 LICENSE="MPL-2.0 AND GPL-2.0-or-later"
 # A Debian native package, so the tarball is in the pool directory the URL points into
-# and the default index scrape finds it. Point releases are spelled 20230311+deb12u1 and
-# never match the numeric filter, which is right: those are stable backports, not new
-# snapshots.
+# and the default index scrape finds it. A sid upload replaces the previous one there, so
+# a pinned version disappears from the pool the day it is superseded;
+# tools/fetch-sources.sh then falls back to snapshot.debian.org.
+#
+# Non-maintainer uploads (20260816+nmu1) are proposed as updates: they are sid uploads
+# like any other, and for this package they are usually a distrust that cannot wait for
+# the next Mozilla bundle. Point releases are spelled 20230311+deb12u1 and still never
+# match, which is right: those are stable backports, not new snapshots.
+UPSTREAM_NUM='[0-9]{8}(\+nmu[0-9]+)?'
