@@ -61,9 +61,10 @@ require breaking one, say so and offer an alternative that keeps it.
 5. **No new interpreters in the image.** `bash` is the one it has, and that is the budget.
    A package that would put perl, python, lua or a JavaScript runtime into `rootfs/`
    needs an argument that it is unavoidable, not merely convenient — and "we could write
-   this bit in python" is never that argument. What the *builder* needs is unconstrained:
-   perl is already in `builder/deps.txt`, and a package whose `configure` is perl or
-   python is fine. The rule is about what ships. Watch `make install`, which is where an
+   this bit in python" is never that argument. What the *builder* and the *host* need is
+   unconstrained: perl is already in `builder/deps.txt`, a package whose `configure` is
+   perl or python is fine, and the repository's own tests and tools may be Python or Go
+   (see *Host-side code* below). The rule is about what ships. Watch `make install`, which is where an
    interpreted helper script sneaks into `DESTDIR` — iproute2's `routel` is python and
    OpenSSL's `c_rehash`/`CA.pl`/`tsget` are perl. Each package's `build.sh` deletes its
    own. `#!/bin/sh` is *not* one of these cases: `packages/bash/build.sh` links
@@ -136,6 +137,50 @@ Paths in scripts are relative to the repository root, and the ones under `test/`
 scratch directory for downloaded artifacts — it deliberately does not collide with
 `packages/` or `image/`.
 
+## Host-side code: bash, Python or Go
+
+Constraint 5 is about the image. What runs on the host, in CI or in a builder container
+is not bound to bash, and bash is not the default: it is hard to read and review, and much
+of `test/` and `tools/` is JSON, HTTP, joins and report tables written in jq, awk and
+`declare -A`. Choose per job. `docs/proposals/host-scripting.md` reviews every script
+against this and orders the migration; nothing has been rewritten yet.
+
+- **Bash** where the job *is* a sequence of commands and their exit codes: anything
+  sourced by a package build (`builder/build-package.sh`, `packages/*/build.sh`, `env.sh`,
+  whose vocabulary is shell functions), thin wrappers around podman/qemu/git, and scripts
+  that run inside the assembly image. `tools/boot-vz.sh` and what it sources stay within
+  bash 3.2 for macOS.
+- **Python** for the rest: anything that parses JSON or tool output, talks to an HTTP API
+  or GitHub, compares versions, joins data sets, renders a report, or is a CLI with
+  subcommands and state (`vm.sh`, `k8s-demo.sh`). The default for new host-side code
+  that is not a command sequence.
+- **Go** only where a static binary is the point: something that must run where there
+  is no Python. Not as a second general-purpose language beside Python.
+- **`env.sh` stays bash.** Python reads a package's pins through bash (`env_get`, or
+  `bash -c 'source …; printf …'`), never by parsing the file.
+- **Virtualenvs, always, via uv.** A Python script declares its dependencies inline
+  (PEP 723: `# /// script`, `requires-python`, `dependencies`), starts with
+  `#!/usr/bin/env -S uv run --script`, and is locked with `uv lock --script` (the
+  `<script>.lock` beside it is committed). uv creates and caches the venv. Never
+  `pip install` into a system or user site, never rely on the host's packages, never
+  `sudo pip`. CI installs a pinned uv. Shared helpers, the Python counterpart of
+  `tools/lib.sh`, live in one module under `tools/` that scripts import after they `cd`
+  to the repository root. A script with only stdlib imports still has the header.
+- **Dependencies** must be established and maintained (`requests`, `pyelftools`,
+  `python-debian`, `license-expression`, `spdx-tools`, `pexpect`, `pytest`), pinned by the
+  lock, and argued like a package: *what does it drag in?* Prefer the stdlib when it is
+  enough, and the `gh` CLI over a GitHub client library (it already holds the auth).
+- **Never in an image.** A Python helper used during assembly runs in the assembly
+  container (python3 in `image/Containerfile` is builder-side), on files, and nothing it
+  imports is copied into the tree. `test/image-files/interpreters.txt` already fails a
+  `.py` in the tree; a python binary would need an `absent` line of its own.
+- **Lint**: `ruff check` and `ruff format` for Python, `go vet`/`gofmt` for Go,
+  `shellcheck` for bash.
+- **A rewrite changes the language, not the behaviour**, and is proved like a refactor
+  of `build-rootfs.sh`: the same output before and after (byte-identical reports,
+  SBOMs, exit codes), and every check `test/selftest.sh` covers still fails on its
+  fixtures, naming what is wrong. One script per pull request.
+
 ## Commands
 
 ```sh
@@ -196,8 +241,8 @@ scratch directory for downloaded artifacts — it deliberately does not collide 
 ./tools/build-node-e2e.sh         # e2e_node.test + ginkgo for the pinned Kubernetes, in a golang container
 ```
 
-There is no test suite and no linter — the checks above plus a real boot are the
-verification story. The checks themselves are tested: `test/selftest.sh` builds small
+There is no unit-test suite — the checks above plus a real boot are the verification
+story (Python, as it lands, is linted as *Host-side code* says). The checks themselves are tested: `test/selftest.sh` builds small
 trees broken in one way each and requires every tree check to fail on its fixture *naming
 what is wrong*. A check that skips what it cannot judge passes vacuously, so a new check,
 or a new case in one, gets a fixture that must produce a finding.

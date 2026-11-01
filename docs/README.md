@@ -22,5 +22,7 @@ Guides describe current behavior. Proposals describe work that is not implemente
   improvement; package patches are already supported ([guide](guides/patches.md)).
 - [Ideas from other builders](proposals/ideas-from-other-builders.md): checks, hardening
   and SBOM features adapted from Talos, LinuxKit, Flatcar and podman-machine-os.
+- [Host-side scripts](proposals/host-scripting.md): which tests and tools move from bash
+  to Python, and in what order.
 
 Host architecture and tool requirements are summarized in the [project README](../README.md#host-requirements).
