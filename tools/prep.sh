@@ -74,6 +74,8 @@ extract_sources() {
     mkdir -p downloads
     podman cp "$ctr:/sources/." downloads/
     podman rm "$ctr" >/dev/null
+    # Not used from here: the checkout's packages/<pkg>/patches are what a build applies.
+    rm -rf downloads/patches
 }
 
 if [ "$want" = builder ]; then
@@ -102,6 +104,13 @@ else
               cp "downloads/$TARBALL" "$stage/sources/$TARBALL"
               if [ -n "${VENDOR_TARBALL:-}" ]; then
                   cp "downloads/$VENDOR_TARBALL" "$stage/sources/$VENDOR_TARBALL"
+              fi
+              # The patches too, as /sources/patches/<pkg>/, so the image alone is every
+              # byte of source a build compiles. A build reads them from the checkout, which
+              # has the same files; this copy is for whoever has only the image.
+              if [ -d "packages/$pkg/patches" ]; then
+                  mkdir -p "$stage/sources/patches"
+                  cp -r "packages/$pkg/patches" "$stage/sources/patches/$pkg"
               fi
           fi )
     done

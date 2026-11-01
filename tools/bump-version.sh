@@ -23,21 +23,50 @@
 # rebuild are all held to exactly those bytes. For the same reason only $URL is tried and
 # never $MIRRORS — a mirror serving something else is precisely what the checksum is for,
 # and pinning a mirror's bytes would enshrine the problem instead of catching it.
+#
+#     ./tools/bump-version.sh --vendor tcpdump 1.11.0   # the second tarball's VENDOR_VERSION
+#
+# Our own patches (packages/<pkg>/patches/*.patch) are left alone: one that no longer
+# applies fails the build in the pull request, which is where it has to be looked at.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 source tools/lib.sh
 
+vendor=
+[ "${1:-}" = --vendor ] && { vendor=1; shift; }
+
 PKG="${1:-}"
 NEW="${2:-}"
 
 if [ -z "$PKG" ] || [ -z "$NEW" ]; then
-    echo "usage: ${0##*/} <package> <version>" >&2
+    echo "usage: ${0##*/} [--vendor] <package> <version>" >&2
     exit 2
 fi
 
 PKG=$(package_name "$PKG")
 env_file="packages/$PKG/env.sh"
+
+# --vendor: the second tarball's own VENDOR_VERSION (tcpdump's libpcap), and its checksum.
+# Allowed for a FOLLOWS package too — linux-tools' libtraceevent is its own, whatever
+# kernel it follows.
+if [ -n "$vendor" ]; then
+    old_version=$(sed -n -E 's|^VENDOR_VERSION="?([^"]*)"?.*|\1|p' "$env_file" | head -n1)
+    [ -n "$old_version" ] || { echo "error: $env_file sets no VENDOR_VERSION" >&2; exit 1; }
+    sed -i -E "s|^VENDOR_VERSION=.*|VENDOR_VERSION=\"$NEW\"|" "$env_file"
+    mapfile -t vendor_values < <(env_get "$PKG" VENDOR_TARBALL VENDOR_URL)
+    mkdir -p downloads
+    echo "$PKG: fetching ${vendor_values[1]}"
+    rm -f "downloads/${vendor_values[0]}"
+    "${CURL_DOWNLOAD[@]}" -o "downloads/${vendor_values[0]}" "${vendor_values[1]}"
+    vendor_sha=$(sha256sum <"downloads/${vendor_values[0]}" | cut -d' ' -f1)
+    sed -i -E "s|^VENDOR_SHA256=.*|VENDOR_SHA256=\"$vendor_sha\"|" "$env_file"
+    echo "$PKG: vendor $old_version -> $NEW"
+    echo "  ${vendor_values[0]}"
+    echo "  sha256 -> $vendor_sha"
+    ./tools/fetch-sources.sh "$PKG" >/dev/null || { echo "error: $PKG does not verify after the bump" >&2; exit 1; }
+    exit 0
+fi
 
 # linux-tools sources the kernel's env.sh for its VERSION, tarball and checksum, so it has
 # none of its own to rewrite — bumping the package it follows moves it too.
@@ -121,4 +150,10 @@ fi
 if ! ./tools/fetch-sources.sh "$PKG" >/dev/null; then
     echo "error: $PKG does not verify after the bump" >&2
     exit 1
+fi
+
+# A package whose fixes come as an upstream patch series (bash) starts a new one with
+# every release: the old version's patches go, the new one's — often none yet — come.
+if [ -n "$(env_get "$PKG" UPSTREAM_PATCHES)" ]; then
+    ./tools/sync-patches.sh "$PKG"
 fi

@@ -23,7 +23,8 @@ tag hashes the archive names and checksums. The same architecture-independent im
 published for amd64 and arm64.
 
 `tools/fetch-sources.sh` verifies downloaded archives against the SHA256 values in each
-package's `env.sh`. `tools/prep.sh` pulls the content-addressed images when available,
+package's `env.sh`. When a Debian pool URL has been removed, it falls back to
+snapshot.debian.org. `tools/prep.sh` pulls the content-addressed images when available,
 building them from their pinned inputs on a cache miss. It extracts source archives into
 `downloads/` for local builds.
 

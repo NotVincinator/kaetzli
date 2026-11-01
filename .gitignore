@@ -17,10 +17,11 @@ output
 # CI's scratch directory for downloaded artifacts.
 artifacts
 
-# Unpacked source trees, e.g. packages/bash/bash-5.3/, and the directory build.sh
-# assembles one in before moving it into place.
+# Unpacked source trees, e.g. packages/bash/bash-5.3/, the directory build.sh assembles
+# one in before moving it into place, and the stamp naming the patches it got.
 /packages/*/*-[0-9]*/
 /packages/*/.extracting/
+/packages/*/.*.patches
 
 # Local additions laid over the image by tools/build-image.sh (see the header of
 # tools/build-image.sh). Never part of a CI build.

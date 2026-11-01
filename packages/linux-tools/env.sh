@@ -19,10 +19,14 @@ unset CPE
 # extension's packages cannot compile against each other, and perf is its only
 # consumer. Without it perf builds, but `perf trace` does not and tracepoints print as
 # raw bytes. A snapshot of the tag, which is how Debian fetches it too and which came
-# back byte-identical on repeated downloads when this was pinned.
-LIBTRACEEVENT_VERSION="1.9.1"
-VENDOR_TARBALL="libtraceevent-${LIBTRACEEVENT_VERSION}.tar.gz"
+# back byte-identical on repeated downloads when this was pinned. Its own version, so
+# tools/check-updates.sh watches it even though the package FOLLOWS the kernel; cgit has no
+# listing of snapshot/, so the versions come from the tags page.
+VENDOR_NAME=libtraceevent
+VENDOR_VERSION="1.9.1"
+VENDOR_TARBALL="libtraceevent-${VENDOR_VERSION}.tar.gz"
 VENDOR_URL="https://git.kernel.org/pub/scm/libs/libtrace/libtraceevent.git/snapshot/${VENDOR_TARBALL}"
+VENDOR_UPSTREAM_INDEX="https://git.kernel.org/pub/scm/libs/libtrace/libtraceevent.git/refs/tags"
 VENDOR_SHA256="3bc19dd940914260ba591b5276723bf84bb43f82c7c3d4267622bee4d016ea55"
 LICENSE="GPL-2.0-only AND (LGPL-2.1-only OR BSD-2-Clause) AND LGPL-2.1-only"
 # In the debug system extension (docs/guides/debugging.md).

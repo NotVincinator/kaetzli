@@ -82,7 +82,7 @@ jobs:
           # reason (`jq -sc .`); merging the snapshot list in is what dropped it.
           jq -cs add updates.json snapshot.json > all.json
           echo "updates=$(cat all.json)" >> "$GITHUB_OUTPUT"
-          jq -r '.[] | "\(.package): \(.current) -> \(.latest)"' all.json
+          jq -r '.[] | "\(.package)\(if .component then "/" + .component else "" end): \(.current) -> \(.latest)"' all.json
           if [ -n "${failed:-}" ]; then
             echo "::warning::some upstream checks failed, see the log above"
           fi
@@ -112,9 +112,20 @@ jobs:
           LATEST: ${{ matrix.update.latest }}
           URL: ${{ matrix.update.url }}
           RELEASE_NOTES: ${{ matrix.update.release_notes }}
+          # version (the default, and debian-snapshot's), vendor or patches: which of a
+          # package's pins moved. tools/check-updates.sh explains the three.
+          KIND: ${{ matrix.update.kind || 'version' }}
+          COMPONENT: ${{ matrix.update.component }}
         run: |
           set -euo pipefail
-          BRANCH="update/$PKG-$LATEST"
+          # A vendor tarball's version is not the package's, so it gets its name in the
+          # branch: update/tcpdump-libpcap-1.11.0 cannot collide with a tcpdump release.
+          # A patch series is spelled <version>-p<n> already (update/bash-5.3-p21).
+          if [ "$KIND" = vendor ]; then
+            BRANCH="update/$PKG-$COMPONENT-$LATEST"
+          else
+            BRANCH="update/$PKG-$LATEST"
+          fi
 
           # An open pull request is already being reviewed. A closed pull request is
           # eligible for recreation, including when its branch was deleted.
@@ -142,8 +153,9 @@ jobs:
           # bump-snapshot.sh writes both, in both Containerfiles, and refuses a tag that is
           # not a multi-architecture index — one FROM line has to serve both builders.
           #
-          # Anything else the new version needs — a configure flag, a patch — is still for
-          # the human reviewing the failing build to add.
+          # Anything else the new version needs — a configure flag, a patch of our own
+          # (docs/guides/patches.md) — is still for the human reviewing the failing build
+          # to add.
           if [ "$PKG" = debian-snapshot ]; then
             ./tools/bump-snapshot.sh "$LATEST"
             TITLE="Update the Debian snapshot to $LATEST"
@@ -153,8 +165,32 @@ jobs:
           Tag: $URL
           EOF
             )
+          elif [ "$KIND" = vendor ]; then
+            ./tools/bump-version.sh --vendor "$PKG" "$LATEST"
+            TITLE="Update $COMPONENT in $PKG to $LATEST"
+            COMMIT_BODY=$(cat <<EOF
+          \`$COMPONENT\` (vendored in \`$PKG\`) $CURRENT -> $LATEST.
+
+          Source: $URL
+          EOF
+            )
+          elif [ "$KIND" = patches ]; then
+            # The new patches are committed: a build never fetches them.
+            ./tools/sync-patches.sh "$PKG"
+            git add "packages/$PKG/patches"
+            TITLE="Update $PKG to $LATEST"
+            COMMIT_BODY=$(cat <<EOF
+          \`$PKG\` $CURRENT -> $LATEST: upstream's patch series, in
+          packages/$PKG/patches/upstream/.
+
+          Source: $URL
+          EOF
+            )
           else
             ./tools/bump-version.sh "$PKG" "$LATEST"
+            # A release of a package with a patch series replaces it (bump-version.sh
+            # syncs), and the files it added or removed are not tracked yet.
+            [ ! -d "packages/$PKG/patches" ] || git add -A "packages/$PKG/patches"
             TITLE="Update $PKG to $LATEST"
             COMMIT_BODY=$(cat <<EOF
           \`$PKG\` $CURRENT -> $LATEST.
@@ -170,7 +206,7 @@ jobs:
           # Over the worktree rather than one named file, so it covers both bumpers: sed
           # says nothing when its pattern does not match, and a bump that silently changed
           # nothing would otherwise become an empty pull request.
-          git diff --quiet && { echo "error: nothing changed for $PKG" >&2; exit 1; }
+          git diff --quiet HEAD && { echo "error: nothing changed for $PKG" >&2; exit 1; }
 
           git commit -am "$TITLE" -m "$COMMIT_BODY"
 

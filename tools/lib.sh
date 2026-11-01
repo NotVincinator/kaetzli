@@ -109,3 +109,63 @@ extract_vmlinux() {
     tail -c "+$((off + 1))" "$1" | gzip -dc 2>/dev/null > "$2" || true
     [ "$(head -c 4 "$2")" = $'\x7fELF' ] || { echo "error: $1 did not unpack to an ELF" >&2; return 1; }
 }
+
+# Patches: packages/<pkg>/patches/ (docs/guides/patches.md).
+#
+#   patches/upstream/*   a series upstream publishes as patches rather than as a release
+#                        (bash's bash53-001…), owned by tools/sync-patches.sh, applied
+#                        first, with -p$UPSTREAM_PATCH_STRIP (default 1)
+#   patches/*.patch      ours, `git format-patch` style, applied after them with -p1
+#
+# Each list in C-locale order of the file name, so 0001-… before 0002-….
+
+# package_patches <pkg> — the patch files, one per line, in the order they are applied.
+package_patches() {
+    local dir="packages/$1/patches" sub f
+    for sub in upstream/ ''; do
+        for f in "$dir/$sub"*; do
+            [ -f "$f" ] || continue
+            [ -n "$sub" ] || [[ $f == *.patch ]] || continue
+            printf '%s\n' "$f"
+        done | LC_ALL=C sort
+    done
+}
+
+# patches_digest <pkg> — a hash of exactly which patches would be applied, for the
+# extraction stamp, the CI cache key and the sources image tag. Empty when there are none.
+patches_digest() {
+    local list f
+    list=$(package_patches "$1")
+    [ -n "$list" ] || return 0
+    while read -r f; do
+        printf '%s %s\n' "${f#packages/$1/patches/}" "$(sha256sum <"$f" | cut -d' ' -f1)"
+    done <<< "$list" | sha256sum | cut -d' ' -f1
+}
+
+# apply_patches <pkg> <source-dir> <builder-image> — apply every patch in order, in the
+# builder (the host may have no `patch`, and this way every machine runs the same one),
+# with --network=none like the compile. --fuzz=0: a patch that only applies by guessing is
+# a patch that needs rebasing, and the guess could differ between `patch` versions.
+apply_patches() {
+    local pkg=$1 dir=$2 builder=$3 strip
+    [ -n "$(package_patches "$pkg")" ] || return 0
+    strip=$(env_get "$pkg" UPSTREAM_PATCH_STRIP)
+    # Paths inside the container: packages/<pkg>/patches is mounted at /patches.
+    package_patches "$pkg" | sed "s|^packages/$pkg/patches/|/patches/|" |
+        podman run --rm -i --network=none --security-opt label=disable \
+            --volume "$(realpath "$dir")":/src --volume "$PWD/packages/$pkg/patches":/patches:ro \
+            --workdir /src --env STRIP="${strip:-1}" "$builder" bash -c '
+                set -eu
+                while read -r p; do
+                    case $p in /patches/upstream/*) level=$STRIP ;; *) level=1 ;; esac
+                    echo "  patching: ${p#/patches/} (-p$level)"
+                    if ! patch --batch --forward --fuzz=0 --no-backup-if-mismatch -p"$level" -i "$p" >/tmp/out 2>&1; then
+                        cat /tmp/out >&2
+                        echo "error: ${p#/patches/} does not apply" >&2
+                        if grep -q "previously applied" /tmp/out; then
+                            echo "       upstream has it already, it seems: delete the patch" >&2
+                        fi
+                        exit 1
+                    fi
+                done'
+}

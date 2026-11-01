@@ -27,6 +27,9 @@
 #   UPSTREAM_NUM      ERE of what a release version looks like, replacing $NUM below
 #                     for one package. tz numbers its releases 2026e.
 #
+# With --vendor, the same for the second tarball of a package that gives it a version of
+# its own (VENDOR_VERSION), read from VENDOR_UPSTREAM_* instead.
+#
 # Only plain numeric versions are ever considered, so alphas, betas and release
 # candidates never show up as an update.
 set -euo pipefail
@@ -82,12 +85,30 @@ default_regex() {
     printf '%s' "${escaped/@@V@@/($NUM)}"
 }
 
+vendor=
+[ "${1:-}" = --vendor ] && { vendor=1; shift; }
+
 if [ -z "${1:-}" ]; then
-    echo "usage: $0 <package>" >&2
+    echo "usage: $0 [--vendor] <package>" >&2
     exit 1
 fi
 
 load_env "$(package_name "$1")"
+
+# --vendor: the second tarball, for a package whose env.sh gives it a VENDOR_VERSION of
+# its own (tcpdump's libpcap). Everything below then reads the vendor tarball's name, URL
+# and version, and VENDOR_UPSTREAM_* in place of UPSTREAM_*.
+if [ -n "$vendor" ]; then
+    if [ -z "${VENDOR_VERSION:-}" ]; then
+        echo "error: $PKG: no VENDOR_VERSION; its vendor tarball follows VERSION" >&2
+        exit 1
+    fi
+    TARBALL=$VENDOR_TARBALL URL=$VENDOR_URL VERSION=$VENDOR_VERSION
+    for v in GITHUB INDEX SUBDIR REGEX SED IGNORE NUM; do
+        src="VENDOR_UPSTREAM_$v"
+        printf -v "UPSTREAM_$v" '%s' "${!src:-}"
+    done
+fi
 
 UPSTREAM_GITHUB="${UPSTREAM_GITHUB:-}"
 UPSTREAM_SUBDIR="${UPSTREAM_SUBDIR:-}"

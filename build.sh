@@ -7,6 +7,8 @@
 #
 #   packages/<pkg>/env.sh     VERSION, TARBALL, URL, SHA256, LICENSE, and optionally
 #                             NO_SYSROOT, LOCAL_SOURCE, EXTENSION, VENDOR_*, FOLLOWS.
+#   packages/<pkg>/patches/   optional, applied to the source at extraction
+#                             (docs/guides/patches.md).
 #   packages/<pkg>/build.sh   configure/compile/install, sourced by
 #                             builder/build-package.sh in the unpacked source tree.
 #
@@ -92,6 +94,16 @@ else
 
     # Into packages/<pkg>/$PACKAGE whatever the tarball's top directory is called, so the
     # tree is versioned even when upstream's is not (ca-certificates).
+    #
+    # The patches (packages/<pkg>/patches/, docs/guides/patches.md) are applied here, once,
+    # so the tree is reused like any other — and the stamp beside it names the set it was
+    # patched with, so adding, editing or removing a patch re-extracts rather than building
+    # a tree that no longer matches the checkout.
+    stamp="$PKG_DIR/.$PACKAGE.patches"
+    if [ -d "$PKG_DIR/$PACKAGE" ] && [ "$(cat "$stamp" 2>/dev/null || true)" != "$(patches_digest "$PKG")" ]; then
+        echo "The patches for $PKG changed since $PKG_DIR/$PACKAGE was extracted; extracting again."
+        as_owner rm -rf "$PKG_DIR/$PACKAGE"
+    fi
     if [ ! -d "$PKG_DIR/$PACKAGE" ]; then
         echo "Extracting ${TARBALL}..."
         # Moved into place when complete, so an interrupted extraction is not reused.
@@ -103,6 +115,8 @@ else
         if [ -n "${VENDOR_TARBALL:-}" ]; then
             tar -xf "downloads/$VENDOR_TARBALL" -C "$staging"
         fi
+        apply_patches "$PKG" "$staging" "$BUILDER"
+        patches_digest "$PKG" > "$stamp"
         mv "$staging" "$PKG_DIR/$PACKAGE"
     else
         echo "Directory $PKG_DIR/$PACKAGE already exists, skipping extraction."
@@ -125,8 +139,15 @@ if [ -n "${LOCAL_SOURCE:-}" ]; then
 else
     component_env+=(--env "KAETZLI_ORIGIN=tarball" --env "KAETZLI_URL=$URL" --env "KAETZLI_SHA256=$SHA256")
     if [ -n "${VENDOR_TARBALL:-}" ]; then
-        component_env+=(--env "KAETZLI_VENDOR_URL=$VENDOR_URL" --env "KAETZLI_VENDOR_SHA256=$VENDOR_SHA256")
+        component_env+=(--env "KAETZLI_VENDOR_URL=$VENDOR_URL" --env "KAETZLI_VENDOR_SHA256=$VENDOR_SHA256"
+                        --env "KAETZLI_VENDOR_VERSION=${VENDOR_VERSION:-$VERSION}")
     fi
+    # What was applied on top, as <name>:<sha256>,…, for the SBOM: a patched bash 5.3 is
+    # not the bash 5.3 a scanner would otherwise take it for.
+    patch_list=$(package_patches "$PKG" | while read -r f; do
+                     printf '%s:%s,' "${f#"$PKG_DIR"/patches/}" "$(sha256sum <"$f" | cut -d' ' -f1)"
+                 done)
+    [ -z "$patch_list" ] || component_env+=(--env "KAETZLI_PATCHES=${patch_list%,}")
 fi
 
 # packages/<pkg>/licenses/: license texts for a source that carries none of its own,

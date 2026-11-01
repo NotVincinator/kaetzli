@@ -4,7 +4,7 @@
 # element starting with ",\n", so the caller writes the document around them.
 #
 #   usr/share/kaetzli/components/<pkg>   key=value pins: name, version, license, origin,
-#                                     builder, url, sha256, cpe
+#                                     builder, url, sha256, cpe, patches
 #   usr/share/kaetzli/modules/<pkg>      purls, one per line: the Go modules and Rust crates
 #                                     a package's programs compiled in
 
@@ -20,14 +20,15 @@ spdxid() { printf '%s' "$1" | tr -c 'A-Za-z0-9.-' '-'; }
 # indexes; a record with a cpe= gets it as a SECURITY reference, which is what scanners
 # match C packages by (NVD's CPE dictionary, env.sh's CPE=).
 sbom_component_packages() { # components-dir
-    local record name version license origin url sha256 cpe c key value cpes
+    local record name version license origin url sha256 cpe patches c key value cpes
     for record in "$1"/*; do
-        name= version= license= origin= url= sha256= cpe=
+        name= version= license= origin= url= sha256= cpe= patches=
         while IFS='=' read -r key value; do
             case "$key" in
                 name) name=$value ;; version) version=$value ;; license) license=$value ;;
                 origin) origin=$value ;;
                 url) url=$value ;; sha256) sha256=$value ;; cpe) cpe=$value ;;
+                patches) patches=$value ;;
             esac
         done < "$record"
         [ -n "$name" ] || continue
@@ -55,6 +56,11 @@ sbom_component_packages() { # components-dir
                 "$(jstr "$c")"
         done
         printf ' ],\n'
+        # The tarball's checksum describes the source before packages/<pkg>/patches/; what
+        # was applied on top is said here, each patch by name and SHA-256.
+        if [ -n "$patches" ]; then
+            printf '      "comment": "patched: %s",\n' "$(jstr "${patches//,/, }")"
+        fi
         printf '      "licenseConcluded": "NOASSERTION",\n'
         printf '      "licenseDeclared": "%s",\n' "$(jstr "${license:-NOASSERTION}")"
         printf '      "copyrightText": "NOASSERTION"\n'

@@ -199,12 +199,15 @@ if [ -n "${KAETZLI_PKG:-}" ]; then
         if [ -n "${KAETZLI_URL:-}" ];    then printf 'url=%s\n'    "$KAETZLI_URL";    fi
         if [ -n "${KAETZLI_SHA256:-}" ]; then printf 'sha256=%s\n' "$KAETZLI_SHA256"; fi
         if [ -n "${KAETZLI_CPE:-}" ];    then printf 'cpe=%s\n'    "$KAETZLI_CPE";    fi
+        if [ -n "${KAETZLI_PATCHES:-}" ]; then printf 'patches=%s\n' "$KAETZLI_PATCHES"; fi
     } > "$components/$KAETZLI_PKG"
     # Vendored dependencies are a component of their own, with their own checksum.
     if [ -n "${KAETZLI_VENDOR_URL:-}" ]; then
         {
+            # Its own version where it has one (libpcap in tcpdump, VENDOR_VERSION); a Rust
+            # package's crates are versioned with the package.
             printf 'name=%s\n'    "$KAETZLI_PKG-vendor"
-            printf 'version=%s\n' "${KAETZLI_VERSION:-}"
+            printf 'version=%s\n' "${KAETZLI_VENDOR_VERSION:-${KAETZLI_VERSION:-}}"
             printf 'license=%s\n' "${KAETZLI_LICENSE:-NOASSERTION}"
             printf 'origin=tarball\n'
             printf 'builder=%s\n' "${KAETZLI_BUILDER:-}"

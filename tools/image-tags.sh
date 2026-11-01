@@ -28,8 +28,9 @@ case "${1:-}" in
         exit 0
         ;;
     sources)
-        # Every pinned version and its checksum. A version bump changes the tag, which is
-        # the point — the image contents changed. Nothing else in env.sh matters here:
+        # Every pinned version and its checksum, and the patches. A version bump changes
+        # the tag, which is the point — the image contents changed. Nothing else in env.sh
+        # matters here:
         # a changed URL that still yields the same bytes is the same image.
         # LOCAL_SOURCE packages contribute nothing: they put no tarball in the image, so
         # bumping one must not invalidate a tag that describes the tarballs.
@@ -40,6 +41,10 @@ case "${1:-}" in
                          if [ -n "${VENDOR_TARBALL:-}" ]; then
                              printf '%s %s %s\n' "$PKG" "$VENDOR_TARBALL" "$VENDOR_SHA256"
                          fi
+                         # The patches it carries (tools/prep.sh copies them in). Nothing
+                         # for a package without any, so this leaves every other tag alone.
+                         digest=$(patches_digest "$PKG")
+                         [ -z "$digest" ] || printf '%s patches %s\n' "$PKG" "$digest"
                      fi )
                done | sort | sha256sum)
         ;;

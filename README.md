@@ -167,9 +167,12 @@ kernel paths it requires, for example:
 ./test/podman.sh output/rootfs.erofs rootfs/boot/bzImage
 ```
 
-`./tools/check-updates.sh` checks pinned package versions. `./tools/bump-version.sh
-<package> <version>` updates a package pin and checksum. The weekly update workflow opens
-pull requests for available updates.
+`./tools/check-updates.sh` checks pinned package versions, vendored second tarballs and
+upstream patch series. `./tools/bump-version.sh <package> <version>` updates a package pin
+and checksum. The nightly update workflow opens pull requests for available updates.
+
+A package can carry patches in `packages/<name>/patches/`; `./tools/check-patches.sh`
+tests in seconds whether they apply. See [Patches](docs/guides/patches.md).
 
 To add a package, create `packages/<name>/env.sh` and `packages/<name>/build.sh`; declare
 its version, source URL, checksum, and license in `env.sh`. See `CLAUDE.md` for build-system

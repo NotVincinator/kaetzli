@@ -151,7 +151,9 @@ scratch directory for downloaded artifacts — it deliberately does not collide 
 ./test/kernel-config-diff.sh <old> <new> [src]  # what a kernel build turned on or off
 ./test/check-licenses.sh                # every package declares a DFSG-free license
 ./test/selftest.sh                      # the static checks above fail on broken fixture trees, and pass on a good one
-./tools/check-updates.sh [pkg...] # what upstream has released since the pinned VERSION
+./tools/check-updates.sh [pkg...] # what upstream has released since the pinned VERSION, VENDOR_VERSION and patch series
+./tools/check-patches.sh [--version V] [pkg...]  # packages/<pkg>/patches apply to the tarball (seconds; no build)
+./tools/sync-patches.sh [--list] <pkg>  # patches/upstream/ = upstream's patch series (bash53-NNN)
 ./test/boot.sh output/rootfs.erofs rootfs/boot/bzImage   # headless boot smoke test (reads rootfs.cmdline beside the image)
 ./test/systemd.sh output/rootfs.erofs rootfs/boot/bzImage  # no failed units
 ./test/network.sh output/rootfs.erofs rootfs/boot/bzImage  # DHCP + DNS + outbound TCP
@@ -268,6 +270,18 @@ nothing and says nothing. `rm -f` is for lists longer than any one build install
 elsewhere. `SHA256` cannot be derived, so a bump is two lines: use
 `tools/bump-version.sh <pkg> <version>`, which writes both and verifies the tarball. A bump
 of `VERSION` alone fails the `sources` job as *CHECKSUM MISMATCH*.
+
+**Patches** (`docs/guides/patches.md`): `packages/<pkg>/patches/upstream/*` (a series
+upstream publishes, owned by `tools/sync-patches.sh`, `-p$UPSTREAM_PATCH_STRIP`) then
+`patches/*.patch` (ours, `-p1`), applied by `build.sh` at extraction in the builder with
+`--fuzz=0`. They are in the extraction stamp, the cache key, the sources image and its tag,
+and the SBOM. Ours is upstream's commit verbatim, for a fix not yet released; a bump to the
+release that has it fails until the patch is deleted, which is the point.
+
+**`VENDOR_VERSION`**: a second tarball with a version of its own (tcpdump's libpcap,
+linux-tools' libtraceevent) is checked by `check-updates.sh` as `<pkg>/<VENDOR_NAME>`, from
+`VENDOR_UPSTREAM_*`, and moved by `bump-version.sh --vendor`. Without it the vendor tarball
+follows `VERSION` (netavark's crates).
 
 **`LOCAL_SOURCE=1`**: the source is `packages/<pkg>/src/` in git (`packages/kaetzlifetch`), with
 no `TARBALL`, `URL` or `SHA256`. `build.sh` mounts it **read-only**, so the build must
