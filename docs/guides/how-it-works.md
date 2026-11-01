@@ -84,7 +84,9 @@ CI repeats image assembly from the same package artifacts and compares the resul
 SBOM, and extension bytes. This checks deterministic assembly; it is not an independent
 rebuild of all package sources. The CVE scan is informational and does not gate the result.
 Kubernetes cluster and node-conformance jobs also run, but are separate from the required
-result. Scheduled fresh builds check that pinned inputs can still be fetched and rebuilt.
+result. Node conformance takes most of an hour, so a push runs it only when it changes
+`packages/`, `builder/`, `image/`, the test or `ci.yml`; scheduled and manual runs always do.
+Scheduled fresh builds check that pinned inputs can still be fetched and rebuilt.
 
 Checks cover package licenses, shared-library dependencies and symbols, kernel options,
 image contents and size, reproducibility, real boots, networking, SSH, containers, and

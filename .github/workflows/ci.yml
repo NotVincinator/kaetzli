@@ -45,6 +45,7 @@ jobs:
       contents: read
     outputs:
       build: ${{ steps.diff.outputs.build }}
+      node_conformance: ${{ steps.diff.outputs.node_conformance }}
     steps:
       - name: Classify the changed files
         id: diff
@@ -54,7 +55,7 @@ jobs:
           BEFORE: ${{ github.event.before }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          build=true
+          build=true node_conformance=true
           if [ "$EVENT" = push ]; then
             base=$BEFORE
             case "$base" in ''|0000000000000000000000000000000000000000) base=$DEFAULT_BRANCH ;; esac
@@ -65,9 +66,18 @@ jobs:
                  ! printf '%s\n' "$files" | grep -qvE '^(docs/.*|[^/]*\.md)$'; then
                 build=false
               fi
+              # Node conformance takes most of an hour, so it runs only for a change to
+              # what the image is made of (any package, the builder, the assembly and
+              # /etc) or to the test itself.
+              if [ "$count" -gt 0 ] && [ "$count" -lt 300 ] &&
+                 ! printf '%s\n' "$files" | grep -qE '^(packages/|builder/|image/|test/node-conformance\.sh$|test/qemu-lib\.sh$|tools/build-node-e2e\.sh$|\.github/workflows/ci\.yml$)'; then
+                node_conformance=false
+              fi
             fi
           fi
+          [ "$build" = true ] || node_conformance=false
           echo "build=$build" | tee -a "$GITHUB_OUTPUT"
+          echo "node_conformance=$node_conformance" | tee -a "$GITHUB_OUTPUT"
           if [ "$build" = false ]; then
             echo "Documentation only: the image build is skipped, \`docs\` checks the change." >> "$GITHUB_STEP_SUMMARY"
           fi
@@ -783,10 +793,14 @@ jobs:
   # [NodeConformance] specs, on one node with the kubernetes extension. Like k8s, it needs
   # KVM (it skips without) and registry.k8s.io, so nothing waits on it. Failed specs are
   # annotations and in the job summary; the suite's output and results are an artifact.
+  # It takes most of an hour, so only a push that changes the image runs it (`changes`);
+  # the scheduled and manual runs always do.
   node-conformance:
     runs-on: *runner
     needs:
+      - changes
       - rootfs
+    if: needs.changes.outputs.node_conformance == 'true'
     strategy: *per-arch
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
