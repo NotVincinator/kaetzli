@@ -628,9 +628,8 @@ jobs:
           name: boot-console-log-${{ matrix.arch }}
           path: output/*.log
 
-  # grind, which turns the CVE reports into a workbook (test/cve-workbook.sh). It has no
-  # releases yet, so this builds the commit that script pins, once per commit thanks to the
-  # cache, and alongside the image build rather than after it. Gates nothing.
+  # grind from main, which turns the CVE reports into a workbook (test/cve-workbook.sh).
+  # Builds alongside the image. Gates nothing.
   grind:
     needs: changes
     if: needs.changes.outputs.build == 'true'
@@ -641,36 +640,19 @@ jobs:
     strategy: *per-arch
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: The pinned commit
-        id: pin
-        run: sed -n 's/^GRIND_COMMIT=/commit=/p' test/cve-workbook.sh | tee -a "$GITHUB_OUTPUT"
-
-      - name: Restore grind
-        id: cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ~/.cache/flfs/grind-${{ steps.pin.outputs.commit }}/grind
-          key: grind-${{ matrix.arch }}-${{ steps.pin.outputs.commit }}
+          repository: fwilhe2/grind
 
       - name: Build grind
-        if: steps.cache.outputs.cache-hit != 'true'
         run: |
           rustup toolchain install stable --profile minimal
           rustup default stable
-          GRIND_PINNED=1 ./test/cve-workbook.sh --grind
-
-      - name: Save grind
-        if: steps.cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/flfs/grind-${{ steps.pin.outputs.commit }}/grind
-          key: ${{ steps.cache.outputs.cache-primary-key }}
+          cargo build --locked --release --no-default-features -p grind-cli
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: grind-${{ matrix.arch }}
-          path: ~/.cache/flfs/grind-${{ steps.pin.outputs.commit }}/grind
+          path: target/release/grind
           if-no-files-found: error
 
   # Known vulnerabilities in what this build ships (test/cve-scan.sh), and how the count
@@ -715,7 +697,7 @@ jobs:
             chmod +x grind/grind # an artifact does not keep the mode
             export GRIND=$PWD/grind/grind
           fi
-          GRIND_PINNED=1 ./test/cve-workbook.sh output
+          ./test/cve-workbook.sh output
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
