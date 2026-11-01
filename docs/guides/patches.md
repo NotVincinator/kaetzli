@@ -91,7 +91,7 @@ example:
 CVE: CVE-2026-12345
 ```
 
-The build records these fixes in the package's SBOM. `test/cve-scan.sh` converts them to
+The build records these fixes in the package's SBOM. `test/cve-scan.py` converts them to
 OpenVEX statements for grype, so fixed CVEs are reported as patched rather than open. The
 CI scan is informational; it does not gate the build.
 

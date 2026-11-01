@@ -1,0 +1,29 @@
+{
+  "matches": [
+    {"vulnerability": {"id": "CVE-2026-1", "severity": "Medium", "fix": {"versions": [], "state": ""}, "cvss": [{"metrics": {"baseScore": 4.3}}]},
+     "relatedVulnerabilities": [], "artifact": {"name": "openssh", "version": "10.6p1"}},
+    {"vulnerability": {"id": "CVE-2026-1", "severity": "High", "fix": {"versions": ["10.7p1"], "state": "fixed"}},
+     "artifact": {"name": "openssh", "version": "10.6p1"}},
+    {"vulnerability": {"id": "CVE-2026-2", "severity": "Critical", "fix": {"versions": ["7.3.2"], "state": "fixed"}, "cvss": [{"metrics": {"baseScore": 9.8}}, {"metrics": {"baseScore": 7.5}}]},
+     "relatedVulnerabilities": [], "artifact": {"name": "kernel", "version": "7.3.1"}},
+    {"vulnerability": {"id": "GO-2026-3", "severity": "High", "fix": {"versions": ["0.60.0", "0.61.0"], "state": "fixed"}},
+     "relatedVulnerabilities": [{"id": "GHSA-aaaa-bbbb-cccc", "cvss": []}, {"id": "CVE-2026-3", "cvss": [{"metrics": {"baseScore": 7.5}}]}],
+     "artifact": {"name": "golang.org/x/net", "version": "v0.57.0"}},
+    {"vulnerability": {"id": "CVE-2026-4", "severity": "Negligible", "fix": {"versions": [], "state": "not-fixed"}},
+     "artifact": {"name": "kernel", "version": "7.3.1"}},
+    {"vulnerability": {"id": "CVE-2026-5", "fix": {"versions": [], "state": ""}},
+     "artifact": {"name": "kernel", "version": "7.3.1"}},
+    {"vulnerability": {"id": "CVE-2026-0", "severity": "Low", "fix": {"versions": [], "state": ""}},
+     "artifact": {"name": "tar", "version": "1.35"}}
+  ],
+  "ignoredMatches": [
+    {"vulnerability": {"id": "CVE-2026-6", "severity": "Medium"}, "artifact": {"name": "glibc", "version": "2.44"},
+     "appliedIgnoreRules": [{"namespace": "vex", "vex-status": "fixed"}]},
+    {"vulnerability": {"id": "CVE-2026-6", "severity": "Medium"}, "artifact": {"name": "glibc", "version": "2.44"},
+     "appliedIgnoreRules": [{"namespace": "vex", "vex-status": "fixed"}]},
+    {"vulnerability": {"id": "CVE-2026-7"}, "artifact": {"name": "bash", "version": "5.3"},
+     "appliedIgnoreRules": [{"namespace": "vex", "vex-status": "fixed"}]},
+    {"vulnerability": {"id": "CVE-2026-8", "severity": "High"}, "artifact": {"name": "glibc", "version": "2.44"},
+     "appliedIgnoreRules": [{"namespace": "", "vulnerability": "CVE-2026-8"}]}
+  ]
+}

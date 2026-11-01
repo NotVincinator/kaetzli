@@ -1,0 +1,46 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-glibc",
+      "name": "glibc",
+      "versionInfo": "2.44",
+      "externalRefs": [
+        { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:generic/glibc@2.44" },
+        { "referenceCategory": "SECURITY", "referenceType": "cpe23Type", "referenceLocator": "cpe:2.3:a:gnu:glibc:2.44:*:*:*:*:*:*:*" },
+        { "referenceCategory": "SECURITY", "referenceType": "fix", "referenceLocator": "git+https://sourceware.org/git/glibc.git@0b4e", "comment": "CVE-2026-18374 fixed by upstream/0039-libio-Fix.patch" },
+        { "referenceCategory": "SECURITY", "referenceType": "fix", "referenceLocator": "git+https://sourceware.org/git/glibc.git@63b5", "comment": "CVE-2026-19499 fixed by upstream/0029-stdlib-Fix.patch" }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-gawk",
+      "name": "gawk",
+      "versionInfo": "5.3.1",
+      "externalRefs": [
+        { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:generic/gawk@5.3.1" }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Package-tcpdump-vendor",
+      "name": "tcpdump-vendor",
+      "versionInfo": "1.10.5"
+    },
+    {
+      "SPDXID": "SPDXRef-Package-bash",
+      "name": "bash",
+      "versionInfo": "5.3",
+      "externalRefs": [
+        { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:generic/bash@5.3" },
+        { "referenceCategory": "SECURITY", "referenceType": "fix", "referenceLocator": "https://x", "comment": "CVE-2026-7 fixed by ours.patch" },
+        { "referenceCategory": "SECURITY", "referenceType": "fix", "referenceLocator": "https://y", "comment": "not a CVE" }
+      ]
+    },
+    {
+      "SPDXID": "SPDXRef-Module-podman-golang.org-x-net-v0.57.0",
+      "name": "golang.org/x/net",
+      "versionInfo": "v0.57.0",
+      "externalRefs": [ { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:golang/golang.org/x/net@v0.57.0" } ]
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+_17 findings, 15 distinct CVEs, from 4 reports_
+_every column, Red Hat's statements included: <dir>/cve-context.tsv_

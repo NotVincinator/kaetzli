@@ -7,7 +7,7 @@
 # Tab-separated: the CVE, the patch under packages/<pkg>/patches/, and where the fix comes
 # from (the upstream commit, the upstream patch file, or the patch in this repository).
 # build.sh records these in the package's component record, image/sbom.sh turns them into
-# SPDX `fix` references, and test/cve-scan.sh into an OpenVEX document grype applies, so
+# SPDX `fix` references, and test/cve-scan.py into an OpenVEX document grype applies, so
 # a CVE a patch closes is reported as patched rather than open (docs/guides/patches.md).
 #
 # Two sources, because neither is complete:

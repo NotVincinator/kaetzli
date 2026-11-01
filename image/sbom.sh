@@ -58,7 +58,7 @@ sbom_component_packages() { # components-dir
                 "$(jstr "$c")"
         done
         # A CVE one of packages/<pkg>/patches fixes: SPDX's `fix` reference, the code that
-        # fixes it, with the CVE first in the comment. test/cve-scan.sh reads these back
+        # fixes it, with the CVE first in the comment. test/cve-scan.py reads these back
         # into OpenVEX, so the scan reports the CVE as patched instead of open.
         while read -r cve file loc; do
             [ -n "$cve" ] || continue

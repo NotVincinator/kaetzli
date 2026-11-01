@@ -1,0 +1,40 @@
+name: Python
+
+# python/: the kaetzli package behind the Python scripts in test/ and tools/, its tests
+# and its lint. Its own workflow, like selftest.yml: it needs nothing built, and a broken
+# report should be answered in seconds. The lock must match pyproject.toml (--locked), so
+# a dependency change without `uv lock` fails here rather than on someone's machine.
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-26.04
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the history tests ask git about this repository's commits
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.13.1"
+          enable-cache: true
+          cache-dependency-glob: python/uv.lock
+
+      - name: Lock is current
+        run: uv lock --check
+
+      - name: Lint
+        run: |
+          uv run --locked ruff check .
+          uv run --locked ruff format --check .
+
+      - name: Tests
+        run: uv run --locked pytest

@@ -322,8 +322,8 @@ to start. With no `kernel.panic`, a panicked node hangs forever instead of reboo
 which NVD files under two vendors each), Go modules and Rust crates in the SBOM
 (`builder/build-package.sh`, `image/sbom.sh`), an SBOM per extension,
 a package the assembly removes whole (the container image's kernel, kmod and PAM) left
-out of that flavour's SBOM, and a `cve-scan` job that nothing waits on: `test/cve-scan.sh`
-(grype, pinned) and `test/cve-history.sh`, which rescans the last builds' SBOMs with one
+out of that flavour's SBOM, and a `cve-scan` job that nothing waits on: `test/cve-scan.py`
+(grype, pinned) and `test/cve-history.py`, which rescans the last builds' SBOMs with one
 database so that a step in the count is the image's doing, and sums the steps by whether
 the updater's commits made them. Step 4 (`check-sbom.sh` requiring the references) is not done.
 
@@ -343,7 +343,7 @@ Known gaps:
   `release/2.44/master` but cuts no tarball, so building from that branch is a decision
   of its own.
 - **History before this change** is the base image only (no extension SBOMs, no
-  modules), with today's CPEs added by `cve-history.sh`.
+  modules), with today's CPEs added by `cve-history.py`.
 
 **Inspiration:** Flatcar security-triage, `src/*/sbom.py` (`SBOMIndex.from_spdx`, which
 indexes Flatcar's production SPDX SBOM by package name and version), `go_vulndb.py` and

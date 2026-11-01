@@ -1,0 +1,6 @@
+{"matches": [
+  {"vulnerability": {"id": "GO-2026-3", "severity": "High", "fix": {"versions": ["0.60.0"], "state": "fixed"}},
+   "artifact": {"name": "golang.org/x/net", "version": "v0.57.0"}},
+  {"vulnerability": {"id": "CVE-2026-9", "severity": "Critical", "fix": {"versions": [], "state": ""}},
+   "artifact": {"name": "podman", "version": "5.7.0"}}
+], "ignoredMatches": []}

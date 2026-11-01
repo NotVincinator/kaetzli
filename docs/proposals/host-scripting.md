@@ -1,9 +1,9 @@
 # Host-side scripts: which language for which job
 
-**Status: proposal.** Every script in `test/`, `tools/`, `image/` and `builder/` is bash
-today. CLAUDE.md (*Host-side code*) now allows Python and Go for what runs on the host,
-in CI or in a builder container; nothing has been rewritten. This page reviews the
-scripts against that rule and orders the migration.
+**Status: proposal, partly implemented.** Implemented: item 1, the CVE reports
+(`python/`, see its README). CLAUDE.md (*Host-side code*) allows Python and Go for what
+runs on the host, in CI or in a builder container. This page reviews the scripts against
+that rule and orders the migration.
 
 Bash remains the only interpreter *in the image*. This is about the repository's tooling.
 
@@ -21,7 +21,11 @@ bash would be more to maintain, not less.
 
 ## Move to Python, by payoff
 
-### 1. CVE reports: `test/cve-context.sh`, `cve-scan.sh`, `cve-history.sh`
+### 1. CVE reports: `test/cve-context.py`, `cve-scan.py`, `cve-history.py` (done)
+
+Ported with no dependency beyond the stdlib; `python-debian` was not needed to stay
+byte-identical, and changing the version comparison is a change of its own. What the
+bash versions said:
 
 `cve-context.sh` is about 280 lines, most of them a jq program that joins five sources,
 plus a curl cache and `xargs -P 8 bash -c` with exported functions. Its Debian version
@@ -51,8 +55,8 @@ Dependencies: none in the assembly image; `spdx-tools` for the check.
 These are awk sparklines, associative arrays of directory sizes and markdown tables, and
 `size-history.sh` repeats the "last N green runs on main that still have artifact X" loop.
 That loop also appears in `cve-context.sh`, `cve-history.sh`, `fetch-image.sh`,
-`reproducible.sh` and `dispatch-ci.sh`. It is the first thing the shared Python module
-should hold: one function over `gh run list` / `gh run download`.
+`reproducible.sh` and `dispatch-ci.sh`. The shared module now has it, from item 1:
+`kaetzli.gh.Gh` (`successful_runs`, `newest_run_with`, `download`).
 
 Dependencies: none (stdlib and the `gh` CLI).
 

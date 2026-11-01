@@ -1,0 +1,45 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://github.com/fwilhe2/kaetzli/vex",
+  "author": "kaetzli build (tools/patch-cves.sh)",
+  "timestamp": "2026-01-01T00:00:00Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "CVE-2026-18374"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/glibc@2.44"
+        }
+      ],
+      "status": "fixed",
+      "status_notes": "fixed by packages/glibc/patches/upstream/0039-libio-Fix.patch"
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-19499"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/glibc@2.44"
+        }
+      ],
+      "status": "fixed",
+      "status_notes": "fixed by packages/glibc/patches/upstream/0029-stdlib-Fix.patch"
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-7"
+      },
+      "products": [
+        {
+          "@id": "pkg:generic/bash@5.3"
+        }
+      ],
+      "status": "fixed",
+      "status_notes": "fixed by packages/bash/patches/ours.patch"
+    }
+  ]
+}

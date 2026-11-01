@@ -1,0 +1,26 @@
+[project]
+name = "kaetzli"
+version = "0"
+description = "Host-side tooling for kaetzli: the code behind the Python scripts in test/ and tools/"
+requires-python = ">=3.12"
+# Runtime dependencies are an argument each (CLAUDE.md, Host-side code). None yet: the
+# stdlib and the gh CLI cover the CVE reports.
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest", "ruff"]
+
+[build-system]
+requires = ["uv_build>=0.9,<0.13"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "-ra"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]

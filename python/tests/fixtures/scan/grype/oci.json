@@ -1,0 +1,7 @@
+{"matches": [
+  {"vulnerability": {"id": "CVE-2026-0", "severity": "Low", "fix": {"versions": [], "state": ""}},
+   "artifact": {"name": "tar", "version": "1.35"}}
+], "ignoredMatches": [
+  {"vulnerability": {"id": "CVE-2026-6", "severity": "Medium"}, "artifact": {"name": "glibc", "version": "2.44"},
+   "appliedIgnoreRules": [{"namespace": "vex", "vex-status": "fixed"}]}
+]}

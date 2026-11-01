@@ -1,0 +1,8 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "packages": [
+    { "SPDXID": "SPDXRef-Package-podman", "name": "podman", "versionInfo": "5.7.0",
+      "externalRefs": [ { "referenceCategory": "PACKAGE-MANAGER", "referenceType": "purl", "referenceLocator": "pkg:generic/podman@5.7.0" } ] }
+  ]
+}

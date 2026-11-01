@@ -1,0 +1,3 @@
+grype -q sbom-erofs.json --vex erofs.vex.json -o json
+grype -q sbom-ext-podman.json -o json
+grype -q sbom-oci.json --vex oci.vex.json -o json

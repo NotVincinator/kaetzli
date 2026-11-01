@@ -26,3 +26,11 @@ artifacts
 # Local additions laid over the image by tools/build-image.sh (see the header of
 # tools/build-image.sh). Never part of a CI build.
 /extra
+
+# Python: python/'s virtualenv (uv makes it from python/uv.lock), and what Python, pytest
+# and ruff leave beside the code.
+.venv
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/

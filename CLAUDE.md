@@ -119,6 +119,8 @@ docs/             design notes; each says at the top whether it is implemented.
                   how-it-works.md is the mechanics and pitfalls of the system as it is,
                   debugging.md the debug extension, linking.md how a binary finds its
                   libraries
+python/           the kaetzli package behind the .py scripts in test/ and tools/: its
+                  code, tests, pyproject.toml and the one uv.lock (python/README.md)
 examples/         images built FROM the published kaetzli image, each with its own README;
                   templates for users, not part of a build or of CI
 downloads/        source tarballs (gitignored)
@@ -143,7 +145,7 @@ Constraint 5 is about the image. What runs on the host, in CI or in a builder co
 is not bound to bash, and bash is not the default: it is hard to read and review, and much
 of `test/` and `tools/` is JSON, HTTP, joins and report tables written in jq, awk and
 `declare -A`. Choose per job. `docs/proposals/host-scripting.md` reviews every script
-against this and orders the migration; nothing has been rewritten yet.
+against this and orders the migration; the CVE reports are done.
 
 - **Bash** where the job *is* a sequence of commands and their exit codes: anything
   sourced by a package build (`builder/build-package.sh`, `packages/*/build.sh`, `env.sh`,
@@ -158,14 +160,14 @@ against this and orders the migration; nothing has been rewritten yet.
   is no Python. Not as a second general-purpose language beside Python.
 - **`env.sh` stays bash.** Python reads a package's pins through bash (`env_get`, or
   `bash -c 'source …; printf …'`), never by parsing the file.
-- **Virtualenvs, always, via uv.** A Python script declares its dependencies inline
-  (PEP 723: `# /// script`, `requires-python`, `dependencies`), starts with
-  `#!/usr/bin/env -S uv run --script`, and is locked with `uv lock --script` (the
-  `<script>.lock` beside it is committed). uv creates and caches the venv. Never
-  `pip install` into a system or user site, never rely on the host's packages, never
-  `sudo pip`. CI installs a pinned uv. Shared helpers, the Python counterpart of
-  `tools/lib.sh`, live in one module under `tools/` that scripts import after they `cd`
-  to the repository root. A script with only stdlib imports still has the header.
+- **One project, one venv, one lock, via uv.** The code is the `kaetzli` package in
+  `python/src/` (`kaetzli.repo`, `.report`, `.gh`, `.http_cache` are what `tools/lib.sh`
+  is to bash: reach for them first). An entry point in `test/` or `tools/` is five lines
+  that call `python/launch.py`, which execs `uv run --locked --project python`, so it
+  runs in `python/.venv` as made from `python/uv.lock`, from any directory. Never
+  `pip install`, never rely on the host's packages; a dependency is a line in
+  `pyproject.toml` and a `uv lock`. CI installs a pinned uv (`astral-sh/setup-uv`), and
+  Dependabot proposes lock updates two weeks after a release.
 - **Dependencies** must be established and maintained (`requests`, `pyelftools`,
   `python-debian`, `license-expression`, `spdx-tools`, `pexpect`, `pytest`), pinned by the
   lock, and argued like a package: *what does it drag in?* Prefer the stdlib when it is
@@ -174,12 +176,19 @@ against this and orders the migration; nothing has been rewritten yet.
   container (python3 in `image/Containerfile` is builder-side), on files, and nothing it
   imports is copied into the tree. `test/image-files/interpreters.txt` already fails a
   `.py` in the tree; a python binary would need an `absent` line of its own.
+- **Tests, first.** Python gets pytest tests under `python/tests/`, written before the
+  code and seen to fail (red, then green), and `.github/workflows/python.yml` runs them
+  with `ruff check`, `ruff format --check` and `uv lock --check`. Collaborators are
+  injected (`gh`'s runner, the HTTP fetch, grype's binary) so a test needs no network.
 - **Lint**: `ruff check` and `ruff format` for Python, `go vet`/`gofmt` for Go,
   `shellcheck` for bash.
 - **A rewrite changes the language, not the behaviour**, and is proved like a refactor
   of `build-rootfs.sh`: the same output before and after (byte-identical reports,
   SBOMs, exit codes), and every check `test/selftest.sh` covers still fails on its
-  fixtures, naming what is wrong. One script per pull request.
+  fixtures, naming what is wrong. The bash version's output on the fixtures is committed
+  as a golden file the Python must reproduce; a bug fixed on the way is a deliberate
+  difference, edited into the golden and said so. One script, or one family sharing
+  code, per pull request.
 
 ## Commands
 
@@ -221,10 +230,10 @@ against this and orders the migration; nothing has been rewritten yet.
 ./test/vs-debian-slim.sh          # the OCI image against debian-slim, with both breakdowns
 ./test/size-history.sh [amd64|arm64]  # both flavours against the last dozen builds on main
 ./test/check-sbom.sh              # the SPDX documents parse and carry their provenance
-./test/cve-scan.sh [dir]          # known CVEs in the SBOMs, by grype (report only; the cve-scan job)
-./test/cve-workbook.sh [dir]      # cve-scan.sh's reports as <dir>/cve.ods, by grind ($GRIND or PATH; CI builds it from main)
-./test/cve-history.sh [amd64|arm64]  # the CVE count over the last builds on main, rescanned with one database, steps by update/other
-./test/cve-context.sh [dir]       # cve-scan.sh's findings (output/, else CI's newest; RUN=, ARCH=) with EPSS, CISA KEV, Debian/Ubuntu/Red Hat verdicts, grouped by triage hint (report)
+./test/cve-scan.py [dir]          # known CVEs in the SBOMs, by grype (report only; the cve-scan job)
+./test/cve-workbook.sh [dir]      # cve-scan.py's reports as <dir>/cve.ods, by grind ($GRIND or PATH; CI builds it from main)
+./test/cve-history.py [amd64|arm64]  # the CVE count over the last builds on main, rescanned with one database, steps by update/other
+./test/cve-context.py [dir]       # cve-scan.py's findings (output/, else CI's newest; RUN=, ARCH=) with EPSS, CISA KEV, Debian/Ubuntu/Red Hat verdicts, grouped by triage hint (report)
 ./test/check-doc-links.sh         # relative links in the tracked markdown resolve
 ./test/check-image-files.sh       # each assembled image against test/image-files/: what must and must not ship
 ./test/check-tree-hygiene.sh <tree>  # nothing world-writable, no dangling symlink (build-rootfs.sh runs it on each flavour)
@@ -241,8 +250,8 @@ against this and orders the migration; nothing has been rewritten yet.
 ./tools/build-node-e2e.sh         # e2e_node.test + ginkgo for the pinned Kubernetes, in a golang container
 ```
 
-There is no unit-test suite — the checks above plus a real boot are the verification
-story (Python, as it lands, is linted as *Host-side code* says). The checks themselves are tested: `test/selftest.sh` builds small
+The checks above plus a real boot are the verification story for the image. The Python
+tooling has its own unit tests (`cd python && uv run pytest`, *Host-side code*). The checks themselves are tested: `test/selftest.sh` builds small
 trees broken in one way each and requires every tree check to fail on its fixture *naming
 what is wrong*. A check that skips what it cannot judge passes vacuously, so a new check,
 or a new case in one, gets a fixture that must produce a finding.
@@ -425,7 +434,7 @@ name for it, space-separated where NVD has two) becomes a `cpe23Type` reference 
 compiled in (`go version -m`, `cargo tree -e normal`, recorded by `build-package.sh` in
 `usr/share/kaetzli/modules/`) become packages it `CONTAINS`: those two are what scanners match.
 A CVE a patch fixes (`tools/patch-cves.sh`) is a SPDX `fix` reference on its package, and
-`test/cve-scan.sh` makes OpenVEX of those, so grype reports it patched rather than open.
+`test/cve-scan.py` makes OpenVEX of those, so grype reports it patched rather than open.
 `image/sbom.sh` is shared with `build-extension.sh`, which writes `sbom-ext-<name>.json`.
 Unresolved libraries
 are `DEPENDS_ON` without `CONTAINS`, computed like `check-rootfs-deps.sh` (a library is a
