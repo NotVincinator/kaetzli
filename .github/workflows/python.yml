@@ -2,8 +2,10 @@ name: Python
 
 # python/: the kaetzli package behind the Python scripts in test/ and tools/, its tests
 # and its lint. Its own workflow, like selftest.yml: it needs nothing built, and a broken
-# report should be answered in seconds. The lock must match pyproject.toml (--locked), so
-# a dependency change without `uv lock` fails here rather than on someone's machine.
+# report should be answered in seconds. It runs on Python 3.12, the baseline, and on the
+# newest release, and on the baseline the lock must be what requirements.in compiles to,
+# so a dependency change without python/lock.sh fails here rather than on someone's
+# machine. No uv (CLAUDE.md, Host-side code): the venv is python3 -m venv and pip.
 on:
   push:
   workflow_dispatch:
@@ -13,6 +15,10 @@ permissions:
 
 jobs:
   python:
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.x"]
     runs-on: ubuntu-26.04
     defaults:
       run:
@@ -22,21 +28,29 @@ jobs:
         with:
           fetch-depth: 0 # the history tests ask git about this repository's commits
 
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          version: "0.13.1"
-          enable-cache: true
-          cache-dependency-glob: python/uv.lock
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: python/requirements.txt
 
+      - name: Make the venv
+        run: python3 launch.py
+
+      # What python/lock.sh does, without the container: compile requirements.in with the
+      # pinned pip-tools, keeping every pin, and require the committed file back.
       - name: Lock is current
-        run: uv lock --check
+        if: matrix.python == '3.12'
+        run: |
+          python3 launch.py piptools compile requirements.in
+          git diff --exit-code requirements.txt
 
       # ../image/*.py: what the assembly container runs on its own python3, stdlib only,
       # outside the package but held to its rules (CLAUDE.md, Host-side code).
       - name: Lint
         run: |
-          uv run --locked ruff check . ../image/*.py
-          uv run --locked ruff format --check . ../image/*.py
+          python3 launch.py ruff check . ../image/*.py
+          python3 launch.py ruff format --check . ../image/*.py
 
       - name: Tests
-        run: uv run --locked pytest
+        run: python3 launch.py pytest

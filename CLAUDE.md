@@ -120,7 +120,7 @@ docs/             design notes; each says at the top whether it is implemented.
                   debugging.md the debug extension, linking.md how a binary finds its
                   libraries
 python/           the kaetzli package behind the .py scripts in test/ and tools/: its
-                  code, tests, pyproject.toml and the one uv.lock (python/README.md)
+                  code, tests, requirements.in and the one lock (python/README.md)
 examples/         images built FROM the published kaetzli image, each with its own README;
                   templates for users, not part of a build or of CI
 downloads/        source tarballs (gitignored)
@@ -161,14 +161,27 @@ and the library checks are done.
   is no Python. Not as a second general-purpose language beside Python.
 - **`env.sh` stays bash.** Python reads a package's pins through bash (`env_get`, or
   `bash -c 'source …; printf …'`), never by parsing the file.
-- **One project, one venv, one lock, via uv.** The code is the `kaetzli` package in
+- **Python 3.12 is the baseline**: the host's `python3`, from the distribution (Debian,
+  Ubuntu, Fedora; nothing else is a target for the tooling). Code must run on 3.12 and on
+  the newest release, and `python.yml` tests both. `requires-python`, ruff's
+  `target-version` and `python/.python-version` say 3.12, and a test holds them together;
+  raising it is a decision of its own, made when the oldest distribution we care about
+  has moved.
+- **uv is a no-go dependency.** It is a fine tool, but it is one company's, and the
+  tooling must not depend on it: not to run, not to lock, not in CI. The same goes for
+  any tool that installs its own Python. The standard pieces do the job: `python3 -m
+  venv`, pip with `--require-hashes`, and a lock compiled by pip-tools.
+  `test_uv_is_not_a_dependency` fails on a reference to it.
+- **One project, one venv, one lock.** The code is the `kaetzli` package in
   `python/src/` (`kaetzli.repo`, `.report`, `.gh`, `.http_cache` are what `tools/lib.sh`
   is to bash: reach for them first). An entry point in `test/` or `tools/` is five lines
-  that call `python/launch.py`, which execs `uv run --locked --project python`, so it
-  runs in `python/.venv` as made from `python/uv.lock`, from any directory. Never
-  `pip install`, never rely on the host's packages; a dependency is a line in
-  `pyproject.toml` and a `uv lock`. CI installs a pinned uv (`astral-sh/setup-uv`), and
-  Dependabot proposes lock updates two weeks after a release.
+  that call `python/launch.py`, which keeps `python/.venv` equal to
+  `python/requirements.txt` (made again from scratch when the lock or the interpreter
+  changes) and execs the module there, from any directory. Never `pip install` by hand,
+  never rely on the host's packages; a dependency is a line in `requirements.in` and a
+  `python/lock.sh`, which compiles the hashed lock on 3.12 in a container. CI uses
+  `actions/setup-python` with the baseline, and Dependabot (`pip`) proposes lock updates
+  two weeks after a release.
 - **Dependencies** must be established and maintained (`requests`, `pyelftools`,
   `python-debian`, `license-expression`, `spdx-tools`, `pexpect`, `pytest`), pinned by the
   lock, and argued like a package: *what does it drag in?* Prefer the stdlib when it is
@@ -182,7 +195,7 @@ and the library checks are done.
   would need an `absent` line of its own.
 - **Tests, first.** Python gets pytest tests under `python/tests/`, written before the
   code and seen to fail (red, then green), and `.github/workflows/python.yml` runs them
-  with `ruff check`, `ruff format --check` and `uv lock --check`. Collaborators are
+  with `ruff check`, `ruff format --check` and a recompile of the lock. Collaborators are
   injected (`gh`'s runner, the HTTP fetch, grype's binary) so a test needs no network.
 - **Lint**: `ruff check` and `ruff format` for Python, `go vet`/`gofmt` for Go,
   `shellcheck` for bash.
@@ -255,7 +268,7 @@ and the library checks are done.
 ```
 
 The checks above plus a real boot are the verification story for the image. The Python
-tooling has its own unit tests (`cd python && uv run pytest`, *Host-side code*). The checks themselves are tested: `test/selftest.sh` builds small
+tooling has its own unit tests (`python3 python/launch.py pytest`, *Host-side code*). The checks themselves are tested: `test/selftest.sh` builds small
 trees broken in one way each and requires every tree check to fail on its fixture *naming
 what is wrong*. A check that skips what it cannot judge passes vacuously, so a new check,
 or a new case in one, gets a fixture that must produce a finding.

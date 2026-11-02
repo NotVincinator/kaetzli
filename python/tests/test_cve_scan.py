@@ -94,9 +94,7 @@ def test_an_unreachable_database_is_a_note(build):
 
 
 def test_the_entry_point(build, tmp_path):
-    """./test/cve-scan.py, through uv, with the stand-in on PATH."""
-    if not shutil.which("uv"):
-        pytest.skip("no uv")
+    """./test/cve-scan.py, through launch.py's venv, with the stand-in on PATH."""
     env = dict(
         os.environ,
         PATH=f"{FIXTURES / 'bin'}:{os.environ['PATH']}",

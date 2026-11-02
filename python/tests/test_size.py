@@ -309,8 +309,6 @@ class TestTrim:
     ],
 )
 def test_the_entry_points(script, args, tmp_path):
-    if not shutil.which("uv"):
-        pytest.skip("no uv")
     env = dict(os.environ, ARCH="amd64")
     env.pop("GITHUB_STEP_SUMMARY", None)
     p = subprocess.run(

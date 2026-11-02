@@ -5,10 +5,12 @@ updates:
     schedule:
       interval: "weekly"
 
-  # python/uv.lock: the Python tools' dependencies (CLAUDE.md, Host-side code). A release
-  # is proposed once it is two weeks old, the same rule as every other pin here; the
-  # Python workflow runs the tests and lint on the pull request.
-  - package-ecosystem: "uv"
+  # python/requirements.txt, compiled by pip-tools from requirements.in: the Python
+  # tools' dependencies (CLAUDE.md, Host-side code). Dependabot recompiles it on the
+  # Python its header names, 3.12, the baseline. A release is proposed once it is two
+  # weeks old, the same rule as every other pin here; the Python workflow runs the tests,
+  # the lint and the lock check on the pull request.
+  - package-ecosystem: "pip"
     directory: "/python"
     schedule:
       interval: "weekly"

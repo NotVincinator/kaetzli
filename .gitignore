@@ -27,8 +27,8 @@ artifacts
 # tools/build-image.sh). Never part of a CI build.
 /extra
 
-# Python: python/'s virtualenv (uv makes it from python/uv.lock), and what Python, pytest
-# and ruff leave beside the code.
+# Python: python/'s virtualenv (python/launch.py makes it from requirements.txt), and
+# what Python, pytest and ruff leave beside the code.
 .venv
 __pycache__/
 *.py[cod]

@@ -1,0 +1,22 @@
+# What python/.venv is made of, compiled to requirements.txt (every version pinned, every
+# file hashed) by pip-tools on Python 3.12, the baseline. One lock for the tools and their
+# tests, like the venv. Each dependency is an argument (CLAUDE.md, Host-side code); a
+# change here is a recompile in the same commit (python/README.md), and the Python
+# workflow fails a requirements.txt that does not match this file.
+
+# pyelftools     the dynamic section, version tables and symbols of an ELF file, for the
+#                library checks; no dependencies of its own
+pyelftools>=0.33
+# python-debian  dpkg's version order, for cve-context's Debian verdicts; no dependencies
+#                of its own
+python-debian>=1.1.1
+# spdx-tools     the SPDX project's library, for check-sbom's validation against the SPDX
+#                2.3 model; brings rdflib, beartype, license-expression, click, pyyaml,
+#                xmltodict, ply, uritools, semantic-version (its other formats)
+spdx-tools>=0.8.5
+
+# Development: the tests, the lint, and the compiler of this lock (pinned like the rest,
+# so the workflow's recompile is the one a contributor runs).
+pytest
+ruff
+pip-tools

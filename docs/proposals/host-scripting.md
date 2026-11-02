@@ -16,8 +16,8 @@ escaper, `xargs -P` with `export -f` for concurrency, hand-parsed tool output, o
 parsing and state for a CLI with subcommands.
 
 Go was considered for each and chosen for none: nothing here has to run where Python
-cannot (uv installs Python itself, on macOS too), and two general-purpose languages beside
-bash would be more to maintain, not less.
+cannot (Python 3.12 or newer is on every distribution the tooling targets), and two
+general-purpose languages beside bash would be more to maintain, not less.
 
 ## Move to Python, by payoff
 
@@ -139,7 +139,8 @@ tests become test functions sharing fixtures (a booted machine, an ssh session),
 `CONSOLE_BAD` becomes a fixture finaliser.
 
 Two constraints shape it. `tools/boot-vz.sh` runs on macOS and sources `qemu-lib.sh`;
-it can keep a small bash copy of what it needs or run the Python harness under uv. And
+it can keep a small bash copy of what it needs or run the Python harness on macOS's own
+python3 (uv, which would have brought one, is ruled out: CLAUDE.md, *Host-side code*). And
 `tools/boot-qemu.sh` has to keep booting *the same machine* as CI, so the harness must
 expose its argv-building for interactive boots. Port it after 1–6 have settled the
 module layout, and keep the bash and Python harnesses side by side until every boot test
@@ -175,4 +176,5 @@ One script per pull request, behaviour unchanged. The proof is the same output b
 and after: byte-identical reports, SBOMs and job summaries for the same inputs, the same
 exit codes, and every `selftest.sh` fixture still failing with what is wrong named. Then
 the bash file is deleted in the same pull request and the `Commands` list in CLAUDE.md is
-updated. The CI step that runs it gains `astral-sh/setup-uv` with a pinned version.
+updated. The CI step that runs it gains `actions/setup-python` on the 3.12 baseline, as
+`ci.yml`'s `&setup-python` does.
