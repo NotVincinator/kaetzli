@@ -6,7 +6,7 @@
 #
 # The kernel's tarball, the kernel's version: sourced rather than copied, so a kernel
 # bump moves these with it and the two can never disagree. That makes this the one
-# package that is not its own upstream — FOLLOWS says so, and tools/check-updates.sh
+# package that is not its own upstream — FOLLOWS says so, and tools/check-updates.py
 # and tools/bump-version.sh read it and leave the package to packages/kernel.
 source packages/kernel/env.sh
 FOLLOWS=kernel
@@ -20,7 +20,7 @@ unset CPE
 # consumer. Without it perf builds, but `perf trace` does not and tracepoints print as
 # raw bytes. A snapshot of the tag, which is how Debian fetches it too and which came
 # back byte-identical on repeated downloads when this was pinned. Its own version, so
-# tools/check-updates.sh watches it even though the package FOLLOWS the kernel; cgit has no
+# tools/check-updates.py watches it even though the package FOLLOWS the kernel; cgit has no
 # listing of snapshot/, so the versions come from the tags page.
 VENDOR_NAME=libtraceevent
 VENDOR_VERSION="1.9.1"

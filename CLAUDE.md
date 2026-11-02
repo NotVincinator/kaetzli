@@ -222,7 +222,7 @@ the library checks and the policy checks are done.
 ./test/kernel-config-diff.py <old> <new> [src]  # what a kernel build turned on or off
 ./test/check-licenses.py                # every package declares a DFSG-free license
 ./test/selftest.sh                      # the static checks above fail on broken fixture trees, and pass on a good one
-./tools/check-updates.sh [pkg...] # what upstream has released since the pinned VERSION, VENDOR_VERSION and patch series
+./tools/check-updates.py [pkg...] # what upstream has released since the pinned VERSION, VENDOR_VERSION and patch series
 ./tools/check-patches.sh [--version V] [pkg...]  # packages/<pkg>/patches apply to the tarball (seconds; no build)
 ./tools/sync-patches.sh [--list] <pkg>  # patches/upstream/ = upstream's patch series (bash53-NNN) or release branch (glibc)
 ./test/boot.sh output/rootfs.erofs rootfs/boot/bzImage   # headless boot smoke test (reads rootfs.cmdline beside the image)
@@ -356,7 +356,7 @@ key; bash, ncurses, glibc and gcc follow series this way, nightly, through the u
 workflow and auto-merge.
 
 **`VENDOR_VERSION`**: a second tarball with a version of its own (tcpdump's libpcap,
-linux-tools' libtraceevent) is checked by `check-updates.sh` as `<pkg>/<VENDOR_NAME>`, from
+linux-tools' libtraceevent) is checked by `check-updates.py` as `<pkg>/<VENDOR_NAME>`, from
 `VENDOR_UPSTREAM_*`, and moved by `bump-version.sh --vendor`. Without it the vendor tarball
 follows `VERSION` (netavark's crates).
 
@@ -540,7 +540,7 @@ before `shadow` when a login fails.
 - **TLS** is OpenSSL 3.5 LTS, curl `--with-openssl`, and Debian's `ca-certificates` as one
   bundle at `/etc/ssl/certs/ca-certificates.crt` (no hashed `CApath`: `c_rehash` is perl).
   **OpenSSL is coupled to sid's**: curl and openssh compile against sid's `libssl-dev`, so
-  ours must stay on 3.x (`check-updates.sh` holds it to 3.5).
+  ours must stay on 3.x (`check-updates.py` holds it to 3.5).
 - **sshd** ships its units, account, PAM file and config from its own `build.sh` — a
   package installs its scaffolding into `DESTDIR`, never into `image/files`, which ships
   whatever was built. `make install-nokeys`, never `install`. openssh's configure runs a
@@ -596,7 +596,7 @@ reloads PID 1, so one that should start at boot needs `UpheldBy=` as well as `Wa
 - **An extension's packages cannot link against each other.** A library with one consumer
   is that consumer's `VENDOR_TARBALL`, built static under `/tmp`, with `assert_not_linked`.
 - **`FOLLOWS=<pkg>`** builds from another package's tarball (`linux-tools` from the kernel's
-  `env.sh`). `check-updates.sh` skips it; `bump-version.sh` refuses it.
+  `env.sh`). `check-updates.py` skips it; `bump-version.sh` refuses it.
 - **What a tool attaches to has to be in the kernel already** (`trace.config`).
 - kbuild's tools Makefiles start `CFLAGS` from scratch, so perf and bpftool get the sysroot
   as `EXTRA_CFLAGS`/`EXTRA_LDFLAGS`. bpftool is built without skeletons (they would compile

@@ -6,7 +6,7 @@
 # (rarpd, rdisc, traceroute6, tftpd) over the last few releases, so what is left is four
 # small C programs rather than a 1990s network suite.
 #
-# Releases are dated rather than numbered, which tools/upstream.sh handles unaided: it
+# Releases are dated rather than numbered, which tools/upstream.py handles unaided: it
 # keeps candidates matching ^[0-9]+(\.[0-9]+)*$, and a bare date satisfies that. The
 # tarball is a release asset, not GitHub's generated archive — those are regenerated on
 # demand and have changed bytes under a fixed tag before now, which a SHA256 pin turns

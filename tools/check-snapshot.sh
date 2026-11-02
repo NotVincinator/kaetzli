@@ -4,8 +4,8 @@
 #     ./tools/check-snapshot.sh           # human readable
 #     ./tools/check-snapshot.sh --json    # the shape update-packages.yml consumes
 #
-# The toolchain answer to tools/check-updates.sh, and deliberately a separate script:
-# check-updates.sh iterates packages/*/env.sh and its contract is "every package", which
+# The toolchain answer to tools/check-updates.py, and deliberately a separate script:
+# check-updates.py iterates packages/*/env.sh and its contract is "every package", which
 # the Debian base is not. What the two share is the JSON shape, so the workflow can
 # concatenate them and open one pull request per entry with no idea which script produced
 # which.

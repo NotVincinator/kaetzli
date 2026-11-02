@@ -1,8 +1,8 @@
 # Host-side scripts: which language for which job
 
 **Status: proposal, partly implemented.** Implemented: items 1 to 5, the CVE reports,
-the SBOM, the size reports, the library checks and the policy checks (`python/`, see its
-README). CLAUDE.md (*Host-side code*)
+the SBOM, the size reports, the library checks and the policy checks, and from item 6 the
+update check (`python/`, see its README). CLAUDE.md (*Host-side code*)
 allows Python and Go for what runs on the host, in CI or in a builder container. This
 page reviews the scripts against that rule and orders the migration.
 
@@ -132,7 +132,7 @@ real `dpkg --compare-versions`, are the edge cases' golden.
 
 Dependencies: `license-expression`.
 
-### 6. Updates and GitHub automation: `tools/upstream.sh`, `check-updates.sh`, `check-snapshot.sh`, `auto-merge.sh`, `dispatch-ci.sh`, `release-notes.sh`
+### 6. Updates and GitHub automation: `tools/upstream.py`, `check-updates.py`, `release-notes.py` (done), `check-snapshot.sh`, `auto-merge.sh`, `dispatch-ci.sh`
 
 `upstream.sh` scrapes HTML listings with regexes and sorts versions with knobs from
 `env.sh`. `auto-merge.sh` is a state machine that pushes to `main`: age, labels,
@@ -142,10 +142,21 @@ output can be compared line by line against the bash version over several nights
 `UPSTREAM_SED` values are sed expressions and stay that way: Python runs `sed -E` on them
 rather than translating the knob.
 
+`upstream.py`, `release-notes.py` and `check-updates.py` are `kaetzli.updates`, with no
+dependency beyond the stdlib (`requests` was not needed for GETs and HEADs). The env.sh
+patterns are matched by Python's `re`, which reads every one of them as ERE does;
+`sort -V` is gnulib's `filevercmp`, ported and tested against GNU sort on the real
+versions and 3,000 random strings; a candidate's URL is still env.sh evaluated by bash.
+Run live over every package, side by side with the bash versions, `--json` was
+byte-identical, the text identical but for glib and glibc (the bash glob's locale), and
+`upstream.py` gave every package and vendor tarball the same answer, and a plain error
+for `kaetzlifetch`, whose local source crashed the bash version. Packages are checked
+eight at a time: four minutes became forty seconds.
+
 `bump-version.sh` and `bump-snapshot.sh` stay bash: they are `sed -i` on `env.sh` and a
 download.
 
-Dependencies: `requests`.
+Dependencies: none so far.
 
 ### 7. The qemu harness and its clients: `test/qemu-lib.sh`, the boot tests, `tools/vm.sh`, `tools/k8s-demo.sh`
 

@@ -43,7 +43,7 @@
 # this trusts what upstream serves at the moment of the sync; git is the pin afterwards,
 # and a series that changed under us shows up as a diff of a file already committed.
 #
-# tools/check-updates.sh proposes a sync when upstream has more patches than we do, the
+# tools/check-updates.py proposes a sync when upstream has more patches than we do, the
 # update workflow runs this to make the pull request, and tools/bump-version.sh runs it
 # after every version bump of such a package — a new release starts a new series.
 set -euo pipefail

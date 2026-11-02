@@ -412,7 +412,7 @@ compared with `main`.
 2. In CI, have the rootfs job fetch the previous `main` run's bundle (as
    `tools/fetch-image.sh` already does) and post the output as the job summary and, on
    pull requests, as a comment, the way the kernel job posts `kernel-config-diff.py`.
-3. Reuse it in `tools/release-notes.sh` once the [release](release.md) proposal is
+3. Reuse it in `tools/release-notes.py` once the [release](release.md) proposal is
    implemented, so release notes are generated from the same report.
 
 **Verification:** a pull request that bumps one package shows exactly that package's

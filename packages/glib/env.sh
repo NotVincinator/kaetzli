@@ -7,7 +7,7 @@
 # is the check that does. Keep this at or above sid's; tools/header-skew.py shows both.
 #
 # The stable series is the even minor; odd minors are development snapshots, which
-# UPSTREAM_IGNORE keeps tools/check-updates.sh from proposing.
+# UPSTREAM_IGNORE keeps tools/check-updates.py from proposing.
 VERSION="2.90.1"
 PACKAGE="glib-${VERSION}"
 TARBALL="$PACKAGE.tar.xz"

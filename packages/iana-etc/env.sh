@@ -1,5 +1,5 @@
 # The version is the date IANA's registries were snapshotted, not a release number.
-# tools/upstream.sh handles it without help: it keeps candidates matching ^[0-9]+(\.[0-9]+)*$,
+# tools/upstream.py handles it without help: it keeps candidates matching ^[0-9]+(\.[0-9]+)*$,
 # which a bare date satisfies, and sort -V orders them correctly.
 VERSION="20261022"
 PACKAGE="iana-etc-${VERSION}"

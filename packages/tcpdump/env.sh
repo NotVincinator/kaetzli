@@ -12,7 +12,7 @@ PACKAGE="tcpdump-${VERSION}"
 TARBALL="$PACKAGE.tar.xz"
 URL="https://www.tcpdump.org/release/${TARBALL}"
 SHA256="39675dfa06fb0e99be8da5d4a1784acbaab58ae0870231d956ff7870cb99eec1"
-# Its own version, not tcpdump's, so VENDOR_VERSION: tools/check-updates.sh watches it
+# Its own version, not tcpdump's, so VENDOR_VERSION: tools/check-updates.py watches it
 # as tcpdump/libpcap, and `tools/bump-version.sh --vendor tcpdump <v>` moves it.
 VENDOR_NAME=libpcap
 VENDOR_VERSION="1.10.7"

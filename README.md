@@ -174,7 +174,7 @@ it requires, for example:
 ./test/podman.sh output/rootfs.erofs rootfs/boot/bzImage
 ```
 
-`./tools/check-updates.sh` checks pinned package versions, vendored second tarballs and
+`./tools/check-updates.py` checks pinned package versions, vendored second tarballs and
 upstream patch series. `./tools/bump-version.sh <package> <version>` updates a package pin
 and checksum. The nightly update workflow opens pull requests for available updates.
 

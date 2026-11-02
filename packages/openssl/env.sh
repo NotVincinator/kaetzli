@@ -33,7 +33,7 @@ LICENSE="Apache-2.0"
 CPE="cpe:2.3:a:openssl:openssl:${VERSION}:*:*:*:*:*:*:*"
 UPSTREAM_GITHUB="openssl/openssl"
 # Tags are openssl-3.5.7; the ancient ones are OpenSSL_1_1_1w and never survive the
-# numeric filter in tools/upstream.sh.
+# numeric filter in tools/upstream.py.
 UPSTREAM_SED='s/^openssl-//'
 # Everything whose first two components are not 3.5 — later minors, later majors, and
 # the older branches that are still getting releases. See the two reasons above; this is

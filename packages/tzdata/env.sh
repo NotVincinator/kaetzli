@@ -15,6 +15,6 @@ SHA256="2fe4b4f27f75beea17970dfdd242ffb7f099fad9447950a39d0fe8eae522d8e2"
 LICENSE="LicenseRef-PublicDomain"
 UPSTREAM_GITHUB="eggert/tz"
 # tz numbers releases <year><letter>. That is a final release, not a pre-release, but it
-# is not what tools/upstream.sh's default pattern accepts, and widening that pattern for
+# is not what tools/upstream.py's default pattern accepts, and widening that pattern for
 # everyone would let suffixes through that are pre-releases elsewhere.
 UPSTREAM_NUM='[0-9]{4}[a-z]'

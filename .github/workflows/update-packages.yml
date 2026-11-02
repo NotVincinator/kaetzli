@@ -9,7 +9,7 @@ name: Package updates
 # is an input like any other — it decides what every binary is compiled by and what
 # mkfs.erofs and strip do to the shipped bytes — and a pin nobody updates is how a
 # reproducible build becomes an unbuildable one. It arrives here under the name
-# `debian-snapshot`, from tools/check-snapshot.sh rather than from tools/check-updates.sh,
+# `debian-snapshot`, from tools/check-snapshot.sh rather than from tools/check-updates.py,
 # and is bumped by tools/bump-snapshot.sh rather than tools/bump-version.sh. Everything
 # between those two ends — the branch, the duplicate-suppression, the pull request, the
 # dispatched CI run — is shared, which is the reason it is wired in here instead of
@@ -43,6 +43,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: python/.python-version
+          cache: pip
+          cache-dependency-path: python/requirements.txt
+
       - name: Check upstreams
         id: check
         env:
@@ -52,10 +58,10 @@ jobs:
         run: |
           # An upstream that can't be reached shouldn't stop the packages that can, so
           # the failures are reported at the end rather than aborting the run.
-          ./tools/check-updates.sh --json $PACKAGES > updates.json || failed=1
+          ./tools/check-updates.py --json $PACKAGES > updates.json || failed=1
           [ -s updates.json ] || echo '[]' > updates.json
 
-          # The toolchain pin, from its own script for its own reasons: check-updates.sh
+          # The toolchain pin, from its own script for its own reasons: check-updates.py
           # iterates packages/*/env.sh and the Debian base is not one of those. Both emit
           # the same JSON shape, so the matrix below never learns which produced what.
           #
@@ -87,7 +93,7 @@ jobs:
           # default pretty-printing makes an array of objects many. The runner rejects
           # the continuation lines with "Invalid format '  {'" and the whole job fails —
           # but only in a week where something actually has an update, since `[]` is one
-          # line either way. tools/check-updates.sh emits compact JSON for exactly this
+          # line either way. tools/check-updates.py emits compact JSON for exactly this
           # reason (`jq -sc .`); merging the snapshot list in is what dropped it.
           jq -cs add updates.json snapshot.json > all.json
           echo "updates=$(cat all.json)" >> "$GITHUB_OUTPUT"
@@ -122,7 +128,7 @@ jobs:
           URL: ${{ matrix.update.url }}
           RELEASE_NOTES: ${{ matrix.update.release_notes }}
           # version (the default, and debian-snapshot's), vendor or patches: which of a
-          # package's pins moved. tools/check-updates.sh explains the three.
+          # package's pins moved. tools/check-updates.py explains the three.
           KIND: ${{ matrix.update.kind || 'version' }}
           COMPONENT: ${{ matrix.update.component }}
         run: |

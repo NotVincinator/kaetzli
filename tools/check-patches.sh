@@ -52,7 +52,7 @@ for pkg in "${packages[@]}"; do
     mkdir -p "$work/src"
 
     if [ -n "$version" ]; then
-        # The URL env.sh would download for that version, as tools/check-updates.sh finds it.
+        # The URL env.sh would download for that version, as tools/check-updates.py finds it.
         url=$(PKG=$pkg; eval "$(sed -E "s/^VERSION=.*/VERSION=\"$version\"/" "packages/$pkg/env.sh")"; echo "$URL")
         tarball="$work/${url##*/}"
         echo "$pkg $version: fetching $url (unverified: not pinned yet)"

@@ -36,5 +36,5 @@ SHA256="a9dc9565dffe8640f64d863cd29a32bc4a3dbdec0566a7fc44c5d6ee767d5f39"
 LICENSE="SSH-OpenSSH AND ssh-keyscan AND BSD-2-Clause AND BSD-3-Clause AND ISC AND X11 AND LicenseRef-PublicDomain"
 CPE="cpe:2.3:a:openbsd:openssh:${VERSION}:*:*:*:*:*:*:*"
 # Portable OpenSSH numbers itself <upstream>p<portable>, so the version is 10.5p1 and not
-# 10.5. tools/upstream.sh understands that suffix; nothing else here has one, which is why
+# 10.5. tools/upstream.py understands that suffix; nothing else here has one, which is why
 # the pattern in that script had to learn it.

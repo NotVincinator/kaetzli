@@ -53,7 +53,7 @@ series retain their commit IDs in each patch.
 ./tools/sync-patches.sh bash          # update the committed series
 ```
 
-`tools/check-updates.sh` detects a longer series. The package update workflow opens a pull
+`tools/check-updates.py` detects a longer series. The package update workflow opens a pull
 request with the new patches and the CVEs they fix. A package version bump starts a new
 series.
 
