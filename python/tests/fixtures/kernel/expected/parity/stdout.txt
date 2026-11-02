@@ -1,0 +1,1 @@
+kernel parity OK: every symbol both arches define agrees (39 allowed to differ)

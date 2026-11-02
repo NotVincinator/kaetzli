@@ -146,7 +146,7 @@ is not bound to bash, and bash is not the default: it is hard to read and review
 of `test/` and `tools/` is JSON, HTTP, joins and report tables written in jq, awk and
 `declare -A`. Choose per job. `docs/proposals/host-scripting.md` reviews every script
 against this and orders the migration; the CVE reports, the SBOM, the size reports,
-the library checks and the license check are done.
+the library checks, the license check and the kernel config checks are done.
 
 - **Bash** where the job *is* a sequence of commands and their exit codes: anything
   sourced by a package build (`builder/build-package.sh`, `packages/*/build.sh`, `env.sh`,
@@ -217,9 +217,9 @@ the library checks and the license check are done.
 ./test/check-symbol-versions.py rootfs  # symbol versions no shipped library defines
 ./test/check-symbol-resolution.py rootfs  # undefined symbols nothing in a binary's NEEDED closure defines
 ./tools/header-skew.sh            # builder -dev headers vs the libraries we ship (report)
-./test/kernel-caps.sh rootfs            # kernel config vs what a container needs
-./test/kernel-parity.sh <amd64> <arm64>  # the two arches' kernel configs agree (configs or trees)
-./test/kernel-config-diff.sh <old> <new> [src]  # what a kernel build turned on or off
+./test/kernel-caps.py rootfs            # kernel config vs test/kernel-caps.txt: what a container needs
+./test/kernel-parity.py <amd64> <arm64>  # the two arches' kernel configs agree (configs or trees)
+./test/kernel-config-diff.py <old> <new> [src]  # what a kernel build turned on or off
 ./test/check-licenses.py                # every package declares a DFSG-free license
 ./test/selftest.sh                      # the static checks above fail on broken fixture trees, and pass on a good one
 ./tools/check-updates.sh [pkg...] # what upstream has released since the pinned VERSION, VENDOR_VERSION and patch series
@@ -619,22 +619,23 @@ which is why `vm.config` names so much arm64 board support.
   upstream fails the build). When clearing something, expect to clear what *selects* it
   — and a clear only takes if nothing selects the symbol *at that merge*: a selector a
   later fragment turns off leaves the symbol on, which is why `parity.config` is last.
-- **Both arches have the same features** (`test/kernel-parity.sh`, the `kernel-parity`
+- **Both arches have the same features** (`test/kernel-parity.py`, the `kernel-parity`
   job): their defconfigs disagree about much that is not the architecture's, and
   `parity.config` decides it once. A new difference fails the job; hardware goes in
-  `vm.config`, the arch's own internals in the script's allowlist. `kernel/configs` can be
-  resolved for either arch without a compile by sourcing `build.sh` with `make` and
-  `uname -m` shimmed, which is how a change to it is tried for arm64 on an amd64 host.
+  `vm.config`, the arch's own internals in `test/kernel-parity-allowed.txt`.
+  `kernel/configs` can be resolved for either arch without a compile by sourcing
+  `build.sh` with `make` and `uname -m` shimmed, which is how a change to it is tried
+  for arm64 on an amd64 host.
 - **Each `iptables -m`/`-j` an engine uses is a kernel symbol of its own**, and a missing one
   fails at runtime (*revision 0 not supported*). No legacy `IP_NF_*`: iptables is
-  iptables-nft through `NFT_COMPAT`. `test/kernel-caps.sh` holds the kernel to the list.
+  iptables-nft through `NFT_COMPAT`. `test/kernel-caps.py` holds the kernel to the list, `test/kernel-caps.txt`.
 - **`SERIAL_8250` must never be in `vm.config`**: it is amd64's and Firecracker's console.
 - `DEBUG_INFO_BTF` needs the "Debug information" choice settled first, and `BPF_LSM` needs
   `FTRACE` (for `BPF_EVENTS`) on arm64; `SECURITYFS` is how systemd sees bpf-lsm.
 - Not `VT` (only settable under `EXPERT`), and not `tinyconfig`: subtracting from defconfig
   lets upstream keep the architecture's own requirements current.
 - **The kernel follows the latest stable**, from x.y.1. New `default y` drivers are reported,
-  not gated: the kernel job posts `test/kernel-config-diff.sh` against main on the pull
+  not gated: the kernel job posts `test/kernel-config-diff.py` against main on the pull
   request, and the 24 hours before auto-merge are the time to clear them or label `hold`.
 
 ## Reproducible builds

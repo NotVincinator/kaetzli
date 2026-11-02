@@ -1,0 +1,2 @@
+error: the kernel is missing capabilities this image depends on:
+  CONFIG_PCI_HOST_GENERIC — the ECAM host bridge of qemu virt and Virtualization.framework

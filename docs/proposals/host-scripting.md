@@ -1,7 +1,7 @@
 # Host-side scripts: which language for which job
 
 **Status: proposal, partly implemented.** Implemented: items 1 to 4, the CVE reports,
-the SBOM, the size reports and the library checks, and the license check from item 5
+the SBOM, the size reports and the library checks, and item 5 but for `header-skew.sh`
 (`python/`, see its README). CLAUDE.md (*Host-side code*)
 allows Python and Go for what runs on the host, in CI or in a builder container. This
 page reviews the scripts against that rule and orders the migration.
@@ -106,7 +106,7 @@ CI runner, not in the assembly image.
 
 Dependencies: `pyelftools`.
 
-### 5. Policy checks: `check-licenses.py` (done), `kernel-caps.sh`, `kernel-parity.sh`, `kernel-config-diff.sh`, `header-skew.sh`
+### 5. Policy checks: `check-licenses.py`, `kernel-caps.py`, `kernel-parity.py`, `kernel-config-diff.py` (done), `header-skew.sh`
 
 `check-licenses.py` is `kaetzli.licenses`. The bash version split SPDX expressions on
 whitespace and parentheses, so `MIT ISC`, `MIT AND`, `(MIT` and `GPL-2.0-only WITH MIT`
@@ -115,8 +115,14 @@ exceptions, so each of those is now NOT VALID. On the repository's own packages 
 output is identical, but for `glib` and `glibc`, which the bash glob ordered by the
 host's locale.
 
-The kernel scripts read `.config` files into awk tables, which
-a dict does better. `header-skew.sh` is a report built on two `declare -A`.
+The kernel scripts are `kaetzli.kernel`: one reader of a `.config` (`config`) and a
+check each (`caps`, `parity`, `config_diff`). Their lists moved out of the scripts'
+heredocs into `test/kernel-caps.txt` and `test/kernel-parity-allowed.txt`, beside the
+other lists in `test/`. On CI's 7.3.1 configs for both arches and amd64's 7.2.13 the
+output is identical, and `config_diff`'s classification of the 7.3.1 source agrees with
+the awk's on all 21,742 symbols. One deliberate difference: `kernel-config-diff` lists
+changes by symbol, a removal before its addition, where GNU diff's hunks could put a
+symbol's old and new values lines apart. `header-skew.sh` is a report built on two `declare -A`.
 
 Dependencies: `license-expression`.
 

@@ -1,0 +1,48 @@
+# Symbols the amd64 and arm64 kernels may set differently: test/kernel-parity.py fails on
+# any other symbol both configs define with different values.
+#
+# Each kernel is its arch's defconfig plus the same fragments, and the two defconfigs
+# disagree about much that is not the architecture's: parity.config in
+# packages/kernel/build.sh decides those once for both. What belongs here is the
+# architecture's own hardware model, firmware interface and toolchain, nothing a program
+# in the image would see differently. One symbol per line, without CONFIG_, then why.
+
+ACPI_EC                         x86's ACPI embedded controller
+ACPI_HED                        arm64's ACPI hardware error device, part of its ACPI core
+HOTPLUG_PCI_ACPI                PCI hotplug through ACPI, how arm64's virt board does it
+OF                              device tree: arm64 boots with one, amd64 does not
+COMMON_CLK                      arm64's clock framework
+GPIOLIB                         arm64: the virt board's power button is a GPIO key
+PINCTRL                         arm64's pin controllers
+POWER_RESET                     arm64's reset drivers
+RESET_CONTROLLER                arm64's reset controllers
+MFD_SYSCON                      arm64's system controller registers
+GENERIC_PHY                     arm64's PHY framework
+NVMEM_LAYOUTS                   arm64's NVMEM, which its platform selects
+RTC_HCTOSYS                     arm64 sets the clock from the PL031; amd64 reads the CMOS
+VT_HW_CONSOLE_BINDING           follows the console drivers each arch has
+MEMORY_HOTPLUG                  arm64's ACPI memory hotplug
+BLK_DEV_BSGLIB                  selected by arm64's SCSI transport classes
+IRQ_POLL                        selected by arm64's block drivers
+PACKING                         a library arm64's drivers select
+PAGE_POOL_STATS                 arm64's defconfig default for network page pools
+IRQ_TIME_ACCOUNTING             per-arch default for IRQ time in CPU accounting
+WQ_POWER_EFFICIENT_DEFAULT      arm64's power-saving workqueue default
+IOMMU_DEFAULT_DMA_LAZY          per-arch IOMMU default; a VM's virtio devices use none
+IOMMU_DEFAULT_DMA_STRICT        the same choice, from arm64's side
+PCI_PRI                         x86's IOMMU page requests
+NO_HZ                           x86's legacy alias for NO_HZ_IDLE
+WERROR                          build setting (x86's defconfig)
+LD_ORPHAN_WARN_LEVEL            build setting
+CC_VERSION_TEXT                 build setting
+FUNCTION_ALIGNMENT              code generation
+ARCH_MMAP_RND_BITS              ASLR entropy, from each arch's address space
+ARCH_MMAP_RND_BITS_MIN          the same
+ARCH_MMAP_RND_BITS_MAX          the same
+ARCH_MMAP_RND_COMPAT_BITS       the same, for 32-bit processes
+ARCH_MMAP_RND_COMPAT_BITS_MIN   the same
+ARCH_PKEY_BITS                  memory protection keys, per arch
+CRYPTO_LIB_POLY1305_RSIZE       the arch's Poly1305 implementation
+NODES_SHIFT                     NUMA node count, per arch default
+SERIAL_8250_NR_UARTS            per-arch default
+NLS_DEFAULT                     unused: no filesystem here takes a codepage

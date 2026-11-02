@@ -1,0 +1,2 @@
+error: no kernel config at nowhere/boot/config
+       packages/kernel/build.sh stages it next to the image; build the kernel first

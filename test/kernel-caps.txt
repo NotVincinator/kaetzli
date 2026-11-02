@@ -1,42 +1,20 @@
-#!/usr/bin/env bash
-# Assert the kernel can actually run a container — and boot on the VMMs this image
-# targets, be a Kubernetes node, and be traced by the debug extension:
+# What the kernel must build in, and what breaks without each: test/kernel-caps.py holds
+# the kernel's resolved config (rootfs/boot/config) to this list.
 #
-#     ./test/kernel-caps.sh [rootfs]      # default rootfs/, reads rootfs/boot/config
+# Not the same check as packages/kernel/build.sh's. That one asks "did every line of the
+# fragments apply"; this one asks "does the kernel have what the image needs", and the
+# two come apart in both directions. A capability can arrive from defconfig rather than
+# from a fragment, and then stop arriving: CGROUPS, the pid/net/ipc/uts namespaces and
+# SECCOMP_FILTER have never been in container.config because defconfig provided them.
+# And a subtraction in vm.config can take out something no line of it names: turning off
+# all 48 arm64 SoC platforms removed 1594 symbols, and the only reason to believe none of
+# them mattered is a list like this one saying so.
 #
-# This is deliberately not the same check as the one in packages/kernel/build.sh. That
-# one asks "did every line of container.config and vm.config apply", which is a question
-# about the fragments. This one asks "does the kernel have what a container needs",
-# which is a question about the answer — and the two come apart in both directions:
-#
-#   - a capability can arrive from defconfig rather than from our fragment, and then
-#     stop arriving. CGROUPS, the pid/net/ipc/uts namespaces and SECCOMP_FILTER are all
-#     in that category: they have never been in container.config because defconfig
-#     provided them, so nothing here would notice them going away.
-#   - a subtraction in vm.config can take out something no line of it names. Turning off
-#     all 48 arm64 SoC platforms removed 1594 symbols, and the only reason to believe
-#     none of them mattered is a list like this one saying so.
-#
-# It runs in the `rootfs` CI job, next to check-rootfs-deps.py, because it needs nothing
-# but the staged tree — no boot, no qemu, a few milliseconds. test/container.sh is the
-# other half: it boots the thing and starts a real container. Both are worth having, and
-# this one says *which* capability is missing rather than "crun exited 1".
-set -euo pipefail
+# One symbol per line, without CONFIG_, then what breaks without it. Keep the second
+# column concrete: the point of this file is that a failure names the feature, not just
+# the symbol. Lines under [x86] or [arm64] apply to that architecture only (the arch in
+# the config's "# Linux/<arch>" header); before any section, to both.
 
-cd "$(dirname "$0")/.."
-
-ROOT="${1:-rootfs}"
-CONFIG="$ROOT/boot/config"
-
-[ -f "$CONFIG" ] || {
-    echo "error: no kernel config at $CONFIG" >&2
-    echo "       packages/kernel/build.sh stages it next to the image; build the kernel first" >&2
-    exit 1
-}
-
-# symbol : what breaks without it. Keep the second column concrete — the point of this
-# file is that a failure names the feature, not just the symbol.
-REQUIRED=$(cat <<'EOF'
 NAMESPACES          every namespace below hangs off this
 PID_NS              the container gets the host's pid 1
 NET_NS              no network isolation, and veth has nothing to move between
@@ -114,34 +92,14 @@ KPROBES             perf probe and BPF kprobes: a probe on any kernel function
 KPROBE_EVENTS       the same, through the tracefs and perf interfaces they use
 UPROBE_EVENTS       probes on functions in programs and libraries
 FTRACE_SYSCALLS     syscalls:sys_enter_*/sys_exit_*; perf trace reads nothing without them
-EOF
-)
-# Architecture-specific halves of the same: what boots the machine at all on each.
-case "$(sed -n 's/^# Linux\/\([a-z0-9_]*\) .*/\1/p' "$CONFIG")" in
-    x86)   REQUIRED+=$'\n'$(cat <<'EOF2'
+
+# What boots the machine at all on each architecture.
+[x86]
 PVH                 Firecracker boots an uncompressed vmlinux through PVH
-EOF2
-) ;;
-    arm64) REQUIRED+=$'\n'$(cat <<'EOF2'
+
+[arm64]
 SERIAL_AMBA_PL011_CONSOLE  ttyAMA0, arm64 qemu's console
 SERIAL_OF_PLATFORM  Firecracker's arm64 console, a device-tree 8250
 PCI_HOST_GENERIC    the ECAM host bridge of qemu virt and Virtualization.framework
 GPIO_PL061          qemu virt's power button is a GPIO line on a PL061...
 KEYBOARD_GPIO       ...and gpio-keys is what turns it into KEY_POWER
-EOF2
-) ;;
-esac
-
-missing=()
-while read -r sym why; do
-    [ -n "$sym" ] || continue
-    grep -qx "CONFIG_$sym=y" "$CONFIG" || missing+=("CONFIG_$sym — $why")
-done <<<"$REQUIRED"
-
-if [ ${#missing[@]} -gt 0 ]; then
-    echo "error: the kernel is missing capabilities this image depends on:" >&2
-    printf '  %s\n' "${missing[@]}" >&2
-    exit 1
-fi
-
-echo "kernel capabilities OK ($(grep -c '=y$' "$CONFIG") symbols built in, $(wc -l <<<"$REQUIRED") required present)"

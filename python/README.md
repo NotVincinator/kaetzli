@@ -18,6 +18,8 @@ src/kaetzli/elf/      the library checks: deps (check-rootfs-deps), versions
                      and scan, what they read from a tree with pyelftools
 src/kaetzli/sbom_check.py
                      test/check-sbom.py: what the SBOM says
+src/kaetzli/kernel/  the kernel config checks: caps (kernel-caps), parity (kernel-parity),
+                     config_diff (kernel-config-diff), and config, their .config reader
 src/kaetzli/licenses.py
                      test/check-licenses.py: every package's LICENSE, against
                      test/dfsg-licenses.txt

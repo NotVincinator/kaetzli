@@ -635,7 +635,7 @@ make vm.config
 # What defconfig gives one architecture and not the other, decided once for both: a
 # feature userspace can see is the same on amd64 and arm64. Hardware and the arch's own
 # internals (ACPI, IOMMU defaults, clocks, pinctrl) still follow the arch; arm64's
-# leftover boards are vm.config's. test/kernel-parity.sh holds the two configs to it.
+# leftover boards are vm.config's. test/kernel-parity.py holds the two configs to it.
 #
 # Merged after vm.config, last: a clear only takes if nothing selects the symbol at the
 # time, and before vm.config amd64's BLK_DEV_IO_TRACE and SELinux still select RELAY and
@@ -825,7 +825,7 @@ esac
 # bootable on its own.
 install -D -m 644 "$kernel_image" $ROOTFS/boot/bzImage
 
-# The resolved config, which test/kernel-caps.sh reads.
+# The resolved config, which test/kernel-caps.py reads.
 install -D -m 644 .config $ROOTFS/boot/config
 
 # There are no modules, but /usr/lib/modules/<release> has to exist: kubeadm's preflight

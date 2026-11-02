@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: GPL-2.0
+mainmenu "kernel-config-diff fixture"
+
+config PROMPTED
+	bool "a choice somebody makes"
+	default y
+
+config DERIVED
+	bool
+	default y if PROMPTED
+
+config CC_HAS_THING
+	def_bool $(cc-option,-fthing)
+
+config GCC_VERSION
+	int
+	default $(gcc-version)
+
+config CC_HAS_COUNTED_BY
+	bool
+	# no $( of its own: toolchain-derived through GCC_VERSION
+	default y if GCC_VERSION >= 150000
+
+config USES_COUNTED
+	def_bool y
+	depends on CC_HAS_COUNTED_BY && PROMPTED
+
+config PROMPTED_TOOLCHAIN
+	bool "prompted, though its default reads the compiler"
+	default $(cc-option,-fother)
+
+config HELP_QUIRK
+	bool
+	help
+	  default $(help text, which the classification reads as a default)
+
+config VALUE
+	string "a string"
+
+source "sub/Kconfig.debug"

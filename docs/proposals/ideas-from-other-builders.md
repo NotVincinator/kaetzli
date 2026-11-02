@@ -396,7 +396,7 @@ package list, kernel config and disk usage, and diffs them against the last rele
 nightly for review and release notes.
 
 **Gap:** kaetzli already has most of the inputs — `output/rootfs-files-<flavour>.txt`
-manifests, `test/kernel-config-diff.sh`, `test/oci-trim.py`, `test/rootfs-size.py` and
+manifests, `test/kernel-config-diff.py`, `test/oci-trim.py`, `test/rootfs-size.py` and
 `test/size-history.py` — but no single view of how a pull request changes the image
 compared with `main`.
 
@@ -411,7 +411,7 @@ compared with `main`.
    - the extension contents the same way.
 2. In CI, have the rootfs job fetch the previous `main` run's bundle (as
    `tools/fetch-image.sh` already does) and post the output as the job summary and, on
-   pull requests, as a comment, the way the kernel job posts `kernel-config-diff.sh`.
+   pull requests, as a comment, the way the kernel job posts `kernel-config-diff.py`.
 3. Reuse it in `tools/release-notes.sh` once the [release](release.md) proposal is
    implemented, so release notes are generated from the same report.
 
@@ -425,7 +425,7 @@ version, files and size; a docs-only change does not run it.
 config has the hardening options LinuxKit requires; LinuxKit `docs/security.md`
 ("Modern and Securely Configured Kernels"); the KSPP recommended settings.
 
-**Gap:** `test/kernel-caps.sh` asserts what containers, Kubernetes, the VMMs and the debug
+**Gap:** `test/kernel-caps.txt` lists what containers, Kubernetes, the VMMs and the debug
 extension need, but nothing about hardening. The kernel is defconfig plus fragments, so
 hardening options come and go with upstream defaults unnoticed.
 
@@ -439,14 +439,14 @@ hardening options come and go with upstream defaults unnoticed.
    `BUG_ON_DATA_CORRUPTION`, `LIST_HARDENED`, `STATIC_USERMODEHELPER`, `VMAP_STACK`,
    `SCHED_STACK_END_CHECK`; and as must-be-off: `DEVMEM`, `DEVPORT`, `PROC_KCORE`,
    `LEGACY_TIOCSTI`, `COMPAT_BRK`, `LDISC_AUTOLOAD`. Some are amd64-only; mark the arch
-   as `kernel-caps.sh` does for its existing entries.
+   as `kernel-caps.txt` does for its existing entries.
 2. Turn on what is missing in a fragment in `packages/kernel/build.sh` (a new
    `hardening.config` heredoc, merged before `vm.config`, so `build.sh`'s existing
    "every line applied" check covers it). Clearing `DEVMEM` and friends goes in
    `vm.config`.
-3. Add the list to `test/kernel-caps.sh` with the second column saying what each protects
+3. Add the list to `test/kernel-caps.txt` with the second column saying what each protects
    against, following that file's rule that a failure names the feature. If it grows long,
-   a separate `test/kernel-hardening.sh` with the same shape is fine. Add a fixture to
+   a separate list checked the same way is fine. Add a fixture to
    `test/selftest.sh` that drops one symbol and must fail naming it, as the existing
    `kernel-caps` fixture does.
 4. Do not add `kernel-hardening-checker` to the builder for this: a short, explained list

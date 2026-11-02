@@ -1,0 +1,12 @@
+menuconfig MENU_THING
+	tristate "a menu"
+
+if MENU_THING
+
+config TWICE
+	bool
+
+endif
+
+config TWICE
+	bool "defined twice, prompted once: an option"

@@ -1,0 +1,13 @@
++ CONFIG_DOC_ONLY=y
+- CONFIG_GONE=y
++ CONFIG_MENU_THING=y
++ CONFIG_NET_CLS_BASIC=y
+- CONFIG_NET_CLS_CGROUP=y
++ CONFIG_NET_CLS_FLOWER=y
+- CONFIG_PROMPTED=y
++ CONFIG_PROMPTED_TOOLCHAIN=y
++ CONFIG_TWICE=y
+- CONFIG_VALUE="old"
++ CONFIG_VALUE="new"
+# and 0 derived (prompt-less) settings added, 1 removed
+# and 5 toolchain-derived settings changed, not shown

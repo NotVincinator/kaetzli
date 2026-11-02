@@ -205,6 +205,13 @@ jobs:
           arch: ${{ matrix.arch }}
           fresh: *fresh
 
+      - &setup-python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: python/.python-version
+          cache: pip
+          cache-dependency-path: python/requirements.txt
+
       # What this kernel builds in that main's last green one does not, and the reverse,
       # posted on the pull request: a new `default y` driver arrives with a bump and
       # fails nothing. A report, never a failure. Only when the kernel was compiled,
@@ -228,7 +235,7 @@ jobs:
             exit 0
           fi
           tar xf baseline/kernel.tar -C baseline
-          ./test/kernel-config-diff.sh baseline/rootfs/boot/config rootfs/boot/config "$src" > config.diff
+          ./test/kernel-config-diff.py baseline/rootfs/boot/config rootfs/boot/config "$src" > config.diff
           if [ ! -s config.diff ]; then
             echo "kernel config ($ARCH): same as main" >> "$GITHUB_STEP_SUMMARY"
             exit 0
@@ -243,7 +250,7 @@ jobs:
             gh pr comment "$pr" --body "$report"
           fi
 
-  # Both arches' kernels against each other (test/kernel-parity.sh): a feature userspace
+  # Both arches' kernels against each other (test/kernel-parity.py): a feature userspace
   # sees is the same on amd64 and arm64. Its own job because it needs both artifacts.
   kernel-parity:
     runs-on: ubuntu-26.04
@@ -265,10 +272,12 @@ jobs:
           name: package-kernel-arm64
           path: artifacts/arm64
 
+      - *setup-python
+
       - name: Compare the amd64 and arm64 kernel configs
         run: |
           for a in amd64 arm64; do tar xf artifacts/$a/kernel.tar -C artifacts/$a; done
-          ./test/kernel-parity.sh artifacts/amd64/rootfs artifacts/arm64/rootfs
+          ./test/kernel-parity.py artifacts/amd64/rootfs artifacts/arm64/rootfs
 
   build:
     runs-on: *runner
@@ -342,12 +351,7 @@ jobs:
 
       # The library checks, the size reports and the SBOM check are Python, run in
       # python/'s venv on the 3.12 baseline (python/README.md).
-      - &setup-python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version-file: python/.python-version
-          cache: pip
-          cache-dependency-path: python/requirements.txt
+      - *setup-python
 
       # Static checks; each is cheaper than finding the same thing in qemu.
       - name: Check for unresolved library dependencies
@@ -360,7 +364,7 @@ jobs:
         run: ./test/check-symbol-resolution.py rootfs
 
       - name: Check the kernel can run containers
-        run: ./test/kernel-caps.sh rootfs
+        run: ./test/kernel-caps.py rootfs
 
       # The same library checks for each extension merged over the base, as a guest sees it.
       - name: Check the extensions' libraries against the base

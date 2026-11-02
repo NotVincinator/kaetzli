@@ -1,0 +1,2 @@
+config DOC_ONLY
+	bool

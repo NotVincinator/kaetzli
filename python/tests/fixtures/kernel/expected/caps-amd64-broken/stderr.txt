@@ -1,0 +1,4 @@
+error: the kernel is missing capabilities this image depends on:
+  CONFIG_USER_NS — no rootless containers, and no uid mapping at all
+  CONFIG_VIRTIO_FS — host directories in Virtualization.framework and qemu+virtiofsd
+  CONFIG_PVH — Firecracker boots an uncompressed vmlinux through PVH

@@ -168,38 +168,36 @@ expect fail "symbol-resolution: a missing symbol behind a symlink name is report
 # ---------------------------------------------------------------------------------
 # Kernel config
 #
-# A config that has every symbol kernel-caps.sh requires, generated from the script's own
-# list so that adding a requirement there does not break this — and then the same config
-# with one removed. The list is every line of its heredocs that starts with a symbol;
-# both architectures' extras are included, which is harmless, since extra =y lines are
-# never an error.
+# A config that has every symbol kernel-caps.py requires, generated from its list,
+# test/kernel-caps.txt, so that adding a requirement there does not break this — and then
+# the same config with one removed. Every line that starts with a symbol, both
+# architectures' sections included, which is harmless: extra =y lines are never an error.
 
 kernel=$work/kernel
 mkdir -p "$kernel/boot"
 {
     echo "# Linux/x86 0.0.0 Kernel Configuration"
-    awk '/<<.EOF/ { on = 1; next } /^EOF/ { on = 0 } on && /^[A-Z0-9_]+ / { print "CONFIG_" $1 "=y" }' \
-        test/kernel-caps.sh
+    awk '/^[A-Z0-9_]+ / { print "CONFIG_" $1 "=y" }' test/kernel-caps.txt
 } > "$kernel/boot/config"
-expect pass "kernel-caps: a config with every requirement passes" "" ./test/kernel-caps.sh "$kernel"
+expect pass "kernel-caps: a config with every requirement passes" "" ./test/kernel-caps.py "$kernel"
 
 sed -i '/^CONFIG_USER_NS=y$/d' "$kernel/boot/config"
-expect fail "kernel-caps: a missing requirement is reported" CONFIG_USER_NS ./test/kernel-caps.sh "$kernel"
+expect fail "kernel-caps: a missing requirement is reported" CONFIG_USER_NS ./test/kernel-caps.py "$kernel"
 
-# kernel-parity.sh: two configs that differ only in what may differ (OF, a symbol only
+# kernel-parity.py: two configs that differ only in what may differ (OF, a symbol only
 # one arch defines), then a pair that differs in a feature, and in a string value.
 parity=$work/parity
 mkdir -p "$parity"
 printf '%s\n' CONFIG_INET_DIAG=y CONFIG_OF=y 'CONFIG_LSM="yama,bpf"' CONFIG_ARM64_ONLY=y > "$parity/arm64"
 printf '%s\n' CONFIG_INET_DIAG=y '# CONFIG_OF is not set' 'CONFIG_LSM="yama,bpf"' CONFIG_X86_ONLY=y > "$parity/amd64"
 expect pass "kernel-parity: configs that differ only where an arch may pass" "" \
-    ./test/kernel-parity.sh "$parity/amd64" "$parity/arm64"
+    ./test/kernel-parity.py "$parity/amd64" "$parity/arm64"
 sed 's/^CONFIG_INET_DIAG=y$/# CONFIG_INET_DIAG is not set/' "$parity/amd64" > "$parity/amd64-nodiag"
 expect fail "kernel-parity: a feature one arch lacks is reported" CONFIG_INET_DIAG \
-    ./test/kernel-parity.sh "$parity/amd64-nodiag" "$parity/arm64"
+    ./test/kernel-parity.py "$parity/amd64-nodiag" "$parity/arm64"
 sed 's/^CONFIG_LSM=.*/CONFIG_LSM="selinux,yama,bpf"/' "$parity/amd64" > "$parity/amd64-lsm"
 expect fail "kernel-parity: a value that differs is reported" CONFIG_LSM \
-    ./test/kernel-parity.sh "$parity/amd64-lsm" "$parity/arm64"
+    ./test/kernel-parity.py "$parity/amd64-lsm" "$parity/arm64"
 
 # ---------------------------------------------------------------------------------
 # check-image-files.sh reads a manifest, not a tree. One rule of each kind, one of them
