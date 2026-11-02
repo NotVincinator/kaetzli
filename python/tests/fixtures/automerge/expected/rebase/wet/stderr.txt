@@ -1,0 +1,2 @@
+! [rejected] (non-fast-forward)
+✓ Created workflow_dispatch event for ci.yml

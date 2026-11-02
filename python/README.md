@@ -26,6 +26,9 @@ src/kaetzli/header_skew.py
 src/kaetzli/updates/ the update check: upstream (what upstream released), release_notes,
                      check (check-updates), snapshot (check-snapshot), versort (GNU
                      sort -V) and http
+src/kaetzli/automerge.py
+                     tools/auto-merge.py: merging the update pull requests; in the shadow
+                     of tools/auto-merge.sh until they have agreed for a while
 src/kaetzli/licenses.py
                      test/check-licenses.py: every package's LICENSE, against
                      test/dfsg-licenses.txt

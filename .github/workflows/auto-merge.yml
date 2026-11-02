@@ -43,6 +43,33 @@ jobs:
         with:
           fetch-depth: 0 # the rebase and the ancestry checks need history
 
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version-file: python/.python-version
+          cache: pip
+          cache-dependency-path: python/requirements.txt
+
+      # The Python port in the shadow of the bash version it replaces: both say what they
+      # would do, on the same pull requests a moment before the bash version acts, and a
+      # difference is a warning with the diff in the summary. Never a failure of this run,
+      # and never an action: tools/auto-merge.sh merges until the two have agreed for a
+      # while (docs/proposals/host-scripting.md, item 6). Then this step goes, and the
+      # next one runs tools/auto-merge.py.
+      - name: Shadow the Python port (dry run, both versions)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ./tools/auto-merge.sh -n > bash.txt 2>&1 || echo "exit $?" >> bash.txt
+          ./tools/auto-merge.py -n > python.txt 2>&1 || echo "exit $?" >> python.txt
+          if diff -u bash.txt python.txt > shadow.diff; then
+            echo "auto-merge shadow: \`auto-merge.py -n\` said what \`auto-merge.sh -n\` said ($(wc -l < bash.txt) lines)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::auto-merge.py -n differs from auto-merge.sh -n; the diff is in the job summary"
+            { echo 'auto-merge shadow: the dry runs differ'; echo; echo '```diff'; cat shadow.diff; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
       - name: Merge green updates
         env:
           GH_TOKEN: ${{ github.token }}
