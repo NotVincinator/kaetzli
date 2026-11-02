@@ -410,9 +410,12 @@ and status format). A package that sets `CFLAGS` wholesale drops both sysroot an
 
 `image/build-rootfs.sh` turns `rootfs/` into `output/rootfs.erofs` (or, with `oci`,
 `output/kaetzli-oci.tar`) on a copy in the container: skeleton, `image/files` as the shipped
-`/etc`, the trim, first boot, `ldconfig`, `mkfs.erofs`, verity, the SBOM. **`image/files` is
-`COPY`ed into the assembly image**, so editing it means rebuilding that image
-(`tools/build-image.sh` does). Accounts are `root` and `user` (uid 1000) with **no
+`/etc`, the trim, first boot, `ldconfig`, `mkfs.erofs`, verity, the SBOM. The assembly image
+is two files: `image/Containerfile`, the snapshot-pinned tools, content-addressed like the
+builder (`tools/prep.sh assembler`; the builder job pushes it, so a rootfs job does not ask
+snapshot.debian.org), and `image/Containerfile.scripts` on top. **`image/files` is
+`COPY`ed into the latter**, so editing it means rebuilding that layer (`tools/build-image.sh`
+does, every run). Accounts are `root` and `user` (uid 1000) with **no
 passwords**: `shadow` is all `*` and the build fails on a hash; the console takes the
 `login.noauth` credential, ssh takes keys only.
 

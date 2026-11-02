@@ -3,6 +3,7 @@
 #
 #     ./tools/image-tags.sh builder    # the toolchain everything compiles in
 #     ./tools/image-tags.sh sources    # every pinned tarball, FROM scratch
+#     ./tools/image-tags.sh assembler  # the pinned tools images are assembled with
 #
 # Both tags are content hashes, so the same checkout always names the same image and CI
 # and a local tree agree without having to coordinate. Override the registry with
@@ -27,6 +28,13 @@ case "${1:-}" in
         echo "$REGISTRY/builder:${hash:0:16}-$ARCH"
         exit 0
         ;;
+    assembler)
+        # image/Containerfile alone: the pin and the apt line. The scripts and image/files
+        # are layered on locally (image/Containerfile.scripts) and are not in this image.
+        hash=$(sha256sum < image/Containerfile)
+        echo "$REGISTRY/assembler:${hash:0:16}-$ARCH"
+        exit 0
+        ;;
     sources)
         # Every pinned version and its checksum, and the patches. A version bump changes
         # the tag, which is the point — the image contents changed. Nothing else in env.sh
@@ -49,7 +57,7 @@ case "${1:-}" in
                done | sort | sha256sum)
         ;;
     *)
-        echo "usage: $0 builder|sources" >&2
+        echo "usage: $0 builder|sources|assembler" >&2
         exit 1
         ;;
 esac

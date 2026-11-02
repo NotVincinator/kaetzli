@@ -1,0 +1,15 @@
+# The assembly image: the pinned tools (image/Containerfile, pulled by its content-hash
+# tag) plus what changes from commit to commit — the scripts and image/files, the /etc
+# the image ships. No RUN that reaches the network, so building this needs nothing but
+# the base: tools/build-image.sh and tools/build-extension.sh rebuild it on every run,
+# since a stale copy would ship a stale /etc.
+ARG BASE
+FROM ${BASE}
+
+COPY image/build-rootfs.sh image/build-extension.sh image/sbom.py test/check-tree-hygiene.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/build-rootfs.sh /usr/local/bin/build-extension.sh \
+             /usr/local/bin/sbom.py /usr/local/bin/check-tree-hygiene.sh
+
+COPY image/files /files
+
+WORKDIR /usr/local/src

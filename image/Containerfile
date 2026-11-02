@@ -8,6 +8,12 @@
 # the filesystem and strip decides what comes out of every ELF object. An unpinned
 # erofs-utils or binutils means the same tree produces a different image, which is the one
 # thing test/size-budget.txt has to be able to compare across runs.
+#
+# This file is the tools alone, and it is content-addressed like the builder
+# (tools/image-tags.sh assembler): the builder job pushes it to the registry, and the jobs
+# that assemble images pull it, so snapshot.debian.org is asked only when this file
+# changes or on a FRESH run, not by every rootfs job. What changes often (the scripts,
+# image/files) goes on top of it in image/Containerfile.scripts, built locally each time.
 ARG SNAPSHOT=20261027
 FROM debian:sid-${SNAPSHOT}@sha256:46e441d513e81eb6c04119061b4abe68a5bae6fa55fd42bf39147e7d2a548bf5
 
@@ -20,17 +26,12 @@ ARG SNAPSHOT
 # setcap, for the two file capabilities the image grants (newuidmap, newgidmap).
 # python3 runs image/sbom.py, which writes the SBOM with the standard library's json: a
 # builder-side interpreter, as perl is in the builder, and nothing of it reaches a tree.
+# The retries are for snapshot.debian.org, which answers 503 under load; apt backs off
+# between them.
 RUN rm -f /etc/apt/sources.list.d/debian.sources /etc/apt/sources.list \
     && printf 'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/%sT000000Z sid main\n' "$SNAPSHOT" \
        > /etc/apt/sources.list \
+    && printf 'Acquire::Retries "10";\n' > /etc/apt/apt.conf.d/80-retries \
     && apt-get update \
     && apt-get install -y --no-install-recommends erofs-utils cryptsetup-bin libcap2-bin binutils python3 \
     && rm -rf /var/lib/apt/lists/*
-
-COPY image/build-rootfs.sh image/build-extension.sh image/sbom.py test/check-tree-hygiene.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/build-rootfs.sh /usr/local/bin/build-extension.sh \
-             /usr/local/bin/sbom.py /usr/local/bin/check-tree-hygiene.sh
-
-COPY image/files /files
-
-WORKDIR /usr/local/src

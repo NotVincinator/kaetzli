@@ -37,7 +37,10 @@ offline. To prepare before disconnecting from the network, run:
 ./tools/prep.sh
 ```
 
-CI prepares and publishes the inputs, then builds packages and assembles the images. Set
+CI prepares and publishes the inputs, then builds packages and assembles the images. The
+image-assembly tools (`image/Containerfile`, also pinned to the snapshot) are a third
+content-addressed image: `./tools/prep.sh assembler` pulls or builds it, and
+`tools/build-image.sh` calls that itself. Set
 `FRESH=1` when running preparation to rebuild both images rather than reuse cached tags;
 `./tools/prep.sh --push` pushes newly built images.
 

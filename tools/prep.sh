@@ -4,6 +4,7 @@
 #     ./tools/prep.sh            # make sure both images exist locally, building if needed
 #     ./tools/prep.sh --push     # ...and push them to the registry
 #     FRESH=1 ./tools/prep.sh    # build both even if the registry has them
+#     ./tools/prep.sh assembler  # the image-assembly tools instead (tools/build-image.sh)
 #
 # After this succeeds a build needs nothing from the internet, which is why build.sh runs
 # the compile with --network=none. Run it before going offline, or let build.sh call it.
@@ -20,9 +21,10 @@ push=
 # CI splits the two: the builder is built once per architecture on a native runner, the
 # sources image once for both. Locally the default does whichever is missing.
 want="${1:-both}"
-
-builder=$(./tools/image-tags.sh builder)
-sources=$(./tools/image-tags.sh sources)
+case "$want" in
+    both|builder|sources|assembler) ;;
+    *) echo "usage: $0 [--push] [both|builder|sources|assembler]" >&2; exit 2 ;;
+esac
 
 # FRESH=1 is CI's scheduled clean rebuild: a tag that resolves proves the image was built
 # once, not that its inputs still build — the snapshot still serving the pinned packages,
@@ -43,6 +45,27 @@ push_image() {
         podman push "$1"
     fi
 }
+
+# The assembly tools are on their own: the builder job pushes them beside the builder, and
+# only image assembly (tools/build-image.sh, tools/build-extension.sh) asks for them, so
+# a package build never needs them and they never need a sources image.
+if [ "$want" = assembler ]; then
+    assembler=$(./tools/image-tags.sh assembler)
+    if have "$assembler"; then
+        echo ">> assembler: $assembler (already local)" >&2
+    elif pull "$assembler"; then
+        echo ">> assembler: $assembler (pulled)" >&2
+    else
+        echo ">> assembler: $assembler (building)" >&2
+        podman build -t "$assembler" -f image/Containerfile . >&2
+        [ -z "$push" ] || push_image "$assembler" >&2
+    fi
+    echo "$assembler"
+    exit 0
+fi
+
+builder=$(./tools/image-tags.sh builder)
+sources=$(./tools/image-tags.sh sources)
 
 # Whether the registry already had it, which is the same question as whether there is
 # anything to push. Content-addressed tags make that exact: a tag that resolved is by

@@ -120,8 +120,11 @@ fi
 
 echo "==> assembling images"
 mkdir -p output
-# Rebuilt every time: image/files is COPYed into it, so a stale image ships a stale /etc.
-podman build -q -t rootfs-builder -f image/Containerfile .
+# The pinned tools are pulled by their content-hash tag (built from the Debian snapshot
+# only when the registry does not have them); the scripts and image/files go on top, and
+# that layer is rebuilt every time, since a stale one ships a stale /etc.
+assembler=$(./tools/prep.sh assembler)
+podman build -q -t rootfs-builder --build-arg BASE="$assembler" -f image/Containerfile.scripts .
 
 build=${KAETZLI_BUILD:-$(git rev-parse HEAD 2>/dev/null || echo local)}
 for f in $flavours; do

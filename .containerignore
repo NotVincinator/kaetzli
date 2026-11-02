@@ -1,5 +1,5 @@
-# Only these paths are ever COPYied into an image (builder/package.Containerfile and
-# image/Containerfile); everything else — unpacked source trees, the rootfs staging
+# Only these paths are ever COPYied into an image (builder/Containerfile and
+# image/Containerfile.scripts); everything else — unpacked source trees, the rootfs staging
 # dir, downloaded tarballs, .git — would just bloat the build context. Add an entry
 # here when a Containerfile starts copying something new.
 #

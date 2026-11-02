@@ -21,7 +21,8 @@ dir="${3:?usage: $0 sysext|confext <name> <dir>}"
 mkdir -p output
 # Rebuilt every time, as tools/build-image.sh does: image/files is COPYed into it, and the
 # extension's level is read from there.
-podman build -q -t rootfs-builder -f image/Containerfile . > /dev/null
+assembler=$(./tools/prep.sh assembler)
+podman build -q -t rootfs-builder --build-arg BASE="$assembler" -f image/Containerfile.scripts . > /dev/null
 podman run --rm --security-opt label=disable \
     -e SOURCE_DATE_EPOCH="$KAETZLI_SOURCE_DATE_EPOCH" ${LEVEL:+-e LEVEL="$LEVEL"} \
     --volume "$(realpath "$dir")":/usr/local/src:ro \

@@ -99,12 +99,14 @@ fi
 # rather than spelled out, so REGISTRY= works the same here as there.
 builder=$(./tools/image-tags.sh builder)
 sources=$(./tools/image-tags.sh sources)
+assembler=$(./tools/image-tags.sh assembler)
 registry=${builder%/builder:*}
 
 while read -r ref id size; do
     case "$ref" in
-        "$registry"/builder:*|"$registry"/sources:*)
-            if [ "$current" = 0 ] && { [ "$ref" = "$builder" ] || [ "$ref" = "$sources" ]; }; then
+        "$registry"/builder:*|"$registry"/sources:*|"$registry"/assembler:*)
+            if [ "$current" = 0 ] && { [ "$ref" = "$builder" ] || [ "$ref" = "$sources" ] ||
+                                       [ "$ref" = "$assembler" ]; }; then
                 continue
             fi ;;
         localhost/rootfs-builder:*|localhost/kaetzli:*) ;;
