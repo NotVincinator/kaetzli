@@ -1,8 +1,8 @@
 # Host-side scripts: which language for which job
 
-**Status: proposal, partly implemented.** Implemented: items 1 to 4, the CVE reports,
-the SBOM, the size reports and the library checks, and item 5 but for `header-skew.sh`
-(`python/`, see its README). CLAUDE.md (*Host-side code*)
+**Status: proposal, partly implemented.** Implemented: items 1 to 5, the CVE reports,
+the SBOM, the size reports, the library checks and the policy checks (`python/`, see its
+README). CLAUDE.md (*Host-side code*)
 allows Python and Go for what runs on the host, in CI or in a builder container. This
 page reviews the scripts against that rule and orders the migration.
 
@@ -106,7 +106,7 @@ CI runner, not in the assembly image.
 
 Dependencies: `pyelftools`.
 
-### 5. Policy checks: `check-licenses.py`, `kernel-caps.py`, `kernel-parity.py`, `kernel-config-diff.py` (done), `header-skew.sh`
+### 5. Policy checks: `check-licenses.py`, `kernel-caps.py`, `kernel-parity.py`, `kernel-config-diff.py`, `header-skew.py` (done)
 
 `check-licenses.py` is `kaetzli.licenses`. The bash version split SPDX expressions on
 whitespace and parentheses, so `MIT ISC`, `MIT AND`, `(MIT` and `GPL-2.0-only WITH MIT`
@@ -122,7 +122,13 @@ other lists in `test/`. On CI's 7.3.1 configs for both arches and amd64's 7.2.13
 output is identical, and `config_diff`'s classification of the 7.3.1 source agrees with
 the awk's on all 21,742 symbols. One deliberate difference: `kernel-config-diff` lists
 changes by symbol, a removal before its addition, where GNU diff's hunks could put a
-symbol's old and new values lines apart. `header-skew.sh` is a report built on two `declare -A`.
+symbol's old and new values lines apart.
+
+`header-skew.py` is `kaetzli.header_skew`: the table is a dict, the version is stripped
+and compared in Python (`python-debian`'s `Version`, dpkg's order), and the builder is
+asked only for what it has, `dpkg-query`'s versions. Against the builder its output is
+identical; synthetic versions through a stub `dpkg-query` in the builder, compared by its
+real `dpkg --compare-versions`, are the edge cases' golden.
 
 Dependencies: `license-expression`.
 

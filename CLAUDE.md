@@ -146,7 +146,7 @@ is not bound to bash, and bash is not the default: it is hard to read and review
 of `test/` and `tools/` is JSON, HTTP, joins and report tables written in jq, awk and
 `declare -A`. Choose per job. `docs/proposals/host-scripting.md` reviews every script
 against this and orders the migration; the CVE reports, the SBOM, the size reports,
-the library checks, the license check and the kernel config checks are done.
+the library checks and the policy checks are done.
 
 - **Bash** where the job *is* a sequence of commands and their exit codes: anything
   sourced by a package build (`builder/build-package.sh`, `packages/*/build.sh`, `env.sh`,
@@ -216,7 +216,7 @@ the library checks, the license check and the kernel config checks are done.
 ./test/check-rootfs-deps.py rootfs      # unresolved NEEDED entries
 ./test/check-symbol-versions.py rootfs  # symbol versions no shipped library defines
 ./test/check-symbol-resolution.py rootfs  # undefined symbols nothing in a binary's NEEDED closure defines
-./tools/header-skew.sh            # builder -dev headers vs the libraries we ship (report)
+./tools/header-skew.py            # builder -dev headers vs the libraries we ship (report)
 ./test/kernel-caps.py rootfs            # kernel config vs test/kernel-caps.txt: what a container needs
 ./test/kernel-parity.py <amd64> <arm64>  # the two arches' kernel configs agree (configs or trees)
 ./test/kernel-config-diff.py <old> <new> [src]  # what a kernel build turned on or off
@@ -398,7 +398,7 @@ The same arrangement is how every package links every library we ship: the CI sy
 glibc alone, so curl compiles against sid's `libssl-dev` and runs on our `libssl.so.3`.
 It holds while our version is at least sid's — held by `check-symbol-versions.py` for
 versioned libraries and `check-symbol-resolution.py` for unversioned ones (glib, json-c,
-pcre2); `tools/header-skew.sh` shows both sides. `docs/guides/linking.md` is the long version.
+pcre2); `tools/header-skew.py` shows both sides. `docs/guides/linking.md` is the long version.
 
 **3. No optimization.** Autotools picks `-O2` only when `CFLAGS` is unset, and
 `build-package.sh` sets it, so it exports `-O2` itself; `SYSROOT_CFLAGS` is the same without

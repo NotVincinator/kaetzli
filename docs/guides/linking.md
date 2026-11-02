@@ -47,7 +47,7 @@ that are absent from the image.
 
 ## Investigate a mismatch
 
-Compare the builder and shipped versions with `./tools/header-skew.sh`. In a booted guest,
+Compare the builder and shipped versions with `./tools/header-skew.py`. In a booted guest,
 inspect library resolution with `LD_DEBUG`:
 
 ```sh

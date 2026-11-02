@@ -20,6 +20,9 @@ src/kaetzli/sbom_check.py
                      test/check-sbom.py: what the SBOM says
 src/kaetzli/kernel/  the kernel config checks: caps (kernel-caps), parity (kernel-parity),
                      config_diff (kernel-config-diff), and config, their .config reader
+src/kaetzli/header_skew.py
+                     tools/header-skew.py: the builder's -dev headers against our
+                     libraries
 src/kaetzli/licenses.py
                      test/check-licenses.py: every package's LICENSE, against
                      test/dfsg-licenses.txt
