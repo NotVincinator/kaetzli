@@ -12,8 +12,8 @@
 # version, ours, and which is newer. Ours newer is the safe direction — a library is
 # backwards compatible with headers older than itself. sid's newer is the one to look at:
 # a binary built against that header may call a function our library does not have yet.
-# Whether one actually does is test/check-symbol-resolution.sh's question (and, for a
-# library with versioned symbols, test/check-symbol-versions.sh's); this only says where
+# Whether one actually does is test/check-symbol-resolution.py's question (and, for a
+# library with versioned symbols, test/check-symbol-versions.py's); this only says where
 # to expect it. It never fails: a skew is a fact about two release schedules, not a bug.
 set -euo pipefail
 
@@ -93,7 +93,7 @@ podman run --rm -i --network=none "$(./tools/image-tags.sh builder)" bash -c '
     echo
     if [ "$newer" -gt 0 ]; then
         echo "$newer header(s) newer than the library we ship. Not an error by itself:"
-        echo "test/check-symbol-resolution.sh says whether any binary actually uses what is"
+        echo "test/check-symbol-resolution.py says whether any binary actually uses what is"
         echo "missing. See docs/guides/linking.md."
     else
         echo "Every library we ship is at least as new as the header it is compiled against."

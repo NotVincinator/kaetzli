@@ -1,7 +1,7 @@
 # Host-side scripts: which language for which job
 
-**Status: proposal, partly implemented.** Implemented: items 1 to 3, the CVE reports,
-the SBOM and the size reports (`python/`, see its README). CLAUDE.md (*Host-side code*)
+**Status: proposal, partly implemented.** Implemented: items 1 to 4, the CVE reports,
+the SBOM, the size reports and the library checks (`python/`, see its README). CLAUDE.md (*Host-side code*)
 allows Python and Go for what runs on the host, in CI or in a builder container. This
 page reviews the scripts against that rule and orders the migration.
 
@@ -74,7 +74,27 @@ loop that `cve-history.sh` had too.
 
 Dependencies: none (stdlib and the `gh` CLI).
 
-### 4. Static ELF checks: `check-symbol-resolution.sh`, `check-symbol-versions.sh`, `check-rootfs-deps.sh`
+### 4. Static ELF checks: `test/check-rootfs-deps.py`, `check-symbol-versions.py`, `check-symbol-resolution.py` (done)
+
+Ported as `kaetzli.elf`: one scan of the tree with `pyelftools` (`scan`), shared by the
+three checks, and a check each (`deps`, `versions`, `resolution`). The tests compile
+`selftest.sh`'s trees and one more for the longer reports, and the bash versions' output
+on them is the golden. On CI's own trees (amd64 and arm64, the base and each extension
+merged over it) and on a copy broken three ways (a stub libz with one version,
+libpcre2-8 deleted, libtinfow emptied behind the libtinfo.so.6 link), the output is
+identical, in one to eight seconds where bash took 15 to 30. `selftest.sh` runs the `.py` checks, and moves
+to pytest when the checks it covers are all Python (*Later*). Deliberate differences:
+
+- The scan reads the symbol table, not readelf's columns. On arm64 readelf prints
+  `[VARIANT_PCS]` after the visibility of an SVE or Advanced SIMD function, which moved
+  every column after it by one: the bash version took a definition's section number for
+  its name (libmvec's vector functions were defined as `13`), and would have taken an
+  undefined one for a definition of `UND`. Nothing on arm64 calls one today, so CI's
+  output is the same; the first caller would have been reported unresolved.
+- `check-rootfs-deps` follows a library's symlink inside the tree; readelf followed an
+  absolute one on the host.
+
+What the bash versions said:
 
 They parse `readelf` text with awk and compute NEEDED closures in shell. `pyelftools`
 reads the dynamic section, version tables and symbols directly, with no text format to

@@ -1,4 +1,4 @@
-# Undefined symbols test/check-symbol-resolution.sh accepts, as
+# Undefined symbols test/check-symbol-resolution.py accepts, as
 # "<soname> <symbol>" (the file name, for an object without one). Each one is resolved at runtime from outside the
 # object's own NEEDED closure, by design — not a library this image fails to ship, and
 # not a header newer than the library behind it. See docs/guides/linking.md.

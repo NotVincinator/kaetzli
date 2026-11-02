@@ -1,0 +1,1 @@
+Every symbol an object in ROOT/ uses is defined by the libraries it loads.

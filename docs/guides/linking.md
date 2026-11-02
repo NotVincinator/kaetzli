@@ -36,9 +36,9 @@ image. For other libraries, the repository checks:
 
 | Check | Detects |
 | --- | --- |
-| `test/check-rootfs-deps.sh` | Required shared-library files missing from the image. |
-| `test/check-symbol-versions.sh` | Required symbol versions not provided by the runtime libraries. |
-| `test/check-symbol-resolution.sh` | Unresolved non-weak symbols in the dependency closure. |
+| `test/check-rootfs-deps.py` | Required shared-library files missing from the image. |
+| `test/check-symbol-versions.py` | Required symbol versions not provided by the runtime libraries. |
+| `test/check-symbol-resolution.py` | Unresolved non-weak symbols in the dependency closure. |
 
 These checks catch many ABI mismatches, but cannot prove compatibility of data layouts,
 constants, or behavior. Keep shipped libraries at or newer than the builder headers where
@@ -59,9 +59,9 @@ Use `ldd` on the host only when its loader and library paths match the target im
 Run the static checks against the merged tree:
 
 ```sh
-./test/check-rootfs-deps.sh rootfs
-./test/check-symbol-versions.sh rootfs
-./test/check-symbol-resolution.sh rootfs
+./test/check-rootfs-deps.py rootfs
+./test/check-symbol-versions.py rootfs
+./test/check-symbol-resolution.py rootfs
 ```
 
 For package sysroot and build details, see [How the build works](how-it-works.md). Declared

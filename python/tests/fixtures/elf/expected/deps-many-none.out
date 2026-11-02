@@ -1,0 +1,14 @@
+NEW unresolved shared library dependencies in ROOT/:
+
+  libbar.so.2
+      needed by usr/bin/bar1
+      needed by usr/bin/bar2
+      needed by usr/bin/bar3
+      needed by usr/bin/bar4
+      ... and 1 more
+  libbaz.so.3
+      needed by usr/bin/baz
+
+Each is linked against a library from the Debian builder image that is never
+installed into the rootfs. Either add a package providing it, or configure the
+package that wants it to build without that optional dependency.

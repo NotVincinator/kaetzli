@@ -1,0 +1,17 @@
+deps-good 0
+deps-nolib 1
+deps-nolib-allowed 0
+deps-nolib-comments 1
+deps-alias 0
+deps-many 1
+deps-many-none 1
+versions-good 0
+versions-old 1
+versions-nolib 0
+versions-many 1
+resolution-good 0
+resolution-old 1
+resolution-nolib 0
+resolution-alias 0
+resolution-alias-old 1
+resolution-many 1

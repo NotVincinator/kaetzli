@@ -115,7 +115,7 @@ def check(doc: Path) -> tuple[list[str], str | None]:
 
     # The libraries the image references and does not ship are DEPENDS_ON *without* a
     # CONTAINS, which is how SPDX says "needed, not present". The shape, not the contents:
-    # which libraries are missing is test/check-rootfs-deps.sh's business.
+    # which libraries are missing is test/check-rootfs-deps.py's business.
     unresolved = _ids(packages, "SPDXRef-Unresolved-")
     wrongly = [r for r in contains if _starts(r.get("relatedSpdxElement"), "SPDXRef-Unresolved-")]
     if wrongly:

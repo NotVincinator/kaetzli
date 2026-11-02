@@ -1,0 +1,5 @@
+Known-missing libraries (listed in allowlist.txt):
+  libfoo.so.1
+      needed by usr/bin/app
+
+No new unresolved dependencies.

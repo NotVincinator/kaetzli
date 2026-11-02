@@ -45,5 +45,5 @@ every removed path:
   usr/lib/udev/rules.d
   usr/lib/udev/rules.d/50-udev-default.rules
 
-links: test/check-rootfs-deps.sh on the container's layer
+links: test/check-rootfs-deps.py on the container's layer
   All shared library dependencies in <tree>/ are satisfied.

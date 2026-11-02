@@ -1,0 +1,11 @@
+UNRESOLVED symbols in ROOT/:
+
+  usr/bin/app
+      foo_new
+      foo_v2
+
+Each of these calls a function that no library in its NEEDED closure defines, and
+will fail with 'undefined symbol' when the call is first made. The usual cause is a
+header from builder/deps.txt newer than the library packages/ ships: bump ours to
+at least sid's (docs/guides/linking.md). A plugin that expects its host program to
+provide the symbol is not a bug; add it to test/known-unresolved-symbols.txt.

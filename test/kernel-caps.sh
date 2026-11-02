@@ -17,7 +17,7 @@
 #     all 48 arm64 SoC platforms removed 1594 symbols, and the only reason to believe
 #     none of them mattered is a list like this one saying so.
 #
-# It runs in the `rootfs` CI job, next to check-rootfs-deps.sh, because it needs nothing
+# It runs in the `rootfs` CI job, next to check-rootfs-deps.py, because it needs nothing
 # but the staged tree — no boot, no qemu, a few milliseconds. test/container.sh is the
 # other half: it boots the thing and starts a real container. Both are worth having, and
 # this one says *which* capability is missing rather than "crun exited 1".

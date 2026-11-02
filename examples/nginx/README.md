@@ -96,7 +96,7 @@ A failure names the file and the problem:
 /usr/bin/nginx: no libpcre2-8.so.0 in kaetzli or the bundle
 ```
 
-These are the repo's `test/check-rootfs-deps.sh` and `test/check-symbol-versions.sh`, cut
+These are the repo's `test/check-rootfs-deps.py` and `test/check-symbol-versions.py`, cut
 down to one image.
 
 **In the final stage**, `LD_BIND_NOW=1 nginx -V && nginx -t` runs the binary on kaetzli's own

@@ -1,0 +1,39 @@
+note: 6 object(s) need a library ROOT/ does not ship and were not checked;
+      test/check-rootfs-deps.py reports which.
+UNRESOLVED symbols in ROOT/:
+
+  usr/bin/app
+      foo_new
+      foo_v2
+  usr/bin/app1
+      foo_new
+      foo_v2
+  usr/bin/app2
+      foo_new
+      foo_v2
+  usr/bin/app3
+      foo_new
+      foo_v2
+  usr/bin/app4
+      foo_new
+      foo_v2
+  usr/bin/app5
+      foo_new
+      foo_v2
+  usr/bin/app6
+      foo_new
+      foo_v2
+  usr/bin/usesmany
+      many_1
+      many_2
+      many_3
+      many_4
+      many_5
+      many_6
+      ... and 3 more
+
+Each of these calls a function that no library in its NEEDED closure defines, and
+will fail with 'undefined symbol' when the call is first made. The usual cause is a
+header from builder/deps.txt newer than the library packages/ ships: bump ours to
+at least sid's (docs/guides/linking.md). A plugin that expects its host program to
+provide the symbol is not a bug; add it to test/known-unresolved-symbols.txt.

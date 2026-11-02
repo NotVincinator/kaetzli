@@ -1,0 +1,3 @@
+note: 1 object(s) need a library ROOT/ does not ship and were not checked;
+      test/check-rootfs-deps.py reports which.
+Every symbol an object in ROOT/ uses is defined by the libraries it loads.

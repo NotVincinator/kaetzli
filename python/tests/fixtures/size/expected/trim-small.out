@@ -25,5 +25,5 @@ added (only in the container):
   var/log
   var/tmp
 
-links: test/check-rootfs-deps.sh on the container's layer
+links: test/check-rootfs-deps.py on the container's layer
   All shared library dependencies in <tree>/ are satisfied.

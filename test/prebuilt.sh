@@ -19,7 +19,7 @@
 # not for what it does:
 #
 #   c-cancel     pthread_cancel, which makes glibc dlopen libgcc_s — the case
-#                check-rootfs-deps.sh cannot see, since nothing has it in NEEDED.
+#                check-rootfs-deps.py cannot see, since nothing has it in NEEDED.
 #   cxx          libstdc++ and an exception that has to unwind through it.
 #   rust         libgcc_s in NEEDED, and a panic caught with catch_unwind.
 #   go-cgo       a dynamically linked Go binary, through glibc's NSS for user lookup,

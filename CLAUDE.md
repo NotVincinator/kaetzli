@@ -145,8 +145,8 @@ Constraint 5 is about the image. What runs on the host, in CI or in a builder co
 is not bound to bash, and bash is not the default: it is hard to read and review, and much
 of `test/` and `tools/` is JSON, HTTP, joins and report tables written in jq, awk and
 `declare -A`. Choose per job. `docs/proposals/host-scripting.md` reviews every script
-against this and orders the migration; the CVE reports, the SBOM and the size reports
-are done.
+against this and orders the migration; the CVE reports, the SBOM, the size reports
+and the library checks are done.
 
 - **Bash** where the job *is* a sequence of commands and their exit codes: anything
   sourced by a package build (`builder/build-package.sh`, `packages/*/build.sh`, `env.sh`,
@@ -200,9 +200,9 @@ are done.
 ./build.sh glibc            # must come first — everything else compiles against it
 ./build.sh <package>        # one package into staging/<package>/, then rootfs/ re-merged from all of them
 ./tools/merge-staging.sh    # rootfs/ and extensions/ from staging/, failing on a file two packages install
-./test/check-rootfs-deps.sh rootfs      # unresolved NEEDED entries
-./test/check-symbol-versions.sh rootfs  # symbol versions no shipped library defines
-./test/check-symbol-resolution.sh rootfs  # undefined symbols nothing in a binary's NEEDED closure defines
+./test/check-rootfs-deps.py rootfs      # unresolved NEEDED entries
+./test/check-symbol-versions.py rootfs  # symbol versions no shipped library defines
+./test/check-symbol-resolution.py rootfs  # undefined symbols nothing in a binary's NEEDED closure defines
 ./tools/header-skew.sh            # builder -dev headers vs the libraries we ship (report)
 ./test/kernel-caps.sh rootfs            # kernel config vs what a container needs
 ./test/kernel-parity.sh <amd64> <arm64>  # the two arches' kernel configs agree (configs or trees)
@@ -369,13 +369,13 @@ outside `/usr` is fine where glibc hardcodes the path (`/etc/services`).
 **1. Compiling against the wrong glibc.** `build-package.sh` points gcc at our glibc with
 `--sysroot` and appends the builder's own paths so other dependencies resolve to Debian's.
 A build system that *replaces* rather than appends to `CPPFLAGS`/`CFLAGS`/`LDFLAGS` drops
-the sysroot (systemd's `-Dc_args` carries it by hand). `test/check-symbol-versions.sh`
+the sysroot (systemd's `-Dc_args` carries it by hand). `test/check-symbol-versions.py`
 catches this. `glibc` and `kernel` are `NO_SYSROOT=1`. The builder container also *runs* on
 our glibc: `build.sh` bind-mounts ours over every file Debian's `libc6` owns.
 
 **2. Linking against a library only the builder has.** configure finds an optional `-dev`
 package, links it, and the missing `.so` shows up in qemu. Configure it out
-(`--without-selinux`). `test/check-rootfs-deps.sh` reports them; `known-missing-libs.txt`
+(`--without-selinux`). `test/check-rootfs-deps.py` reports them; `known-missing-libs.txt`
 allowlists the accepted backlog. **The allowlist is per library, not per consumer**, so a
 new package picking up an allowlisted library passes: iproute2 would have linked
 libselinux (allowlisted for nscd) with no flag to stop it, so it hides the library from
@@ -383,8 +383,8 @@ libselinux (allowlisted for nscd) with no flag to stop it, so it hides the libra
 
 The same arrangement is how every package links every library we ship: the CI sysroot is
 glibc alone, so curl compiles against sid's `libssl-dev` and runs on our `libssl.so.3`.
-It holds while our version is at least sid's — held by `check-symbol-versions.sh` for
-versioned libraries and `check-symbol-resolution.sh` for unversioned ones (glib, json-c,
+It holds while our version is at least sid's — held by `check-symbol-versions.py` for
+versioned libraries and `check-symbol-resolution.py` for unversioned ones (glib, json-c,
 pcre2); `tools/header-skew.sh` shows both sides. `docs/guides/linking.md` is the long version.
 
 **3. No optimization.** Autotools picks `-O2` only when `CFLAGS` is unset, and
@@ -443,7 +443,7 @@ commit's URL: `image/sbom.py` maps `git+<repo>@<sha>`, and the check fails a for
 `test/cve-scan.py` makes OpenVEX of those, so grype reports it patched rather than open.
 `image/sbom.py` is shared with `build-extension.sh`, which writes `sbom-ext-<name>.json`.
 Unresolved libraries
-are `DEPENDS_ON` without `CONTAINS`, computed like `check-rootfs-deps.sh` (a library is a
+are `DEPENDS_ON` without `CONTAINS`, computed like `check-rootfs-deps.py` (a library is a
 file plus its SONAME symlink).
 
 **License texts ship with every package and nothing may remove one.** After the install,
@@ -567,7 +567,7 @@ reloads PID 1, so one that should start at boot needs `UpheldBy=` as well as `Wa
   carry no xattrs) and the assembly applies them. Images are made from a tar stream with
   `--xattrs-include=security.capability`, so no host SELinux label gets in.
 - **glib is coupled to sid like OpenSSL, and unversioned**: keep `packages/glib` at or
-  above sid's; `check-symbol-resolution.sh` is what notices. glib's stable series is the
+  above sid's; `check-symbol-resolution.py` is what notices. glib's stable series is the
   even minor.
 - **Go and Rust read none of the C flags**: `build-package.sh` passes the sysroot through
   `CGO_*` and one `-C link-arg=` per flag in `RUSTFLAGS` (cargo splits on whitespace), and

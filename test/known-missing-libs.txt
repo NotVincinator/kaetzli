@@ -2,7 +2,7 @@
 #
 # Everything here was picked up opportunistically from the Debian builder image: the
 # package's configure found an optional dependency, linked against it, and we never
-# staged it. test/check-rootfs-deps.sh reports these but doesn't fail on them, so that new
+# staged it. test/check-rootfs-deps.py reports these but doesn't fail on them, so that new
 # regressions stand out from this existing backlog.
 #
 # Fixing one means either adding a package that provides the library, or configuring

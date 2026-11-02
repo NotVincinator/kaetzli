@@ -1,0 +1,13 @@
+MISSING symbol versions in ROOT/:
+
+  libfoo.so.1: FOO_2
+      needed by usr/bin/app
+      needed by usr/bin/app1
+      needed by usr/bin/app2
+      needed by usr/bin/app3
+      ... and 3 more
+
+These binaries were compiled against a newer library than the image ships and will
+fail at exec time. For glibc that means the build didn't go through our sysroot:
+check that SYSROOT reaches the compiler (builder/build-package.sh) and that the
+package's build system doesn't drop the CFLAGS/LDFLAGS it exports.

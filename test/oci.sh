@@ -87,7 +87,7 @@ check "no module tools for a modless kernel" test ! -e /usr/bin/modprobe
 check "no libudev with no client"            test ! -e /usr/lib/libudev.so.1
 
 # Running these rather than testing -x is the point: a binary whose libraries are not in
-# the image is executable right up until it is executed. check-rootfs-deps.sh catches
+# the image is executable right up until it is executed. check-rootfs-deps.py catches
 # that on the staging tree, but only this catches a library the subtraction above took
 # away — bash is proven by the fact that anything here ran at all.
 echo "and what it must be:"

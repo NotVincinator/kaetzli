@@ -695,7 +695,7 @@ created=$(date -u -d "@${SOURCE_DATE_EPOCH:-$(date +%s)}" +%Y-%m-%dT%H:%M:%SZ)
 image_name="kaetzli-$flavour-$oci_arch"
 
 # Libraries a shipped binary needs and the image lacks: DEPENDS_ON without CONTAINS.
-# The same construction as test/check-rootfs-deps.sh, over the assembled tree. A
+# The same construction as test/check-rootfs-deps.py, over the assembled tree. A
 # library is a file plus its SONAME symlink, so both count as provided.
 provided=$(
     { find "$IMAGE" -name '*.so*' \( -type f -o -type l \) -print0 2>/dev/null |

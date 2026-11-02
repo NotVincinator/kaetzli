@@ -1,0 +1,8 @@
+NEW unresolved shared library dependencies in ROOT/:
+
+  libfoo.so.1
+      needed by usr/bin/app
+
+Each is linked against a library from the Debian builder image that is never
+installed into the rootfs. Either add a package providing it, or configure the
+package that wants it to build without that optional dependency.

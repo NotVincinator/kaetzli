@@ -76,7 +76,7 @@ RUN install -d /out/usr/lib \
 # Fail here, with a readable message, rather than at `docker run`: every library the
 # binary and the bundled libraries name must exist in kaetzli or in the bundle, and every
 # symbol version asked for must be one that copy defines. This is
-# test/check-rootfs-deps.sh and check-symbol-versions.sh in miniature, run against the
+# test/check-rootfs-deps.py and check-symbol-versions.py in miniature, run against the
 # real runtime image's /usr/lib.
 COPY --from=runtime /usr/lib /kaetzli/usr/lib
 RUN set -e; status=0; \

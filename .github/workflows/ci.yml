@@ -340,15 +340,24 @@ jobs:
           done
           ./tools/merge-staging.sh
 
+      # The library checks, the size reports and the SBOM check are Python, run by uv in
+      # python/'s venv (python/README.md).
+      - &setup-uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.1"
+          enable-cache: true
+          cache-dependency-glob: python/uv.lock
+
       # Static checks; each is cheaper than finding the same thing in qemu.
       - name: Check for unresolved library dependencies
-        run: ./test/check-rootfs-deps.sh rootfs
+        run: ./test/check-rootfs-deps.py rootfs
 
       - name: Check for unsatisfied symbol versions
-        run: ./test/check-symbol-versions.sh rootfs
+        run: ./test/check-symbol-versions.py rootfs
 
       - name: Check every symbol resolves
-        run: ./test/check-symbol-resolution.sh rootfs
+        run: ./test/check-symbol-resolution.py rootfs
 
       - name: Check the kernel can run containers
         run: ./test/kernel-caps.sh rootfs
@@ -361,9 +370,9 @@ jobs:
               merged="merged-$(basename "$ext")"
               cp -a rootfs "$merged"
               cp -a --remove-destination "$ext/usr/." "$merged/usr/"
-              ./test/check-rootfs-deps.sh "$merged"
-              ./test/check-symbol-versions.sh "$merged"
-              ./test/check-symbol-resolution.sh "$merged"
+              ./test/check-rootfs-deps.py "$merged"
+              ./test/check-symbol-versions.py "$merged"
+              ./test/check-symbol-resolution.py "$merged"
               rm -rf "$merged"
           done
 
@@ -374,15 +383,6 @@ jobs:
       # assembly writes: a trim line or a disabled feature that quietly stopped applying.
       - name: Check what the images contain
         run: ./test/check-image-files.sh
-
-      # The size reports and the SBOM check are Python, run by uv in python/'s venv
-      # (python/README.md).
-      - &setup-uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          version: "0.13.1"
-          enable-cache: true
-          cache-dependency-glob: python/uv.lock
 
       # What the container flavour leaves out of the disk image, by area, and the deps
       # check on its own layer that shows nothing left needs what went: the OCI

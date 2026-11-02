@@ -10,6 +10,9 @@ src/kaetzli/         shared: repo (env.sh through bash), report (stdout + job su
 src/kaetzli/cve/     the CVE reports: scan, context, history, and what they share
 src/kaetzli/size/    the size reports: budget (rootfs-size), slim (vs-debian-slim),
                      history (size-history), trim (oci-trim), and sizes, their parser
+src/kaetzli/elf/      the library checks: deps (check-rootfs-deps), versions
+                     (check-symbol-versions), resolution (check-symbol-resolution),
+                     and scan, what they read from a tree with pyelftools
 src/kaetzli/sbom_check.py
                      test/check-sbom.py: what the SBOM says
 tests/               pytest; fixtures/ holds real data cut down, and the bash versions'

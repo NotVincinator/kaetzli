@@ -5,9 +5,9 @@
 #
 # Every check in test/ that reads a tree reports success when it finds nothing wrong — and
 # a check that is broken finds nothing wrong too. That is not hypothetical here. The first
-# version of check-symbol-resolution.sh resolved NEEDED by SONAME only, decided bash's
-# libtinfo.so.6 was missing, skipped bash and seventy other programs, and still printed
-# its success line. CLAUDE.md's grep -a story is the same shape: a sweep that matched
+# version of the symbol-resolution check, in bash, resolved NEEDED by SONAME only, decided
+# bash's libtinfo.so.6 was missing, skipped bash and seventy other programs, and still
+# printed its success line. CLAUDE.md's grep -a story is the same shape: a sweep that matched
 # nothing and said so with exit 0.
 #
 # So each check gets small trees built to be wrong in exactly one way, and has to fail on
@@ -125,32 +125,32 @@ empty=$work/empty-allowlist
 : > "$empty"
 
 good=$(tree good new)
-expect pass "rootfs-deps: a complete tree passes"            "" ./test/check-rootfs-deps.sh "$good" "$empty"
-expect pass "symbol-versions: a complete tree passes"        "" ./test/check-symbol-versions.sh "$good"
-expect pass "symbol-resolution: a complete tree passes"      "" ./test/check-symbol-resolution.sh "$good"
+expect pass "rootfs-deps: a complete tree passes"            "" ./test/check-rootfs-deps.py "$good" "$empty"
+expect pass "symbol-versions: a complete tree passes"        "" ./test/check-symbol-versions.py "$good"
+expect pass "symbol-resolution: a complete tree passes"      "" ./test/check-symbol-resolution.py "$good"
 
 nolib=$(tree nolib "")
-expect fail "rootfs-deps: a missing library is reported"     libfoo.so.1 ./test/check-rootfs-deps.sh "$nolib" "$empty"
+expect fail "rootfs-deps: a missing library is reported"     libfoo.so.1 ./test/check-rootfs-deps.py "$nolib" "$empty"
 allow=$work/allow-libfoo
 echo libfoo.so.1 > "$allow"
-expect pass "rootfs-deps: an allowlisted library is accepted" "" ./test/check-rootfs-deps.sh "$nolib" "$allow"
+expect pass "rootfs-deps: an allowlisted library is accepted" "" ./test/check-rootfs-deps.py "$nolib" "$allow"
 
 old=$(tree old old)
-expect fail "symbol-versions: a missing version is reported" FOO_2 ./test/check-symbol-versions.sh "$old"
-expect fail "symbol-resolution: a missing symbol is reported" foo_new ./test/check-symbol-resolution.sh "$old"
+expect fail "symbol-versions: a missing version is reported" FOO_2 ./test/check-symbol-versions.py "$old"
+expect fail "symbol-resolution: a missing symbol is reported" foo_new ./test/check-symbol-resolution.py "$old"
 
 # The loader matches NEEDED against file names, and a symlink is one: here libfoo.so.1
 # exists only as a link to a file whose name and SONAME are something else. This is the
-# libtinfo.so.6 -> libtinfow.so.6 arrangement that check-symbol-resolution.sh once got
+# libtinfo.so.6 -> libtinfow.so.6 arrangement that check-symbol-resolution.py once got
 # wrong, and both checks that resolve NEEDED have to accept it.
 alias=$(tree alias "")
 gcc -shared -fPIC -Wl,-soname,libfoo-real.so.1 -Wl,--version-script="$src/new.map" \
     "$src/new.c" -o "$alias/usr/lib/libfoo-real.so.1"
 ln -s libfoo-real.so.1 "$alias/usr/lib/libfoo.so.1"
 expect pass "rootfs-deps: a library found through a symlink name passes" \
-    "" ./test/check-rootfs-deps.sh "$alias" "$empty"
+    "" ./test/check-rootfs-deps.py "$alias" "$empty"
 expect pass "symbol-resolution: a library found through a symlink name passes" \
-    "" ./test/check-symbol-resolution.sh "$alias"
+    "" ./test/check-symbol-resolution.py "$alias"
 
 # And the same arrangement with the *old* library behind the link, which has to fail.
 # The pass above cannot tell a check that followed the link from one that gave up on
@@ -163,7 +163,7 @@ gcc -shared -fPIC -Wl,-soname,libfoo-real.so.1 -Wl,--version-script="$src/old.ma
     "$src/old.c" -o "$alias_old/usr/lib/libfoo-real.so.1"
 ln -s libfoo-real.so.1 "$alias_old/usr/lib/libfoo.so.1"
 expect fail "symbol-resolution: a missing symbol behind a symlink name is reported" \
-    foo_new ./test/check-symbol-resolution.sh "$alias_old"
+    foo_new ./test/check-symbol-resolution.py "$alias_old"
 
 # ---------------------------------------------------------------------------------
 # Kernel config

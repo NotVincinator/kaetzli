@@ -12,7 +12,7 @@ whole difference, the trim's side effects included:
             path components), with the shared libraries among them named
   added     paths only the container has (its /home/user, the /var the disk image
             empties for its tmpfs)
-  links     test/check-rootfs-deps.sh run on the container's own layer, unpacked from
+  links     test/check-rootfs-deps.py run on the container's own layer, unpacked from
             kaetzli-oci.tar: the evidence that no binary left behind needs a library the
             subtractions deleted. build-rootfs.sh's own consumer guards (glib and pcre2,
             libudev) fail the assembly before this; this covers everything else.
@@ -94,7 +94,7 @@ def unpack_layer(archive: Path, tree: Path) -> None:
 
 def check_deps(tree: Path) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [str(repo.ROOT / "test" / "check-rootfs-deps.sh"), str(tree)],
+        [str(repo.ROOT / "test" / "check-rootfs-deps.py"), str(tree)],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False,
         env=dict(os.environ, LC_ALL="C"),
     )  # fmt: skip
@@ -151,7 +151,7 @@ def trim(out_dir: Path, stdout: TextIO, full: bool = False) -> int:
         except FileNotFoundError as e:
             print(f"error: {e}", file=sys.stderr)
             return 1
-        say("", "links: test/check-rootfs-deps.sh on the container's layer")
+        say("", "links: test/check-rootfs-deps.py on the container's layer")
         p = check_deps(tree)
         lines = p.stdout.splitlines()
         if p.returncode == 0:

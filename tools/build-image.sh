@@ -9,7 +9,7 @@
 #     ./tools/build-image.sh --only strace   # build just these packages, then the images
 #     ./tools/build-image.sh --allow-unresolved   # assemble despite missing libraries (see below)
 #
-# Before assembling, test/check-rootfs-deps.sh must pass on rootfs/, as it must in CI's
+# Before assembling, test/check-rootfs-deps.py must pass on rootfs/, as it must in CI's
 # rootfs job: a binary needing a library the image does not ship starts nowhere, and an
 # image that boots far enough to show it is a slow way to find out. --allow-unresolved
 # turns that failure back into a warning, for a look at a half-built tree; never in CI.
@@ -107,7 +107,7 @@ if [ ! -e rootfs/usr/lib/libc.so.6 ]; then
 fi
 
 echo "==> checking the staging tree"
-if ! ./test/check-rootfs-deps.sh rootfs; then
+if ! ./test/check-rootfs-deps.py rootfs; then
     if [ "$allow_unresolved" = 1 ]; then
         echo "warning: unresolved libraries (see above); assembling anyway (--allow-unresolved)" >&2
     else
