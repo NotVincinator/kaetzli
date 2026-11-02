@@ -9,7 +9,7 @@ name: Package updates
 # is an input like any other — it decides what every binary is compiled by and what
 # mkfs.erofs and strip do to the shipped bytes — and a pin nobody updates is how a
 # reproducible build becomes an unbuildable one. It arrives here under the name
-# `debian-snapshot`, from tools/check-snapshot.sh rather than from tools/check-updates.py,
+# `debian-snapshot`, from tools/check-snapshot.py rather than from tools/check-updates.py,
 # and is bumped by tools/bump-snapshot.sh rather than tools/bump-version.sh. Everything
 # between those two ends — the branch, the duplicate-suppression, the pull request, the
 # dispatched CI run — is shared, which is the reason it is wired in here instead of
@@ -80,7 +80,7 @@ jobs:
             snapshot=false
           fi
           if $snapshot; then
-            ./tools/check-snapshot.sh --json > snapshot.json 2> snapshot.err || failed=1
+            ./tools/check-snapshot.py --json > snapshot.json 2> snapshot.err || failed=1
             [ -s snapshot.json ] || echo '[]' > snapshot.json
             # Its staleness warning is the one thing here worth an annotation rather than
             # a line in a log nobody opens: it fires when bumps have stopped landing, and

@@ -1,8 +1,8 @@
 # Host-side scripts: which language for which job
 
 **Status: proposal, partly implemented.** Implemented: items 1 to 5, the CVE reports,
-the SBOM, the size reports, the library checks and the policy checks, and from item 6 the
-update check (`python/`, see its README). CLAUDE.md (*Host-side code*)
+the SBOM, the size reports, the library checks and the policy checks, and item 6 but for
+`auto-merge.sh` (`python/`, see its README). CLAUDE.md (*Host-side code*)
 allows Python and Go for what runs on the host, in CI or in a builder container. This
 page reviews the scripts against that rule and orders the migration.
 
@@ -132,7 +132,7 @@ real `dpkg --compare-versions`, are the edge cases' golden.
 
 Dependencies: `license-expression`.
 
-### 6. Updates and GitHub automation: `tools/upstream.py`, `check-updates.py`, `release-notes.py` (done), `check-snapshot.sh`, `auto-merge.sh`, `dispatch-ci.sh`
+### 6. Updates and GitHub automation: `tools/upstream.py`, `check-updates.py`, `release-notes.py`, `check-snapshot.py` (done), `auto-merge.sh`
 
 `upstream.sh` scrapes HTML listings with regexes and sorts versions with knobs from
 `env.sh`. `auto-merge.sh` is a state machine that pushes to `main`: age, labels,
@@ -151,7 +151,11 @@ Run live over every package, side by side with the bash versions, `--json` was
 byte-identical, the text identical but for glib and glibc (the bash glob's locale), and
 `upstream.py` gave every package and vendor tarball the same answer, and a plain error
 for `kaetzlifetch`, whose local source crashed the bash version. Packages are checked
-eight at a time: four minutes became forty seconds.
+eight at a time: four minutes became forty seconds. `check-snapshot.py` (Docker Hub's
+dated sid tags against the pin) moved with them, and was identical live.
+
+`dispatch-ci.sh` was on this list and stays bash: it is `gh` and `git` in sequence (a
+check run, a dispatch, a wait), and its two `jq` expressions are one-liners.
 
 `bump-version.sh` and `bump-snapshot.sh` stay bash: they are `sed -i` on `env.sh` and a
 download.
@@ -194,6 +198,7 @@ Dependencies: `pexpect`, `pytest`.
 | `image/build-rootfs.sh` | mostly cp, tar, setcap, mkfs.erofs and veritysetup in order. 907 lines is too long; split the reports out (item 3, as the SBOM was) and leave the commands |
 | `tools/lib.sh` | the bash scripts that remain still need it; the Python module is its counterpart, not its replacement |
 | `tools/prep.sh`, `fetch-sources.sh`, `build-image.sh`, `build-extension.sh`, `publish-oci.sh`, `merge-staging.sh`, `clean.sh`, `image-tags.sh`, `build-node-e2e.sh` | podman, tar and file operations in sequence |
+| `tools/dispatch-ci.sh` | `gh` and `git` in sequence: a check run, a dispatch, a wait for the run |
 | `tools/check-patches.sh`, `sync-patches.sh`, `patch-cves.sh` | patch and git invocations; `sync-patches.sh` is the largest and could move later |
 | `tools/boot-qemu.sh`, `boot-firecracker.sh`, `boot-vz.sh`, `ssh.sh`, `demo.sh` | thin wrappers that exec a VMM or ssh; `boot-vz.sh` must run on macOS's bash 3.2 |
 | `test/check-tree-hygiene.sh` | runs inside the assembly image; a few `find` calls |
