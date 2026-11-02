@@ -16,14 +16,14 @@
 #   - The SONAME has to agree with the builder image's headers. curl is compiled against
 #     Debian sid's libssl-dev (3.6.x today), so its NEEDED says libcrypto.so.3 and
 #     libssl.so.3, and it is our library that answers at runtime. OpenSSL 4.x is
-#     libcrypto.so.4 — taking it before sid does would fail test/check-rootfs-deps.sh,
+#     libcrypto.so.4 — taking it before sid does would fail test/check-rootfs-deps.py,
 #     and taking it silently is what an unbounded version check would do.
 #   - 3.5 is supported to 2030; a non-LTS branch gets about a year. For the one library
 #     here whose bugs are remotely exploitable, that is worth staying on.
 #
 # Being *behind* sid is safe in a way being ahead of it is not: the version nodes a
 # binary asks for are the ones its library defined at link time, and curl uses nothing
-# newer than OPENSSL_3.0.0. test/check-symbol-versions.sh is what would say otherwise.
+# newer than OPENSSL_3.0.0. test/check-symbol-versions.py is what would say otherwise.
 VERSION="3.5.9"
 PACKAGE="openssl-${VERSION}"
 TARBALL="$PACKAGE.tar.gz"

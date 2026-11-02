@@ -4,7 +4,7 @@
 #
 # What that leaves out, and why it is safe:
 #   gobject, gio, gmodule, gthread  no consumer. A package that wants one later fails
-#                    test/check-rootfs-deps.sh loudly rather than quietly finding it.
+#                    test/check-rootfs-deps.py loudly rather than quietly finding it.
 #                    gobject is also the only thing that needs libffi, which is why
 #                    there is no libffi package: builder/deps.txt has libffi-dev for this
 #                    build alone, the way it has libgmp-dev for gcc's.

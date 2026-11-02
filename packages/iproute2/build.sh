@@ -1,6 +1,6 @@
 # iproute2 builds whatever libraries it finds: libmnl, libelf and libcap (ours), and
 # none of the rest. Except libselinux, which the builder has (libblkid-dev pulls it in)
-# and the image does not, and which is allowlisted for nscd, so check-rootfs-deps.sh
+# and the image does not, and which is allowlisted for nscd, so check-rootfs-deps.py
 # would pass an `ip` that cannot start. There is no --without-selinux, so it is hidden
 # from pkg-config, and the binary is checked at the end.
 cat > /tmp/pkg-config-no-selinux <<'EOF'

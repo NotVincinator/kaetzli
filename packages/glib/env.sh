@@ -3,7 +3,7 @@
 # Coupled to the builder's version the way packages/openssl is: consumers compile against
 # sid's libglib2.0-dev headers and resolve against this library by SONAME, and glib's
 # symbols are unversioned, so a header newer than the library is a missing symbol at
-# runtime that test/check-symbol-versions.sh cannot see — test/check-symbol-resolution.sh
+# runtime that test/check-symbol-versions.py cannot see — test/check-symbol-resolution.py
 # is the check that does. Keep this at or above sid's; tools/header-skew.sh shows both.
 #
 # The stable series is the even minor; odd minors are development snapshots, which

@@ -5,7 +5,7 @@
  * a few files systemd leaves in /run and /usr (resolved's servers, merged extensions).
  * Nothing is executed and nothing is asked over D-Bus. There is no
  * dependency beyond glibc, which is the point twice over: nothing has to be packaged to
- * make it build, and test/check-rootfs-deps.sh has nothing to report about the result.
+ * make it build, and test/check-rootfs-deps.py has nothing to report about the result.
  *
  * Two constraints from the image it ships in shape the output:
  *
