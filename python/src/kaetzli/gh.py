@@ -104,3 +104,49 @@ class Gh:
             ["gh", "run", "download", run_id, *self._repo_args(), "-n", name, "-D", str(dest)]
         )
         return p.returncode == 0
+
+    # Pull request comments, for a report that keeps one comment up to date rather than
+    # adding one per push: it finds its own by a marker the body starts with.
+
+    def _api_repo(self) -> str:
+        return self.repo or "{owner}/{repo}"  # gh api fills the placeholders in
+
+    def open_pr(self, branch: str) -> str | None:
+        """The number of the open pull request from the branch, or None."""
+        p = self._run(
+            [
+                "gh", "pr", "list", *self._repo_args(), "--head", branch, "--state", "open",
+                "--json", "number", "--jq", ".[0].number // empty",
+            ]
+        )  # fmt: skip
+        n = p.stdout.strip() if p.returncode == 0 else ""
+        return n or None
+
+    def comment_with(self, pr: str, prefix: str) -> str | None:
+        """The id of the pull request's first comment whose body starts with prefix."""
+        p = self._run(
+            [
+                "gh", "api", "--paginate", f"repos/{self._api_repo()}/issues/{pr}/comments",
+                "--jq", f".[] | select(.body | startswith({json.dumps(prefix)})) | .id",
+            ]
+        )  # fmt: skip
+        ids = p.stdout.split() if p.returncode == 0 else []
+        return ids[0] if ids else None
+
+    def edit_comment(self, comment_id: str, body: str) -> bool:
+        p = self._run(
+            [
+                "gh", "api", "-X", "PATCH",
+                f"repos/{self._api_repo()}/issues/comments/{comment_id}", "-f", f"body={body}",
+            ]
+        )  # fmt: skip
+        return p.returncode == 0
+
+    def add_comment(self, pr: str, body: str) -> bool:
+        p = self._run(
+            [
+                "gh", "api", "-X", "POST", f"repos/{self._api_repo()}/issues/{pr}/comments",
+                "-f", f"body={body}",
+            ]
+        )  # fmt: skip
+        return p.returncode == 0

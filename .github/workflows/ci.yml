@@ -326,8 +326,9 @@ jobs:
 
   rootfs:
     runs-on: *runner
-    # actions: read for size-history.py, which reads earlier runs' artifacts. Naming a
-    # block replaces the workflow default, so pull-requests: write (telemetry) is repeated.
+    # actions: read for size-history.py and image-diff.py, which read earlier runs'
+    # artifacts; pull-requests: write for telemetry and image-diff.py's comment. Naming a
+    # block replaces the workflow default.
     permissions:
       contents: read
       actions: read
@@ -469,6 +470,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./test/size-history.py ${{ matrix.arch }}
+
+      # What this build changes against main's newest green one: package versions from
+      # the SBOMs, paths from the manifests, size per flavour (test/image-diff.py). On a
+      # pull request it keeps one comment per arch current. Telemetry, never a failure.
+      - name: Image changes against main
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./test/image-diff.py --arch ${{ matrix.arch }} --comment
 
       - name: Upload rootfs.erofs
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

@@ -1,6 +1,6 @@
 # Ideas from other image builders
 
-**Status: proposal, partly implemented.** Implemented: sections 1–6; 7 as a report. This page collects features found
+**Status: proposal, partly implemented.** Implemented: sections 1–6 and 8; 7 as a report. This page collects features found
 in other immutable or minimal Linux image builders that fit this project's constraints
 (see `CLAUDE.md`), with enough detail to implement each one. Each section names where the
 idea came from, what the gap is today, how to close it, and how to verify the change.
@@ -388,6 +388,12 @@ come from.
 module (temporarily pin one to check, then revert).
 
 ## 8. A report of what changed in the image
+
+**Implemented** as `test/image-diff.py` (Python, per CLAUDE.md's *Host-side code*, rather
+than the `.sh` planned below), in the rootfs job. Paths are grouped by directory, not by
+package: the owners list is deleted in assembly, and a removed path has no owner on the
+new side. Version-only renames are folded into one line. Release notes (step 3) wait for
+the [release](release.md) proposal.
 
 **Inspiration:** Flatcar scripts, `ci-automation/image_changes.sh` (`image_changes`,
 `print_image_reports`) and `build_library/reports_util.sh` (`write_contents`,
