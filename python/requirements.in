@@ -10,6 +10,9 @@ pyelftools>=0.33
 # python-debian  dpkg's version order, for cve-context's Debian verdicts; no dependencies
 #                of its own
 python-debian>=1.1.1
+# license-expression  SPDX expression parsing, for check-licenses: AND, OR, WITH and which
+#                identifiers are exceptions; already in the lock through spdx-tools
+license-expression>=30.4.4
 # spdx-tools     the SPDX project's library, for check-sbom's validation against the SPDX
 #                2.3 model; brings rdflib, beartype, license-expression, click, pyyaml,
 #                xmltodict, ply, uritools, semantic-version (its other formats)

@@ -1,0 +1,5 @@
+  alpha        MIT
+  beta         (no LICENSE declared)
+  delta        (no LICENSE declared)
+  gamma        ISC
+

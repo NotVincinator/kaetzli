@@ -1,0 +1,4 @@
+alpha	MIT
+beta	GPL-2.0-only WITH Linux-syscall-note
+gamma	LGPL-2.1-or-later AND (GPL-2.0-or-later OR BSD-3-Clause)
+delta	ISC AND LicenseRef-PublicDomain

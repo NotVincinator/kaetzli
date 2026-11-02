@@ -16,7 +16,8 @@
 # of these are close calls.
 #
 # A `LICENSE=` in an env.sh is an SPDX *expression* — `AND`, `OR`, `WITH` and parentheses
-# are understood — because most of these packages are not under one license. `AND` means
+# are understood, and an exception is valid only after `WITH` — because most of these
+# packages are not under one license. `AND` means
 # the package ships components under each; `OR` means upstream offers a choice.
 #
 # One thing this check cannot do: it verifies that a declaration is *free*, not that it is

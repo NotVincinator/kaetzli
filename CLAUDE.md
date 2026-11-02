@@ -72,7 +72,7 @@ require breaking one, say so and offer an alternative that keeps it.
    what it wraps is missing — curl's `curl-config` describes headers the trim removes —
    but that is a judgement about the wrapper, not about the shebang.
 6. **Every package is DFSG-free, and says so.** `LICENSE=` in `env.sh`, as an SPDX
-   expression, checked by `test/check-licenses.sh` against `test/dfsg-licenses.txt` in its
+   expression, checked by `test/check-licenses.py` against `test/dfsg-licenses.txt` in its
    own workflow. Debian's guidelines are the bar because Debian has already argued every
    one of these to a conclusion. A license that only exists in `non-free` means the
    package does not belong here, however good it is.
@@ -145,8 +145,8 @@ Constraint 5 is about the image. What runs on the host, in CI or in a builder co
 is not bound to bash, and bash is not the default: it is hard to read and review, and much
 of `test/` and `tools/` is JSON, HTTP, joins and report tables written in jq, awk and
 `declare -A`. Choose per job. `docs/proposals/host-scripting.md` reviews every script
-against this and orders the migration; the CVE reports, the SBOM, the size reports
-and the library checks are done.
+against this and orders the migration; the CVE reports, the SBOM, the size reports,
+the library checks and the license check are done.
 
 - **Bash** where the job *is* a sequence of commands and their exit codes: anything
   sourced by a package build (`builder/build-package.sh`, `packages/*/build.sh`, `env.sh`,
@@ -220,7 +220,7 @@ and the library checks are done.
 ./test/kernel-caps.sh rootfs            # kernel config vs what a container needs
 ./test/kernel-parity.sh <amd64> <arm64>  # the two arches' kernel configs agree (configs or trees)
 ./test/kernel-config-diff.sh <old> <new> [src]  # what a kernel build turned on or off
-./test/check-licenses.sh                # every package declares a DFSG-free license
+./test/check-licenses.py                # every package declares a DFSG-free license
 ./test/selftest.sh                      # the static checks above fail on broken fixture trees, and pass on a good one
 ./tools/check-updates.sh [pkg...] # what upstream has released since the pinned VERSION, VENDOR_VERSION and patch series
 ./tools/check-patches.sh [--version V] [pkg...]  # packages/<pkg>/patches apply to the tarball (seconds; no build)

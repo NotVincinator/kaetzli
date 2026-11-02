@@ -1,0 +1,8 @@
+error: 3 package(s) declare a license that is not in test/dfsg-licenses.txt:
+       alpha beta delta
+
+       Either the identifier is misspelled, or this is a license nobody has
+       decided about yet. The second case is a real decision: the bar is the
+       Debian Free Software Guidelines, so a license Debian ships in main can
+       be added to test/dfsg-licenses.txt, and one that only exists in non-free means the
+       package does not belong in this image.

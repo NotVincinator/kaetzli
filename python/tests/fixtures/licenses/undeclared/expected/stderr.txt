@@ -1,0 +1,8 @@
+error: no LICENSE in packages/{beta delta}/env.sh
+       Add one, as an SPDX expression describing what the tarball ships:
+
+           LICENSE="GPL-3.0-or-later"
+           LICENSE="BSD-3-Clause OR GPL-2.0-only"      # upstream offers a choice
+           LICENSE="LGPL-2.1-or-later AND GPL-2.0-or-later"  # library and tools differ
+
+       Read it off the tarball's COPYING rather than assuming.

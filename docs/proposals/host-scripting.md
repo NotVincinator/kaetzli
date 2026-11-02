@@ -1,7 +1,8 @@
 # Host-side scripts: which language for which job
 
 **Status: proposal, partly implemented.** Implemented: items 1 to 4, the CVE reports,
-the SBOM, the size reports and the library checks (`python/`, see its README). CLAUDE.md (*Host-side code*)
+the SBOM, the size reports and the library checks, and the license check from item 5
+(`python/`, see its README). CLAUDE.md (*Host-side code*)
 allows Python and Go for what runs on the host, in CI or in a builder container. This
 page reviews the scripts against that rule and orders the migration.
 
@@ -105,10 +106,16 @@ CI runner, not in the assembly image.
 
 Dependencies: `pyelftools`.
 
-### 5. Policy checks: `check-licenses.sh`, `kernel-caps.sh`, `kernel-parity.sh`, `kernel-config-diff.sh`, `header-skew.sh`
+### 5. Policy checks: `check-licenses.py` (done), `kernel-caps.sh`, `kernel-parity.sh`, `kernel-config-diff.sh`, `header-skew.sh`
 
-`check-licenses.sh` splits SPDX expressions by hand; `license-expression` parses them,
-`WITH` exceptions included. The kernel scripts read `.config` files into awk tables, which
+`check-licenses.py` is `kaetzli.licenses`. The bash version split SPDX expressions on
+whitespace and parentheses, so `MIT ISC`, `MIT AND`, `(MIT` and `GPL-2.0-only WITH MIT`
+all passed; `license-expression` parses them, and SPDX's list says which identifiers are
+exceptions, so each of those is now NOT VALID. On the repository's own packages the
+output is identical, but for `glib` and `glibc`, which the bash glob ordered by the
+host's locale.
+
+The kernel scripts read `.config` files into awk tables, which
 a dict does better. `header-skew.sh` is a report built on two `declare -A`.
 
 Dependencies: `license-expression`.

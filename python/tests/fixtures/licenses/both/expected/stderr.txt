@@ -1,0 +1,16 @@
+error: no LICENSE in packages/{beta}/env.sh
+       Add one, as an SPDX expression describing what the tarball ships:
+
+           LICENSE="GPL-3.0-or-later"
+           LICENSE="BSD-3-Clause OR GPL-2.0-only"      # upstream offers a choice
+           LICENSE="LGPL-2.1-or-later AND GPL-2.0-or-later"  # library and tools differ
+
+       Read it off the tarball's COPYING rather than assuming.
+error: 1 package(s) declare a license that is not in test/dfsg-licenses.txt:
+       alpha
+
+       Either the identifier is misspelled, or this is a license nobody has
+       decided about yet. The second case is a real decision: the bar is the
+       Debian Free Software Guidelines, so a license Debian ships in main can
+       be added to test/dfsg-licenses.txt, and one that only exists in non-free means the
+       package does not belong in this image.

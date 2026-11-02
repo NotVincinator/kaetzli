@@ -1,0 +1,4 @@
+  alpha        SSPL-1.0                                             NOT ALLOWED: SSPL-1.0
+  beta         (no LICENSE declared)
+  gamma        BSD-3-Clause
+

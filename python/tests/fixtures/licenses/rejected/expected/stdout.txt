@@ -1,0 +1,5 @@
+  alpha        MIT AND Apache-2.0                                   NOT ALLOWED: Apache-2.0
+  beta         GPL-3.0-or-later OR (BSD-2-Clause AND MIT)           NOT ALLOWED: GPL-3.0-or-later BSD-2-Clause
+  delta        mit                                                  NOT ALLOWED: mit
+  gamma        ISC
+

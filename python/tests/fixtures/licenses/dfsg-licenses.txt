@@ -1,0 +1,10 @@
+# A cut-down test/dfsg-licenses.txt: comments, blank lines and notes are ignored.
+
+MIT
+BSD-3-Clause            # a note after an identifier
+GPL-2.0-only
+GPL-2.0-or-later
+LGPL-2.1-or-later
+   ISC   
+Linux-syscall-note      # an exception
+LicenseRef-PublicDomain

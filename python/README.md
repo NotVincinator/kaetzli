@@ -18,6 +18,9 @@ src/kaetzli/elf/      the library checks: deps (check-rootfs-deps), versions
                      and scan, what they read from a tree with pyelftools
 src/kaetzli/sbom_check.py
                      test/check-sbom.py: what the SBOM says
+src/kaetzli/licenses.py
+                     test/check-licenses.py: every package's LICENSE, against
+                     test/dfsg-licenses.txt
 tests/               pytest; fixtures/ holds real data cut down, and the bash versions'
                      output the Python had to reproduce
 ```
